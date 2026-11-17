@@ -30,6 +30,9 @@ namespace CriticalMass.Sim.Core
         internal static bool RouteGuardOn(World w) =>
             DepthRules.On(w, true) && Phys.On(w, w.Config.Physics.KaijuNavGuard) && Phys.On(w, w.Config.Physics.KaijuHillSiege);
 
+        /// <summary>World creation: allocate the per-world clearance build state now (no rebuild, no Sim state touched).</summary>
+        internal static void WarmClearanceBuild(World w) => ClearBuildFor(w);
+
         private static bool PassableType(byte t) => MapGrid.IsWalkableType(t) || t == Cell.Barricade || t == Cell.LowWall;
 
         private static void Fit(int n)
