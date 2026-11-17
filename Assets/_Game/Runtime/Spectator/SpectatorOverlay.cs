@@ -192,6 +192,7 @@ namespace CriticalMass.Runtime.Spectator
             bool paused = Mode != null && Mode.Input != null && Mode.Input.State.Paused;
             bool down = !w.Actors[LocalSeat.Actor].Alive;
             bool offer = !watching && down && w.Match.Phase == MatchPhase.Playing && !paused && !SimDriverBehaviour.CaptureMode &&
+                         !_driver.IsReplay &&   // b13 S0 (PR #190 routed patch): a replay never offers to spectate (it would take the camera)
                          GetComponent<TitleScreen>() == null && !(CriticalMass.Runtime.Flow.GameFlow.State == CriticalMass.Runtime.Flow.FlowState.Results);   // batch 5: never under the results
             if (!watching && !offer && _canvas == null) return;
             Build();

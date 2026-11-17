@@ -51,6 +51,7 @@ namespace CriticalMass.Runtime.Game
         {
             "-autoplay", "-quitaftermatch", "-autoplaymatches", "-autoplayqualities", "-perflog", "-shots", "-simhashout",
             "-capture", "-soak", "-tracestates", "-debughangseconds", "-automation", "-groundshots", "-followshots", "-smokeshots", "-flowshots", "-onlineshots", "-onlinerelayshots", "-shottick", "-matchvideo", "-simscout",
+            "-replayshots", "-replaylast",
         };
 
         /// <summary>True when this run must stay hidden: an automation flag is present and -showWindow is not (pure; tests).</summary>

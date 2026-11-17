@@ -234,11 +234,16 @@ namespace CriticalMass.Runtime.Menus
         void RefreshRewards()
         {
             if (_rewards == null) return;
-            MatchRewards r = MatchRewardTracker.Last;
+            // b13 S0 (PR #190 routed patch): a replay never earns rewards; MatchRewardTracker.Last may still hold the
+            // previous match's, so the panel stays hidden while the driver shows a replay.
+            FlowDirector fd = FlowDirector.Current;
+            bool replay = fd != null && fd.Driver != null && fd.Driver.IsReplay;
+            MatchRewards r = replay ? null : MatchRewardTracker.Last;
             bool has = r != null;
             if (has) _rewards.Show(r);
             else _rewards.gameObject.SetActive(false);
-            HudText.Set(_noRewards, has ? string.Empty : "This match paid nothing out: finish a match to earn coins and SP.");
+            HudText.Set(_noRewards, has ? string.Empty
+                : replay ? "A replay pays nothing out." : "This match paid nothing out: finish a match to earn coins and SP.");
         }
 
         // ---------------------------------------------------------------- achievements page
