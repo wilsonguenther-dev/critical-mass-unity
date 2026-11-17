@@ -226,7 +226,7 @@ namespace CriticalMass.Sim.Bots
 
             // Corruption flag: at most one kaiju-role bot.
             TeamId other = team == TeamId.Azure ? TeamId.Crimson : TeamId.Azure;
-            bool behind = !hatched && !m.BerserkLocked && m.Allegiance[other] - m.Allegiance[team] >= cfg.Bots.CorruptWhenBehindBy;
+            bool behind = !hatched && !m.BerserkLocked && !Corruption.On(world) && m.Allegiance[other] - m.Allegiance[team] >= cfg.Bots.CorruptWhenBehindBy; // CM b13 [C] routed patch: under the crystal rule a crystal gives no allegiance, so the old corruption run is off and BotCorrupt sends the trailing team's runners
             int keep = -1;
             if (behind)
             {
