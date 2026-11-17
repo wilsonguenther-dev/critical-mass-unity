@@ -149,6 +149,23 @@ namespace CriticalMass.Runtime.Codex
         }
 
         /// <summary>The words pack's relics (DG-04, words pack section 5), id, name, line 1, line 2.</summary>
+        // ---- b13-v: codex lines for the batch 13 mechanics (the codex page and the station panel tooltip read these)
+        public const string HutTitle = "THE BLACKSMITH HUT";
+        public static string HutLine => CriticalMass.Runtime.Progression.ProgressionWords.HutLine;
+        public const string CorruptionTitle = "DARK CRYSTALS";
+        public static string CorruptionLine => CriticalMass.Runtime.Progression.ProgressionWords.CorruptionLine;
+        public const string KaijuTypesTitle = "WHAT HATCHES";
+        public const string KaijuTypesLead = "Feeding mostly plants, meat, wood or water decides which one hatches.";
+        /// <summary>Type, fed power, one line; in KaijuType order after ELDER (Elder, Grove, Brute, Timber, Mire).</summary>
+        public static readonly string[][] KaijuTypeLines =
+        {
+            new[] { "ELDER", "", "Fed a little of everything, or nothing at all: the Kaiju the Basin has always known." },
+            new[] { "GROVE", "REGROWTH", "Fed mostly plants. Tougher and slower, and it heals when left alone." },
+            new[] { "BRUTE", "FRENZY", "Fed mostly meat. Hits harder and moves faster, and swings faster still when hurt." },
+            new[] { "TIMBER", "BARKSKIN", "Fed mostly wood. A wider slam, and TNT and mines hurt it less." },
+            new[] { "MIRE", "SHROUD", "Fed mostly water. Slams more often and calls a cloud that blinds its enemies." },
+        };
+
         public static readonly string[][] FallbackRelics =
         {
             new[] { "relic-01", "The First Banner", "Nobody remembers if it was Azure or Crimson.", "Both sides are certain." },

@@ -22,6 +22,84 @@ namespace CriticalMass.Runtime.Hud.Mechanics
     /// down, and the minimap and full map markers for ladders, bridges, your team's mines, drops and TNT, with legend rows.
     /// View only; never writes the sim. Added to the driver by MechanicsWorldViewInstaller.
     /// </summary>
+    /// <summary>
+    /// b13-v: the kit rows of the batch 13 jobs, read from the S0 getters (zeros and false until the rule items land, so with
+    /// the rules off the kit is exactly today's ClassKit): the Miner's F MINE with the ore he carries (0/3) and Space HAUL;
+    /// the Builder's F BUILD with the selected piece and tier (SHORT WALL / TALL WALL / BLOCK) and Space STAIRS / BRIDGE,
+    /// his switch key on the wood line; every class's DODGE chip. Pure helpers; nothing allocates per frame.
+    /// </summary>
+    public static class B13Kit
+    {
+        public const float DodgeW = 150f;
+        public const string Mine = "MINE", Haul = "HAUL", Build = "BUILD", Stairs = "STAIRS / BRIDGE";
+        public const string ShortWall = "SHORT WALL", TallWall = "TALL WALL", LongWall = "TALL WALL x5", Block = "BLOCK";
+        public static readonly string[] OreNotes = { "ORE 0/3", "ORE 1/3", "ORE 2/3", "ORE 3/3" };
+
+        public static bool Overrides(World w, ClassId c) => w != null && ((c == ClassId.Miner && Blacksmith.On(w)) || (c == ClassId.Builder && BuilderWalls.On(w)));
+        public static int RowCount(World w, ClassId c) => Overrides(w, c) ? 2 : ClassKit.RowCount(c);
+        public static string OreNote(int n) => OreNotes[Mathf.Clamp(n, 0, OreNotes.Length - 1)];
+
+        /// <summary>The two row names of a class with the batch 13 rule on (row 0 = F, row 1 = Space); null = today's rows.</summary>
+        public static string[] SlotNames(ClassId c) =>
+            c == ClassId.Miner ? new[] { Mine, Haul } : c == ClassId.Builder ? new[] { Build, Stairs } : null;
+
+        /// <summary>The Builder's piece word: BLOCK, SHORT WALL, TALL WALL (tier 1) or TALL WALL x5 (tier 2).</summary>
+        public static string PieceWord(BuildPiece p, bool tall, int tier) => p == BuildPiece.Block ? Block : !tall ? ShortWall : tier >= 2 ? LongWall : TallWall;
+
+        public static bool Read(World w, int id, int r, ref KitRow row, string[] numbers)
+        {
+            if (w == null || id < 0 || id >= w.ActorCount) return false;
+            Actor a = w.Actors[id];
+            if (!Overrides(w, a.Cls)) return ClassKit.Read(w, id, r, ref row, numbers);
+            ClassConfig cc = w.Config.Class(a.Cls);
+            row.Note = null;
+            row.Usable = a.Alive;
+            row.MaxCharges = 0;
+            row.Charges = 0;
+            if (r == 0)
+            {
+                row.Action = "DigPlace";
+                row.Cd01 = 0f;
+                row.CdSeconds = 0f;
+                if (a.Cls == ClassId.Miner)
+                {
+                    row.Name = Mine;
+                    row.Note = OreNote(a.Carry == CarryKind.Ore ? a.CarryAmount : 0);
+                }
+                else
+                {
+                    row.Name = Build;
+                    int tier = BuilderWalls.Tier(w, a.Team);
+                    bool tall = tier >= 1;   // the default selection is the tallest he has
+                    if (BuilderWalls.Ghost(w, id, out _, out _, out _, out _, out _, out bool gt, out bool ok)) { tall = gt; row.Usable = a.Alive && ok; }
+                    row.Note = PieceWord(BuilderWalls.Piece(w, id), tall, tier);
+                }
+                return true;
+            }
+            if (r != 1) return false;
+            row.Action = "Ability";
+            row.Name = a.Cls == ClassId.Miner ? Haul : Stairs;
+            row.Cd01 = cc.AbilityCooldown > 0 ? Mathf.Clamp01((float)(a.AbilityCd / cc.AbilityCooldown)) : 0f;
+            row.CdSeconds = (float)Math.Max(0, a.AbilityCd);
+            return true;
+        }
+
+        /// <summary>The Builder's wood line with his switch key (allocates; the HUD calls it only when a value changes).</summary>
+        public static string BankLine(string wood, string switchKey) => wood + "   SWITCH " + switchKey;
+
+        /// <summary>The dodge ring 0..1: full when ready, else how far it has recharged (maxSeen = the cooldown it started at).</summary>
+        public static float DodgeFill(int ticksLeft, int maxSeen) => ticksLeft <= 0 ? 1f : maxSeen <= 0 ? 0f : 1f - Mathf.Clamp01(ticksLeft / (float)maxSeen);
+
+        public static string DodgeLabel(string key) => "DODGE " + key;
+
+        /// <summary>The key words of an action from the current bindings, upper case, or the fallback (allocates; rebinds only).</summary>
+        public static string KeyOr(string action, string fallback)
+        {
+            string s = InputGlyphs.Words(action);
+            return string.IsNullOrEmpty(s) || s == "-" ? fallback : s.ToUpperInvariant();
+        }
+    }
+
     public sealed class MechanicsHud : MonoBehaviour
     {
         public const int SortingOrder = 13;
@@ -55,6 +133,16 @@ namespace CriticalMass.Runtime.Hud.Mechanics
         readonly string[] _rowKeyWord = new string[2];
         bool _glyphDirty = true;
         int _kitClass = -1;
+
+        // b13-v: the dodge chip in the kit's title row (every class, while the dodge rule is on) and the Builder's switch key
+        VectorShape _dodgePie;
+        Text _dodgeKey;
+        int _dodgeMax;
+        string _switchKey = "WHEEL";
+        int _bankWood = -1;
+        string _bankSwitch, _bankLine = string.Empty;
+        /// <summary>b13-v: the dodge chip shows (tests and captures).</summary>
+        public bool DodgeShown => _dodgeKey != null && _dodgeKey.gameObject.activeSelf;
 
         // stun, dodge, jump
         RectTransform _stun, _dodge, _jump;
@@ -158,7 +246,16 @@ namespace CriticalMass.Runtime.Hud.Mechanics
             HudZones.RegisterPanel(_kit);   // fix/hud-containment-4: name tags stay off the kit and the build bank box
             MenuUi.Place(_kit, KitX, HudZones.Kit.y, KitW, kitH);
             _kitPanel = MenuUi.Panel(_kit, "Panel", 0f, 0f, KitW, kitH);
-            _kitTitle = MenuUi.Fit(MenuUi.Label(_kit, "Title", CMTokens.Display, UiScale.TypeSmall, brass, TextAnchor.MiddleLeft, 18f, 8f, KitW - 36f, 28f, "", 2f), 13);
+            _kitTitle = MenuUi.Fit(MenuUi.Label(_kit, "Title", CMTokens.Display, UiScale.TypeSmall, brass, TextAnchor.MiddleLeft, 18f, 8f, KitW - 36f - B13Kit.DodgeW, 28f, "", 2f), 13);
+            // b13-v: DODGE with its cooldown ring, right end of the title row (two graphics on this canvas)
+            _dodgePie = MenuUi.Shape(_kit, "Dodge Ring", ShapeKind.Pie, KitW - B13Kit.DodgeW - 6f, 7f, 28f, 28f, brass, 14f);
+            _dodgePie.EmptyColor = CMTokens.MeterEmpty.Color;
+            _dodgePie.RoundPie = true;
+            _dodgePie.OutlinePx = 2f;
+            _dodgePie.RimPx = 0f;
+            _dodgeKey = MenuUi.Fit(MenuUi.Label(_kit, "Dodge Key", CMTokens.Ui, UiScale.TypeMin, cream, TextAnchor.MiddleLeft, KitW - B13Kit.DodgeW + 28f, 6f, B13Kit.DodgeW - 46f, 30f, "", 2f), 10);
+            _dodgePie.gameObject.SetActive(false);
+            _dodgeKey.gameObject.SetActive(false);
             for (int r = 0; r < 2; r++)
             {
                 float y = 42f + r * RowH;
@@ -283,10 +380,11 @@ namespace CriticalMass.Runtime.Hud.Mechanics
         void TickKit(World w, int me)
         {
             Actor a = w.Actors[me];
-            int rows = ClassKit.RowCount(a.Cls);
+            int rows = B13Kit.RowCount(w, a.Cls);   // b13-v: the Miner's MINE / HAUL and the Builder's BUILD / STAIRS rows
             bool teamBank = rows == 0 && BuilderBank.TeamHasBuilder(w, a.Team);
+            bool dodgeOn = CriticalMass.Sim.Core.Dodge.On(w);   // b13-v: every class has the dodge chip, so the kit shows for every class then
             // fix/hud-containment-3: an empty team bank is no box at all (it was a panel saying the bank is empty)
-            bool show = (rows > 0 || (teamBank && BuilderBank.Whole(w, a.Team) > 0)) && a.Alive;
+            bool show = (rows > 0 || (teamBank && BuilderBank.Whole(w, a.Team) > 0) || dodgeOn) && a.Alive;
             if (_kit.gameObject.activeSelf != show) _kit.gameObject.SetActive(show);
             if (!show) return;
             int cls = (int)a.Cls;
@@ -294,13 +392,13 @@ namespace CriticalMass.Runtime.Hud.Mechanics
             {
                 _kitClass = cls;
                 _glyphDirty = true;
-                HudText.Set(_kitTitle, rows > 0 ? HitRecapWords.ClassNames[Mathf.Clamp(cls, 0, HitRecapWords.ClassNames.Length - 1)] : "TEAM BUILD BANK");
+                HudText.Set(_kitTitle, rows > 0 || !teamBank ? HitRecapWords.ClassNames[Mathf.Clamp(cls, 0, HitRecapWords.ClassNames.Length - 1)] : "TEAM BUILD BANK");
                 _kitPanel.SetRim(CMTokens.Team(a.Team));
             }
             var row = new KitRow();
             for (int r = 0; r < 2; r++)
             {
-                bool on = r < rows && ClassKit.Read(w, me, r, ref row, Whole);
+                bool on = r < rows && B13Kit.Read(w, me, r, ref row, Whole);
                 SetRowActive(r, on);
                 if (!on) continue;
                 if (_rowAction[r] != row.Action) { _rowAction[r] = row.Action; _glyphDirty = true; }
@@ -331,9 +429,33 @@ namespace CriticalMass.Runtime.Hud.Mechanics
             if (bankOn)
             {
                 int b = BuilderBank.Whole(w, a.Team);
-                HudText.Set(_bank, BankLine[Mathf.Clamp(b, 0, BankLine.Length - 1)]);
+                if (a.Cls == ClassId.Builder && B13Kit.Overrides(w, a.Cls))
+                {
+                    // b13-v: "TEAM WOOD 4   SWITCH WHEEL", rebuilt only when the wood or the switch key changes
+                    if (b != _bankWood || !ReferenceEquals(_bankSwitch, _switchKey))
+                    {
+                        _bankWood = b;
+                        _bankSwitch = _switchKey;
+                        _bankLine = B13Kit.BankLine(WoodNote(b), _switchKey);
+                    }
+                    HudText.Set(_bank, _bankLine);
+                }
+                else HudText.Set(_bank, BankLine[Mathf.Clamp(b, 0, BankLine.Length - 1)]);
             }
+            TickDodge(w, me, dodgeOn);
             if (_glyphDirty) RefreshGlyphs();
+        }
+
+        /// <summary>b13-v: the dodge chip: ring full = ready, filling while it recharges (Dodge.CooldownTicks).</summary>
+        void TickDodge(World w, int me, bool on)
+        {
+            if (_dodgeKey.gameObject.activeSelf != on) { _dodgeKey.gameObject.SetActive(on); _dodgePie.gameObject.SetActive(on); }
+            if (!on) return;
+            int left = CriticalMass.Sim.Core.Dodge.CooldownTicks(w, me);
+            if (left <= 0) _dodgeMax = 0;
+            else if (left > _dodgeMax) _dodgeMax = left;
+            _dodgePie.Fill01 = B13Kit.DodgeFill(left, _dodgeMax);
+            _dodgePie.SetFill(left <= 0 ? CMTokens.ToolBrass.Color : CMTokens.Stone.Color);
         }
 
         readonly VectorShape[] _rowKeyChip = new VectorShape[2];
@@ -405,6 +527,9 @@ namespace CriticalMass.Runtime.Hud.Mechanics
                 RectTransform kc = _rowKeyChip[r].rectTransform;
                 if (Mathf.Abs(kc.sizeDelta.x - cw) > 0.5f) MenuUi.Place(kc, KitW - 24f - cw, 42f + r * RowH + 9f, cw, 30f);
             }
+            // b13-v: the dodge and switch keys from the current bindings (J's defaults while no Dodge binding exists)
+            HudText.Set(_dodgeKey, B13Kit.DodgeLabel(B13Kit.KeyOr("Dodge", ControlBindings.ActiveDevice == ControlDevice.Gamepad ? "B" : "SHIFT")));
+            _switchKey = B13Kit.KeyOr("SwitchDigPlace", ControlBindings.ActiveDevice == ControlDevice.Gamepad ? "LB / RB" : "WHEEL");
             string jump = InputGlyphs.Words("Jump");
             HudText.Set(_jumpText, "JUMP IT  " + (string.IsNullOrEmpty(jump) ? "SPACE" : jump.ToUpperInvariant()));
         }
