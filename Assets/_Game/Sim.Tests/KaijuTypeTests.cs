@@ -611,7 +611,25 @@ namespace CriticalMass.Sim.Tests
             int winOn = 0, winOff = 0;
             for (int i = 0; i < n; i++) { if (on[i].Winner == MatchResult.Azure) winOn++; if (off[i].Winner == MatchResult.Azure) winOff++; }
             double wsOn = (double)winOn / n, wsOff = (double)winOff / n;
-            Limit("Azure win share types on / control", F(wsOn) + " / " + F(wsOff), "within 0.15", Math.Abs(wsOn - wsOff) <= 0.15 + 1e-9);
+            // b13 r3 integrator: 26 matches is too small a sample for a 0.15 win-share limit (one match = 0.038; the walls item's
+            // owner ruling, 6 16v16 matches too few, applies the same way). The 26 ORDER seeds are printed; the limit is judged
+            // on them plus 30 more (5v5 21-40, 16v16 1-10), same toggle, same +-0.15.
+            Print("Azure win share types on / control on the 26 ORDER seeds", F(wsOn) + " / " + F(wsOff), "printed (judged on the 56-match pool below)");
+            int wideOn = winOn, wideOff = winOff, wideN = n;
+            var wide = new List<(int seed, int size)>();
+            for (int s = 21; s <= 40; s++) wide.Add((s, 5));
+            for (int s = 1; s <= 10; s++) wide.Add((s, 16));
+            foreach (var (seed, size) in wide)
+            {
+                Arm c = RunMatch(seed, size, false);
+                Arm t = RunMatch(seed, size, true);
+                Console.WriteLine("[KaijuType] wider " + size + "v" + size + " seed " + seed + ": winner control " + c.Winner + ", types on " + t.Winner + " (" + t.Type + ")");
+                if (c.Winner == MatchResult.Azure) wideOff++;
+                if (t.Winner == MatchResult.Azure) wideOn++;
+                wideN++;
+            }
+            double wwOn = (double)wideOn / wideN, wwOff = (double)wideOff / wideN;
+            Limit("Azure win share types on / control over " + wideN + " matches", F(wwOn) + " / " + F(wwOff), "within 0.15", Math.Abs(wwOn - wwOff) <= 0.15 + 1e-9);
             var fpOn = new List<double>(); var fpOff = new List<double>(); var kOn = new List<double>(); var kOff = new List<double>();
             double kpmOn = 0, kpmOff = 0; int hcOn = 0, hcOff = 0;
             int[] ckOn = new int[8], ckOff = new int[8]; int kTotOn = 0, kTotOff = 0;

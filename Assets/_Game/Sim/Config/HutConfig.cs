@@ -76,10 +76,10 @@ namespace CriticalMass.Sim.Config
         public double BotHillShiftSeconds = 15;
         /// <summary>
         /// b13 r3 integrator (snowball guard, "higher-level team at 6:00 wins at most 75%"): the shift when his team's hut is
-        /// AHEAD of the enemy's (longer: the leader's Miner mines less) and when it is BEHIND (0 s: the trailing Miner keeps
+        /// AHEAD of the enemy's (longer, and no per-team cap: the leader's Miners mine less) and when it is BEHIND (0 s: the trailing Miner keeps
         /// mining to catch up). Level teams use BotHillShiftSeconds.
         /// </summary>
-        public double BotHillShiftAheadSeconds = 30;
+        public double BotHillShiftAheadSeconds = 45;
         public double BotHillShiftBehindSeconds = 0;
         /// <summary>At most this many of a team's Miners are on a hill shift at once (the others keep mining).</summary>
         public int BotHillShiftMaxPerTeam = 1;

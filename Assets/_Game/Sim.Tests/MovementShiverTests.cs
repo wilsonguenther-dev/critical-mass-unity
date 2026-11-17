@@ -586,6 +586,28 @@ namespace CriticalMass.Sim.Tests
                               mOn.ToString("F3") + " (limit 0.20), on hill " + mOnS.ToString("F1") + " s (limit 20 s), worst idle " + worst.ToString("F1") + " s (limit 5 s)");
             Assert.GreaterOrEqual(used, 4, "at least four seeds give an owned Kaiju a minute");
             Assert.GreaterOrEqual(mNear, 0.55, "six-seed mean on-or-near share");
+        }
+
+        /// <summary>
+        /// b13 r3 integrator: the rest of the original per-seed floors (on the disc at least 20% and more than 20 s, never idle
+        /// off the hill over 5 s), judged on the same six seeds' mean (idle: the worst seed). Kept apart from the adopted near-share
+        /// limit so a red here names what is short.
+        /// </summary>
+        [Test, Category("Slow")]
+        public void KaijuHillSixSeedMeanOnTheDiscAndNeverIdle()
+        {
+            int[] seeds = { 1337, 4242, 7, 99, 2024, 31337 };
+            double on = 0, onS = 0, worst = 0; int used = 0; int worstSeed = 0;
+            foreach (int seed in seeds)
+            {
+                KaijuHillRun r = MeasureKaijuHill(seed);
+                if (!(r.Owned > 60.0)) continue;
+                used++; on += r.OnShare; onS += r.OnHill;
+                if (r.WorstStill > worst) { worst = r.WorstStill; worstSeed = seed; }
+            }
+            double mOn = used > 0 ? on / used : 0, mOnS = used > 0 ? onS / used : 0;
+            Console.WriteLine("[KaijuHill] six-seed mean over " + used + " seeds: on share " + mOn.ToString("F3") + " (limit 0.20), on hill " + mOnS.ToString("F1") +
+                              " s (limit 20 s), worst idle off the hill " + worst.ToString("F1") + " s on seed " + worstSeed + " (limit 5 s)");
             Assert.GreaterOrEqual(mOn, 0.20, "six-seed mean on-hill share");
             Assert.Greater(mOnS, 20.0, "six-seed mean time on the hill");
             Assert.LessOrEqual(worst, 5.0, "never idle off the hill with no target over 5 s");
