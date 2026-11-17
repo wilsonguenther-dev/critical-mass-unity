@@ -42,8 +42,8 @@ namespace CriticalMass.Runtime.Input
     public sealed class HumanInputSource : MonoBehaviour
     {
         /// <summary>Action names in the Player map bound to game buttons, parallel to Buttons.</summary>
-        private static readonly string[] ButtonActions = { "Jump", "Attack", "Ability", "Interact", "DigPlace", "Pause", "Scoreboard" };
-        private static readonly B[] Buttons = { B.Jump, B.Attack, B.Ability, B.Interact, B.DigPlace, B.Pause, B.Scoreboard };
+        private static readonly string[] ButtonActions = { "Jump", "Attack", "Ability", "Interact", "DigPlace", "Pause", "Scoreboard", "Dodge" };
+        private static readonly B[] Buttons = { B.Jump, B.Attack, B.Ability, B.Interact, B.DigPlace, B.Pause, B.Scoreboard, B.Dodge };
 
         /// <summary>The human's input between two sim steps; SimDriverBehaviour calls State.Fill once per tick.</summary>
         public HumanInputState State { get; } = new HumanInputState();
@@ -81,6 +81,7 @@ namespace CriticalMass.Runtime.Input
         private void OnEnable()
         {
             var map = InputSystem.actions.FindActionMap("Player", true);
+            EnsureDodgeAction(map); // CM b13 J: until Settings/Controls.inputactions carries the Dodge action
             map.Enable();
             _map = map;
             _move = map["Move"];
@@ -129,6 +130,30 @@ namespace CriticalMass.Runtime.Input
                 a.started += _started[i];
                 a.canceled += _canceled[i];
             }
+        }
+
+        /// <summary>CM b13 J: the Dodge default keys (checked against every binding: Left Shift is taken by walk-to-pointer
+        /// and the Arrows layout's lock facing, and every controller button is taken, so the keys are Left Ctrl (mouse and
+        /// WASD hands) and Right Ctrl (Arrows hand), and the controller's east face button moves from the ability's second
+        /// binding to Dodge; the ability keeps the left trigger).</summary>
+        public static readonly string[] DodgeDefaults = { "<Keyboard>/leftCtrl", "<Keyboard>/rightCtrl", "<Gamepad>/buttonEast" };
+
+        /// <summary>CM b13 J: adds the Dodge action with DodgeDefaults when the actions asset lacks it (in memory only) and
+        /// moves the east face button off the ability. A no-op once the asset carries Dodge (the routed asset patch).</summary>
+        public static void EnsureDodgeAction(InputActionMap map)
+        {
+            if (map == null || map.FindAction("Dodge", false) != null) return;
+            bool was = map.enabled;
+            if (was) map.Disable();
+            InputAction d = map.AddAction("Dodge", InputActionType.Button);
+            d.AddBinding(DodgeDefaults[0], groups: "KeyboardMouse");
+            d.AddBinding(DodgeDefaults[1], groups: "KeyboardMouse");
+            d.AddBinding(DodgeDefaults[2], groups: "Gamepad");
+            InputAction ability = map.FindAction("Ability", false);
+            if (ability != null)
+                for (int i = ability.bindings.Count - 1; i >= 0; i--)
+                    if (ability.bindings[i].path == DodgeDefaults[2]) ability.ChangeBinding(i).Erase();
+            if (was) map.Enable();
         }
 
         private void ReadSettings()
