@@ -5,17 +5,19 @@
 # (AudioRenderer takes the mix). Actor 0 is the Azure Warrior on autopilot; the camera is the default gameplay camera.
 #   tools/match-video.sh --app PATH.app [--seed N | --scout A-B] [--out DIR] [--final-dir DIR] [--fps 30]
 #                        [--quality High] [--results-seconds 10] [--timeout S] [--keep-frames] [--scout-only] [--camera default|saved]
+# --encode-only: re-encode OUT/capture (kept with --keep-frames) without recording again.
 # --camera default (the default): the game's own default camera (top-down, default heading) for the film, whatever this
 #   Mac's saved settings say (the cm.camera.* keys are removed for the run, then every saved setting is restored); saved: as saved.
 # --scout A-B: sim-only matches on seeds A..B first (-batchmode -nographics -simScout, seconds each, no window) and
 #   records the best one: the Kaiju hatched, both teams hold the hill, the closest final score (ties: more knock-outs).
+# Audio: the engine's float mix can pass full scale (peaks near +6 dB after the hatch): -3 dB and a -2 dBFS limiter.
 # Output: FINAL_DIR/CriticalMass-match-<version>-1080p.mp4 (H.264 CRF 19 capped at 14 Mb/s + AAC 192k) and -720p-text.mp4 (two-pass,
 #   sized under 95 MB); OUT keeps Player.log, video.json, scout.txt (frames are deleted unless --keep-frames).
 # The recording runs inside ~/bin/cm-heavy's Unity slot. Exit: 0 ok, 1 failed, 66 no app, 64 usage, 124 timeout.
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 APP=""; SEED=""; SCOUT=""; OUT=""; FINAL="$HOME/Movies/CriticalMass"; FPS=30; QUALITY=High; RESULTS=10; TIMEOUT=1500
-KEEP=0; SCOUT_ONLY=0; VFLIP=0; CAMERA=default
+KEEP=0; SCOUT_ONLY=0; VFLIP=0; CAMERA=default; ENCODE_ONLY=0
 usage() { sed -n '6,7p' "${BASH_SOURCE[0]}" | sed 's/^# *//' >&2; exit 64; }
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -23,7 +25,7 @@ while [[ $# -gt 0 ]]; do
     --out) OUT="${2:?}"; shift 2 ;; --final-dir) FINAL="${2:?}"; shift 2 ;; --fps) FPS="${2:?}"; shift 2 ;;
     --quality) QUALITY="${2:?}"; shift 2 ;; --results-seconds) RESULTS="${2:?}"; shift 2 ;;
     --timeout) TIMEOUT="${2:?}"; shift 2 ;; --keep-frames) KEEP=1; shift ;; --scout-only) SCOUT_ONLY=1; shift ;;
-    --vflip) VFLIP=1; shift ;; --camera) CAMERA="${2:?}"; shift 2 ;;
+    --vflip) VFLIP=1; shift ;; --camera) CAMERA="${2:?}"; shift 2 ;; --encode-only) ENCODE_ONLY=1; shift ;;
     -h|--help) usage ;; *) echo "match-video: unknown flag $1" >&2; usage ;;
   esac
 done
@@ -64,6 +66,8 @@ fi
 [[ -n "$SEED" ]] || { echo "match-video: give --seed N or --scout A-B" >&2; exit 64; }
 
 # 2. The recording: hidden automation run inside the machine's Unity slot.
+CAP="$OUT/capture"
+if (( ! ENCODE_ONLY )); then
 if [[ -z "${CM_HEAVY_HELD:-}" && -x "$HOME/bin/cm-heavy" ]]; then
   set +e
   CM_HEAVY_TIMEOUT=$((TIMEOUT + 120)) CM_HEAVY_HELD=1 "$HOME/bin/cm-heavy" unity env CM_HEAVY_HELD=1 bash "${BASH_SOURCE[0]}" \
@@ -76,7 +80,7 @@ if [[ -z "${CM_HEAVY_HELD:-}" && -x "$HOME/bin/cm-heavy" ]]; then
   exit "$rc"
 fi
 
-CAP="$OUT/capture"; rm -rf "$CAP"; mkdir -p "$OUT/data"
+rm -rf "$CAP"; mkdir -p "$OUT/data"
 LOG="$OUT/Player.log"; rm -f "$LOG"
 DOMAIN="${CM_PREFS_DOMAIN:-com.drivia.criticalmass}"; HAD_PREFS=0
 if defaults export "$DOMAIN" "$OUT/prefs-before.plist" 2>/dev/null; then HAD_PREFS=1; fi
@@ -99,6 +103,7 @@ while kill -0 "$pid" 2>/dev/null; do
 done
 grep -q '\[CM.MatchVideo\] DONE' "$LOG" || { echo "match-video: the recording did not finish (see $LOG)" >&2; exit 1; }
 cp "$CAP/video.json" "$OUT/video.json"
+fi
 read -r RATE CH < <(python3 -I -c 'import json,sys; j=json.load(open(sys.argv[1])); print(j["audio_rate"], j["audio_channels"])' "$OUT/video.json")
 
 # 3. Encode: 1080p master, then a two-pass 720p copy that fits a text message.
@@ -106,7 +111,7 @@ NAME="CriticalMass-match-$VERSION"; M1080="$FINAL/$NAME-1080p.mp4"; M720="$FINAL
 VF="format=yuv420p"; (( VFLIP )) && VF="vflip,$VF"
 ffmpeg -hide_banner -loglevel error -y -framerate "$FPS" -i "$CAP/frames/f%06d.jpg" -f f32le -ar "$RATE" -ac "$CH" -i "$CAP/audio.f32" \
   -map 0:v -map 1:a -vf "$VF" -c:v libx264 -preset slow -crf 19 -maxrate 14M -bufsize 28M -profile:v high -r "$FPS" \
-  -c:a aac -b:a 192k -ac 2 -shortest -movflags +faststart "$M1080"
+  -af "volume=-3dB,alimiter=limit=0.794:attack=5:release=80:level=disabled" -c:a aac -b:a 192k -ac 2 -shortest -movflags +faststart "$M1080"
 DUR="$(ffprobe -v error -show_entries format=duration -of csv=p=0 "$M1080")"
 VBR="$(python3 -I -c 'import sys; d=float(sys.argv[1]); print(int((86*8*1000*1000/d - 128000)/1000))' "$DUR")"
 PASS="$OUT/x264-pass"
