@@ -128,7 +128,8 @@ namespace CriticalMass.Sim.Core
             bool ok = false;
             try
             {
-                ok = PadsReachHill(map);
+                // b14-c item 2: and the Kaiju's body still reaches the hill (Kaiju.RouteGuard.cs; Full only; tentative cells written)
+                ok = PadsReachHill(map) && Kaiju.TentativeKeepsKaijuRoute(w, idx, next, OldTypes, n);
                 if (ok)
                 {
                     FlowField f = FlowField.ComputeFlowField(map, ShrineRing(w), ScratchField(map));

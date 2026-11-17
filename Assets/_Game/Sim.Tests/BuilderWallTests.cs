@@ -6,6 +6,7 @@ using CriticalMass.Sim.Bots;
 using CriticalMass.Sim.Config;
 using CriticalMass.Sim.Core;
 using CriticalMass.Sim.Grid;
+using CriticalMass.Sim.Tests.Harness;
 using NUnit.Framework;
 
 namespace CriticalMass.Sim.Tests
@@ -542,6 +543,7 @@ namespace CriticalMass.Sim.Tests
             public int WallsAll;
             // b13 r3 tilt diagnostics (index = team; [t * 2 + u] = team t's actors near team u's walls)
             public int Matches16, AzureWins16, Matches5, AzureWins5;
+            public readonly WinShare.Tally T16 = new WinShare.Tally(), T5 = new WinShare.Tally();
             public readonly int[] WallsTeam = new int[2];
             public readonly int[] ByRule = new int[8];
             public readonly double[] OwnDelta = new double[2], EnemyDelta = new double[2], ToEnemy = new double[2], HillDist = new double[2];
@@ -683,6 +685,7 @@ namespace CriticalMass.Sim.Tests
             arm.Minutes += w.Match.Time / 60.0;
             if (w.Match.Winner == MatchResult.Azure || w.Match.Winner == MatchResult.Crimson) arm.Decided++;
             if (w.Match.Winner == MatchResult.Azure) arm.AzureWins++;
+            (teamSize == 16 ? arm.T16 : arm.T5).Add(w.Match.Winner);
             if (teamSize == 16) { arm.Matches16++; if (w.Match.Winner == MatchResult.Azure) arm.AzureWins16++; }
             else { arm.Matches5++; if (w.Match.Winner == MatchResult.Azure) arm.AzureWins5++; }
             arm.HillSec[0] += w.Match.HillSeconds.Azure;
@@ -734,7 +737,7 @@ namespace CriticalMass.Sim.Tests
             var arms = new[] { new Arm(), new Arm() };   // 0 = rule on, 1 = control (Build.On false)
             // b13 r3 integrator, OWNER DECISION: 6 16v16 matches is too small a sample (one flip = 0.167 of share against a 0.15
             // limit), so walls are judged on 24 16v16 seeds (the ORDER's six first) with the same +-0.15 limit.
-            int[] big = { 1337, 4242, 7, 99, 2024, 31337, 1, 2, 3, 4, 5, 6, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19 };
+            int[] big = WinShare.Seeds16;   // b14-c item 5: the one helper's 24 seeds (the same list)
             for (int a = 0; a < 2; a++)
             {
                 for (int seed = 1; seed <= 20; seed++) Play(seed, 5, a == 0, arms[a]);
@@ -742,12 +745,12 @@ namespace CriticalMass.Sim.Tests
             }
             var lines = new List<(string line, bool pass)>();
             Arm on = arms[0], off = arms[1];
-            double winOn = (double)on.AzureWins / on.Matches, winOff = (double)off.AzureWins / off.Matches;
-            lines.Add(($"team win share (Azure), all: on {winOn:F3} control {winOff:F3} (limit within 0.15)", Math.Abs(winOn - winOff) <= 0.15));
-            double w16On = (double)on.AzureWins16 / Math.Max(1, on.Matches16), w16Off = (double)off.AzureWins16 / Math.Max(1, off.Matches16);
-            double w5On = (double)on.AzureWins5 / Math.Max(1, on.Matches5), w5Off = (double)off.AzureWins5 / Math.Max(1, off.Matches5);
-            lines.Add(($"team win share (Azure), 16v16 ({on.Matches16} matches): on {w16On:F3} control {w16Off:F3} (limit within 0.15)", Math.Abs(w16On - w16Off) <= 0.15 + 1e-9));
-            lines.Add(($"team win share (Azure), 5v5 ({on.Matches5} matches): on {w5On:F3} control {w5Off:F3} (limit within 0.15)", Math.Abs(w5On - w5Off) <= 0.15 + 1e-9));
+            // b14-c item 5: the win shares are judged by the one helper (WinShare: both teams' shares, both arms printed)
+            var allOn = new WinShare.Tally(); allOn.Add(on.T16); allOn.Add(on.T5);
+            var allOff = new WinShare.Tally(); allOff.Add(off.T16); allOff.Add(off.T5);
+            lines.Add(("team win share, all (see the [win share] line)", WinShare.Judge("b13-b walls", "all " + allOn.Matches + " matches", allOn, allOff, false)));
+            lines.Add(("team win share, 16v16 (see the [win share] line)", WinShare.Judge("b13-b walls", "16v16 (" + on.T16.Matches + " seeds)", on.T16, off.T16, true)));
+            lines.Add(("team win share, 5v5 (see the [win share] line)", WinShare.Judge("b13-b walls", "5v5 (" + on.T5.Matches + " seeds)", on.T5, off.T5, false)));
             double koOn = Median(on.FirstKo), koOff = Median(off.FirstKo);
             lines.Add(($"median first knock-out: on {koOn:F1} s control {koOff:F1} s (limit -10% / +20%)", koOn >= koOff * 0.9 && koOn <= koOff * 1.2));
             double kpmOn = on.Kills / on.Minutes, kpmOff = off.Kills / off.Minutes;

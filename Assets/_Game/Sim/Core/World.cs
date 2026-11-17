@@ -870,6 +870,8 @@ namespace CriticalMass.Sim.Core
             world.KaijuKind.Init(world);   // b13-hook
             world.Corrupt.Init(world);   // b13-hook
             InitWorld(world, opts);
+            // b14-c: the Kaiju clearance build state exists from the start, so the route guard's first pre-hatch refresh allocates nothing.
+            Kaiju.WarmClearanceBuild(world);
             return world;
         }
 

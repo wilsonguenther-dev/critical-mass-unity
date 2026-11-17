@@ -206,7 +206,8 @@ namespace CriticalMass.Sim.Tests
             public readonly int[] ClassKills = new int[6];
             public readonly List<double> FirstKo = new List<double>();
             public readonly List<int> EndLevel16 = new List<int>();
-            public int L5Seeds16, DiffAt6, HigherWonAt6;
+            public int L5Seeds16, DiffAt6, HigherWonAt6, Matches16;
+            public readonly WinShare.Tally T16 = new WinShare.Tally(), T5 = new WinShare.Tally();
         }
 
         static void Play(Arm arm, int seed, int teamSize, bool hutOn)
@@ -261,6 +262,7 @@ namespace CriticalMass.Sim.Tests
             if (win == MatchResult.Azure) arm.AzureWins++;
             else if (win == MatchResult.Crimson) arm.CrimsonWins++;
             else arm.Draws++;
+            (teamSize == 16 ? arm.T16 : arm.T5).Add(win);
             if (!double.IsNaN(firstKo)) arm.FirstKo.Add(firstKo);
             for (int i = 0; i < w.ActorCount; i++)
             {
@@ -270,6 +272,7 @@ namespace CriticalMass.Sim.Tests
             }
             if (teamSize == 16)
             {
+                arm.Matches16++;
                 arm.EndLevel16.Add(lv[3, 0]);
                 arm.EndLevel16.Add(lv[3, 1]);
                 if (lv[3, 0] >= 5 || lv[3, 1] >= 5) arm.L5Seeds16++;
@@ -297,7 +300,7 @@ namespace CriticalMass.Sim.Tests
         {
             var arm = new Arm { Name = name };
             for (int seed = 1; seed <= 20; seed++) Play(arm, seed, 5, hutOn);
-            foreach (int seed in new[] { 1337, 4242, 7, 99, 2024, 31337 }) Play(arm, seed, 16, hutOn);
+            foreach (int seed in WinShare.OrderSeeds16) Play(arm, seed, 16, hutOn);
             double share = arm.Matches > 0 ? (double)arm.AzureWins / arm.Matches : 0;
             string cls = "";
             for (int c = 0; c < 6; c++) cls += (ClassId)c + " " + (arm.Kills > 0 ? (double)arm.ClassKills[c] / arm.Kills : 0).ToString("0.000") + " ";
@@ -324,16 +327,19 @@ namespace CriticalMass.Sim.Tests
                 if (!ok) fails++;
             }
             double sOn = (double)on.AzureWins / on.Matches, sOff = (double)off.AzureWins / off.Matches;
-            // b13 r3 integrator: 26 matches is too small a sample for a 0.15 win-share limit (one match = 0.038; after the dodge
-            // merge this flipped 0.346 vs 0.500 with hut-unrelated changes; the walls owner ruling applies the same way). The
-            // 26 ORDER seeds are printed; the limit is judged on them plus 30 more (5v5 21-40, 16v16 1-10), same toggle.
-            Console.WriteLine("[b13 H] azure win share on the 26 ORDER seeds: on " + sOn.ToString("0.000") + ", control " + sOff.ToString("0.000") + " (printed; judged on the 56-match pool)");
+            // b14-c item 5 (approved): the win share is judged by the one helper (WinShare) on the 16v16 pool of 24 seeds (the
+            // six ORDER seeds plus WinShare.ExtraSeeds16) and on the whole pool (plus 5v5 21-40); the 26 ORDER seeds print.
+            Console.WriteLine("[b13 H] azure win share on the 26 ORDER seeds: on " + sOn.ToString("0.000") + ", control " + sOff.ToString("0.000") + " (printed; judged on the pools below)");
             var wOn = new Arm { Name = "hut on, wider" };
             var wOff = new Arm { Name = "control, wider" };
             for (int seed = 21; seed <= 40; seed++) { Play(wOff, seed, 5, false); Play(wOn, seed, 5, true); }
-            for (int seed = 1; seed <= 10; seed++) { Play(wOff, seed, 16, false); Play(wOn, seed, 16, true); }
-            double pOn = (double)(on.AzureWins + wOn.AzureWins) / (on.Matches + wOn.Matches), pOff = (double)(off.AzureWins + wOff.AzureWins) / (off.Matches + wOff.Matches);
-            Check("azure win share over " + (on.Matches + wOn.Matches) + " matches", pOn, pOff, Math.Abs(pOn - pOff) <= 0.15 + 1e-9, "within 0.15 of control");
+            foreach (int seed in WinShare.ExtraSeeds16) { Play(wOff, seed, 16, false); Play(wOn, seed, 16, true); }
+            var t16On = new WinShare.Tally(); t16On.Add(on.T16); t16On.Add(wOn.T16);
+            var t16Off = new WinShare.Tally(); t16Off.Add(off.T16); t16Off.Add(wOff.T16);
+            var allOn = new WinShare.Tally(); allOn.Add(t16On); allOn.Add(on.T5); allOn.Add(wOn.T5);
+            var allOff = new WinShare.Tally(); allOff.Add(t16Off); allOff.Add(off.T5); allOff.Add(wOff.T5);
+            if (!WinShare.Judge("b13 H hut", "16v16 pool", t16On, t16Off, true)) fails++;
+            if (!WinShare.Judge("b13 H hut", "all " + allOn.Matches + " matches", allOn, allOff, false)) fails++;
             double koOn = Median(on.FirstKo), koOff = Median(off.FirstKo);
             Check("median first player knock-out (s)", koOn, koOff, koOn >= koOff * 0.9 - 1e-9 && koOn <= koOff * 1.2 + 1e-9, "-10% / +20% of control");
             double kOn = on.Kills / on.Minutes, kOff = off.Kills / off.Minutes;
@@ -345,20 +351,21 @@ namespace CriticalMass.Sim.Tests
             }
             // b13 r3 integrator: lead changes are judged on the same 56-match pool as the win share (26 matches swung 49 vs 33
             // and 52 vs 30 once dodge, walls and corruption joined; the 26 ORDER seeds print)
-            Console.WriteLine("[b13 H] hill lead changes on the 26 ORDER seeds: on " + on.LeadChanges + ", control " + off.LeadChanges + " (printed; judged on the 56-match pool)");
+            Console.WriteLine("[b13 H] hill lead changes on the 26 ORDER seeds: on " + on.LeadChanges + ", control " + off.LeadChanges + " (printed; judged on the whole pool)");
             int lcOn = on.LeadChanges + wOn.LeadChanges, lcOff = off.LeadChanges + wOff.LeadChanges;
             Check("hill lead changes over " + (on.Matches + wOn.Matches) + " matches", lcOn, lcOff, Math.Abs(lcOn - lcOff) <= Math.Max(3, 0.3 * lcOff) + 1e-9, "+-30% of control");
             var lv = new List<double>();
             foreach (int l in on.EndLevel16) lv.Add(l);
             double med = Median(lv);
             Check("16v16 median end hut level", med, 0, med >= 3, "3 or more");
-            // b13 r3 integrator: judged on the 16 16v16 matches of the pool (the 6 ORDER seeds print): 1 of 6 vs 2 of 6 flipped
-            // between runs with hut-unrelated rules (dodge, walls); the same one-third share is the limit
-            Console.WriteLine("[b13 H] 16v16 ORDER seeds with a team at L5: on " + on.L5Seeds16 + " of 6 (printed; judged on the 16-match 16v16 pool)");
-            int l5 = on.L5Seeds16 + wOn.L5Seeds16;
-            Check("16v16 matches with a team at L5 (of 16)", l5, off.L5Seeds16 + wOff.L5Seeds16, l5 * 3 >= 16, "one third (6 of 16) or more");
-            double snow = on.DiffAt6 > 0 ? (double)on.HigherWonAt6 / on.DiffAt6 : 0;
-            Check("higher-level team at 6:00 wins (share of " + on.DiffAt6 + " matches)", snow, 0, snow <= 0.75 + 1e-9, "0.75 at most");
+            // b13 r3 integrator: judged on the 16v16 pool (the 6 ORDER seeds print); b14-c: the pool is the helper's 24 seeds
+            Console.WriteLine("[b13 H] 16v16 ORDER seeds with a team at L5: on " + on.L5Seeds16 + " of 6 (printed; judged on the 16v16 pool)");
+            int l5 = on.L5Seeds16 + wOn.L5Seeds16, n16 = on.Matches16 + wOn.Matches16;
+            Check("16v16 matches with a team at L5 (of " + n16 + ")", l5, off.L5Seeds16 + wOff.L5Seeds16, n16 > 0 && l5 * 3 >= n16, "one third or more");
+            // b14-c: the snowball guard on the widened sample (the whole pool), not the 26 ORDER seeds alone
+            int diff6 = on.DiffAt6 + wOn.DiffAt6, won6 = on.HigherWonAt6 + wOn.HigherWonAt6;
+            double snow = diff6 > 0 ? (double)won6 / diff6 : 0;
+            Check("higher-level team at 6:00 wins (share of " + diff6 + " matches of the whole pool)", snow, 0, snow <= 0.75 + 1e-9, "0.75 at most");
             Check("Miner barricades placed", on.MinerBarricades, off.MinerBarricades, on.MinerBarricades == 0, "0");
             Check("Miner cells dug or placed", on.MinerDigs, off.MinerDigs, on.MinerDigs == 0, "0");
             double cOn = on.SimSeconds / on.SimTicks, cOff = off.SimSeconds / off.SimTicks;

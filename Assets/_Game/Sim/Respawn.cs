@@ -195,6 +195,7 @@ namespace CriticalMass.Sim.Core
                 inp.AimZ = w.Z[i];
                 World.PushEvent(w, SimEventType.Respawn, i, -1, w.X[i], w.Z[i], (int)a.Cls);
             }
+            Collide.KaijuDepenetrate(w); // b14-c: a respawn on top of the Kaiju never ends the tick inside it (Full only)
         }
     }
 }
