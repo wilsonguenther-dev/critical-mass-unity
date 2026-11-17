@@ -431,8 +431,8 @@ namespace CriticalMass.Runtime.Menus
         /// <summary>b13 r2 (owner decision: terrain belongs to the Builder and the Demolitionist): the Builder's F while the hut rule is on.</summary>
         public const string BuilderDig = "DIG a block of ground with F, then F at an edge or a hole places it back.";
         public const string BuilderDigSwitch = "The wheel or LB / RB flips between dig and place.";
-        public const string BuilderDigRole = "Shapes the ground and builds the way.";
-        public const string BuilderDigBio = "Digs holes and fills them, builds new ground at an edge, stairs onto high ground and bridges over gaps.";
+        public const string BuilderDigRole = "Digs, fills and builds ways.";
+        public const string BuilderDigBio = "Give the Builder a gap and he hands you a way across: he digs and fills the ground, builds stairs and bridges.";
         public const string Dodge = "DODGE: a quick dash; you cannot be hit for a moment. 3 s to recharge.";
         public const string Jump = "JUMP clears gaps and short walls.";
 

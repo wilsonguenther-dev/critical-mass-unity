@@ -269,7 +269,7 @@ namespace CriticalMass.Runtime.PlayTests
         [UnityTest]
         public IEnumerator Settings_SwitchEachElementOff_AndBotsGetNothing()
         {
-            Restart(ClassId.Miner);
+            Restart(ClassId.Builder);   // b13 r2: the Miner has no terrain affordance with the hut rule (he mines)
             TerrainAffordanceView v = View();
             Assert.IsTrue(FindSpot(s => s.Primary.Valid && s.MarkerCount >= 3));
             yield return Shows(v, "DIG");

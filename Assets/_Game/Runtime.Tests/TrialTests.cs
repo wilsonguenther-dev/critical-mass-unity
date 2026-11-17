@@ -85,8 +85,8 @@ namespace CriticalMass.Runtime.Tests
             Assert.AreEqual(TrialFeature.Jump, Step("jump").Needs);
             Assert.AreEqual(TrialFeature.Terraform, Step("dig").Needs);
             Assert.AreEqual(TrialFeature.Terraform, Step("place").Needs);
-            Assert.AreEqual(ClassId.Miner, Step("dig").OnlyClass);
-            Assert.AreEqual(ClassId.Miner, Step("place").OnlyClass);
+            Assert.AreEqual(ClassId.Builder, Step("dig").OnlyClass);   // b13 r2: dig / place is the Builder's
+            Assert.AreEqual(ClassId.Builder, Step("place").OnlyClass);
             Assert.AreEqual(TrialFeature.Map, Step("map").Needs);
             StringAssert.Contains("{Map}", Step("map").Prompt);
         }
@@ -388,7 +388,7 @@ namespace CriticalMass.Runtime.Tests
             r.SkipAll(w);
             int dig = Array.FindIndex(r.Steps, x => x.Id == "dig");
             Assert.AreEqual(TrialStepState.Off, r.States[dig]);
-            StringAssert.Contains("Miner", r.OffReasons[dig]);
+            StringAssert.Contains("Builder", r.OffReasons[dig]);   // b13 r2
         }
 
         [Test]

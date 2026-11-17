@@ -24,7 +24,11 @@ namespace CriticalMass.Runtime.Tests
 
         static World Field(ClassId cls)
         {
-            World w = World.CreateWorld(new WorldOptions { Seed = 7, TeamSize = 16, HumanTeam = TeamId.Azure, HumanClass = cls, Config = GameConfig.CreateDefault() });
+            GameConfig cfg = GameConfig.CreateDefault();
+            // b13 r2: with the hut rule the Builder owns dig / place (Terraform.OwnerClass); the Miner's dig and barricade affordance
+            // is exercised where he still owns them (no hut rule, as in Classic / PhysicsOnly).
+            if (cls == ClassId.Miner) cfg.Depth.Hut.On = false;
+            World w = World.CreateWorld(new WorldOptions { Seed = 7, TeamSize = 16, HumanTeam = TeamId.Azure, HumanClass = cls, Config = cfg });
             for (int j = 1; j < w.ActorCount; j++)
             {
                 w.Actors[j].Alive = false;
