@@ -196,6 +196,19 @@ namespace CriticalMass.Runtime.View.Art
         /// <summary>The carried cargo prop (DG-71, CarryProp): props_art p14, 0.55 u tall.</summary>
         public const string CarriedBundle = "prop_carried_bundle";
 
+        /// <summary>
+        /// CM b13 r3 ART: the Blacksmith hut, ore vein, carried ore lump and level-up effect pieces, built by script on the props
+        /// pipeline (Art/Blacksmith/_source~/build_blacksmith.py, manifest.json beside it). The hut is one FBX with six stage
+        /// meshes: _L0 always drawn, _L1.._L5 drawn while the hut level is at least n (ridge gem n lights with each), so the level
+        /// reads at a glance. The vein swaps Full for Depleted at zero charges. The Fx pieces are all glow (no hull).
+        /// </summary>
+        public const string BlacksmithHut = "BlacksmithHut", BlacksmithOreVein = "BlacksmithOreVein",
+            BlacksmithOreLump = "BlacksmithOreLump", BlacksmithFx = "BlacksmithFx";
+        public static readonly string[] BlacksmithHutStages =
+            { "BlacksmithHut_L0", "BlacksmithHut_L1", "BlacksmithHut_L2", "BlacksmithHut_L3", "BlacksmithHut_L4", "BlacksmithHut_L5" };
+        public const string OreVeinFull = "BlacksmithOreVein_Full", OreVeinDepleted = "BlacksmithOreVein_Depleted";
+        public const string BlacksmithFxRing = "BlacksmithFx_Ring", BlacksmithFxSpark = "BlacksmithFx_Spark";
+
         /// <summary>Barricade states: child mesh names of MinerBarricade.fbx.</summary>
         public const string BarricadeFolded = "Miner_Barricade_Folded";
         public const string BarricadeDeployed = "Miner_Barricade_Deployed";
@@ -476,6 +489,19 @@ namespace CriticalMass.Runtime.View.Art
                 Meshes = new[] { "Kaiju_TelegraphSpikes" }, OutlinePx = 0f, Authored = KaijuDefault(GlowAzure) },
             Prop(BiomassS, 0.5f), Prop(BiomassM, 0.8f), Prop(BiomassL, 1.2f), Prop(BiomassSprout, 0.25f),
             Prop(CorruptionS, 0.6f), Prop(CorruptionL, 1.2f), Prop(CarriedBundle, 0.55f),
+            // CM b13 r3 ART (heights: Art/Blacksmith/_source~/manifest.json; triangles all six hut stages 4136, L0 2084).
+            new ModelSpec { Key = BlacksmithHut, AssetPath = "Assets/_Game/Art/Blacksmith/BlacksmithHut.fbx", Kind = ArtKind.Prop,
+                Meshes = BlacksmithHutStages, MaskCodes = new[] { 0, 2, 4, 5, 8 }, OutlinePx = 2f,
+                Authored = PropAzure, Crimson = PropCrimson, Height = 3.185f },
+            new ModelSpec { Key = BlacksmithOreVein, AssetPath = "Assets/_Game/Art/Blacksmith/BlacksmithOreVein.fbx", Kind = ArtKind.Prop,
+                Meshes = new[] { OreVeinFull, OreVeinDepleted }, MaskCodes = new[] { 0, 1 }, OutlinePx = 2.5f,
+                Authored = PropAzure, Crimson = PropCrimson, Height = 1.027f },
+            new ModelSpec { Key = BlacksmithOreLump, AssetPath = "Assets/_Game/Art/Blacksmith/BlacksmithOreLump.fbx", Kind = ArtKind.Prop,
+                Meshes = new[] { BlacksmithOreLump }, MaskCodes = new[] { 0, 1 }, OutlinePx = 2.5f,
+                Authored = PropAzure, Crimson = PropCrimson, Height = 0.5f },
+            new ModelSpec { Key = BlacksmithFx, AssetPath = "Assets/_Game/Art/Blacksmith/BlacksmithFx.fbx", Kind = ArtKind.Prop,
+                Meshes = new[] { BlacksmithFxRing, BlacksmithFxSpark }, MaskCodes = new[] { 2 }, OutlinePx = 0f,
+                Authored = PropAzure, Crimson = PropCrimson },
         };
 
         static ModelSpec Prop(string key, float height) => new ModelSpec

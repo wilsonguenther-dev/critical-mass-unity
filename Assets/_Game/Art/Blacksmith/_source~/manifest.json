@@ -1,0 +1,256 @@
+{
+ "generated_by": "build_blacksmith.py",
+ "blender": "5.2.3 LTS",
+ "unit": "1 unit = 1 m",
+ "pivot": "footprint centre on the ground (z = 0); front faces Blender -Y = Unity +Z",
+ "colour": "vertex colour set `Col` (props pipeline): RGB = hex (sRGB), A = mask code in eighths",
+ "hut_tris_all_levels": 4136,
+ "meshes": [
+  {
+   "fbx": "Blacksmith/BlacksmithHut.fbx",
+   "mesh": "BlacksmithHut_L0",
+   "tris": 2084,
+   "budget": 2200,
+   "min_xyz": [
+    -1.45,
+    -1.415,
+    -0.0
+   ],
+   "max_xyz": [
+    1.45,
+    1.645,
+    3.185
+   ],
+   "height": 3.185,
+   "mask_codes": [
+    0,
+    2,
+    4,
+    8
+   ],
+   "outline_px": 2.0
+  },
+  {
+   "fbx": "Blacksmith/BlacksmithHut.fbx",
+   "mesh": "BlacksmithHut_L1",
+   "tris": 568,
+   "budget": 600,
+   "min_xyz": [
+    -1.435,
+    -1.33,
+    0.0
+   ],
+   "max_xyz": [
+    1.374,
+    0.46,
+    3.22
+   ],
+   "height": 3.22,
+   "mask_codes": [
+    0,
+    1,
+    5
+   ],
+   "outline_px": 2.5
+  },
+  {
+   "fbx": "Blacksmith/BlacksmithHut.fbx",
+   "mesh": "BlacksmithHut_L2",
+   "tris": 152,
+   "budget": 300,
+   "min_xyz": [
+    -0.66,
+    0.24,
+    2.92
+   ],
+   "max_xyz": [
+    1.04,
+    1.18,
+    3.845
+   ],
+   "height": 3.845,
+   "mask_codes": [
+    0,
+    2,
+    5
+   ],
+   "outline_px": 2.5
+  },
+  {
+   "fbx": "Blacksmith/BlacksmithHut.fbx",
+   "mesh": "BlacksmithHut_L3",
+   "tris": 444,
+   "budget": 500,
+   "min_xyz": [
+    -0.21,
+    -0.21,
+    -0.004
+   ],
+   "max_xyz": [
+    1.49,
+    0.97,
+    3.22
+   ],
+   "height": 3.224,
+   "mask_codes": [
+    0,
+    5
+   ],
+   "outline_px": 2.5
+  },
+  {
+   "fbx": "Blacksmith/BlacksmithHut.fbx",
+   "mesh": "BlacksmithHut_L4",
+   "tris": 408,
+   "budget": 700,
+   "min_xyz": [
+    -1.78,
+    -0.965,
+    0.0
+   ],
+   "max_xyz": [
+    1.78,
+    0.46,
+    3.22
+   ],
+   "height": 3.22,
+   "mask_codes": [
+    0,
+    4,
+    5,
+    8
+   ],
+   "outline_px": 2.5
+  },
+  {
+   "fbx": "Blacksmith/BlacksmithHut.fbx",
+   "mesh": "BlacksmithHut_L5",
+   "tris": 480,
+   "budget": 700,
+   "min_xyz": [
+    -1.6,
+    -1.025,
+    0.449
+   ],
+   "max_xyz": [
+    1.6,
+    1.048,
+    4.17
+   ],
+   "height": 4.17,
+   "mask_codes": [
+    0,
+    2,
+    5
+   ],
+   "outline_px": 2.5
+  },
+  {
+   "fbx": "Blacksmith/BlacksmithOreVein.fbx",
+   "mesh": "BlacksmithOreVein_Full",
+   "tris": 200,
+   "budget": 700,
+   "min_xyz": [
+    -0.765,
+    -0.524,
+    -0.178
+   ],
+   "max_xyz": [
+    0.877,
+    0.637,
+    0.849
+   ],
+   "height": 1.027,
+   "mask_codes": [
+    0,
+    1
+   ],
+   "outline_px": 2.5
+  },
+  {
+   "fbx": "Blacksmith/BlacksmithOreVein.fbx",
+   "mesh": "BlacksmithOreVein_Depleted",
+   "tris": 140,
+   "budget": 500,
+   "min_xyz": [
+    -0.761,
+    -0.566,
+    -0.103
+   ],
+   "max_xyz": [
+    0.755,
+    0.529,
+    0.297
+   ],
+   "height": 0.401,
+   "mask_codes": [
+    0
+   ],
+   "outline_px": 2.5
+  },
+  {
+   "fbx": "Blacksmith/BlacksmithOreLump.fbx",
+   "mesh": "BlacksmithOreLump",
+   "tris": 80,
+   "budget": 260,
+   "min_xyz": [
+    -0.288,
+    -0.244,
+    -0.009
+   ],
+   "max_xyz": [
+    0.306,
+    0.279,
+    0.491
+   ],
+   "height": 0.5,
+   "mask_codes": [
+    0,
+    1
+   ],
+   "outline_px": 2.5
+  },
+  {
+   "fbx": "Blacksmith/BlacksmithFx.fbx",
+   "mesh": "BlacksmithFx_Ring",
+   "tris": 256,
+   "budget": 300,
+   "min_xyz": [
+    -1.07,
+    -1.07,
+    0.0
+   ],
+   "max_xyz": [
+    1.07,
+    1.07,
+    0.07
+   ],
+   "height": 0.07,
+   "mask_codes": [
+    2
+   ],
+   "outline_px": 0.0
+  },
+  {
+   "fbx": "Blacksmith/BlacksmithFx.fbx",
+   "mesh": "BlacksmithFx_Spark",
+   "tris": 8,
+   "budget": 40,
+   "min_xyz": [
+    -0.07,
+    -0.07,
+    -0.12
+   ],
+   "max_xyz": [
+    0.07,
+    0.07,
+    0.12
+   ],
+   "height": 0.24,
+   "mask_codes": [
+    2
+   ],
+   "outline_px": 0.0
+  }
+ ]
+}
