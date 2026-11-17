@@ -385,6 +385,8 @@ namespace CriticalMass.Runtime.View
             }
             Quaternion facing = Quaternion.Euler(0f, SimSpace.YawDeg(faceYaw), 0f);
             if (hasFx) facing = fx.Lean * facing;
+            float dodgeLean = B13.DodgeView.LeanDeg(w, i, a); // CM b13 J: a dodging fighter leans into the dash
+            if (dodgeLean != 0f) facing = facing * Quaternion.Euler(dodgeLean, 0f, 0f);
             if (hasFx && fx.Holding) dSim = 0; // the fake hit-stop: loops do not advance during the hold
             if (capsule)
             {

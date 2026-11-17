@@ -67,6 +67,7 @@ namespace CriticalMass.Sim.Core
                     if (a.Alive && a.StandUp <= 0) ResolveSwing(w, i, a.SwingFacing, fair, lane, maxTargetRadius, candidates);
                 }
                 if (!a.Alive || a.StandUp > 0 || !w.Inputs[i].Attack || a.AttackCd > 0 || a.SwingPending) continue;
+                if (Dodge.Active(w, i)) continue; // CM b13 J: a dodging actor cannot attack (rule off: never active)
                 if (lane && a.HitStunTicks > 0) continue; // DG-70: a staggered actor cannot start a swing
                 // feat/light-weapons-1: with LightWeapons on, the Demolitions Expert swings her pry bar and the Healer her
                 // lantern; off (or Classic) it is DG-22 (CM-38: no regular attack, Travis 2026-11-06) and DG-40 exactly.
