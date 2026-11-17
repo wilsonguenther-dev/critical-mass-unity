@@ -68,7 +68,7 @@ namespace CriticalMass.Runtime.Menus.Characters
                     S("CLEAVE", "Your attack is a wide swing across the front."),
                     S("SHIELD UP", "Space raises the shield and takes most of the sting out of hits from the front."),
                     S("HOLD THE HILL", "Stand on the hill with more friends than they have and the clock is yours."),
-                    S("JUMP", "Jump clears gaps and short walls."),
+                    S("JUMP", "Jump clears gaps."),
                 },
             },
             new ShowcaseClass
@@ -81,7 +81,7 @@ namespace CriticalMass.Runtime.Menus.Characters
                     S("GATHER", "Hold E on plants. The Farmer gathers fastest and carries three."),
                     S("FEED THE EGG", "Take biomass to the egg and hold E. It remembers who feeds it."),
                     S("ROOT SEEDS", "Space lobs seeds that slow every enemy near the landing."),
-                    S("JUMP", "Jump clears gaps and short walls."),
+                    S("JUMP", "Jump clears gaps."),
                 },
             },
             new ShowcaseClass
@@ -107,20 +107,20 @@ namespace CriticalMass.Runtime.Menus.Characters
                     S("TNT", "Your attack lobs TNT at your aim. After a short fuse it blows."),
                     S("CRATER", "The blast opens a crater. Nobody walks across a hole."),
                     S("LAND MINE", "Space lays a mine that arms in a moment and hits whoever steps on it."),
-                    S("JUMP", "Jump clears gaps and short walls."),
+                    S("JUMP", "Jump clears gaps."),
                 },
             },
             new ShowcaseClass
             {
-                Id = ClassId.Builder, FileId = "builder", Name = "BUILDER", Role = "Builds walls and stairs.",
-                Summary = "Builds walls and blocks for cover and traps, stairs over walls and bridges over gaps.",
-                FAction = "BUILD", Ability = "STAIRS / BRIDGE",
+                Id = ClassId.Builder, FileId = "builder", Name = "BUILDER", Role = "Builds stairs and bridges.",
+                Summary = "Builds stairs onto high ground and bridges over gaps, so the team gets where it needs to be.",
+                FAction = "", Ability = "STAIRS / BRIDGE",
                 Slides = new[]
                 {
-                    S("BUILD", "BUILD the selected piece where the outline shows."),
-                    S("SWITCH PIECE", "Short wall, tall wall (hut level 2), block. A block dropped in a hole fills it."),
-                    S("STAIRS AND BRIDGES", "STAIRS over a wall, BRIDGE over a gap."),
-                    S("JUMP", "Jump clears gaps and short walls."),
+                    S("STAIRS", "STAIRS lift the team onto higher ground."),
+                    S("BRIDGE", "BRIDGE spans a gap the team cannot jump."),
+                    S("STAIRS AND BRIDGES", "Space builds the one the ground in front of you needs."),
+                    S("JUMP", "Jump clears gaps."),
                 },
             },
             new ShowcaseClass
@@ -133,7 +133,7 @@ namespace CriticalMass.Runtime.Menus.Characters
                     S("MEND", "Your attack mends an ally in front of you."),
                     S("HEALING PULSE", "Space heals everyone close to you in one burst."),
                     S("PURIFY", "Hold E at the egg to clear corruption out of it."),
-                    S("JUMP", "Jump clears gaps and short walls."),
+                    S("JUMP", "Jump clears gaps."),
                 },
             },
         };
@@ -188,15 +188,13 @@ namespace CriticalMass.Runtime.Menus.Characters
         public static ShowcaseControl[] ControlsFor(ClassId c)
         {
             ShowcaseClass k = Of(c);
-            bool builder = c == ClassId.Builder;
-            var rows = new ShowcaseControl[builder ? 7 : 6];   // b13 integrator: no Dodge row (dodge is cut this batch)
+            var rows = new ShowcaseControl[6];   // b13 integrator: no Dodge row (dodge cut) and no Switch piece row (walls cut) this batch
             rows[0] = new ShowcaseControl { Label = "Move", Action = "Move", What = "Walk" };
             rows[1] = new ShowcaseControl { Label = "Attack", Action = "Attack", What = c == ClassId.Healer ? "Mend an ally" : c == ClassId.Demolitions ? "Throw TNT" : "Swing" };
             rows[2] = new ShowcaseControl { Label = "Ability", Action = "Ability", What = Sentence(k.Ability) };
             rows[3] = new ShowcaseControl { Label = "F action", Action = "DigPlace", What = k.FAction.Length > 0 ? Sentence(k.FAction) : "Not used by this class" };
             rows[4] = new ShowcaseControl { Label = "Interact", Action = "Interact", What = c == ClassId.Miner ? "Gather, carry, bank ore" : "Gather, carry, feed" };
-            rows[5] = new ShowcaseControl { Label = "Jump", Action = "Jump", What = "Clears gaps and short walls" };
-            if (builder) rows[6] = new ShowcaseControl { Label = "Switch piece", Action = "SwitchDigPlace", What = "Short wall, tall wall, block" };
+            rows[5] = new ShowcaseControl { Label = "Jump", Action = "Jump", What = "Clears gaps" };
             return rows;
         }
 

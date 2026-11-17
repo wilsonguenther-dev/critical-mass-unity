@@ -81,7 +81,7 @@ namespace CriticalMass.Sim.Tests
             bool on = dd.Hut.On && dd.Build.On && dd.Dodge.On && dd.KaijuTypes.On && dd.Corruption.On;
             Console.WriteLine($"[b13 scaffold] 16v16 Full seed 4242: {n} actors, stub/hook identity failures {bad}, config On flags {on}, deep clone {deep} (limit: 0 failures, true, true)");
             Assert.AreEqual(0, bad);
-            Assert.IsTrue(dd.Hut.On && dd.Build.On && dd.KaijuTypes.On && deep);   // b13 integrator: Dodge and Corruption default off (cut / out this batch)
+            Assert.IsTrue(dd.Hut.On && dd.KaijuTypes.On && deep);   // b13 integrator: Build, Dodge and Corruption default off (cut / out this batch)
         }
 
         [Test]

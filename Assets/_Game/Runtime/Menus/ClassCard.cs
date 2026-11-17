@@ -450,7 +450,8 @@ namespace CriticalMass.Runtime.Menus
                 };
                 w.Early = false;
             }
-            if (b < all.Length && all[b] != null)
+            // b13 integrator: the Builder's wall words only while the wall rule is on (item B is cut this batch: pack words stay)
+            if (b < all.Length && all[b] != null && CriticalMass.Sim.Config.GameConfig.CreateDefault().Depth.Build.On)
             {
                 ClassWords w = all[b];
                 w.Role = BuilderRole;
