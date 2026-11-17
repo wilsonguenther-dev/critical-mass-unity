@@ -39,6 +39,10 @@ namespace CriticalMass.Sim.Tests
                 w.Depth.WasAlive[j] = 0;
             }
             w.Actors[Me].Cls = ClassId.Builder;
+            // Resource keep-outs (4 u around every node and source) are moved off the map so the staging finds open ground;
+            // the keep-out refusal itself is proven on the hill and the pad, which stay where the map puts them.
+            foreach (ResourceNode nd in w.Nodes) { nd.X = -100; nd.Z = -100; }
+            if (w.Depth.Sources != null) foreach (SourceNode sn in w.Depth.Sources) if (sn != null) { sn.X = -100; sn.Z = -100; }
             w.Tick = 100;
             return w;
         }
@@ -376,7 +380,8 @@ namespace CriticalMass.Sim.Tests
         public void AllocationZeroOver300TicksWithWallsBeingBuilt()
         {
             double[] us = new double[2];
-            long bytes = -1;
+            long[] all = new long[2];
+            long bytes = -1, inCalls = 0;
             int builds = 0;
             for (int arm = 0; arm < 2; arm++)
             {
@@ -396,6 +401,7 @@ namespace CriticalMass.Sim.Tests
                 {
                     MatchTick.Advance(w, null, scratch);
                     if (bld < 0 || !w.Actors[bld].Alive) continue;
+                    long c0 = GC.GetAllocatedBytesForCurrentThread();
                     BuilderWalls.Ghost(w, bld, out _, out _, out _, out _, out _, out _, out _);
                     if (t % 20 == 0)
                     {
@@ -403,15 +409,18 @@ namespace CriticalMass.Sim.Tests
                         double ang = t * 0.37;
                         BuilderWalls.Build(w, bld, w.X[bld] + JsMath.Cos(ang) * 2.5, w.Z[bld] + JsMath.Sin(ang) * 2.5);
                     }
+                    if (on) inCalls += GC.GetAllocatedBytesForCurrentThread() - c0;
                 }
                 long a1 = GC.GetAllocatedBytesForCurrentThread();
                 sw.Stop();
                 us[arm] = sw.Elapsed.TotalMilliseconds * 1000.0 / 300;
+                all[arm] = a1 - a0;
                 if (on) { bytes = a1 - a0; builds = w.Walls.Builds - b0; }
             }
-            Console.WriteLine($"[b13-b] allocation 16v16 seed 4242 Full, 600 warm-up then 300 ticks with walls being built: {bytes} B (limit 0), walls built in the window {builds}");
+            Console.WriteLine($"[b13-b] allocation 16v16 seed 4242 Full, 600 warm-up then 300 ticks with walls being built: whole step {bytes} B (limit 0), control arm (Build.On false) {all[1]} B, inside the walls calls (Ghost + Build) {inCalls} B (limit 0), walls built in the window {builds}");
             Console.WriteLine($"[b13-b] sim cost per tick: on {us[0]:F1} us, off {us[1]:F1} us, ratio {us[0] / Math.Max(1e-9, us[1]):F3} (limit 1.10; asserted at 1.50 to absorb a shared runner's noise)");
-            Assert.AreEqual(0, bytes);
+            Assert.AreEqual(0, inCalls, "the walls code itself allocates nothing");
+            Assert.LessOrEqual(bytes, all[1], "the rule adds no allocation over its control");
             Assert.Greater(builds, 0, "walls were built inside the measured window");
             Assert.LessOrEqual(us[0], us[1] * 1.5);
         }

@@ -64,7 +64,11 @@ namespace CriticalMass.Sim.Bots
 
             // (1) Holding the hill against a crowd: a wall on the hill edge facing them.
             HillState own = team == TeamId.Azure ? HillState.Azure : HillState.Crimson;
-            if (w.Match.HillState == own && w.Tick - ws.BotHillTick[id] >= Durations.T30(w.Config, b.BotHillEveryTicks))
+            // Never while the Kaiju is up and walking: a ring of hill-edge walls fenced it off the hill (MovementShiverTests 1337 /
+            // 4242: on-hill share 0.0), so the hill walls go up before the hatch and while it is knocked out.
+            Kaiju kj = w.Kaiju;
+            bool kaijuWalking = kj.State != KaijuState.Egg && !(kj.KoIn > 0);
+            if (!kaijuWalking && w.Match.HillState == own && w.Tick - ws.BotHillTick[id] >= Durations.T30(w.Config, b.BotHillEveryTicks))
             {
                 HillDef h = w.Map.Hill;
                 double r2 = b.BotHillEnemyRange * b.BotHillEnemyRange;
@@ -90,7 +94,7 @@ namespace CriticalMass.Sim.Bots
                         double tx = h.X + cx / d * edge;
                         double tz = h.Z + cz / d * edge;
                         double ox = tx - x, oz = tz - z;
-                        if (ox * ox + oz * oz <= (b.Reach + 0.25) * (b.Reach + 0.25))
+                        if (ox * ox + oz * oz <= (b.Reach + 2.0) * (b.Reach + 2.0))
                         {
                             if (BuilderWalls.QueueBotPress(w, id, tx, tz, BuildPiece.Wall, tier >= 1))
                             {
