@@ -181,7 +181,7 @@ namespace CriticalMass.Sim.Core
             if (clear < dc.MinClearTicks) return false;
             s.Start[id] = w.Tick;
             s.Len[id] = clear;
-            s.Ready[id] = w.Tick + dc.CooldownTicks;
+            s.Ready[id] = w.Tick + Durations.T30(w.Config, dc.CooldownTicks);   // DG68: config tick counts pass the converter
             s.DirX[id] = dx;
             s.DirZ[id] = dz;
             s.Count++;
