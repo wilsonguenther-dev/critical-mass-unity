@@ -101,6 +101,52 @@ namespace CriticalMass.Sim.Bots
             return -1;
         }
 
+        /// <summary>
+        /// b13 r3: bot id stands where field `field` gives no step (cut off, e.g. on a floor pocket TNT craters left). Steps
+        /// toward the walkable cell within 2 cells with the lowest finite field distance (nearest first on a tie, scan order),
+        /// and jumps when the straight line there crosses a cell it cannot walk (an airborne actor passes over void). False when
+        /// there is no such cell. No allocation, no RNG.
+        /// </summary>
+        private static bool HopOut(World w, BotsState st, int id, int field, InputFrame output)
+        {
+            MapDef map = w.Map;
+            double x = w.X[id], z = w.Z[id];
+            int cx = JsMath.FloorToInt(x), cz = JsMath.FloorToInt(z);
+            int bx = 0, bz = 0;
+            double best = double.PositiveInfinity, bestD2 = double.PositiveInfinity;
+            for (int dz = -2; dz <= 2; dz++)
+                for (int dx = -2; dx <= 2; dx++)
+                {
+                    if (dx == 0 && dz == 0) continue;
+                    int nx = cx + dx, nz = cz + dz;
+                    if (!MapGrid.IsWalkable(map, nx, nz)) continue;
+                    double d = BotFields.FieldDistAt(st.Fields, field, nx + 0.5, nz + 0.5);
+                    if (!(d < double.PositiveInfinity)) continue;
+                    double d2 = dx * dx + dz * dz;
+                    if (d < best - 1e-9 || (Math.Abs(d - best) <= 1e-9 && d2 < bestD2))
+                    {
+                        best = d;
+                        bestD2 = d2;
+                        bx = nx;
+                        bz = nz;
+                    }
+                }
+            if (!(best < double.PositiveInfinity)) return false;
+            double gx = bx + 0.5, gz = bz + 0.5, ex = gx - x, ez = gz - z, len = Math.Sqrt(ex * ex + ez * ez);
+            if (len < 1e-6) return false;
+            Mv.X = ex / len;
+            Mv.Z = ez / len;
+            bool gap = false;
+            int n = (int)Math.Ceiling(len / 0.25);
+            for (int k = 1; k <= n && !gap; k++)
+            {
+                double t = (double)k / n;
+                if (!MapGrid.IsWalkable(map, JsMath.FloorToInt(x + ex * t), JsMath.FloorToInt(z + ez * t))) gap = true;
+            }
+            if (gap && w.Actors[id].AirLen == 0) output.Jump = true;
+            return true;
+        }
+
         private static int TeamPadField(World w, int id)
         {
             return w.Actors[id].Team == TeamId.Azure ? BotFields.FieldPadAzure : BotFields.FieldPadCrimson;
@@ -554,7 +600,11 @@ namespace CriticalMass.Sim.Bots
                     break;
                 }
                 case AiState.Retreat:
-                    Follow(w, st, id, TeamPadField(w, id));
+                    // b13 r3 (PhysicsSoak16v16 seed 101, Healer bot 14 still in Retreat at (65.06, 42.58) from tick 13860): TNT
+                    // craters (Cell.Void) cut the floor pocket she stood on off the pad field (her cell and every neighbour
+                    // Infinity but one diagonal past a void corner, which FlowStepAt refuses), so Follow found no step, she wanted
+                    // no move (WantMove 0: the stuck and progress detectors never fire) and stood there for good. Now she hops out.
+                    if (!Follow(w, st, id, TeamPadField(w, id))) HopOut(w, st, id, TeamPadField(w, id), output);
                     break;
                 case AiState.Order:
                 {
