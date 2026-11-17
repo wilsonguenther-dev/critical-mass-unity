@@ -37,12 +37,21 @@ namespace CriticalMass.Sim.Config
         public double[] LevelUnits = { 8, 16, 24 };
 
         // ---- GROVE (plant): inherent HP x1.10, speed x0.95; fed REGROWTH
-        public double GroveHpScale = 1.10;
-        public double GroveSpeedScale = 0.95;
-        /// <summary>REGROWTH starts after this many Kaiju ticks without damage (150 = 5 s at 30 Hz).</summary>
-        public int RegrowthDelayTicks = 150;
-        /// <summary>REGROWTH per level 1..3: percent of max HP healed per second (never above max, not while knocked out).</summary>
-        public double[] RegrowthPctPerSecond = { 0.4, 0.7, 1.0 };
+        /// <summary>
+        /// b13 r3 tuning (first Kaiju knock-out +24 % against the control, limit 20 %): GROVE was the cause. Forced on all 26
+        /// balance seeds with the same feed plans (diag sim runs on ci/b13r3-tune-diag), median time to the first Kaiju
+        /// knock-out: ELDER 76.3 s, GROVE as batch 13 shipped it (HP x1.10, speed x0.95, REGROWTH 0.4 / 0.7 / 1.0 % per s after
+        /// 5 s) 106.3 s (+39 %), BRUTE 71.0 s, MIRE 74.0 s, TIMBER 85.9 s. Every bot feed makes plant the largest share, so a
+        /// GROVE is nearly always level 3. Single changes: speed x1.0 84.3 s, no REGROWTH 94.7 s, HP x1.0 97.7 s. Shipped: HP
+        /// x1.05, speed x0.98, REGROWTH 0.2 / 0.35 / 0.5 % per s after 8 s: 82.9 s (+8.6 %), still the tank of the five.
+        /// </summary>
+        public double GroveHpScale = 1.05;
+        public double GroveSpeedScale = 0.98;
+        /// <summary>REGROWTH starts after this many Kaiju ticks without damage (240 = 8 s at 30 Hz; batch 13 shipped 150).</summary>
+        public int RegrowthDelayTicks = 240;
+        /// <summary>REGROWTH per level 1..3: percent of max HP healed per second (never above max, not while knocked out;
+        /// batch 13 shipped 0.4 / 0.7 / 1.0).</summary>
+        public double[] RegrowthPctPerSecond = { 0.2, 0.35, 0.5 };
 
         // ---- BRUTE (meat): inherent melee damage x1.15, speed x1.08, HP x0.95; fed FRENZY
         public double BruteMeleeDamageScale = 1.15;

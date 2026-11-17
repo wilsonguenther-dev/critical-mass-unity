@@ -195,7 +195,7 @@ namespace CriticalMass.Sim.Tests
                 DepthKit.Steps(w, 300);
                 double perSecond = (k.Hp - at150) / (w.Match.Time - t0);
                 double want = k.MaxHp * c.RegrowthPctPerSecond[lv - 1] / 100.0;
-                Print("GROVE level " + KaijuTypes.PowerLevel(w) + " hp 150 ticks after the hit", F(at150), "unchanged " + F(hit));
+                Print("GROVE level " + KaijuTypes.PowerLevel(w) + " hp " + c.RegrowthDelayTicks + " ticks after the hit", F(at150), "unchanged " + F(hit));
                 Print("GROVE level " + KaijuTypes.PowerLevel(w) + " regrowth after the wait", F(perSecond) + " hp/s", F(want) + " hp/s (" + F(c.RegrowthPctPerSecond[lv - 1]) + " % of max HP) within 2 %");
                 if (KaijuTypes.PowerLevel(w) != lv || at150 != hit || Math.Abs(perSecond - want) > want * 0.02) wrong.Add("level " + lv + ": " + at150 + " / " + perSecond);
                 // never above max, and not while knocked out
