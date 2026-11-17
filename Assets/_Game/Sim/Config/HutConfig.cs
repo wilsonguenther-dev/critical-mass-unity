@@ -30,8 +30,17 @@ namespace CriticalMass.Sim.Config
         /// <summary>(31,13) NW courtyard north, (31,59) SW courtyard south, (42,40) central island west rim (contested).</summary>
         public double[] OreAnchors = { 31, 13, 31, 59, 42, 40 };
         public double OreCharges = 6;
-        /// <summary>One charge regrows per 450 ticks (15 s).</summary>
-        public double OreRegrowTicks = 450;
+        /// <summary>
+        /// One charge regrows per 360 ticks (12 s; was 450 = 15 s). b14-c item 1 (16v16 L5 in 4 of 16 matches, limit one third):
+        /// the cause is the r3 HILL SHIFT, not dodge or walls. Measured on the 16 16v16 hut seeds (diag run 44156818867): Miners
+        /// spend 0.203 of their time on the shift and die 19.1 times a match (12.1 with it off), so a team banks 67.4 ore against
+        /// the 72 the five levels cost and L5 lands at 7:35 of 8:00 on average: a knife edge any rule flips (dodge off 7 of 16,
+        /// walls off 8, both off 9, shift off 16 with banked 72.6 and L5 at 6:32). Kept: the shift (Miner kill share), the costs
+        /// (Jeisil's 6/10/14/18/24). Changed: ore flow, 12 s regrowth: 12 of 16 at L5, banked 70.0 per team, levels still equal at
+        /// 6:00 in every match (0 of 0 differ). Alternatives measured: L5 cost 20 12 of 16; shift from L4 14 of 16 (shift time
+        /// 0.116, Miner kill share at risk); shift only when ahead 15 of 16; 8 charges 8 of 16.
+        /// </summary>
+        public double OreRegrowTicks = 360;
         /// <summary>More trees for the Builder (Jeisil): added to the groves, mirrored, so 10 groves instead of 6.</summary>
         public double[] ExtraWoodAnchors = { 40, 27, 40, 53 };
 
