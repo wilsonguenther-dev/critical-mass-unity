@@ -26,7 +26,7 @@ namespace CriticalMass.Runtime.Input
     public sealed class HumanInputState
     {
         /// <summary>The bound game buttons (U-006 Controls table).</summary>
-        public enum HumanButton { Jump, Attack, Ability, Interact, DigPlace, Pause, Scoreboard }
+        public enum HumanButton { Jump, Attack, Ability, Interact, DigPlace, Pause, Scoreboard, /* CM b13 J, appended: */ Dodge }
 
         // Screen -> world basis for the camera heading on screen (CameraHeading.Active: 135 creator's angle by default, 45
         // classic: up = (-1, -1)/sqrt2, right = (1, -1)/sqrt2). Recomputed only when the heading changes.
@@ -84,6 +84,8 @@ namespace CriticalMass.Runtime.Input
         bool _terraformLatch;
         bool _switchLatch;
         bool _jumpLatch;
+        // CM b13 J: dodge, latched like Jump (one InputFrame.Dodge per press, dropped while paused).
+        bool _dodgeLatch;
         int _classPick = -1;
         double _moveRight;
         double _moveUp;
@@ -200,6 +202,7 @@ namespace CriticalMass.Runtime.Input
             _terraformLatch = false;
             _switchLatch = false;
             _jumpLatch = false;
+            _dodgeLatch = false;
             _classPick = -1;
             _moveRight = 0;
             _moveUp = 0;
@@ -228,6 +231,9 @@ namespace CriticalMass.Runtime.Input
             {
                 case HumanButton.Jump:
                     if (!repeat) _jumpLatch = true;
+                    break;
+                case HumanButton.Dodge:
+                    if (!repeat) _dodgeLatch = true; // CM b13 J
                     break;
                 case HumanButton.Attack:
                     if (repeat && _attackHoldOff) break;
@@ -398,6 +404,7 @@ namespace CriticalMass.Runtime.Input
                 _terraformLatch = false;
                 _switchLatch = false;
                 _jumpLatch = false;
+                _dodgeLatch = false;
                 _classPick = -1;
                 _attackBuffer.Clear();
                 _abilityBuffer.Clear();
@@ -442,6 +449,8 @@ namespace CriticalMass.Runtime.Input
             _switchLatch = false;
             output.Jump = _jumpLatch;
             _jumpLatch = false;
+            output.Dodge = _dodgeLatch; // CM b13 J: one dodge per press
+            _dodgeLatch = false;
             output.ClassPick = _classPick;
             _classPick = -1;
             // Mechanics depth (U-065 / U-067): the station purchase and the ping, each for exactly one tick.

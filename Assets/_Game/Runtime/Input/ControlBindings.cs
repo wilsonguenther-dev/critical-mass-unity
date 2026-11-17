@@ -117,11 +117,13 @@ namespace CriticalMass.Runtime.Input
             new ControlRow("Attack", new[] { new RebindSlot("Attack", K, 0, column: SlotColumn.Mouse), new RebindSlot("Attack", K, 1, column: SlotColumn.Wasd), new RebindSlot("Attack", K, 2, column: SlotColumn.Arrows) },
                 new[] { new RebindSlot("Attack", G) }),
             new ControlRow("Class ability", new[] { new RebindSlot("Ability", K, 0, column: SlotColumn.Mouse), new RebindSlot("Ability", K, 1, column: SlotColumn.Wasd), new RebindSlot("Ability", K, 2, column: SlotColumn.Arrows) },
-                new[] { new RebindSlot("Ability", G), new RebindSlot("Ability", G, 1) }),
+                new[] { new RebindSlot("Ability", G) }), // CM b13 J: its second pad binding (east face) is Dodge now
             new ControlRow("Jump", new[] { new RebindSlot("Jump", K, 0, column: SlotColumn.Wasd), new RebindSlot("Jump", K, 1, column: SlotColumn.Arrows) }, new[] { new RebindSlot("Jump", G) }),
+            // CM b13 J: dodge for every class (Left Ctrl / Right Ctrl / east face button: HumanInputSource.DodgeDefaults)
+            new ControlRow("Dodge", new[] { new RebindSlot("Dodge", K, 0, column: SlotColumn.Wasd), new RebindSlot("Dodge", K, 1, column: SlotColumn.Arrows) }, new[] { new RebindSlot("Dodge", G) }),
             new ControlRow("Interact / carry", new[] { new RebindSlot("Interact", K, 0, column: SlotColumn.Mouse), new RebindSlot("Interact", K, 2, column: SlotColumn.Wasd), new RebindSlot("Interact", K, 1, column: SlotColumn.Arrows) }, new[] { new RebindSlot("Interact", G) }),
-            new ControlRow("Dig / place", new[] { new RebindSlot("DigPlace", K, 0, column: SlotColumn.Mouse), new RebindSlot("DigPlace", K, 1, column: SlotColumn.Wasd) }, new[] { new RebindSlot("DigPlace", G) }),
-            new ControlRow("Switch dig / place", new[] { new RebindSlot("SwitchDigPlace", K, 0, rebindable: false, column: SlotColumn.Mouse),
+            new ControlRow("Build / mine", new[] { new RebindSlot("DigPlace", K, 0, column: SlotColumn.Mouse), new RebindSlot("DigPlace", K, 1, column: SlotColumn.Wasd) }, new[] { new RebindSlot("DigPlace", G) }),
+            new ControlRow("Switch piece", new[] { new RebindSlot("SwitchDigPlace", K, 0, rebindable: false, column: SlotColumn.Mouse),
                     new RebindSlot("SwitchDigPlace", K, 1, column: SlotColumn.Wasd), new RebindSlot("SwitchDigPlace", K, 2, column: SlotColumn.Arrows) },
                 new[] { new RebindSlot("SwitchDigPlace", G, 0, "Shoulders", "negative"), new RebindSlot("SwitchDigPlace", G, 0, "Shoulders", "positive") }),
             // feat/terrain-affordances: hold to show everything your class can use nearby (Q, or O by J K L; R3 outside the base ring).

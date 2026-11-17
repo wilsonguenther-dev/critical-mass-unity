@@ -619,6 +619,7 @@ namespace CriticalMass.Sim.Core
         {
             Actor a = w.Actors[id];
             if (a == null || !a.Alive || a.Cls != ClassId.Demolitions || a.StandUp > 0) return false;
+            if (Dodge.Active(w, id)) return false;   // b13-jd (routed): no TNT throw mid-dodge
             if (!w.Config.Abilities.DemolitionsTnt.ThrowOnAttack || w.Config.Depth.Classic) return false;
             if (!w.Inputs[id].Attack || w.Tick < w.Demolitions.TntReadyTick[id]) return false;
             if (a.AttackCd > 0 || a.SwingPending) return false;

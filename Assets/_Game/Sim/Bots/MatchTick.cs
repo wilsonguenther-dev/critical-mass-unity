@@ -33,6 +33,7 @@ namespace CriticalMass.Sim.Bots
         public static void Advance(World w, InputFrame humanFrame, InputFrame scratch)
         {
             Tap?.OnAdvance(w, humanFrame);
+            BotReflex.BeginFills(w);   // b13 r3 integrator: the dodge reflex's per-tick threat lists (sim cost)
             // (1) actor 0: the human's frame, or the bots on autopilot.
             if (humanFrame != null) SimInput.ApplyInput(w, 0, humanFrame);
             else
@@ -48,6 +49,7 @@ namespace CriticalMass.Sim.Bots
                 BotBrain.FillBotInput(w, id, scratch);
                 SimInput.ApplyInput(w, id, scratch);
             }
+            BotReflex.EndFills(w);
             // (4) the sim step.
             SimStep.Step(w);
         }
@@ -61,6 +63,7 @@ namespace CriticalMass.Sim.Bots
         public static void AdvanceHumans(World w, InputFrame[] frames, InputFrame scratch)
         {
             Tap?.OnAdvanceHumans(w, frames);
+            BotReflex.BeginFills(w);
             InputFrame f0 = frames != null && frames.Length > 0 ? frames[0] : null;
             if (f0 != null) SimInput.ApplyInput(w, 0, f0);
             else
@@ -79,6 +82,7 @@ namespace CriticalMass.Sim.Bots
                     SimInput.ApplyInput(w, id, scratch);
                 }
             }
+            BotReflex.EndFills(w);
             SimStep.Step(w);
         }
 
@@ -98,12 +102,14 @@ namespace CriticalMass.Sim.Bots
         public static void AdvanceNoHuman(World w, InputFrame scratch)
         {
             Tap?.OnAdvanceNoHuman(w);
+            BotReflex.BeginFills(w);
             BotBrain.BotsThink(w, SimStep.Dt(w.Config));
             for (int id = 1; id < w.ActorCount; id++)
             {
                 BotBrain.FillBotInput(w, id, scratch);
                 SimInput.ApplyInput(w, id, scratch);
             }
+            BotReflex.EndFills(w);
             SimStep.Step(w);
         }
     }
