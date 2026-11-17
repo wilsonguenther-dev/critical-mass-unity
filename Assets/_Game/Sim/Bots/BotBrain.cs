@@ -80,6 +80,7 @@ namespace CriticalMass.Sim.Bots
             Healer.TakeBotPurify(w, id, output);
             // U-065: a Builder bot in its station buys a class upgrade the team stock can pay.
             Stations.TakeBotBuy(w, id, output);
+            BotReflex.Fill(w, st, id, output);   // b13-hook: J's jump and dodge reflexes, after the steer and the press overrides
         }
     }
 }

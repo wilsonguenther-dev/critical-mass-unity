@@ -146,6 +146,7 @@ namespace CriticalMass.Sim.Bots
                 // and in its gaps (the trial autopilot then sat in the west gap at (46, 41) and never reached its node). A hidden
                 // enemy still counts in the crowd numbers above.
                 if (seeOnly && !SegmentClear.Clear(w.Map, x, z, w.X[j], w.Z[j])) continue;
+                if (KaijuTypes.BlindBlocks(w, id, j)) continue;   // b13-hook: K's SHROUD hides a target (it still counts in the crowd)
                 if (focus)
                 {
                     // DG-21 Hard: carriers and hurt enemies first (BotSkill.FocusScore), lowest id on a tie.
@@ -186,6 +187,9 @@ namespace CriticalMass.Sim.Bots
         }
 
         private static readonly Selection Sel = new Selection();
+
+        /// <summary>CM b13: the items' bot files offer a state's utility to the current ThinkBot choice (same rule as Consider).</summary>
+        internal static void ConsiderExternal(World w, AiState s, double u) => Consider(w, s, u);   // b13-hook
 
         private static void Consider(World w, AiState s, double u)
         {
@@ -298,6 +302,10 @@ namespace CriticalMass.Sim.Bots
         {
             Actor a = w.Actors[id];
             st.AbilityReq[id] = 0;
+            // CM b13: the Miner's and the Builder's item decisions come first, before the ability cooldown gate (H's HAUL keeps
+            // its own cooldown check; B builds on F, not on the ability). False = today's logic below.
+            if (a.Cls == ClassId.Miner && BotMine.DecideAbility(w, st, id, state)) return;   // b13-hook
+            if (a.Cls == ClassId.Builder && BotBuild.DecideBuilder(w, st, id, state)) return;   // b13-hook
             if (a.Cls == ClassId.Demolitions)
             {
                 DecideDemolitions(w, st, id, state, sk); // DG-22 (CM-38)
@@ -705,6 +713,7 @@ namespace CriticalMass.Sim.Bots
             {
                 gatherNode = BestNode(w, st, id, NodeKind.Biomass, double.PositiveInfinity);
                 if (gatherNode >= 0) uGather = Cap1(0.8 * st.Greed[id] * (Roles.IsBestFeeder(w, a.Cls) ? w.Config.Depth.Roles.BestFeederGatherBias : 1)); // U-070 Farmers prioritise feeding
+                if (gatherNode >= 0) uGather *= BotKaijuFeed.GatherScale(w, st, id);   // b13-hook: K's per-team feed plan
             }
 
             double uDeliver = 0;
@@ -753,6 +762,12 @@ namespace CriticalMass.Sim.Bots
                     if (supplySource < 0) supplySource = Sources.BestSource(w, id);
                 }
                 if (supplySource >= 0 || holdsSupply) uSupply = w.Config.Depth.Sources.SupplyUtility;
+            }
+            // CM b13 [K]: a supply bot holding wood or water may feed the egg instead of banking it (the Deliver path).
+            if (holdsSupply && egg && BotKaijuFeed.SupplyFeedsEgg(w, st, id, a.Carry == CarryKind.Wood ? BiomassType.Wood : BiomassType.Water))   // b13-hook
+            {
+                uDeliver = 0.9;   // b13-hook
+                uSupply = 0;   // b13-hook
             }
 
             // U-066: a power-up in sight and close: go for it (not while holding the hill, carrying, or hurt).
@@ -861,6 +876,8 @@ namespace CriticalMass.Sim.Bots
             Consider(w, AiState.Grab, uGrab);
             Consider(w, AiState.Order, uOrder);
             Consider(w, AiState.Retreat, uRetreat);
+            BotMine.Consider(w, st, id);   // b13-hook: H's tasks (through ConsiderExternal)
+            BotCorrupt.Consider(w, st, id);   // b13-hook: C's tasks (through ConsiderExternal)
             AiState best = Sel.Best;
 
             // --- switch rule ---

@@ -573,6 +573,30 @@ namespace CriticalMass.Sim.Bots
                     else Toward(w, id, gx, gz, stop);
                     break;
                 }
+                case AiState.Task:   // b13-hook
+                {
+                    // CM b13: an item task (BotsState.TaskKind): to (TaskX, TaskZ) like an Order to its point (straight when the
+                    // body fits along the line, else Toward with the barricade probe below); within 1.2 u the owning item acts.
+                    if (w.Match.Time >= st.TaskUntil[id])   // b13-hook: a task past TaskUntil ends
+                    {
+                        st.TaskKind[id] = 0;   // b13-hook
+                        a.AiState = AiState.None;   // b13-hook: ThinkBot picks a state next tick
+                        break;
+                    }
+                    double gx = st.TaskX[id];
+                    double gz = st.TaskZ[id];
+                    double tdx = gx - x;
+                    double tdz = gz - z;
+                    if (tdx * tdx + tdz * tdz <= 1.2 * 1.2)
+                    {
+                        aimX = gx;
+                        aimZ = gz;
+                        separate = false;
+                        B13Hooks.BotTaskAct(w, st, id, output);   // b13-hook
+                    }
+                    else Toward(w, id, gx, gz, 0);
+                    break;
+                }
                 case AiState.Grab:
                     Toward(w, id, st.GrabX[id], st.GrabZ[id], 0.2); // U-066: straight at the power-up (it was in line of sight)
                     break;
