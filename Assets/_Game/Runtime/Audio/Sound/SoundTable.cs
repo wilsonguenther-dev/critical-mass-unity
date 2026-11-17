@@ -335,6 +335,15 @@ namespace CriticalMass.Runtime.Audio.Sound
             Silent(SimEventType.BridgeWarning, "the depth HUD (PR #59) plays its own depth-* cue through UiSound for the local player"),
             R(SimEventType.BridgeCollapsed, Pick.Fixed, "piece_break"),
             Silent(SimEventType.BridgeRepaired, "the depth HUD (PR #59) plays its own depth-* cue through UiSound for the local player"),
+            // CM b13 S0: silent until the owner item routes a cue (one route per type; SoundCoverageTests).
+            Silent(SimEventType.HutLevel, "b13 S0: silent until item H adds its cue"),
+            Silent(SimEventType.OreMined, "b13 S0: silent until item H adds its cue"),
+            Silent(SimEventType.WallBuilt, "b13 S0: silent until item B adds its cue"),
+            Silent(SimEventType.WallBroken, "b13 S0: silent until item B adds its cue"),
+            Silent(SimEventType.Dodge, "b13 S0: silent until item J adds its cue"),
+            Silent(SimEventType.CorruptionRoll, "b13 S0: silent until item C adds its cue"),
+            Silent(SimEventType.KaijuPower, "b13 S0: silent until item K adds its cue"),
+            Silent(SimEventType.CrystalMined, "b13 S0: silent until item C adds its cue"),
         };
 
         /// <summary>Every world-force source (draft PR #43): audible cue or silence, and the low-frequency layer.</summary>

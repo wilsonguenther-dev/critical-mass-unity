@@ -1,13 +1,13 @@
 namespace CriticalMass.Sim.Core
 {
     /// <summary>What an actor carries in its class cargo (browser CarryKind).</summary>
-    public enum CarryKind { None, Biomass, Corruption, /* U-064, appended: */ Wood, Water }
+    public enum CarryKind { None, Biomass, Corruption, /* U-064, appended: */ Wood, Water, /* CM b13 [H], appended: */ Ore }
 
     /// <summary>
     /// CM-35: the two biomass types (browser BiomassType). Plant comes from the map's biomass nodes (gathered with E) and
     /// rides in the class cargo; meat drops from killed actors as a loose orb and rides in its own load (Actor.CarryMeat).
     /// </summary>
-    public enum BiomassType { Plant, Meat, /* U-064 (DG-42), appended: gathered at groves and springs, ride in the class cargo */ Wood, Water }
+    public enum BiomassType { Plant, Meat, /* U-064 (DG-42), appended: gathered at groves and springs, ride in the class cargo */ Wood, Water, /* CM b13 [H], appended: ore veins only; never fed to the egg */ Ore }
 
     /// <summary>
     /// DG-16: what dealt a hit (SimEvent.Cause on Hit and Death events, Actor.LastCause). Not in the browser. Never stored or
@@ -44,6 +44,8 @@ namespace CriticalMass.Sim.Core
         Grab,
         /// <summary>U-067: a bot walks to the spot (or the caller) of the ping it answered (appended).</summary>
         Order,
+        /// <summary>CM b13: an item task: steer to (BotsState.TaskX, TaskZ) and act there; BotsState.TaskKind routes it (appended).</summary>
+        Task,
     }
 
     /// <summary>Match phase (browser MatchState.phase).</summary>
@@ -226,5 +228,28 @@ namespace CriticalMass.Sim.Core
         /// <summary>CM-37: one tick of fountain healing (Heal.HealSystem): A = the healed actor, B = -1, (X, Z) = the actor, Value = HP restored this tick (&gt; 0).</summary>
         Heal,
         MatchEnd,
+        // CM b13 (S0 scaffold, appended; each owner item defines A/B/X/Z/Value when it first pushes the event)
+        /// <summary>CM b13 [H]: a team's Blacksmith hut reached a new level.</summary>
+        HutLevel,
+        /// <summary>CM b13 [H]: a Miner mined one ore from a vein.</summary>
+        OreMined,
+        /// <summary>CM b13 [B]: a Builder built a wall or block piece.</summary>
+        WallBuilt,
+        /// <summary>CM b13 [B]: a built wall cell broke or crumbled.</summary>
+        WallBroken,
+        /// <summary>CM b13 [J]: an actor started a dodge.</summary>
+        Dodge,
+        /// <summary>CM b13 [C]: the corruption roll happened (hatch or get-up).</summary>
+        CorruptionRoll,
+        /// <summary>CM b13 [K]: a Kaiju type's fed power acted (level change or a cast).</summary>
+        KaijuPower,
+        /// <summary>CM b13 [C]: a crystal was gathered from a crystal vein.</summary>
+        CrystalMined,
     }
+
+    /// <summary>CM b13 [K]: the Kaiju type decided by the biomass mix at the hatch (Elder = today's Kaiju; appended members only).</summary>
+    public enum KaijuType { Elder, Grove, Brute, Timber, Mire }
+
+    /// <summary>CM b13 [B]: the Builder's selected build piece (appended members only).</summary>
+    public enum BuildPiece { Wall, Block }
 }
