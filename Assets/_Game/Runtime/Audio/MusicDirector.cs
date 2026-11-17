@@ -33,6 +33,7 @@ namespace CriticalMass.Runtime.Audio
             _root.AddComponent<MusicDirector>();
             _root.AddComponent<Announcer>();
             _root.AddComponent<UiSoundBinder>();
+            _root.AddComponent<MasterBusKeeper>();   // CM b13 S0: -1 dB headroom + a -1 dBFS limiter on the final mix
         }
     }
 
