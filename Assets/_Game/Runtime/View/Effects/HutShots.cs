@@ -109,10 +109,7 @@ namespace CriticalMass.Runtime.View.Effects
 
         static Vector3 HutAt(World w, int t)
         {
-            PadDef pad = w.Map.Pads[t];
-            float side = pad.X < w.Map.Width * 0.5 ? -1f : 1f;
-            float x = (float)pad.X + side * 3.5f, z = (float)pad.Z;
-            return new Vector3(x, (float)GroundHeight.At(w.Map, x, z), z);
+            return CriticalMass.Runtime.View.B13.HutView.HutPosition(w.Map, w.Map.Pads[t]);   // b13 r2: the hut's real spot
         }
 
         IEnumerator Run()
@@ -152,9 +149,22 @@ namespace CriticalMass.Runtime.View.Effects
             for (int i = 0; i < w.Depth.Sources.Length; i++) if (w.Depth.Sources[i].Kind == BiomassType.Ore) { vein = w.Depth.Sources[i]; vi = i; break; }
             if (vein != null)
             {
-                Pin(vein.X - 1.0, vein.Z, 0);
+                // b13 r2: stand on walkable ground beside the vein, facing it (round 1 pinned 1 u west of the first vein, which
+                // could be the void: the Miner fell, lost the ore and both shots logged NOT REACHED).
+                double sx = vein.X - 1.0, sz = vein.Z;
+                double rr = w.Config.Class(ClassId.Miner).Radius;
+                for (int k = 0; k < 16; k++)
+                {
+                    double ang = k * Math.PI / 8, d = 1.0 + 0.2 * (k / 8);
+                    double px = vein.X + Math.Cos(ang) * d, pz = vein.Z + Math.Sin(ang) * d;
+                    if (!Collide.ActorFits(w, px, pz, rr) || !MapGrid.IsWalkable(w.Map, JsMath.FloorToInt(px), JsMath.FloorToInt(pz))) continue;
+                    sx = px; sz = pz; break;
+                }
+                me.Alive = true;
+                Pin(sx, sz, Math.Atan2(vein.Z - sz, vein.X - sx));
+                Log("miner stand point (" + sx.ToString("0.0") + ", " + sz.ToString("0.0") + ") for vein " + vi + " at (" + vein.X.ToString("0.0") + ", " + vein.Z.ToString("0.0") + ")");
                 _pinVein = vi;
-                Vector3 va = new Vector3((float)vein.X, (float)GroundHeight.At(w.Map, vein.X, vein.Z), (float)vein.Z);
+                Vector3 va = SimSpace.ToWorld(vein.X, GroundHeight.At(w.Map, vein.X, vein.Z), vein.Z);   // b13 r2: world z = -sim z
                 yield return Shot("miner-mining-mid-channel", Blacksmith.ChannelVein(w, 0) == vi, va);
                 _pinVein = -1;
                 w.Hut.ChannelVein[0] = -1;

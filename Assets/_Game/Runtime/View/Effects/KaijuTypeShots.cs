@@ -142,6 +142,45 @@ namespace CriticalMass.Runtime.View.Effects
             yield return WaitTicks(w, hz * 3);
             yield return Still("kt-" + name + "-3s.png");
             LogRun(name, want, "3s", w);
+            yield return SideStill(w, "kt-" + name + "-side.png");
+        }
+
+        /// <summary>
+        /// b13 r2: a side view with the Kaiju centred and nothing between it and the lens: an off-screen camera at the Kaiju's
+        /// mid height, 11 u to the side (east or west, whichever line of sight is clear of tall cells), looking at its centre.
+        /// </summary>
+        IEnumerator SideStill(World w, string name)
+        {
+            yield return new WaitForEndOfFrame();
+            if (w.Kaiju == null) { Log(name + " NOT REACHED (no Kaiju)"); yield break; }
+            double kx = w.Kaiju.X, kz = w.Kaiju.Z;
+            double ground = GroundHeight.At(w.Map, kx, kz);
+            Vector3 at = SimSpace.ToWorld(kx, ground + 2.2, kz);
+            double side = SegmentClear.Clear(w.Map, kx, kz, kx + 11, kz) ? 11 : -11;
+            Vector3 eye = SimSpace.ToWorld(kx + side, ground + 3.4, kz + 1.5);
+            UnityEngine.Camera main = UnityEngine.Camera.main;
+            var go = new GameObject("KaijuTypeShots Side Camera");
+            UnityEngine.Camera cam = go.AddComponent<UnityEngine.Camera>();
+            if (main != null) cam.CopyFrom(main);
+            cam.fieldOfView = 38f;
+            cam.nearClipPlane = 0.3f;
+            cam.transform.position = eye;
+            cam.transform.LookAt(at);
+            var rt = new RenderTexture(1280, 720, 24);
+            cam.targetTexture = rt;
+            cam.Render();
+            RenderTexture prev = RenderTexture.active;
+            RenderTexture.active = rt;
+            var tex = new Texture2D(1280, 720, TextureFormat.RGB24, false);
+            tex.ReadPixels(new Rect(0, 0, 1280, 720), 0, 0);
+            tex.Apply();
+            RenderTexture.active = prev;
+            File.WriteAllBytes(Path.Combine(_dir, name), tex.EncodeToPNG());
+            cam.targetTexture = null;
+            Destroy(rt);
+            Destroy(tex);
+            Destroy(go);
+            Log(name + " side view from " + (side > 0 ? "east" : "west") + " at (" + kx.ToString("0.0") + ", " + kz.ToString("0.0") + ")");
         }
 
         IEnumerator Run()

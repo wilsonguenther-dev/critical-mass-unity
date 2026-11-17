@@ -59,6 +59,37 @@ namespace CriticalMass.Runtime.View.B13
             return t;
         }
 
+        /// <summary>
+        /// b13 r2: where team pad's hut stands: the first spot with walkable ground under its whole footprint, trying behind the
+        /// pad (3.5 u, then 3.0 and 2.5) and then beside it (3.5 u north / south). Round 1 always used 3.5 u behind, which on the
+        /// base island's back edge, and placed it at world z = +sim z (the views use SimSpace.ToWorld: world z = -sim z), so the
+        /// hut, veins and ore lumps were drawn off the map, floating against the sky. Returns WORLD space; HutShots frames it.
+        /// </summary>
+        public static Vector3 HutPosition(MapDef map, PadDef pad)
+        {
+            double side = pad.X < map.Width * 0.5 ? -1.0 : 1.0;
+            for (int k = 0; k < SpotDx.Length; k++)
+            {
+                double x = pad.X + side * SpotDx[k], z = pad.Z + SpotDz[k];
+                if (!Grounded(map, x, z)) continue;
+                return SimSpace.ToWorld(x, GroundHeight.At(map, x, z), z);   // sim z is world -z
+            }
+            double fx = pad.X + side * Behind;
+            return SimSpace.ToWorld(fx, GroundHeight.At(map, fx, pad.Z), pad.Z);
+        }
+
+        static readonly double[] SpotDx = { 3.5, 3.0, 2.5, 0, 0, 1.5, 1.5 };
+        static readonly double[] SpotDz = { 0, 0, 0, 3.5, -3.5, 3.0, -3.0 };
+
+        /// <summary>Walkable ground under a 2.4 x 2.4 u footprint centred on (x, z) (the hut base is 2.4 x 1.8 u).</summary>
+        static bool Grounded(MapDef m, double x, double z)
+        {
+            for (int i = -1; i <= 1; i++)
+                for (int j = -1; j <= 1; j++)
+                    if (!MapGrid.IsWalkable(m, JsMath.FloorToInt(x + i * 1.2), JsMath.FloorToInt(z + j * 1.2))) return false;
+            return true;
+        }
+
         void Bind(World w)
         {
             if (_root != null) Destroy(_root.gameObject);
@@ -76,12 +107,13 @@ namespace CriticalMass.Runtime.View.B13
                 string team = Hex(t == 0 ? FxScene.AzureC : FxScene.CrimsonC);
                 _pipOn[t] = ToonMaterials.Prop(team);
                 PadDef pad = map.Pads[t];
-                float side = pad.X < map.Width * 0.5 ? -1f : 1f;
-                float x = (float)pad.X + side * Behind, z = (float)pad.Z;
+                Vector3 hp = HutPosition(map, pad);
+                float x = hp.x, z = hp.z;
                 var hut = new GameObject("Hut " + (TeamId)t).transform;
                 hut.SetParent(_root, false);
-                hut.position = new Vector3(x, (float)GroundHeight.At(map, x, z), z);
-                hut.rotation = Quaternion.Euler(0f, side < 0 ? 90f : -90f, 0f); // the plate faces the pad
+                hut.position = hp;
+                Vector3 pw = SimSpace.ToWorld(pad.X, 0, pad.Z);
+                hut.rotation = Quaternion.Euler(0f, Mathf.Atan2(pw.x - hp.x, pw.z - hp.z) * Mathf.Rad2Deg, 0f); // the plate faces the pad
                 Cube(hut, "Base", stone, new Vector3(0f, 0.6f, 0f), new Vector3(2.4f, 1.2f, 1.8f), Quaternion.identity);
                 Cube(hut, "Roof", roof, new Vector3(0f, 1.25f, 0f), new Vector3(1.75f, 1.75f, 1.9f), Quaternion.Euler(0f, 0f, 45f));
                 Cube(hut, "Roof Cap", _pipOn[t], new Vector3(0f, 2.48f, 0f), new Vector3(0.18f, 0.12f, 2.0f), Quaternion.identity);
@@ -119,7 +151,7 @@ namespace CriticalMass.Runtime.View.B13
                 if (s.Kind != BiomassType.Ore) continue;
                 var v = new GameObject("Ore Vein " + i).transform;
                 v.SetParent(_root, false);
-                v.position = new Vector3((float)s.X, (float)GroundHeight.At(map, s.X, s.Z), (float)s.Z);
+                v.position = SimSpace.ToWorld(s.X, GroundHeight.At(map, s.X, s.Z), s.Z);   // b13 r2: sim z is world -z (round 1 drew veins off the map)
                 Cube(v, "Rock A", rock, new Vector3(0f, 0.3f, 0f), new Vector3(0.8f, 0.6f, 0.7f), Quaternion.Euler(0f, 20f, 8f));
                 Cube(v, "Rock B", rock, new Vector3(0.45f, 0.2f, 0.25f), new Vector3(0.5f, 0.4f, 0.5f), Quaternion.Euler(10f, 50f, 0f));
                 Cube(v, "Rock C", rock, new Vector3(-0.35f, 0.18f, -0.3f), new Vector3(0.45f, 0.36f, 0.42f), Quaternion.Euler(0f, -30f, 12f));
@@ -202,7 +234,7 @@ namespace CriticalMass.Runtime.View.B13
                 if (ore <= 0) continue;
                 float fx = Mathf.Cos((float)a.Facing), fz = Mathf.Sin((float)a.Facing);
                 float x = (float)w.X[i] - fx * 0.32f, z = (float)w.Z[i] - fz * 0.32f;
-                l.position = new Vector3(x, (float)GroundHeight.At(w.Map, x, z) + 1.05f, z);
+                l.position = SimSpace.ToWorld(x, GroundHeight.At(w.Map, x, z) + 1.05f, z);   // b13 r2: sim z is world -z
                 float s1 = 0.2f + 0.07f * ore;
                 l.localScale = new Vector3(s1, s1, s1);
             }
