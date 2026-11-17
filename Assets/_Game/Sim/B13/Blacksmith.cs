@@ -140,7 +140,7 @@ namespace CriticalMass.Sim.Core
 
         static bool Reaches(World w, int id, SourceNode s)
         {
-            double r = w.Config.MinerTerraform.Reach;
+            double r = w.Config.Abilities.MinerTerraform.Reach;
             double dx = s.X - w.X[id];
             double dz = s.Z - w.Z[id];
             return dx * dx + dz * dz <= r * r;

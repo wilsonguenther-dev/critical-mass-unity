@@ -69,7 +69,7 @@ namespace CriticalMass.Sim.Tests
                 }
                 Assert.AreEqual(0, Blacksmith.Level(w, TeamId.Crimson));
             }
-            Assert.AreEqual(14, Blacksmith.NextCost(AtHutLevel(3), TeamId.Azure));
+            Assert.AreEqual(18, Blacksmith.NextCost(AtHutLevel(3), TeamId.Azure)); // level 4 costs 18
         }
 
         static World AtHutLevel(int level)

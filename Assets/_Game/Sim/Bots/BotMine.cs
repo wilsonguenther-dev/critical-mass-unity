@@ -149,6 +149,9 @@ namespace CriticalMass.Sim.Bots
             double gx, gz;
             if (kind == TaskMineOre)
             {
+                // Nothing to mine for (full, other cargo, hut at the top): no press, so no refusal every other tick.
+                if (Blacksmith.OreOf(a) >= (int)w.Config.Depth.Hut.OreCarry || (a.CarryAmount > 0 && a.Carry != CarryKind.None && a.Carry != CarryKind.Ore)
+                    || Blacksmith.Level(w, a.Team) >= Blacksmith.MaxLevel(w.Config)) return false;
                 int v = Blacksmith.ChannelVein(w, id);
                 if (v < 0) v = Blacksmith.VeinInReach(w, id);
                 if (v >= 0)
