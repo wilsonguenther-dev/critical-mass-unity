@@ -75,6 +75,7 @@ namespace CriticalMass.Runtime.View.Effects
             OpenSpot(w, out double sx, out double sz);
             Actor me = w.Actors[0];
             me.Cls = ClassId.Builder;
+            w.Walls.Tool[0] = 1;   // b13 r3: a fresh Builder starts on the DIG tool; the shots stage the pieces
             w.Walls.Credit[(int)me.Team] = 99;
             Tier(w, 0);
 

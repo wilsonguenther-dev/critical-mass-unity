@@ -118,7 +118,7 @@ namespace CriticalMass.Sim.Tests
                 bool has = BuilderWalls.Ghost(w, Me, out int cx, out int cz, out int dx, out int dz, out int len, out bool tall, out bool ok);
                 double vx = Math.Abs(ax - w.X[Me]), vz = Math.Abs(az - w.Z[Me]);
                 int wantDx = vx >= vz ? 0 : 1, wantDz = vx >= vz ? 1 : 0;
-                bool pass = has && ok && len == 3 && !tall && dx == wantDx && dz == wantDz && cx == JsMath.FloorToInt(ax) && cz == JsMath.FloorToInt(az);
+                bool pass = has && ok && len == 3 && !tall && dx == wantDx && dz == wantDz && cx == BuilderWalls.MirrorCellX(w, ax, w.X[Me], TeamId.Azure) && cz == JsMath.FloorToInt(az);   // b13 r3: boundary aims go to the Builder's side
                 Console.WriteLine($"[b13-b] ghost facing {k * 45} deg: centre ({cx},{cz}) axis ({dx},{dz}) len {len} tall {tall} ok {ok} (want axis ({wantDx},{wantDz}), len 3, ok) {(pass ? "PASS" : "FAIL")}");
                 if (!pass) bad++;
             }
@@ -531,6 +531,7 @@ namespace CriticalMass.Sim.Tests
             public readonly double[] OwnDelta = new double[2], EnemyDelta = new double[2], ToEnemy = new double[2], HillDist = new double[2];
             public readonly int[] OwnLonger = new int[2], EnemyLonger = new int[2], OwnHalf = new int[2];
             public readonly int[] Near = new int[4];
+            public readonly int[] BoundaryX = new int[2];
             public readonly double[] HillSec = new double[2];
             public readonly List<string> PerMatch = new List<string>();
         }
@@ -671,6 +672,8 @@ namespace CriticalMass.Sim.Tests
             arm.HillSec[0] += w.Match.HillSeconds.Azure;
             arm.HillSec[1] += w.Match.HillSeconds.Crimson;
             for (int k = 0; k < 8; k++) arm.ByRule[k] += w.Walls.BuiltByRule[k];
+            arm.BoundaryX[0] += w.Walls.BoundaryX[0];
+            arm.BoundaryX[1] += w.Walls.BoundaryX[1];
             arm.PerMatch.Add($"{teamSize}v{teamSize} seed {seed}: winner {w.Match.Winner}, hill s A {w.Match.HillSeconds.Azure:F0} C {w.Match.HillSeconds.Crimson:F0}, walls A {wallsTeam[0]} C {wallsTeam[1]}" + (wallLog.Count > 0 ? " | " + string.Join(" ; ", wallLog) : ""));
             if (firstKo >= 0) arm.FirstKo.Add(firstKo);
             arm.WallsAll += walls;
@@ -704,7 +707,7 @@ namespace CriticalMass.Sim.Tests
             }
             Console.WriteLine($"[b13-b] WIDER 5v5 seeds 21..60 ({on.Matches5} matches): Azure win share on {(double)on.AzureWins5 / Math.Max(1, on.Matches5):F3} control {(double)off.AzureWins5 / Math.Max(1, off.Matches5):F3}");
             Console.WriteLine($"[b13-b] WIDER 16v16 seeds 1 2 3 11 13 17 ({on.Matches16} matches): Azure win share on {(double)on.AzureWins16 / Math.Max(1, on.Matches16):F3} control {(double)off.AzureWins16 / Math.Max(1, off.Matches16):F3}");
-            Console.WriteLine($"[b13-b] WIDER flips: {toA + toC} of {on.Matches} matches change winner when walls are on ({toA} to Azure, {toC} to Crimson); walls Azure {on.WallsTeam[0]} Crimson {on.WallsTeam[1]}; hill seconds on A {on.HillSec[0]:F0} C {on.HillSec[1]:F0}, control A {off.HillSec[0]:F0} C {off.HillSec[1]:F0}");
+            Console.WriteLine($"[b13-b] WIDER flips: {toA + toC} of {on.Matches} matches change winner when walls are on ({toA} to Azure, {toC} to Crimson); walls Azure {on.WallsTeam[0]} Crimson {on.WallsTeam[1]}; boundary-x plans A {on.BoundaryX[0]} C {on.BoundaryX[1]}; hill seconds on A {on.HillSec[0]:F0} C {on.HillSec[1]:F0}, control A {off.HillSec[0]:F0} C {off.HillSec[1]:F0}");
             for (int k = 0; k < on.PerMatch.Count; k++) if (on.PerMatch[k].Contains("winner Azure") != off.PerMatch[k].Contains("winner Azure")) Console.WriteLine($"[b13-b] WIDER flip: on {on.PerMatch[k]} || control {off.PerMatch[k].Substring(0, Math.Min(90, off.PerMatch[k].Length))}");
             Assert.AreEqual(on.Matches, off.Matches);
         }
@@ -747,7 +750,7 @@ namespace CriticalMass.Sim.Tests
             {
                 int n = Math.Max(1, on.WallsTeam[t]);
                 Console.WriteLine($"[b13-b] TILT {(TeamId)t}: walls {on.WallsTeam[t]} (rule hill {on.ByRule[t * 4 + 1]}, guard {on.ByRule[t * 4 + 2]}, fill {on.ByRule[t * 4 + 3]}, player {on.ByRule[t * 4]}); mean offset toward the enemy half {on.ToEnemy[t] / n:F2} u, on own half {on.OwnHalf[t]}; mean distance to hill {on.HillDist[t] / n:F2} u; own pad-to-hill route longer after {on.OwnLonger[t]} walls (mean delta {on.OwnDelta[t] / n:F2}), enemy route longer after {on.EnemyLonger[t]} (mean delta {on.EnemyDelta[t] / n:F2})");
-                Console.WriteLine($"[b13-b] TILT {(TeamId)t} actors within 1.2 u of a wall (samples every 30 ticks): own team's walls {on.Near[t * 2 + t]}, enemy walls {on.Near[t * 2 + 1 - t]}; hill seconds on {on.HillSec[t]:F0} control {off.HillSec[t]:F0}");
+                Console.WriteLine($"[b13-b] TILT {(TeamId)t} actors within 1.2 u of a wall (samples every 30 ticks): own team's walls {on.Near[t * 2 + t]}, enemy walls {on.Near[t * 2 + 1 - t]}; hill seconds on {on.HillSec[t]:F0} control {off.HillSec[t]:F0}; plans with the aim x exactly on a cell boundary {on.BoundaryX[t]}");
             }
             for (int k = 0; k < on.PerMatch.Count; k++) Console.WriteLine($"[b13-b] MATCH on  {on.PerMatch[k]}");
             for (int k = 0; k < off.PerMatch.Count; k++) Console.WriteLine($"[b13-b] MATCH off {off.PerMatch[k]}");

@@ -43,6 +43,8 @@ namespace CriticalMass.Sim.Core
         public byte[] BotRule;
         /// <summary>Stats (tests print them): pieces and fills committed per team x rule (index team * 4 + rule).</summary>
         public readonly int[] BuiltByRule = new int[8];
+        /// <summary>Stats: plans per team whose aim x sat exactly on a cell boundary (BuilderWalls.MirrorCellX).</summary>
+        public readonly int[] BoundaryX = new int[2];
 
         // ---- per World.Barricades slot
         /// <summary>0 = not a wall cell (free or a Miner barricade), 1 = short (Cell.LowWall), 2 = tall (Cell.Barricade).</summary>
@@ -145,6 +147,7 @@ namespace CriticalMass.Sim.Core
                 BotRule[i] = 0;
             }
             Array.Clear(BuiltByRule, 0, BuiltByRule.Length);
+            Array.Clear(BoundaryX, 0, BoundaryX.Length);
             for (int s = 0; s < Kind.Length; s++)
             {
                 Kind[s] = 0;
@@ -437,7 +440,7 @@ namespace CriticalMass.Sim.Core
             double ox = w.X[id];
             double oz = w.Z[id];
             Abilities.ClampToRange(ox, oz, aimX, aimZ, a.Facing, b.Reach, out double tx, out double tz);
-            cx = JsMath.FloorToInt(tx);
+            cx = MirrorCellX(w, tx, ox, a.Team);
             cz = JsMath.FloorToInt(tz);
             double vx = tx - ox;
             double vz = tz - oz;
@@ -486,6 +489,27 @@ namespace CriticalMass.Sim.Core
             if (w.Tick < s.ReadyTick[id]) return RefusedLock;
             if (!RouteOk(w, cx, cz, dx, dz, len)) return RefusedRoute;
             return 0;
+        }
+
+        /// <summary>
+        /// b13 r3 (the round 1 tilt check): the cell column for an aim x that is mirror-fair between the teams. The map is a mirror
+        /// image across x = MirrorSum / 2 (cell cx mirrors to Width - 1 - cx), but FloorToInt puts a point exactly on a cell
+        /// boundary into the cell on its +x side for BOTH teams, so the same aim mirrored landed one cell off for Crimson
+        /// (MirroredBuildersGetMirroredPieces: 221 of 875 mirrored aims). On an exact boundary the piece now goes to the cell on
+        /// the Builder's side; when he stands on the boundary line too, to the cell on the side of the mirror line he aims from
+        /// (on the mirror line itself, each team's own half). Off a boundary this is FloorToInt, unchanged.
+        /// </summary>
+        public static int MirrorCellX(World w, double tx, double ox, TeamId team)
+        {
+            int c = JsMath.FloorToInt(tx);
+            if (tx != c) return c;
+            w.Walls.BoundaryX[(int)team]++;
+            double mid = w.Map.Width * 0.5;
+            if (ox < tx) return c - 1;
+            if (ox > tx) return c;
+            if (tx > mid) return c - 1;
+            if (tx < mid) return c;
+            return team == TeamId.Azure ? c - 1 : c;
         }
 
         /// <summary>
