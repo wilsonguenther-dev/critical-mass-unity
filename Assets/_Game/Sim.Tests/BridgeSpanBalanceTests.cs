@@ -2,6 +2,7 @@ using System;
 using CriticalMass.Sim.Config;
 using CriticalMass.Sim.Bots;
 using CriticalMass.Sim.Core;
+using CriticalMass.Sim.Tests.Harness;
 using NUnit.Framework;
 
 namespace CriticalMass.Sim.Tests
@@ -19,7 +20,6 @@ namespace CriticalMass.Sim.Tests
     [TestFixture]
     public sealed class BridgeSpanBalanceTests
     {
-        const double WinShareLimit = 0.15;
 
         static GameConfig Cfg(int teamSize, double bridgeCap)
         {
@@ -72,15 +72,11 @@ namespace CriticalMass.Sim.Tests
                                       ",\"azureWins\":" + wins[arm, 0] + ",\"crimsonWins\":" + wins[arm, 1] + ",\"draws\":" + wins[arm, 2] +
                                       ",\"azureShare\":" + ((double)wins[arm, 0] / n).ToString("F3") + ",\"crimsonShare\":" + ((double)wins[arm, 1] / n).ToString("F3") +
                                       ",\"seedsWithADifferentWinner\":" + differ + "}");
-                for (int team = 0; team < 2; team++)
-                {
-                    double on = (double)wins[0, team] / n, off = (double)wins[1, team] / n;
-                    string name = team == 0 ? "Azure" : "Crimson";
-                    Console.WriteLine("{\"item\":\"b12-jz bridge balance win share\",\"size\":" + size + ",\"team\":\"" + name + "\",\"cap12\":" + on.ToString("F3") +
-                                      ",\"cap6\":" + off.ToString("F3") + ",\"shift\":" + Math.Abs(on - off).ToString("F3") + ",\"limit\":" + WinShareLimit.ToString("F2") + "}");
-                    if (Math.Abs(on - off) > WinShareLimit + 1e-9)
-                        failures.Add(size + "v" + size + " " + name + " win share " + on.ToString("F3") + " with 12-cell bridges against " + off.ToString("F3") + " with 6 (limit " + WinShareLimit + ")");
-                }
+                // b14-c item 5: judged by the one helper (WinShare; 16v16 here is 46 seeds, above its 24-match floor)
+                var tOn = new WinShare.Tally { Azure = wins[0, 0], Crimson = wins[0, 1], Draws = wins[0, 2] };
+                var tOff = new WinShare.Tally { Azure = wins[1, 0], Crimson = wins[1, 1], Draws = wins[1, 2] };
+                if (!WinShare.Judge("b12-jz bridges (12-cell vs 6-cell)", size + "v" + size + " (" + n + " seeds)", tOn, tOff, size == 16))
+                    failures.Add(size + "v" + size + " win share with 12-cell bridges against 6 (see the [win share] line)");
             }
             Assert.IsEmpty(failures, string.Join("\n", failures));
         }

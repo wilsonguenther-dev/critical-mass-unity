@@ -65,6 +65,7 @@ namespace CriticalMass.Sim.Tests
         {
             public string Name;
             public int Matches, AzureWins, Kills, LeadChanges, RouteFailures, RouteChecks, Digs;
+            public readonly WinShare.Tally T16 = new WinShare.Tally(), T5 = new WinShare.Tally();
             public double Minutes;
             public readonly int[] ClassKills = new int[6];
             public readonly List<double> FirstKo = new List<double>();
@@ -109,6 +110,7 @@ namespace CriticalMass.Sim.Tests
             arm.Matches++;
             arm.Minutes += w.Match.Time / 60.0;
             if (w.Match.Winner == MatchResult.Azure) arm.AzureWins++;
+            (teamSize == 16 ? arm.T16 : arm.T5).Add(w.Match.Winner);
             if (!double.IsNaN(firstKo)) arm.FirstKo.Add(firstKo);
             double sx = 0;
             for (int i = 0; i < w.ActorCount; i++) sx += w.X[i] * (i + 1) + w.Z[i] * (i + 7);
@@ -127,7 +129,7 @@ namespace CriticalMass.Sim.Tests
         {
             var arm = new Arm { Name = name };
             for (int seed = 1; seed <= 20; seed++) Play(arm, seed, 5, on);
-            foreach (int seed in new[] { 1337, 4242, 7, 99, 2024, 31337 }) Play(arm, seed, 16, on);
+            foreach (int seed in WinShare.Seeds16) Play(arm, seed, 16, on);   // b14-c item 5: 24 16v16 seeds (ORDER six first)
             string cls = "";
             for (int c = 0; c < 6; c++) cls += (ClassId)c + " " + (arm.ClassKills[c] / Math.Max(1.0, arm.Kills)).ToString("0.000") + " ";
             Console.WriteLine("[b13 r2 P2] ARM " + name + ": matches " + arm.Matches + ", azure win share " + (arm.AzureWins / (double)arm.Matches).ToString("0.000")
@@ -147,8 +149,11 @@ namespace CriticalMass.Sim.Tests
                 Console.WriteLine("[b13 r2 P2] LIMIT " + what + ": on " + a.ToString("0.000") + ", control " + b.ToString("0.000") + " (limit " + limit + ") " + (ok ? "PASS" : "FAIL"));
                 if (!ok) fails++;
             }
-            double wa = on.AzureWins / (double)on.Matches, wb = off.AzureWins / (double)off.Matches;
-            Lim("azure win share", wa, wb, Math.Abs(wa - wb) <= 0.15, "within 0.15 of control");
+            // b14-c item 5: judged by the one helper (WinShare) on the 24 16v16 seeds and on all matches
+            var allOn = new WinShare.Tally(); allOn.Add(on.T16); allOn.Add(on.T5);
+            var allOff = new WinShare.Tally(); allOff.Add(off.T16); allOff.Add(off.T5);
+            if (!WinShare.Judge("b13 r2 P2 builder terrain", "16v16 (" + on.T16.Matches + " seeds)", on.T16, off.T16, true)) fails++;
+            if (!WinShare.Judge("b13 r2 P2 builder terrain", "all " + allOn.Matches + " matches", allOn, allOff, false)) fails++;
             double ka = Median(on.FirstKo), kb = Median(off.FirstKo);
             Lim("median first player knock-out (s)", ka, kb, ka >= kb * 0.9 - 1e-9 && ka <= kb * 1.2 + 1e-9, "-10% / +20% of control");
             double ma = on.Kills / on.Minutes, mb = off.Kills / off.Minutes;

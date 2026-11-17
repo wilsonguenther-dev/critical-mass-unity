@@ -571,7 +571,7 @@ namespace CriticalMass.Sim.Tests
         {
             var runs = new List<(int seed, int size)>();
             for (int s = 1; s <= 20; s++) runs.Add((s, 5));
-            foreach (int s in new[] { 1337, 4242, 7, 99, 2024, 31337 }) runs.Add((s, 16));
+            foreach (int s in WinShare.OrderSeeds16) runs.Add((s, 16));
             var on = new List<Arm>();
             var off = new List<Arm>();
             foreach (var (seed, size) in runs)
@@ -611,25 +611,30 @@ namespace CriticalMass.Sim.Tests
             int winOn = 0, winOff = 0;
             for (int i = 0; i < n; i++) { if (on[i].Winner == MatchResult.Azure) winOn++; if (off[i].Winner == MatchResult.Azure) winOff++; }
             double wsOn = (double)winOn / n, wsOff = (double)winOff / n;
-            // b13 r3 integrator: 26 matches is too small a sample for a 0.15 win-share limit (one match = 0.038; the walls item's
-            // owner ruling, 6 16v16 matches too few, applies the same way). The 26 ORDER seeds are printed; the limit is judged
-            // on them plus 30 more (5v5 21-40, 16v16 1-10), same toggle, same +-0.15.
-            Print("Azure win share types on / control on the 26 ORDER seeds", F(wsOn) + " / " + F(wsOff), "printed (judged on the 56-match pool below)");
-            int wideOn = winOn, wideOff = winOff, wideN = n;
+            // b14-c item 5 (approved): the win share is judged by the one helper (WinShare) on the 16v16 pool of 24 seeds (the six
+            // ORDER seeds plus WinShare.ExtraSeeds16) and on the whole pool (plus 5v5 21-40); the 26 ORDER seeds print.
+            Print("Azure win share types on / control on the 26 ORDER seeds", F(wsOn) + " / " + F(wsOff), "printed (judged on the pools below)");
+            var t16On = new WinShare.Tally(); var t16Off = new WinShare.Tally(); var allOn = new WinShare.Tally(); var allOff = new WinShare.Tally();
+            for (int i = 0; i < n; i++)
+            {
+                (runs[i].size == 16 ? t16On : allOn).Add(on[i].Winner);
+                (runs[i].size == 16 ? t16Off : allOff).Add(off[i].Winner);
+            }
             var wide = new List<(int seed, int size)>();
             for (int s = 21; s <= 40; s++) wide.Add((s, 5));
-            for (int s = 1; s <= 10; s++) wide.Add((s, 16));
+            foreach (int s in WinShare.ExtraSeeds16) wide.Add((s, 16));
             foreach (var (seed, size) in wide)
             {
                 Arm c = RunMatch(seed, size, false);
                 Arm t = RunMatch(seed, size, true);
                 Console.WriteLine("[KaijuType] wider " + size + "v" + size + " seed " + seed + ": winner control " + c.Winner + ", types on " + t.Winner + " (" + t.Type + ")");
-                if (c.Winner == MatchResult.Azure) wideOff++;
-                if (t.Winner == MatchResult.Azure) wideOn++;
-                wideN++;
+                (size == 16 ? t16Off : allOff).Add(c.Winner);
+                (size == 16 ? t16On : allOn).Add(t.Winner);
             }
-            double wwOn = (double)wideOn / wideN, wwOff = (double)wideOff / wideN;
-            Limit("Azure win share types on / control over " + wideN + " matches", F(wwOn) + " / " + F(wwOff), "within 0.15", Math.Abs(wwOn - wwOff) <= 0.15 + 1e-9);
+            allOn.Add(t16On);
+            allOff.Add(t16Off);
+            if (!WinShare.Judge("KaijuType", "16v16 pool", t16On, t16Off, true)) fails.Add("16v16 win share (see the [win share] line)");
+            if (!WinShare.Judge("KaijuType", "all " + allOn.Matches + " matches", allOn, allOff, false)) fails.Add("all-match win share (see the [win share] line)");
             var fpOn = new List<double>(); var fpOff = new List<double>(); var kOn = new List<double>(); var kOff = new List<double>();
             double kpmOn = 0, kpmOff = 0; int hcOn = 0, hcOff = 0;
             int[] ckOn = new int[8], ckOff = new int[8]; int kTotOn = 0, kTotOff = 0;

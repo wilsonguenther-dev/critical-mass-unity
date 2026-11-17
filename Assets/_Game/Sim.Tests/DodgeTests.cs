@@ -4,6 +4,7 @@ using CriticalMass.Sim.Bots;
 using CriticalMass.Sim.Config;
 using CriticalMass.Sim.Core;
 using CriticalMass.Sim.Grid;
+using CriticalMass.Sim.Tests.Harness;
 using NUnit.Framework;
 
 namespace CriticalMass.Sim.Tests
@@ -291,8 +292,11 @@ namespace CriticalMass.Sim.Tests
         /// within 0.15 (5v5, and all 26 together); median first knock-out -10% / +20%; kills per minute -25% / +10%; class kill
         /// shares within 0.08; hill lead changes +-30%; dodges per bot-minute (Normal) between 1 and 4; Kaiju slam damage share
         /// printed (expected to fall).
+        /// b14-c item 4: SLOW (it is 88 whole matches: 58 s on the .NET gate, 1174 s in the Unity EditMode job, whose per-test
+        /// timeout is 180 s); the always-run part is DodgeSmokeBotsDodgeAtTheNormalRateOnTwoSeeds. Item 5: the win shares are
+        /// judged by WinShare on the 24 16v16 seeds (was printed only), on the 20 5v5 seeds and on all 44 together.
         /// </summary>
-        [Test]
+        [Test, Category("Slow")]
         public void DodgeKeepsTheControlsBalanceOnTheSameSeeds()
         {
             var failures = new List<string>();
@@ -301,7 +305,7 @@ namespace CriticalMass.Sim.Tests
             {
                 // b13 r3 integrator: 16v16 on 24 seeds (was 6: hill lead changes swung 18/14 to 9/22 with dodge-unrelated rules; the
                 // walls owner ruling, 24 seeds at 16v16, applies the same way)
-                int[] seeds = size == 16 ? new[] { 1337, 4242, 7, 99, 2024, 31337, 1, 2, 3, 4, 5, 6, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19 } : new[] { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20 };
+                int[] seeds = size == 16 ? WinShare.Seeds16 : new[] { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20 };
                 var arms = new[] { new Arm(), new Arm() };
                 foreach (int seed in seeds) for (int a = 0; a < 2; a++) PlayMatch(seed, size, a == 0, arms[a]);
                 for (int a = 0; a < 2; a++) { all[a].Matches += arms[a].Matches; for (int t = 0; t < 3; t++) all[a].Wins[t] += arms[a].Wins[t]; }
@@ -330,19 +334,27 @@ namespace CriticalMass.Sim.Tests
                     double on = sOn > 0 ? (double)arms[0].KillsByClass[c] / sOn : 0, off = sOff > 0 ? (double)arms[1].KillsByClass[c] / sOff : 0;
                     Limit(failures, tag + " " + (ClassId)c + " kill share", on, off, Math.Abs(on - off) <= 0.08 + 1e-9, "within 0.08");
                 }
-                for (int t = 0; t < 2; t++)
-                {
-                    double on = (double)arms[0].Wins[t] / seeds.Length, off = (double)arms[1].Wins[t] / seeds.Length;
-                    if (size == 5) Limit(failures, "5v5 " + (t == 0 ? "Azure" : "Crimson") + " win share", on, off, Math.Abs(on - off) <= 0.15 + 1e-9, "within 0.15");
-                    else Console.WriteLine("{\"item\":\"b13-jd limit\",\"line\":\"16v16 " + (t == 0 ? "Azure" : "Crimson") + " win share (printed only, 24 matches): on " + on.ToString("F3") + ", control " + off.ToString("F3") + "\"}");
-                }
+                if (!WinShare.Judge("b13-jd dodge", tag + " (" + seeds.Length + " seeds)", TallyOf(arms[0]), TallyOf(arms[1]), size == 16)) failures.Add(tag + " win share (see the [win share] line)");
             }
-            for (int t = 0; t < 2; t++)
-            {
-                double on = (double)all[0].Wins[t] / Math.Max(1, all[0].Matches), off = (double)all[1].Wins[t] / Math.Max(1, all[1].Matches);
-                Limit(failures, "all matches " + (t == 0 ? "Azure" : "Crimson") + " win share", on, off, Math.Abs(on - off) <= 0.15 + 1e-9, "within 0.15");
-            }
+            if (!WinShare.Judge("b13-jd dodge", "all " + all[0].Matches + " matches", TallyOf(all[0]), TallyOf(all[1]), false)) failures.Add("all-match win share (see the [win share] line)");
             Assert.IsEmpty(failures, string.Join("\n", failures));
+        }
+
+        private static WinShare.Tally TallyOf(Arm a) => new WinShare.Tally { Azure = a.Wins[0], Crimson = a.Wins[1], Draws = a.Wins[2] };
+
+        /// <summary>
+        /// b14-c item 4 (the always-run part of the balance split): two whole 5v5 Full matches with dodge on; Normal bots dodge 1 to 4
+        /// times per bot-minute and the matches still have kills (the full balance with its control is the Slow test above).
+        /// </summary>
+        [Test]
+        public void DodgeSmokeBotsDodgeAtTheNormalRateOnTwoSeeds()
+        {
+            var arm = new Arm();
+            foreach (int seed in new[] { 1, 2 }) PlayMatch(seed, 5, true, arm);
+            double dpm = arm.Dodges / Math.Max(1e-9, arm.BotMinutes);
+            Console.WriteLine("{\"item\":\"b13-jd smoke\",\"matches\":" + arm.Matches + ",\"dodgesPerBotMinute\":" + dpm.ToString("F2") + ",\"kills\":" + arm.Kills + ",\"limit\":\"1 to 4, kills > 0\"}");
+            Assert.That(dpm, Is.InRange(1.0, 4.0), "dodges per bot-minute (Normal)");
+            Assert.Greater(arm.Kills, 0);
         }
 
         [Test]
