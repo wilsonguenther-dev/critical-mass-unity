@@ -31,7 +31,8 @@ namespace CriticalMass.Runtime.Game
     /// <c>-matchVideoQuality Q</c> (JPEG, default 92), encoded on worker threads.</item>
     /// <item>Recording starts the first frame the real match (not the title backdrop) exists and ends
     /// <c>-matchVideoResultsSeconds</c> (default 10) after the results screen opens; the results screen does not press
-    /// Play again by itself meanwhile. The AUTOMATED TEST RUN plate is not shown in a match-video run (a film for people).
+    /// Play again by itself meanwhile. The AUTOMATED TEST RUN plate is not shown in a match-video run (a film for people),
+    /// and the camera is the player's play view behind actor 0 (GroundView.ForcePlay), not the spectator watch camera.
     /// DIR/video.json holds the frame numbers of kick-off, the hatch, the match end and the results screen, the score,
     /// the winner and the capture counters; then the game quits (exit 0).</item>
     /// <item><c>-simScout SEEDS</c> (<c>-batchmode -nographics</c>; SEEDS = <c>A-B</c> or <c>A,B,C</c>): sim-only, no view: each seed's
@@ -176,6 +177,9 @@ namespace CriticalMass.Runtime.Game
 
         void Step()
         {
+            // The player's own view: the play camera follows actor 0 (the Warrior) although the autopilot drives it, as
+            // FollowCameraShots does; without this an autoplay run shows the spectator watch camera and its key line.
+            CriticalMass.Runtime.Camera.GroundView.ForcePlay = true;
             // The audio mix of this capture frame (drained every frame, kept only while recording).
             if (_audioOn)
             {
