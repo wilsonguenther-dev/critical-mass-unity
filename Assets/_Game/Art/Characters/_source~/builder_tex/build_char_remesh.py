@@ -769,6 +769,180 @@ def finalize(o, W, tag):
     return wr
 
 
+# ================================================================================================ 6b. weights by robust transfer
+# weights_transfer.enabled: the LOD0 weights come from a well-skinned TEMPLATE character on the same skeleton (the
+# Warrior), posed onto this character's fitted A-pose skeleton, by robust_weight_transfer.py (match + inpaint + smooth
+# + 4 influences). The heat weights above are still computed, on a copy (LOW_OLD), for the old-vs-new comparison.
+WT = C.get("weights_transfer") or {}
+LOW_OLD = None
+
+
+def tris_of(o):
+    me = o.data; me.calc_loop_triangles()
+    T = np.zeros(len(me.loop_triangles) * 3, int); me.loop_triangles.foreach_get("vertices", T); return T.reshape(-1, 3)
+
+
+def write_groups(o, W):
+    o.vertex_groups.clear(); vgs = [o.vertex_groups.new(name=b) for b in DEFORM]
+    for vi, bi in zip(*np.nonzero(W > 0)): vgs[bi].add([int(vi)], float(W[vi, bi]), "REPLACE")
+
+
+def leak_check(o):
+    """Left/right and head leaks (A-pose, fitted skeleton): other-leg bone weight on a leg's vertices (by region label
+    and by side + height), other-arm weight on an arm, head weight below the neck joint (2 cm margin). Rigid parts
+    (pack, belt items) excluded."""
+    Vx, _ = arrays(o); W = read_groups(o); Lx = labels_of(o)
+    rigid = (Lx == RI["item"]) | (Lx == RI["pack"]); out = {}
+    for s, o_ in (("l", "r"), ("r", "l")):
+        sg = np.sign(JA["upperleg." + s][0][0])
+        for kind, chain, zone in (("leg", ("upperleg", "lowerleg", "foot", "toes"), "zleg."), ("arm", ("upperarm", "lowerarm", "wrist", "hand"), "zarm.")):
+            ob = [BI[b + "." + o_] for b in chain]
+            m_lab = ~rigid & (Lx == RI[kind + "." + s])          # limb shell only: the hip/shoulder zones span the centre
+            m_geo = ~rigid & (Vx[:, 0] * sg > 0.03) & ((Vx[:, 2] < JA["hips"][0][2]) if kind == "leg" else (Vx[:, 2] > JA["chest"][0][2]))
+            for tag, m in (("label", m_lab), ("side", m_geo)):
+                w = W[m][:, ob].sum(1)
+                out["%s.%s_on_%s.%s_%s" % (kind, o_, kind, s, tag)] = dict(verts=int((w > 0.01).sum()), of=int(m.sum()), max=round(float(w.max()) if len(w) else 0.0, 3))
+    nz = JA["head"][0][2]
+    for mg in (0.0, 0.02, 0.10):
+        m = ~rigid & (Vx[:, 2] < nz - mg); w = W[m, BI["head"]]
+        out["head_below_neck_%dcm" % round(mg * 100)] = dict(verts=int((w > 0.01).sum()), max=round(float(w.max()) if len(w) else 0.0, 3), neck_z=round(float(nz), 3))
+    return out
+
+
+def simple_finalize(o, W, tag, extra=None):
+    """Transfer path: rigid parts one-hot on their bone (pack on chest, belt items on theirs, as finalize does), every
+    other vertex as transferred; max 4, normalised."""
+    import robust_weight_transfer as rwt
+    Vx, Ex = arrays(o); Lx = labels_of(o)
+    IBx_[0] = np.array([IB[kdr.find(p_)[1]] for p_ in Vx]); Ex_[0] = Ex
+    al, _ = allowed_for(Lx, Vx); rigid = (Lx == RI["item"]) | (Lx == RI["pack"])
+    W = W.copy(); W[rigid] = al[rigid].astype(float)
+    W = rwt.limit(W, WT.get("max_influences", 4))
+    write_groups(o, W); ninf = (W > 0).sum(1)
+    wr = dict(method="robust transfer", max_influences=int(ninf.max()), mean_influences=round(float(ninf.mean()), 2), unweighted=int((ninf == 0).sum()),
+              rigid_verts=int(rigid.sum()), sum_err=float(np.abs(W.sum(1) - 1).max()), leaks=leak_check(o), **(extra or {}))
+    log("v3 weights", tag, json.dumps(wr))
+    return wr
+
+
+def load_template():
+    """The template body (weights in DEFORM columns, props on the excluded bones dropped) and its rest joints."""
+    import robust_weight_transfer as rwt
+    tc = WT["template"]
+    objs = imp_fbx(X(tc["fbx"]), False)
+    trig = next(o for o in objs if o.type == "ARMATURE"); trig.data.pose_position = "REST"; bpy.context.view_layer.update()
+    tm = next(o for o in objs if o.type == "MESH" and o.name.startswith(tc["mesh_prefix"]))
+    Vs, _ = arrays(tm); Fs = tris_of(tm); Ws = read_groups(tm)
+    gname = {g.index: g.name for g in tm.vertex_groups}; excl = np.zeros(len(Vs), bool)
+    for vv in tm.data.vertices:
+        if vv.groups:
+            g = max(vv.groups, key=lambda g_: g_.weight)
+            excl[vv.index] = any(s_ in gname[g.group] for s_ in tc["exclude_dominant_bone_substrings"])
+    keep = ~excl & (Ws.sum(1) > 1e-6)
+    Vs, Fs, idx = rwt.submesh(Vs, Fs, keep); Ws = Ws[idx]; Ws = Ws / Ws.sum(1, keepdims=True)
+    Fs, nflip, npieces = rwt.orient_outward(Vs, Fs)
+    Js = {b: (np.array(trig.matrix_world @ trig.data.bones[b].head_local), np.array(trig.matrix_world @ trig.data.bones[b].tail_local)) for b in DEFORM}
+    hb_ = Ws[Vs[:, 2] < Js["head"][0][2], BI["head"]]
+    rep = dict(fbx=tc["fbx"], mesh=tm.name, verts_total=len(tm.data.vertices), prop_verts_dropped=int(excl.sum()), verts=int(len(Vs)), tris=int(len(Fs)),
+               pieces=npieces, pieces_reoriented=nflip, own_head_weight_below_its_neck=dict(verts=int((hb_ > 0.01).sum()), max=round(float(hb_.max()) if len(hb_) else 0.0, 3)))
+    for o in objs: bpy.data.objects.remove(o, do_unlink=True)
+    return Vs, Fs, Ws, Js, rep
+
+
+def transfer_lod0(o):
+    """Pass 1: template -> the main body piece. Pass 2: the main body (pass-1 weights) -> every other non-rigid piece
+    (clothing shells), so cloth follows what is underneath. Rigid parts stay rigid (simple_finalize)."""
+    import robust_weight_transfer as rwt
+    Vx, Ex = arrays(o); Fx = tris_of(o); Lx = labels_of(o); n = len(Vx)
+    IBx_[0] = np.array([IB[kdr.find(p_)[1]] for p_ in Vx]); Ex_[0] = Ex
+    al, _ = allowed_for(Lx, Vx); rigid = (Lx == RI["item"]) | (Lx == RI["pack"])
+    Fx, tflip, _ = rwt.orient_outward(Vx, Fx)
+    Vs, Fs, Ws, Js, trep = load_template(); trep["target_pieces_reoriented"] = tflip
+    D = bone_dists(Vx, JA); D[~al] = np.inf
+    own = np.where(np.isfinite(D.min(1)) & ~rigid, D.argmin(1), -1)
+    Vp, fit = rwt.fit_template(Vs, Ws, Js, Vx, own, JA, DEFORM, set(WT.get("terminal_bones", [])),
+                               clamp=tuple(WT.get("fit_scale_clamp", [0.5, 3.0])), pct=WT.get("fit_extent_pct", 95.0))
+    if not WT.get("fit_cross_scale", True):
+        Vp, fit = rwt.fit_template(Vs, Ws, Js, Vx, np.full(n, -1), JA, DEFORM, set(), clamp=(1.0, 1.0))
+    # pieces of the non-rigid surface: the largest is the body (pass 1), the rest are shells (pass 2)
+    nr = ~rigid
+    Vb, Fb, ib = rwt.submesh(Vx, Fx, nr)
+    lab = rwt.components(len(Vb), rwt.edges_of(Fb)) if len(Fb) else np.arange(len(Vb))
+    u_, c_ = np.unique(lab, return_counts=True); main = lab == u_[c_.argmax()]
+    W = np.zeros((n, len(DEFORM)))
+    Vm, Fm, im = rwt.submesh(Vb, Fb, main)
+    MK = None
+    if WT.get("region_mask", False):        # the region limits run 9 used (allowed_for grown by allowed_rings), no factors
+        al_s = al.copy()
+        for _ in range(RM["allowed_rings"]):
+            g_ = al_s.copy(); g_[Ex[:, 0]] |= al_s[Ex[:, 1]]; g_[Ex[:, 1]] |= al_s[Ex[:, 0]]; g_[rigid] = al[rigid]; al_s = g_
+        hm_ = WT.get("known_mask_head_below_neck_m")
+        if hm_ is not None:                 # matched (known) values only: no head weight on the body this far below the neck
+            al_s[(Lx != RI["head"]) & (Vx[:, 2] < JA["head"][0][2] - hm_), BI["head"]] = False
+        MK = al_s
+    W1, st1, ok1 = rwt.transfer(Vp, Fs, Ws, Vm, Fm, WT, mask=None if MK is None else MK[ib[im]])
+    W[ib[im]] = W1
+    # remaining surface distance between the posed template and the body, both ways
+    _, _, d_tb = rwt.closest_on_mesh(Vm, Fm, Vp)
+    _, _, d_bt = rwt.closest_on_mesh(Vp, Fs, Vm)
+    dist = {k: dict(median=round(float(np.median(d)), 4), p90=round(float(np.percentile(d, 90)), 4), p99=round(float(np.percentile(d, 99)), 4), max=round(float(d.max()), 4))
+            for k, d in (("target_to_template_m", d_bt), ("template_to_target_m", d_tb))}
+    unm = np.zeros(n, bool); unm[ib[im][~ok1]] = True
+    inb = np.zeros(n, bool); inb[ib[im]] = True
+    by_region = {REG[i]: dict(verts=int(((Lx == i) & inb).sum()), matched_share=round(float(1 - unm[(Lx == i) & inb].mean()), 3))
+                 for i in range(len(REG)) if ((Lx == i) & inb).any()}
+    st2 = None
+    if (~main).any():
+        Vsh, Fsh, ish = rwt.submesh(Vb, Fb, ~main)
+        W2, st2, ok2 = rwt.transfer(Vm, Fm, W1, Vsh, Fsh, dict(WT, **WT.get("shell_pass", {})), mask=None if MK is None else MK[ib[ish]])
+        # a separate piece with no accepted match (debris, a strap end, a glove bit hanging beside the hip) is rigid
+        # on the deform bone nearest its centroid, like the belt items: one bone per piece, so nothing inside it stretches
+        gi = ib[ish]; plm = rwt.components(len(Vsh), rwt.edges_of(Fsh)) if len(Fsh) else np.arange(len(Vsh)); z_ = np.zeros(len(gi), bool)
+        for u in np.unique(plm):
+            m = plm == u
+            if not ok2[m].any():
+                c = Vx[gi][m].mean(0); bb = int(bone_dists(c[None], JA)[0].argmin()); W2[m] = np.eye(len(DEFORM))[bb]; z_ |= m
+        W[gi] = W2
+        pl = rwt.components(len(Vsh), rwt.edges_of(Fsh)) if len(Fsh) else np.arange(len(Vsh))
+        st2 = dict(st2, pieces=int(len(u_) - 1), unmatched_pieces_rigid_verts=int(z_.sum()),
+                   piece_list=[dict(verts=int((pl == u).sum()), centroid=np.round(Vx[gi][pl == u].mean(0), 3).tolist(),
+                                    region=REG[int(np.bincount(Lx[gi][pl == u]).argmax())], bone=DEFORM[int(W2[pl == u].sum(0).argmax())]) for u in np.unique(pl)])
+    # LOD1 source: the same transfer with its own smoothing (LOD1's longer edges span more of a weight gradient:
+    # v3 runs 5 vs D, LOD0 better at 30 iterations, LOD1 better from the 10-iteration weights)
+    l1s = WT.get("lod1_source_smooth_iters")
+    if l1s is not None and l1s != WT.get("smooth_iters", 10):
+        cfg1 = dict(WT, smooth_iters=l1s); Wl = np.zeros_like(W)
+        Wl[ib[im]], _, _ = rwt.transfer(Vp, Fs, Ws, Vm, Fm, cfg1, mask=None if MK is None else MK[ib[im]])
+        if (~main).any():
+            Wl[ib[ish]] = W[ib[ish]]                # the shells as above (region-limited)
+        Wl[rigid] = al[rigid].astype(float); LOD1_SRC[0] = rwt.limit(Wl, WT.get("max_influences", 4))
+    # evidence: the posed template (red) over the body (grey), x-ray, front and side, A-pose
+    TPL[0] = (Vp, Fs)
+    try:
+        tme = bpy.data.meshes.new("TemplatePosed"); tme.from_pydata(Vp.tolist(), [], Fs.tolist()); tob = bpy.data.objects.new("TemplatePosed", tme)
+        scene.collection.objects.link(tob); tob.color = (0.9, 0.15, 0.1, 1); o.color = (0.75, 0.75, 0.75, 1)
+        hid = {x.name: x.hide_render for x in scene.objects}
+        for x in scene.objects: x.hide_render = x not in (o, tob)
+        scene.render.engine = "BLENDER_WORKBENCH"; sh_ = scene.display.shading; sh_.light = "STUDIO"; sh_.color_type = "OBJECT"
+        sh_.show_xray = True; sh_.xray_alpha = 0.55
+        scene.render.resolution_x = scene.render.resolution_y = 600
+        fc = bpy.data.objects.new("fitcam", bpy.data.cameras.new("fitcam")); scene.collection.objects.link(fc); scene.camera = fc
+        fc.data.type = "ORTHO"; fc.data.ortho_scale = 2.5; tiles_ = []
+        for nm, loc in (("front", (0, -6, 1.15)), ("side", (6, 0, 1.15))):
+            fc.location = loc; fc.rotation_euler = (Vector((0, 0, 1.15)) - Vector(loc)).to_track_quat("-Z", "Y").to_euler()
+            scene.render.filepath = os.path.join(OUT, "template_fit_%s.png" % nm); bpy.ops.render.render(write_still=True)
+            tiles_.append(load_px(scene.render.filepath)[:, :, :3])
+        write_png(os.path.join(OUT, "template_fit.png"), np.concatenate(tiles_, 1))
+        sh_.show_xray = False; bpy.data.objects.remove(fc, do_unlink=True); scene.camera = None; bpy.data.objects.remove(tob, do_unlink=True)
+        for x in scene.objects: x.hide_render = hid.get(x.name, False)
+    except Exception as ex_:
+        log("template fit render failed", repr(ex_))
+    return simple_finalize(o, W, o.name, dict(template=trep, fit=fit, pass1_body=st1, pass2_shells=st2, surface_distance=dist, matched_by_region=by_region,
+                                              thresholds=dict(dist_frac=WT.get("dist_frac"), angle_deg=WT.get("angle_deg"), allow_flip=WT.get("allow_flip", False))))
+
+
+TPL = [None]
+LOD1_SRC = [None]
 V0, E0 = arrays(low); lc0 = components(len(V0), E0); u0, c0 = np.unique(lc0, return_counts=True); keep0 = lc0 == u0[c0.argmax()]
 hb = low.copy(); hb.data = low.data.copy(); scene.collection.objects.link(hb); hb.vertex_groups.clear()
 bm = bmesh.new(); bm.from_mesh(hb.data); bm.verts.ensure_lookup_table()
@@ -780,9 +954,19 @@ Wh = np.zeros((len(V0), len(DEFORM))); Wh[np.nonzero(keep0)[0]] = read_groups(hb
 REP["v2_heat"] = dict(verts=int(keep0.sum()), weighted=int((Wh[keep0].sum(1) > 1e-6).sum()))
 log("v2 heat", REP["v2_heat"])
 bpy.data.objects.remove(hb, do_unlink=True)
-REP["weights"] = {"bone_heat_result": list(rh), "LOD0": finalize(low, Wh, "LOD0")}
+if WT.get("enabled"):
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    for p_ in WT.get("pydeps", []): sys.path.insert(0, os.path.expanduser(p_))
+    LOW_OLD = low.copy(); LOW_OLD.data = low.data.copy(); scene.collection.objects.link(LOW_OLD); LOW_OLD.name = LOW_OLD.data.name = KEY + "_LOD0_heat"
+    REP["weights"] = {"bone_heat_result": list(rh), "LOD0_heat": finalize(LOW_OLD, Wh, "LOD0_heat")}
+    REP["weights"]["LOD0_heat"]["leaks"] = leak_check(LOW_OLD)
+    REP["weights"]["LOD0"] = transfer_lod0(low)
+else:
+    REP["weights"] = {"bone_heat_result": list(rh), "LOD0": finalize(low, Wh, "LOD0")}
+    REP["weights"]["LOD0"]["leaks"] = leak_check(low)
 
 lod1 = low.copy(); lod1.data = low.data.copy(); scene.collection.objects.link(lod1); lod1.name = lod1.data.name = KEY + "_LOD1"
+if LOD1_SRC[0] is not None: write_groups(lod1, LOD1_SRC[0])          # carried through the decimation below
 REP["v2_decimate"]["lod1"] = decimate_to(lod1, RM["lod1_tris"])
 shd = lod1.copy(); shd.data = lod1.data.copy(); scene.collection.objects.link(shd); shd.name = shd.data.name = KEY + "_Shadow"
 shd.vertex_groups.clear()
@@ -790,25 +974,48 @@ while shd.data.uv_layers: shd.data.uv_layers.remove(shd.data.uv_layers[0])
 mr = shd.modifiers.new("R", "REMESH"); mr.mode = "VOXEL"; mr.voxel_size = RM["shadow_voxel"]; mr.adaptivity = 0.0; apply_mod(shd, "R")
 REP["v2_decimate"]["shadow"] = decimate_to(shd, RM["shadow_tris"])
 shd.data.uv_layers.new(name="UVMap")
-REP["weights"]["LOD1"] = finalize(lod1, read_groups(lod1), lod1.name)
-V1, _ = arrays(lod1); W1 = read_groups(lod1); kd1 = KDTree(len(V1))
-for i, p in enumerate(V1): kd1.insert(p, i)
-kd1.balance()
-Vs_, _ = arrays(shd)
-REP["weights"]["Shadow"] = finalize(shd, np.array([W1[kd1.find(p)[1]] for p in Vs_]), shd.name)
+if WT.get("enabled") and WT.get("lod1_from", "decimate") == "decimate":
+    # LOD1: the collapse decimation carried the transferred LOD0 weights along its edges (no proximity jumps between
+    # touching parts); limited + normalised. Shadow from LOD1 by closest point.
+    import robust_weight_transfer as rwt
+    L1_ = labels_of(lod1); W1_ = rwt.smooth_all(tris_of(lod1), read_groups(lod1), WT.get("lod1_smooth_iters", 0), WT.get("smooth_alpha", 0.2),
+                                                frozen=(L1_ == RI["item"]) | (L1_ == RI["pack"]))
+    REP["weights"]["LOD1"] = simple_finalize(lod1, W1_, lod1.name, dict(lod1_from="decimation of the transferred LOD0", lod1_smooth_iters=WT.get("lod1_smooth_iters", 0)))
+    V1b, _ = arrays(lod1); fi_, bc_, _ = rwt.closest_on_mesh(V1b, tris_of(lod1), arrays(shd)[0])
+    REP["weights"]["Shadow"] = simple_finalize(shd, np.einsum("ij,ijk->ik", bc_, read_groups(lod1)[tris_of(lod1)[fi_]]), shd.name)
+elif WT.get("enabled"):
+    # LOD1 from LOD0 (closest point on the LOD0 surface, barycentric; body vertices from body faces only), Shadow from LOD1
+    import robust_weight_transfer as rwt
+    V0_, _ = arrays(low); F0_ = tris_of(low); W0_ = read_groups(low); L0_ = labels_of(low); nr0 = (L0_ != RI["item"]) & (L0_ != RI["pack"])
+    V1_, _ = arrays(lod1); L1_ = labels_of(lod1); nr1 = (L1_ != RI["item"]) & (L1_ != RI["pack"])
+    Vb0, Fb0, ib0 = rwt.submesh(V0_, F0_, nr0)
+    fi_, bc_, d1_ = rwt.closest_on_mesh(Vb0, Fb0, V1_)
+    W1_ = np.einsum("ij,ijk->ik", bc_, W0_[ib0][Fb0[fi_]])
+    REP["weights"]["LOD1"] = simple_finalize(lod1, W1_, lod1.name, dict(from_lod0_dist_m=dict(median=round(float(np.median(d1_[nr1])), 4), max=round(float(d1_[nr1].max()), 4))))
+    V1b, _ = arrays(lod1); fi_, bc_, _ = rwt.closest_on_mesh(V1b, tris_of(lod1), arrays(shd)[0])
+    REP["weights"]["Shadow"] = simple_finalize(shd, np.einsum("ij,ijk->ik", bc_, read_groups(lod1)[tris_of(lod1)[fi_]]), shd.name)
+else:
+    REP["weights"]["LOD1"] = finalize(lod1, read_groups(lod1), lod1.name)
+    REP["weights"]["LOD1"]["leaks"] = leak_check(lod1)
+    V1, _ = arrays(lod1); W1 = read_groups(lod1); kd1 = KDTree(len(V1))
+    for i, p in enumerate(V1): kd1.insert(p, i)
+    kd1.balance()
+    Vs_, _ = arrays(shd)
+    REP["weights"]["Shadow"] = finalize(shd, np.array([W1[kd1.find(p)[1]] for p in Vs_]), shd.name)
 LODS = [low, lod1, shd]
 REP["tris"] = {o.name: ntri(o) for o in LODS}
 REP["v2_lod_surfaces"] = {o.name: surface_check(o) for o in LODS}
 REP["v2_gaps_apose"] = {o.name: gaps(*arrays(o)[:1], labels_of(o), arrays(o)[1]) for o in LODS}
 REP["lod0_head_tris"] = REP["v2_lod0_head_tris"]
 log("v2 tris", REP["tris"], json.dumps(REP["v2_gaps_apose"]))
-LAB_REST = {o.name: labels_of(o) for o in LODS}
+LODS_X = LODS + ([LOW_OLD] if LOW_OLD is not None else [])        # LOW_OLD: the heat weights, for comparison only
+LAB_REST = {o.name: labels_of(o) for o in LODS_X}
 bpy.data.objects.remove(rigA, do_unlink=True)
 
 # ================================================================================================ unskin to the rest
 SK = {pb.name: A_ @ pb.matrix @ pb.bone.matrix_local.inverted() @ A_.inverted() for pb in rig.pose.bones}
 REP["unskin_max_move_m"] = {}
-for o in LODS:
+for o in LODS_X:
     gname = {g.index: g.name for g in o.vertex_groups}; mv = 0.0
     for vv in o.data.vertices:
         M = Matrix.Diagonal((0.0, 0.0, 0.0, 0.0)); tot = 0.0
@@ -820,7 +1027,7 @@ for o in LODS:
 for pb in rig.pose.bones: pb.matrix_basis = Matrix.Identity(4)
 bpy.context.view_layer.update()
 JR = joints(rig)
-for o in LODS:
+for o in LODS_X:
     o.parent = rig; o.matrix_parent_inverse = rig.matrix_world.inverted()
     am = o.modifiers.new("Armature", "ARMATURE"); am.object = rig
     for p in o.data.polygons: p.use_smooth = True
@@ -835,7 +1042,7 @@ for o in LODS:
     o.data.color_attributes.active_color_name = "Col"
     o.data.materials.clear()
 kmat = bpy.data.materials.get(KEY) or bpy.data.materials.new(KEY)
-for o in LODS: o.data.materials.append(kmat)
+for o in LODS_X: o.data.materials.append(kmat)
 REP["joint_cut_rest"] = {}; REP["v2_gaps_rest"] = {}
 for o in LODS:
     Vx, Ex = arrays(o)
@@ -845,7 +1052,7 @@ Vx, _ = arrays(low); REP["height_lod0_rest_m"] = round(float(Vx[:, 2].max()), 4)
 REP["joint_cut_rest_spheres"] = {s: dict(shoulder=JR["upperarm." + s][0].round(4).tolist(), hip=JR["upperleg." + s][0].round(4).tolist()) for s in ("l", "r")}
 log("v2 rest gaps", json.dumps(REP["v2_gaps_rest"]))
 for o in list(scene.objects):
-    if o.type == "MESH" and o not in LODS and o is not old0: bpy.data.objects.remove(o, do_unlink=True)
+    if o.type == "MESH" and o not in LODS_X and o is not old0: bpy.data.objects.remove(o, do_unlink=True)
 REP["REST"] = REST
 save()
 bpy.ops.wm.save_as_mainfile(filepath=os.path.join(OUT, "stage_skinned.blend"))
@@ -886,3 +1093,18 @@ Ptail = rig.matrix_world @ pbh.matrix @ Matrix.Translation((0, pbh.bone.length, 
 mallet.matrix_parent_inverse = Ptail.inverted() @ Mw; mallet.matrix_basis = Matrix.Identity(4)
 
 exec(compile(_src[_src.index(_m_proof):], P1, "exec"), globals())         # proof, renders, export, round trip
+
+# ================================================================================================ stretch table (csv)
+GP = set(C.get("gameplay_clips", []))
+cols = [("new_LOD0", "lod0"), ("new_LOD1", "lod1"), ("current_LOD0", "current"), ("heat_LOD0", "heat_lod0")]
+cols = [c_ for c_ in cols if any(c_[0] in r_ for r_ in REP["clip_stretch"].values())]
+lines = ["clip,gameplay," + ",".join("%s_max,%s_p999" % (b_, b_) for _, b_ in cols) + ",lod0_worst_at"]
+for clip in sorted(REP["clip_stretch"]):
+    r_ = REP["clip_stretch"][clip]
+    lines.append("%s,%d,%s,\"%s\"" % (clip, clip in GP, ",".join("%.2f,%.2f" % (r_[k_]["max"], r_[k_]["p999"]) for k_, _ in cols),
+                                     " ".join(str(x_) for x_ in r_["new_LOD0"].get("worst_at", []))))
+open(os.path.join(OUT, KEY + "_stretch.csv"), "w").write("\n".join(lines) + "\n")
+REP["stretch_gameplay"] = {k_: dict(worst_max=max(REP["clip_stretch"][c_][k_]["max"] for c_ in GP), worst_p999=max(REP["clip_stretch"][c_][k_]["p999"] for c_ in GP),
+                                    clips_under_2_5=sum(REP["clip_stretch"][c_][k_]["max"] < 2.5 for c_ in GP)) for k_, _ in cols}
+save()
+print("[%s] GAMEPLAY %s" % (KEY, json.dumps(REP["stretch_gameplay"])), flush=True)
