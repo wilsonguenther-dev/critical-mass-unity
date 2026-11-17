@@ -57,7 +57,9 @@ namespace CriticalMass.Sim.Bots
             double x = w.X[id], z = w.Z[id];
             tx = gx;
             tz = gz;
-            if (SegmentClear.Clear(w.Map, x, z, gx, gz)) return;
+            // b13 integrator: follow the route whenever there is one (a clear centre line is not a clear body line: Miners
+            // pressed into the hut and vein edges, NoShiver flags); straight only without a route.
+            if (route == null && SegmentClear.Clear(w.Map, x, z, gx, gz)) return;
             if (route != null && FlowField.SampleFlowDir(route, w.Map, x, z, out double dx, out double dz))
             {
                 tx = x + dx * Carrot;
@@ -222,7 +224,7 @@ namespace CriticalMass.Sim.Bots
             }
             // Walk on: the route's step (or straight at a clear goal), and the steering point moves with the bot.
             double mx = gx - x, mz = gz - z;
-            if (!SegmentClear.Clear(w.Map, x, z, gx, gz) && route != null && FlowField.SampleFlowDir(route, w.Map, x, z, out double fx, out double fz))
+            if (route != null && FlowField.SampleFlowDir(route, w.Map, x, z, out double fx, out double fz))
             {
                 mx = fx;
                 mz = fz;
