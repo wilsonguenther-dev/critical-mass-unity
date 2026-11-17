@@ -643,6 +643,11 @@ namespace CriticalMass.Sim.Bots
                         aimZ = gz;
                         separate = false;
                         B13Hooks.BotTaskAct(w, st, id, output);   // b13-hook
+                        // b13 r3 (MovementShiver Kaiju hill seed 1337): a task that walks (BotMine.Act writes the step straight into
+                        // the frame) is a wish to move, so the stuck and progress detectors see it. Before, WantMove stayed 0: Crimson
+                        // Miner bot 26 pressed into the void edge of the diagonal bridge at (70, 28.5) for over 300 s, never unstuck,
+                        // and the owned Kaiju behind him on the deck (it cannot push a wedged fighter) stood at (70.6, 27.0) all match.
+                        if (output.MoveX * output.MoveX + output.MoveZ * output.MoveZ > 1e-8) st.WantMove[id] = 1;
                     }
                     else Toward(w, id, gx, gz, 0);
                     break;
