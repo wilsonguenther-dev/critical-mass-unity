@@ -547,8 +547,11 @@ namespace CriticalMass.Sim.Tests
         /// (every 30 s: position, target, active barricades within 13 m of the hill, fighters touching its body) is what to read if
         /// it fails.
         /// </summary>
+        // b14-c: the Slow case was 4242; after the hut regrowth and the Kaiju route guard 4242's Kaiju is never owned (0.0 s, run
+        // 44159219254; 2024 likewise), so the precondition, not the rule, failed. 99 (164.3 s owned in the same run) replaces it;
+        // the six-seed mean tests still play 4242 and print it as left out.
         [TestCase(1337)]
-        [TestCase(4242, Category = "Slow")]
+        [TestCase(99, Category = "Slow")]
         public void InAWholeMatchTheKaijuGetsOntoTheHillAndNeverIdlesOffItWithNoTarget(int seed)
         {
             KaijuHillRun r = MeasureKaijuHill(seed);
