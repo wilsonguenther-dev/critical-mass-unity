@@ -731,7 +731,9 @@ namespace CriticalMass.Sim.Tests
             Assert.AreEqual(on.Matches, off.Matches);
         }
 
-        [Test, Category("Slow")]
+        // KNOWN RED, OWNER REVIEW PENDING (b14 integrator, owner ruling 2026-11-17): walls stay in although the 24-seed 16v16
+        // win-share shift is 0.167 against the 0.15 limit; the owner plays before any feel cut. The limit is NOT loosened.
+        [Test, Category("Slow"), Property("KnownRed", "owner review pending: walls 16v16 win-share shift 0.167 vs limit 0.15")]
         public void BalanceVsControlBuildOnOnlyToggled()
         {
             var arms = new[] { new Arm(), new Arm() };   // 0 = rule on, 1 = control (Build.On false)

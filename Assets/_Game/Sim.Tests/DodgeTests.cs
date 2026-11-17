@@ -296,7 +296,9 @@ namespace CriticalMass.Sim.Tests
         /// timeout is 180 s); the always-run part is DodgeSmokeBotsDodgeAtTheNormalRateOnTwoSeeds. Item 5: the win shares are
         /// judged by WinShare on the 24 16v16 seeds (was printed only), on the 20 5v5 seeds and on all 44 together.
         /// </summary>
-        [Test, Category("Slow")]
+        // KNOWN RED, OWNER REVIEW PENDING (b14 integrator, owner ruling 2026-11-17): dodge stays in although the 5v5 win-share
+        // shift is 0.30 against the 0.15 limit; the owner plays before any feel cut. The limit is NOT loosened.
+        [Test, Category("Slow"), Property("KnownRed", "owner review pending: dodge 5v5 win-share shift 0.30 vs limit 0.15")]
         public void DodgeKeepsTheControlsBalanceOnTheSameSeeds()
         {
             var failures = new List<string>();
