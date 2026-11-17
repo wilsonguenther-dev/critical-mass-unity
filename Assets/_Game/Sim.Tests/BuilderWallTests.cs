@@ -44,6 +44,8 @@ namespace CriticalMass.Sim.Tests
             foreach (ResourceNode nd in w.Nodes) { nd.X = -100; nd.Z = -100; }
             if (w.Depth.Sources != null) foreach (SourceNode sn in w.Depth.Sources) if (sn != null) { sn.X = -100; sn.Z = -100; }
             w.Tick = 100;
+            // b13 r3: the Builder starts on the DIG tool (he owns terrain with the hut rule); these stagings test the pieces.
+            for (int j = 0; j < w.Walls.Tool.Length; j++) w.Walls.Tool[j] = 1;
             return w;
         }
 
@@ -180,6 +182,7 @@ namespace CriticalMass.Sim.Tests
                 if (!ok) bad++;
                 w.Tick += 30;
             }
+            w.Walls.Tool[Me] = 0;   // a fresh Builder: the dig tool (Field() selects pieces for the other stagings)
             Console.WriteLine($"[b13-b] keys: terrain owner {Terraform.OwnerClass(w)} (want Builder with the hut rule)");
             Step("start", true, TerraformMode.Dig, BuildPiece.Wall, false);
             BuilderWalls.TakeBuilderSwitch(w, Me);
@@ -679,6 +682,31 @@ namespace CriticalMass.Sim.Tests
             if (v.Count == 0) return double.NaN;
             var s = v.OrderBy(x => x).ToList();
             return s.Count % 2 == 1 ? s[s.Count / 2] : (s[s.Count / 2 - 1] + s[s.Count / 2]) / 2;
+        }
+
+        [Test, Category("Slow")]
+        public void WinShareOnAWiderSampleBuildOnOnlyToggled()
+        {
+            // b13 r3 tilt evidence (prints only; the limits stay on the ORDER's fixed seeds in BalanceVsControlBuildOnOnlyToggled):
+            // the same toggle on seeds the balance test does not use, so a real per-team tilt would show again and a flip-noise
+            // one would not. Prints the win shares per size, and how many matches flipped each way.
+            var on = new Arm();
+            var off = new Arm();
+            int[] big = { 1, 2, 3, 11, 13, 17 };
+            for (int seed = 21; seed <= 60; seed++) { Play(seed, 5, true, on); Play(seed, 5, false, off); }
+            foreach (int seed in big) { Play(seed, 16, true, on); Play(seed, 16, false, off); }
+            int toA = 0, toC = 0;
+            for (int k = 0; k < on.PerMatch.Count; k++)
+            {
+                bool aOn = on.PerMatch[k].Contains("winner Azure"), aOff = off.PerMatch[k].Contains("winner Azure");
+                if (aOn && !aOff) toA++;
+                if (!aOn && aOff) toC++;
+            }
+            Console.WriteLine($"[b13-b] WIDER 5v5 seeds 21..60 ({on.Matches5} matches): Azure win share on {(double)on.AzureWins5 / Math.Max(1, on.Matches5):F3} control {(double)off.AzureWins5 / Math.Max(1, off.Matches5):F3}");
+            Console.WriteLine($"[b13-b] WIDER 16v16 seeds 1 2 3 11 13 17 ({on.Matches16} matches): Azure win share on {(double)on.AzureWins16 / Math.Max(1, on.Matches16):F3} control {(double)off.AzureWins16 / Math.Max(1, off.Matches16):F3}");
+            Console.WriteLine($"[b13-b] WIDER flips: {toA + toC} of {on.Matches} matches change winner when walls are on ({toA} to Azure, {toC} to Crimson); walls Azure {on.WallsTeam[0]} Crimson {on.WallsTeam[1]}; hill seconds on A {on.HillSec[0]:F0} C {on.HillSec[1]:F0}, control A {off.HillSec[0]:F0} C {off.HillSec[1]:F0}");
+            for (int k = 0; k < on.PerMatch.Count; k++) if (on.PerMatch[k].Contains("winner Azure") != off.PerMatch[k].Contains("winner Azure")) Console.WriteLine($"[b13-b] WIDER flip: on {on.PerMatch[k]} || control {off.PerMatch[k].Substring(0, Math.Min(90, off.PerMatch[k].Length))}");
+            Assert.AreEqual(on.Matches, off.Matches);
         }
 
         [Test, Category("Slow")]
