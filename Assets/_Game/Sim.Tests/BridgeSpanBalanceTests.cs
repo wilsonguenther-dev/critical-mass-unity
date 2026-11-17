@@ -12,6 +12,9 @@ namespace CriticalMass.Sim.Tests
     /// so the Demolitionist's TNT-on-attack rule is on in both arms): 5v5 with the depth lane on, seeds 1 to 20, and 16v16
     /// (the game's default), eight seeds. Prints one line per match and arm and one summary per size and arm, and fails when
     /// either team's win share moves more than WinShareLimit (0.15) from the control's at either size.
+    /// b13 r3 integrator: 16v16 runs 24 seeds (was 8). With 8, one match is 0.125 of share, so two chaotic winner flips
+    /// (0.25, seen after the batch 13 bot tuning with both arms on the same rules) failed a limit of 0.15; the owner's walls
+    /// ruling (6 or 8 16v16 matches is too small a sample) applies the same way here. Same limit, larger sample.
     /// </summary>
     [TestFixture]
     public sealed class BridgeSpanBalanceTests
@@ -47,7 +50,7 @@ namespace CriticalMass.Sim.Tests
             var failures = new System.Collections.Generic.List<string>();
             foreach (int size in new[] { 5, 16 })
             {
-                int[] seeds = size == 16 ? new[] { 1337, 4242, 1, 2, 3, 4, 5, 101 } : new[] { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20 };
+                int[] seeds = size == 16 ? new[] { 1337, 4242, 1, 2, 3, 4, 5, 101, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 99 } : new[] { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20 };
                 double[] caps = { 12, 6 };   // arm 0 = the rule (shipped), arm 1 = the control (1.0.868's cap)
                 var wins = new int[2, 3];
                 int differ = 0;

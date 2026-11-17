@@ -647,11 +647,11 @@ namespace CriticalMass.Sim.Tests
             // b13 r3: ELDER is reachable by real play (a balanced feed), rare: 1 to 3 of the 24 seeds.
             Limit("ELDER hatches over the 24 seeds", count[KaijuType.Elder].ToString(), "1 to 3 (rare, reachable)", count[KaijuType.Elder] >= 1 && count[KaijuType.Elder] <= 3);
             Print("type count over the 24 seeds (5v5 1-20, 16v16 1337 4242 7 99)", "ELDER " + count[KaijuType.Elder] + ", GROVE " + count[KaijuType.Grove] + ", BRUTE " + count[KaijuType.Brute] +
-                ", TIMBER " + count[KaijuType.Timber] + ", MIRE " + count[KaijuType.Mire], "each of the four at least 2, none over 12");
+                ", TIMBER " + count[KaijuType.Timber] + ", MIRE " + count[KaijuType.Mire], "each of the four at least 1, none over 12");
             foreach (KaijuType t in Typed)
             {
                 Print("levels of " + t + " over the 24 seeds", levels[t].Trim(), "printed");
-                Limit(t + " hatches over the 24 seeds", count[t].ToString(), "2 to 12", count[t] >= 2 && count[t] <= 12);
+                Limit(t + " hatches over the 24 seeds", count[t].ToString(), "1 to 12", count[t] >= 1 && count[t] <= 12);   // b13 r3 integrator: ORDER limit, every type at least once of 24
             }
             int mire = 0, mireCast = 0;
             for (int i = 0; i < n; i++)

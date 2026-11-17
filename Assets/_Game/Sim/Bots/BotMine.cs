@@ -137,8 +137,13 @@ namespace CriticalMass.Sim.Bots
             else if (hs.BotHadOre[id] != 0)
             {
                 hs.BotHadOre[id] = 0;
-                if (H.BotHillShiftSeconds > 0 && Blacksmith.Level(w, a.Team) >= H.BotHillShiftFromLevel && OnShift(w, a.Team) < H.BotHillShiftMaxPerTeam)
-                    hs.BotShiftUntil[id] = w.Match.Time + H.BotHillShiftSeconds;
+                // b13 r3 integrator (snowball guard): the shift follows the hut race. A team BEHIND on hut level keeps its Miner
+                // mining (no shift) so it can catch up; a team AHEAD sends him to the hill for the longer BotHillShiftAheadSeconds,
+                // which slows the leader's next level; level teams keep BotHillShiftSeconds.
+                int myLv = Blacksmith.Level(w, a.Team), theirLv = Blacksmith.Level(w, World.OtherTeam(a.Team));
+                double shiftS = myLv > theirLv ? H.BotHillShiftAheadSeconds : myLv < theirLv ? H.BotHillShiftBehindSeconds : H.BotHillShiftSeconds;
+                if (shiftS > 0 && myLv >= H.BotHillShiftFromLevel && OnShift(w, a.Team) < H.BotHillShiftMaxPerTeam)
+                    hs.BotShiftUntil[id] = w.Match.Time + shiftS;
             }
             if (ore <= 0 && w.Match.Time < hs.BotShiftUntil[id])
             {

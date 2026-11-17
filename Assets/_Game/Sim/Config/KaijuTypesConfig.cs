@@ -20,7 +20,9 @@ namespace CriticalMass.Sim.Config
         /// 44012448675: plant 0.900, meat 0.100, wood 0.000, water 0.000), with a floor of RefFloor on wood and water (a
         /// reference of 0 would let a single unit win). KaijuTypeTests prints the measured mean beside this.
         /// </summary>
-        public double[] RefShare = { 0.90, 0.10, 0.02, 0.02 };
+        /// b13 r3 integrator: wood 0.02 -> 0.01. Wood-plan teams deliver 2-9 % wood (their supply bots also stock the Builder's
+        /// wood), water-plan teams 7-35 % water, so with equal references TIMBER hatched 0 of 24; at 0.01 the wood plans win.
+        public double[] RefShare = { 0.90, 0.10, 0.01, 0.02 };
         /// <summary>The floor applied when pinning RefShare to a kind the control never feeds (wood, water).</summary>
         public double RefFloor = 0.02;
         /// <summary>Two best scores within this of each other = a tie = ELDER.</summary>
