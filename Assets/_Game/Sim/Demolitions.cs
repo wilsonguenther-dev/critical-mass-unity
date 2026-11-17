@@ -497,7 +497,7 @@ namespace CriticalMass.Sim.Core
             if (k.State != KaijuState.Egg)
             {
                 double kr = cfg.BlastRadius + w.Config.Kaiju.Radius;
-                if ((k.X - bx) * (k.X - bx) + (k.Z - bz) * (k.Z - bz) <= kr * kr) Kaiju.DamageKaiju(w, b.Owner, cfg.Damage);
+                if ((k.X - bx) * (k.X - bx) + (k.Z - bz) * (k.Z - bz) <= kr * kr) Kaiju.DamageKaiju(w, b.Owner, cfg.Damage, DamageCause.Explosion);   // b13-k: BARKSKIN reads the cause
             }
             Barricades.DamageBarricadesInArc(w, b.Owner, bx, bz, 1, 0, cfg.BlastRadius, -1, cfg.Damage);
 

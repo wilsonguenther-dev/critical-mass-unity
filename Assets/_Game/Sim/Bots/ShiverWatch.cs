@@ -157,7 +157,7 @@ namespace CriticalMass.Sim.Bots
                 return;
             }
             bool kWants = k.TargetId >= 0 && k.TelegraphIn <= 0 && k.MeleeWindupIn <= 0 && KaijuWantsToWalk(w);
-            Sample(w, n, k.X, k.Z, k.PrevX, k.PrevZ, k.Facing, true, kWants, w.Config.Kaiju.MoveSpeed, dt,
+            Sample(w, n, k.X, k.Z, k.PrevX, k.PrevZ, k.Facing, true, kWants, KaijuTypes.MoveSpeed(w), dt,
                 ClassId.Warrior, TeamId.Azure, AiState.None, k.TargetId);
         }
 
