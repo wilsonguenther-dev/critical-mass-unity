@@ -1,5 +1,6 @@
 using CriticalMass.Runtime.Game;
 using CriticalMass.Runtime.View.Effects;
+using CriticalMass.Sim.Config;
 using CriticalMass.Sim.Core;
 using CriticalMass.Sim.Grid;
 using UnityEngine;

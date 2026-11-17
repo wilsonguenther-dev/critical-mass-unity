@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.IO;
 using CriticalMass.Runtime.Game;
+using CriticalMass.Sim.Config;
 using CriticalMass.Sim.Core;
 using CriticalMass.Sim.Grid;
 using UnityEngine;
