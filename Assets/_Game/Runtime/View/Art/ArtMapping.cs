@@ -47,6 +47,8 @@ namespace CriticalMass.Runtime.View.Art
         /// <summary>Mask codes (eighths of vertex alpha) the art must carry at least once.</summary>
         public int[] MaskCodes = new int[0];
         public float OutlinePx;
+        /// <summary>b13 r3 integrator: metres a prop is authored sunk below its ground pivot (a rock outcrop set into the ground); 0 = feet on the ground.</summary>
+        public float GroundSink;
         public float Rim;
         /// <summary>Team channel colours as authored in the FBX (the Azure values; the Kaiju's stage default glow).</summary>
         public TeamSwatch Authored;
@@ -495,7 +497,7 @@ namespace CriticalMass.Runtime.View.Art
                 Authored = PropAzure, Crimson = PropCrimson, Height = 3.185f },
             new ModelSpec { Key = BlacksmithOreVein, AssetPath = "Assets/_Game/Art/Blacksmith/BlacksmithOreVein.fbx", Kind = ArtKind.Prop,
                 Meshes = new[] { OreVeinFull, OreVeinDepleted }, MaskCodes = new[] { 0, 1 }, OutlinePx = 2.5f,
-                Authored = PropAzure, Crimson = PropCrimson, Height = 1.027f },
+                Authored = PropAzure, Crimson = PropCrimson, Height = 1.027f, GroundSink = 0.18f },   // the outcrop's rocks sit 0.178 m into the ground (manifest min z)
             new ModelSpec { Key = BlacksmithOreLump, AssetPath = "Assets/_Game/Art/Blacksmith/BlacksmithOreLump.fbx", Kind = ArtKind.Prop,
                 Meshes = new[] { BlacksmithOreLump }, MaskCodes = new[] { 0, 1 }, OutlinePx = 2.5f,
                 Authored = PropAzure, Crimson = PropCrimson, Height = 0.5f },

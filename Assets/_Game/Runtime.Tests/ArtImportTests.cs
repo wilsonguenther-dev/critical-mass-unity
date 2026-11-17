@@ -120,7 +120,7 @@ namespace CriticalMass.Runtime.Tests
                 b.Encapsulate(m.MultiplyPoint3x4(lb.center + Vector3.Scale(lb.extents, new Vector3((i & 1) == 0 ? -1 : 1, (i & 2) == 0 ? -1 : 1, (i & 4) == 0 ? -1 : 1))));
             float tol = Mathf.Max(ModelSpec.HeightTolerance, 0.06f * spec.Height);
             Assert.AreEqual(spec.Height, b.size.y, tol, "height (m) of " + body.name);
-            Assert.AreEqual(0f, b.min.y, 0.1f, "pivot on the ground");
+            Assert.AreEqual(-spec.GroundSink, b.min.y, 0.1f, "pivot on the ground (less the authored sink " + spec.GroundSink + " m)");   // b13 r3: a sunk outcrop
         }
 
         [TestCase(ArtMapping.Warrior)]
