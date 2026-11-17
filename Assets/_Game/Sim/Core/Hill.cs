@@ -12,7 +12,7 @@ namespace CriticalMass.Sim.Core
             return s == HillState.Neutral ? 0 : s == HillState.Azure ? 1 : s == HillState.Crimson ? 2 : 3;
         }
 
-        /// <summary>Counts living actors inside the hill (strictly less than r), sets control, accrues team and personal hill time.</summary>
+        /// <summary>Counts living actors inside the hill (strictly less than r), sets control, accrues team and personal hill time (none while a wild Kaiju holds it, CM b13 [C]).</summary>
         public static void HillSystem(World w, double dt)
         {
             MatchState m = w.Match;
@@ -41,6 +41,9 @@ namespace CriticalMass.Sim.Core
             else if (azure > crimson) next = HillState.Azure;
             else if (crimson > azure) next = HillState.Crimson;
             else next = HillState.Contested;
+            // CM b13 [C]: a wild Kaiju standing inside the hill holds it for NEITHER team (no hill seconds this tick; shown
+            // as contested). Identity with the rule off (Corruption.WildHoldsHill is false).
+            if (Corruption.WildHoldsHill(w)) next = HillState.Contested;
 
             if (next == HillState.Azure) m.HillSeconds.Azure += dt;
             else if (next == HillState.Crimson) m.HillSeconds.Crimson += dt;
