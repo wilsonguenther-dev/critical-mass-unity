@@ -149,6 +149,10 @@ namespace CriticalMass.Runtime.View
         /// every bases piece whose pivot is on the cell go.</summary>
         static readonly HashSet<string> KeptCats = new HashSet<string> { "cliff", "edge", "sky", "bridge", "water" };
 
+        /// <summary>Small dressing (tufts, reeds, pebbles, flowers, decals) also dropped when its pivot is within NearEdge of an edited cell.</summary>
+        static readonly HashSet<string> SmallCats = new HashSet<string> { "small", "small_tall", "dress_tall", "ground_decal", "decor" };
+        public const double NearEdge = 0.3;
+
         /// <summary>True when a placement of category `cat` stays on an edited cell.</summary>
         public static bool KeptOnEdited(string cat) => cat != null && KeptCats.Contains(cat);
 
@@ -165,7 +169,14 @@ namespace CriticalMass.Runtime.View
                 if (KeptOnEdited(p.Cat)) return false;
                 int cx = (int)System.Math.Floor(p.SimX), cz = (int)System.Math.Floor(p.SimZ);
                 if (cx < 0 || cz < 0 || cx >= w || cz >= h) return false;
-                return edited[cz * w + cx];
+                if (edited[cz * w + cx]) return true;
+                // Review 2026-11-17: reeds and grass tufts planted on the rim (pivot just outside the cell, in the void beyond
+                // an island edge or on the neighbour) stood inside an edge pit. Small dressing within NearEdge of an edited
+                // cell goes too; big pieces (huts, trees, rocks) keep the pivot-cell rule.
+                if (!SmallCats.Contains(p.Cat)) return false;
+                double fx = p.SimX - cx, fz = p.SimZ - cz;
+                return (fx < NearEdge && cx > 0 && edited[cz * w + cx - 1]) || (fx > 1 - NearEdge && cx < w - 1 && edited[cz * w + cx + 1])
+                    || (fz < NearEdge && cz > 0 && edited[(cz - 1) * w + cx]) || (fz > 1 - NearEdge && cz < h - 1 && edited[(cz + 1) * w + cx]);
             });
             if (plan.Dressed != null)
                 for (int i = 0; i < plan.Dressed.Length && i < edited.Length; i++) if (edited[i]) plan.Dressed[i] = false;
