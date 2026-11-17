@@ -71,7 +71,7 @@ namespace CriticalMass.Sim.Bots
             Kaiju kj = w.Kaiju;
             bool kaijuWalking = kj.State != KaijuState.Egg && !(kj.KoIn > 0)
                 && (kj.X - w.Map.Hill.X) * (kj.X - w.Map.Hill.X) + (kj.Z - w.Map.Hill.Z) * (kj.Z - w.Map.Hill.Z) < KaijuNearHill * KaijuNearHill;
-            if (!kaijuWalking && w.Match.HillState == own && w.Tick - ws.BotHillTick[id] >= Durations.T30(w.Config, b.BotHillEveryTicks))
+            if (!kaijuWalking && (w.Match.HillState == own || w.Match.HillState == HillState.Contested) && w.Tick - ws.BotHillTick[id] >= Durations.T30(w.Config, b.BotHillEveryTicks))
             {
                 HillDef h = w.Map.Hill;
                 double r2 = b.BotHillEnemyRange * b.BotHillEnemyRange;
@@ -97,6 +97,24 @@ namespace CriticalMass.Sim.Bots
                         double tx = h.X + cx / d * edge;
                         double tz = h.Z + cz / d * edge;
                         double ox = tx - x, oz = tz - z;
+                        // b13 integrator (walls per 16v16 match 0.5, need 2): when the edge point facing the crowd is out of his
+                        // reach, take the edge point between that direction and his own side of the hill (still on the edge,
+                        // still toward the enemy half), so a Builder anywhere near the hill edge gets his wall up.
+                        if (ox * ox + oz * oz > (b.Reach + 2.0) * (b.Reach + 2.0))
+                        {
+                            double bxr = x - h.X, bzr = z - h.Z, bl = Math.Sqrt(bxr * bxr + bzr * bzr);
+                            if (bl > 1e-6)
+                            {
+                                double mx = cx / d + bxr / bl, mz = cz / d + bzr / bl, ml = Math.Sqrt(mx * mx + mz * mz);
+                                if (ml > 1e-6)
+                                {
+                                    tx = h.X + mx / ml * edge;
+                                    tz = h.Z + mz / ml * edge;
+                                    ox = tx - x;
+                                    oz = tz - z;
+                                }
+                            }
+                        }
                         if (ox * ox + oz * oz <= (b.Reach + 2.0) * (b.Reach + 2.0))
                         {
                             if (BuilderWalls.QueueBotPress(w, id, tx, tz, BuildPiece.Wall, tier >= 1))

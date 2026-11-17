@@ -58,8 +58,8 @@ namespace CriticalMass.Sim.Config
         public double BotHillEdgeExtra = 1.5;
         public double BotHillEveryTicks = 180;
         /// <summary>Rule 2: own HP under this share of max and an enemy within BotGuardRange: a short wall BotGuardDistance toward it.</summary>
-        public double BotGuardHpShare = 0.4;
-        public double BotGuardRange = 4;
+        public double BotGuardHpShare = 0.5;   // b13 integrator: 0.4 -> 0.5 (bot walls per match)
+        public double BotGuardRange = 5;   // b13 integrator: 4 -> 5
         public double BotGuardDistance = 1.5;
 
         public BuildConfig Clone()

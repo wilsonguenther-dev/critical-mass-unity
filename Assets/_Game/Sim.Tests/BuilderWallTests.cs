@@ -397,6 +397,9 @@ namespace CriticalMass.Sim.Tests
                 for (int i = 0; i < w.ActorCount && bld < 0; i++) if (w.Actors[i].Cls == ClassId.Builder) bld = i;
                 w.Walls.Credit[0] = w.Walls.Credit[1] = 100000;
                 for (int t = 0; t < 30; t++) { MatchTick.Advance(w, null, scratch); if (bld >= 0) BuilderWalls.Ghost(w, bld, out _, out _, out _, out _, out _, out _, out _); }
+                // b13 integrator: warm the route guard's one-time static scratch (shrine ring, scratch field, heap) before the
+                // window; the proof writes and restores, so the world is unchanged.
+                if (bld >= 0) Terraform.DigKeepsRoutes(w, JsMath.FloorToInt(w.Z[bld]) * w.Map.Width + JsMath.FloorToInt(w.X[bld]));
                 int b0 = w.Walls.Builds;
                 var sw = Stopwatch.StartNew();
                 long a0 = GC.GetAllocatedBytesForCurrentThread();
