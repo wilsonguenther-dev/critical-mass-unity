@@ -464,10 +464,14 @@ namespace CriticalMass.Sim.Tests
         [Test]
         public void AllocationZeroOver300TicksWithWallsBeingBuilt()
         {
-            double[] us = new double[2];
-            long[] all = new long[2];
-            long bytes = -1, inCalls = 0;
-            int builds = 0;
+            // b13 r3 integrator (sim cost 1.151): round 3 timed the whole loop, so the on arm also paid for the test's own forced
+            // calls (a Ghost every tick and a Build with its route-guard proof every 20 ticks, about 100 times a bot Builder's
+            // rate) while the control's returned at once. Now both arms are warmed, then stepped in turn tick by tick (on,
+            // control, on, ...) so runner drift falls on both alike, and MatchTick.Advance is timed alone; the forced calls are
+            // timed apart and printed. Allocation is measured as before.
+            var worlds = new World[2];
+            var scratches = new InputFrame[2];
+            var blds = new int[2];
             for (int arm = 0; arm < 2; arm++)
             {
                 bool on = arm == 0;
@@ -482,14 +486,27 @@ namespace CriticalMass.Sim.Tests
                 // b13 integrator: warm the route guard's one-time static scratch (shrine ring, scratch field, heap) before the
                 // window; the proof writes and restores, so the world is unchanged.
                 if (bld >= 0) Terraform.DigKeepsRoutes(w, JsMath.FloorToInt(w.Z[bld]) * w.Map.Width + JsMath.FloorToInt(w.X[bld]));
-                int b0 = w.Walls.Builds;
-                var sw = Stopwatch.StartNew();
-                long a0 = GC.GetAllocatedBytesForCurrentThread();
-                for (int t = 0; t < 300; t++)
+                worlds[arm] = w; scratches[arm] = scratch; blds[arm] = bld;
+            }
+            long[] stepTicks = new long[2], callTicks = new long[2], all = new long[2];
+            long inCalls = 0;
+            int b0 = worlds[0].Walls.Builds;
+            for (int t = 0; t < 300; t++)
+            {
+                for (int arm = 0; arm < 2; arm++)
                 {
-                    MatchTick.Advance(w, null, scratch);
+                    World w = worlds[arm];
+                    int bld = blds[arm];
+                    long a0 = GC.GetAllocatedBytesForCurrentThread();
+                    long c0 = Stopwatch.GetTimestamp();
+                    MatchTick.Advance(w, null, scratches[arm]);
+                    long c1 = Stopwatch.GetTimestamp();
+                    stepTicks[arm] += c1 - c0;
+                    long a1 = GC.GetAllocatedBytesForCurrentThread();
+                    all[arm] += a1 - a0;
                     if (bld < 0 || !w.Actors[bld].Alive) continue;
-                    long c0 = GC.GetAllocatedBytesForCurrentThread();
+                    long m0 = GC.GetAllocatedBytesForCurrentThread();
+                    long k0 = Stopwatch.GetTimestamp();
                     BuilderWalls.Ghost(w, bld, out _, out _, out _, out _, out _, out _, out _);
                     if (t % 20 == 0)
                     {
@@ -497,20 +514,19 @@ namespace CriticalMass.Sim.Tests
                         double ang = t * 0.37;
                         BuilderWalls.Build(w, bld, w.X[bld] + JsMath.Cos(ang) * 2.5, w.Z[bld] + JsMath.Sin(ang) * 2.5);
                     }
-                    if (on) inCalls += GC.GetAllocatedBytesForCurrentThread() - c0;
+                    callTicks[arm] += Stopwatch.GetTimestamp() - k0;
+                    if (arm == 0) inCalls += GC.GetAllocatedBytesForCurrentThread() - m0;
                 }
-                long a1 = GC.GetAllocatedBytesForCurrentThread();
-                sw.Stop();
-                us[arm] = sw.Elapsed.TotalMilliseconds * 1000.0 / 300;
-                all[arm] = a1 - a0;
-                if (on) { bytes = a1 - a0; builds = w.Walls.Builds - b0; }
             }
-            Console.WriteLine($"[b13-b] allocation 16v16 seed 4242 Full, 600 warm-up then 300 ticks with walls being built: whole step {bytes} B (limit 0), control arm (Build.On false) {all[1]} B, inside the walls calls (Ghost + Build) {inCalls} B (limit 0), walls built in the window {builds}");
-            Console.WriteLine($"[b13-b] sim cost per tick: on {us[0]:F1} us, off {us[1]:F1} us, ratio {us[0] / Math.Max(1e-9, us[1]):F3} (limit 1.10; asserted at 1.50 to absorb a shared runner's noise)");
+            int builds = worlds[0].Walls.Builds - b0;
+            double f = 1e6 / Stopwatch.Frequency / 300;
+            double usOn = stepTicks[0] * f, usOff = stepTicks[1] * f;
+            Console.WriteLine($"[b13-b] allocation 16v16 seed 4242 Full, 600 warm-up then 300 ticks with walls being built: whole step {all[0]} B (limit 0 over the control), control arm (Build.On false) {all[1]} B, inside the walls calls (Ghost + Build) {inCalls} B (limit 0), walls built in the window {builds}");
+            Console.WriteLine($"[b13-b] sim cost per tick (MatchTick.Advance only, arms interleaved): on {usOn:F1} us, off {usOff:F1} us, ratio {usOn / Math.Max(1e-9, usOff):F3} (limit 1.10; asserted at 1.50 to absorb a shared runner's noise); the test's forced Ghost + Build calls on top: on {callTicks[0] * f:F1} us, off {callTicks[1] * f:F1} us per tick");
             Assert.AreEqual(0, inCalls, "the walls code itself allocates nothing");
-            Assert.LessOrEqual(bytes, all[1], "the rule adds no allocation over its control");
+            Assert.LessOrEqual(all[0], all[1], "the rule adds no allocation over its control");
             Assert.Greater(builds, 0, "walls were built inside the measured window");
-            Assert.LessOrEqual(us[0], us[1] * 1.5);
+            Assert.LessOrEqual(usOn, usOff * 1.5);
         }
 
         // ---------------------------------------------------------------------------------------------------------------
@@ -716,7 +732,9 @@ namespace CriticalMass.Sim.Tests
         public void BalanceVsControlBuildOnOnlyToggled()
         {
             var arms = new[] { new Arm(), new Arm() };   // 0 = rule on, 1 = control (Build.On false)
-            int[] big = { 1337, 4242, 7, 99, 2024, 31337 };
+            // b13 r3 integrator, OWNER DECISION: 6 16v16 matches is too small a sample (one flip = 0.167 of share against a 0.15
+            // limit), so walls are judged on 24 16v16 seeds (the ORDER's six first) with the same +-0.15 limit.
+            int[] big = { 1337, 4242, 7, 99, 2024, 31337, 1, 2, 3, 4, 5, 6, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19 };
             for (int a = 0; a < 2; a++)
             {
                 for (int seed = 1; seed <= 20; seed++) Play(seed, 5, a == 0, arms[a]);
@@ -754,7 +772,7 @@ namespace CriticalMass.Sim.Tests
             }
             for (int k = 0; k < on.PerMatch.Count; k++) Console.WriteLine($"[b13-b] MATCH on  {on.PerMatch[k]}");
             for (int k = 0; k < off.PerMatch.Count; k++) Console.WriteLine($"[b13-b] MATCH off {off.PerMatch[k]}");
-            Console.WriteLine($"[b13-b] BALANCE matches {on.Matches} per arm (5v5 Full 1..20 with one Builder per team, 16v16 Full 1337 4242 7 99 2024 31337); decided on {on.Decided} control {off.Decided}");
+            Console.WriteLine($"[b13-b] BALANCE matches {on.Matches} per arm (5v5 Full 1..20 with one Builder per team, 16v16 Full on 24 seeds: 1337 4242 7 99 2024 31337 and 1-19 bar 7); decided on {on.Decided} control {off.Decided}");
             Assert.IsTrue(lines.All(l => l.pass), "a balance limit failed (see the BALANCE lines): the rule is CUT under lesson 1");
         }
     }
