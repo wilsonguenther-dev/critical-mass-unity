@@ -328,6 +328,7 @@ namespace CriticalMass.Sim.Tests
             BotsState st = BotBrain.GetBotsState(w);
             int bot = w.ActorCount / 2 + 1, enemy = 1;
             Kaiju k = w.Kaiju;
+            bool blocks = false;
             int Think(bool cloud)
             {
                 DepthKit.Put(w, bot, k.X + 1, k.Z);
@@ -337,7 +338,6 @@ namespace CriticalMass.Sim.Tests
                 BotFsm.ThinkBot(w, st, bot);
                 return st.Target[bot];
             }
-            bool blocks = false;
             int before = Think(false);
             KaijuTypes.ForceShroud(w);
             DepthKit.Steps(w, 16);
