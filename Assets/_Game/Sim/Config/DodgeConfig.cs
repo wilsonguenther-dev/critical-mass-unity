@@ -4,7 +4,7 @@ namespace CriticalMass.Sim.Config
     public sealed class DodgeConfig
     {
         /// <summary>The rule's own switch (Full profile only: systems read it through DepthRules.On).</summary>
-        public bool On = true;
+        public bool On = false;   // b13 integrator: item J-dodge is CUT this batch (stub only); off so no HUD, hint or wording shows it
 
         public DodgeConfig Clone() => (DodgeConfig)MemberwiseClone();
     }

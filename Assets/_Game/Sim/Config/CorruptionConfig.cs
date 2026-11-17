@@ -4,7 +4,7 @@ namespace CriticalMass.Sim.Config
     public sealed class CorruptionConfig
     {
         /// <summary>The rule's own switch (Full profile only: systems read it through DepthRules.On).</summary>
-        public bool On = true;
+        public bool On = false;   // b13 integrator: item C is OUT this batch (stub only); off so the meter and roll banner never show
 
         public CorruptionConfig Clone() => (CorruptionConfig)MemberwiseClone();
     }
