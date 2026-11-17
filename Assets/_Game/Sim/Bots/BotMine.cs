@@ -9,7 +9,7 @@ namespace CriticalMass.Sim.Bots
     /// <summary>
     /// CM b13 item H: Miner bots mine ore and bank it at the hut while their hut is below its top level. Task kinds (BotsState
     /// TaskKind, H owns 1-9): 1 = MineOre (TaskX/Z the vein), 2 = Hut (TaskX/Z the pad). Where the straight line to the goal is
-    /// blocked, TaskX/Z is a point about a cell down the goal's flow field (BotSteer walks a Task straight), moved on every
+    /// not walkable for the body (StraightWalk), TaskX/Z is a point about a cell down the goal's flow field (BotSteer walks a Task straight), moved on every
     /// tick by Act, so the bot follows the route. Deterministic, allocation-free.
     /// </summary>
     public static class BotMine
@@ -51,15 +51,48 @@ namespace CriticalMass.Sim.Bots
             return bestOwn >= 0 ? bestOwn : best;
         }
 
+        /// <summary>How far ahead StraightWalk checks the line (u) and its sample step (u).</summary>
+        const double WalkLookahead = 3, WalkStep = 0.4;
+
+        /// <summary>
+        /// b13 r2: the straight line from (x, z) toward (gx, gz) is walkable ground for the whole body over the next
+        /// WalkLookahead u: no hit blocker on the centre line (SegmentClear) and every sample of the centre line and of both
+        /// edge lines one class radius to each side stands on a walkable cell. SegmentClear alone is a HIT line (a hole, a
+        /// cliff edge or water does not stop it), so it sent Miners straight at the base island edge (Pressed flags).
+        /// Allocation-free; at most 8 samples x 3 cell reads.
+        /// </summary>
+        static bool StraightWalk(World w, int id, double x, double z, double gx, double gz)
+        {
+            double dx = gx - x, dz = gz - z, l = Math.Sqrt(dx * dx + dz * dz);
+            if (l < 1e-9) return true;
+            double look = l < WalkLookahead ? l : WalkLookahead;
+            double ux = dx / l, uz = dz / l;
+            double ex = x + ux * look, ez = z + uz * look;
+            if (!SegmentClear.Clear(w.Map, x, z, ex, ez)) return false;
+            double r = w.Config.Class(w.Actors[id].Cls).Radius;
+            double px = -uz * r, pz = ux * r;
+            MapDef m = w.Map;
+            int n = (int)Math.Ceiling(look / WalkStep);
+            for (int k = 1; k <= n; k++)
+            {
+                double t = k * look / n, sx = x + ux * t, sz = z + uz * t;
+                if (!MapGrid.IsWalkable(m, JsMath.FloorToInt(sx), JsMath.FloorToInt(sz))) return false;
+                if (!MapGrid.IsWalkable(m, JsMath.FloorToInt(sx + px), JsMath.FloorToInt(sz + pz))) return false;
+                if (!MapGrid.IsWalkable(m, JsMath.FloorToInt(sx - px), JsMath.FloorToInt(sz - pz))) return false;
+            }
+            return true;
+        }
+
         /// <summary>The steering point toward (gx, gz): the goal when the line is clear, else a point down the route.</summary>
         static void Aim(World w, int id, FlowField route, double gx, double gz, out double tx, out double tz)
         {
             double x = w.X[id], z = w.Z[id];
             tx = gx;
             tz = gz;
-            // b13 integrator: follow the route whenever there is one (a clear centre line is not a clear body line: Miners
-            // pressed into the hut and vein edges, NoShiver flags); straight only without a route.
-            if (route == null && SegmentClear.Clear(w.Map, x, z, gx, gz)) return;
+            // b13 r2: straight while the next stretch of the line is WALKABLE for the whole body (StraightWalk), else the route.
+            // Round 1 followed the route whenever there was one (a hit line over a hole or a cliff edge pressed Miners into
+            // the base edge), which halved the ore rate (21 ore per Miner bot against 44, 0 of 6 16v16 seeds at L5).
+            if (route == null || StraightWalk(w, id, x, z, gx, gz)) return;
             if (route != null && FlowField.SampleFlowDir(route, w.Map, x, z, out double dx, out double dz))
             {
                 tx = x + dx * Carrot;
@@ -224,7 +257,7 @@ namespace CriticalMass.Sim.Bots
             }
             // Walk on: the route's step (or straight at a clear goal), and the steering point moves with the bot.
             double mx = gx - x, mz = gz - z;
-            if (route != null && FlowField.SampleFlowDir(route, w.Map, x, z, out double fx, out double fz))
+            if (route != null && !StraightWalk(w, id, x, z, gx, gz) && FlowField.SampleFlowDir(route, w.Map, x, z, out double fx, out double fz))
             {
                 mx = fx;
                 mz = fz;

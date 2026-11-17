@@ -48,7 +48,7 @@ namespace CriticalMass.Sim.Config
         /// <summary>HAUL on the way to the hut with this much ore.</summary>
         public double BotHaulHomeOre = 2;
         /// <summary>An empty-handed Miner bot with an enemy this close fights (today's logic) instead of walking to a vein (u).</summary>
-        public double BotFightRange = 14;
+        public double BotFightRange = 8;   // b13 r2: back from 14 (round 1 tuning pass): 14 u cost a fifth of the ore and moved no kill share
         /// <summary>b13 integrator tuning pass: a Miner bot carrying ore still fights back when an enemy is this close (u).</summary>
         public double BotFightWithOreRange = 4;
         /// <summary>A Miner bot that ended up in Deliver with ore (the shrine would refuse it) is pulled back to the hut at this utility.</summary>
