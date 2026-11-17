@@ -538,6 +538,83 @@ namespace CriticalMass.Sim.Core
                     JsMath.Cos(k.Facing), JsMath.Sin(k.Facing), most, 0, 0, 0);
         }
 
+        /// <summary>b14-c: cos and sin of 22.5 degrees (literal constants: the ring search turns a unit vector, no trig call).</summary>
+        private const double Ring16Cos = 0.92387953251128674, Ring16Sin = 0.38268343236508978;
+
+        /// <summary>b14-c: the ring radii (beyond body + actor radius) the end-of-tick depenetration tries, nearest first.</summary>
+        private static readonly double[] DepenetrateRings = { 0.02, 0.35, 0.8, 1.4 };
+
+        /// <summary>
+        /// b14-c (Full profile, solid Kaiju): the END-OF-TICK guarantee that no living grounded actor's centre is inside the
+        /// hatched Kaiju's body (KaijuBodyRadius). KaijuBody runs in the separation pass BEFORE the Kaiju moves, so the Kaiju's
+        /// own walk, a shove it could not resolve (a fighter wedged between it and a wall line), a landing jump or a respawn could
+        /// leave a centre inside it until the next tick (the PR #203 soak counted 1 to 11 actor-ticks on 16v16 seed 101). Called
+        /// after the Kaiju system and after respawns: (1) the radial push to body + actor radius through the grid (MoveActor:
+        /// walls slide it); (2) still inside: the nearest spot on rings around the body (16 directions turned from the actor's own
+        /// bearing, radii DepenetrateRings beyond the contact radius) where the actor's box fits the grid. Allocation-free;
+        /// Classic and PhysicsOnly untouched (their golden rows never move). Returns the actors moved.
+        /// </summary>
+        public static int KaijuDepenetrate(World w)
+        {
+            Kaiju k = w.Kaiju;
+            if (k.State == KaijuState.Egg || !w.Match.Hatched || !Phys.On(w, w.Config.Physics.SolidKaiju) || !DepthRules.On(w, true)) return 0;
+            double body = w.Config.Physics.KaijuBodyRadius;
+            double b2 = body * body;
+            int moved = 0;
+            for (int i = 0; i < w.ActorCount; i++)
+            {
+                Actor a = w.Actors[i];
+                if (!a.Alive || a.AirLen > 0) continue;
+                double dx = w.X[i] - k.X;
+                double dz = w.Z[i] - k.Z;
+                double d2 = dx * dx + dz * dz;
+                if (d2 >= b2) continue;
+                double d = Math.Sqrt(d2);
+                double ux, uz;
+                if (d < 1e-6)
+                {
+                    ux = -JsMath.Cos(k.Facing);
+                    uz = -JsMath.Sin(k.Facing);
+                }
+                else
+                {
+                    ux = dx / d;
+                    uz = dz / d;
+                }
+                double r = ActorRadius(w, i);
+                double rr = body + r;
+                MoveActor(w, i, ux * (rr - d), uz * (rr - d));
+                moved++;
+                double ex = w.X[i] - k.X, ez = w.Z[i] - k.Z;
+                if (ex * ex + ez * ez >= b2) continue;
+                // Pinned (a wall line behind it): the nearest clear spot on the rings around the body.
+                double bestD = double.PositiveInfinity, bx = 0, bz = 0;
+                for (int ring = 0; ring < DepenetrateRings.Length && bestD == double.PositiveInfinity; ring++)
+                {
+                    double rad = rr + DepenetrateRings[ring];
+                    double cx = ux, cz = uz;
+                    for (int s = 0; s < 16; s++)
+                    {
+                        double px = JsMath.F32(k.X + cx * rad), pz = JsMath.F32(k.Z + cz * rad);
+                        if (BoxFits(w, px, pz, r))
+                        {
+                            double qx = px - w.X[i], qz = pz - w.Z[i], q2 = qx * qx + qz * qz;
+                            if (q2 < bestD) { bestD = q2; bx = px; bz = pz; }
+                        }
+                        double nx = cx * Ring16Cos - cz * Ring16Sin;
+                        cz = cx * Ring16Sin + cz * Ring16Cos;
+                        cx = nx;
+                    }
+                }
+                if (bestD < double.PositiveInfinity)
+                {
+                    w.X[i] = bx;
+                    w.Z[i] = bz;
+                }
+            }
+            return moved;
+        }
+
         /// <summary>Soft actor-actor separation after all moves: each overlapping living pair is pushed apart through MoveActor.</summary>
         public static void SeparateActors(World w)
         {

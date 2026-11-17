@@ -615,8 +615,17 @@ namespace CriticalMass.Sim.Core
             else k.Facing = JsMath.Atan2(gz - k.Z, gx - k.X);
         }
 
-        /// <summary>One step of the Kaiju: hatch, KO, target choice, slam, pathing and the melee wind-up.</summary>
+        /// <summary>
+        /// One step of the Kaiju: hatch, KO, target choice, slam, pathing and the melee wind-up (KaijuStep), then b14-c's
+        /// end-of-tick guarantee that no grounded fighter is left inside its body (Collide.KaijuDepenetrate, Full only).
+        /// </summary>
         public static void KaijuSystem(World w, double dt)
+        {
+            KaijuStep(w, dt);
+            Collide.KaijuDepenetrate(w);
+        }
+
+        private static void KaijuStep(World w, double dt)
         {
             GameConfig cfg = w.Config;
             KaijuConfig kc = cfg.Kaiju;
