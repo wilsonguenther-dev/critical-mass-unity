@@ -83,6 +83,7 @@ namespace CriticalMass.Runtime.Input
             var map = InputSystem.actions.FindActionMap("Player", true);
             EnsureDodgeAction(map); // CM b13 J: until Settings/Controls.inputactions carries the Dodge action
             map.Enable();
+            BuilderToolbelt.Local = State.Toolbelt;   // b14: the HUD and the terrain view read the local Builder's wheel
             _map = map;
             _move = map["Move"];
             _point = map["Point"];
@@ -132,11 +133,11 @@ namespace CriticalMass.Runtime.Input
             }
         }
 
-        /// <summary>CM b13 J: the Dodge default keys (checked against every binding: Left Shift is taken by walk-to-pointer
-        /// and the Arrows layout's lock facing, and every controller button is taken, so the keys are Left Ctrl (mouse and
-        /// WASD hands) and Right Ctrl (Arrows hand), and the controller's east face button moves from the ability's second
-        /// binding to Dodge; the ability keeps the left trigger).</summary>
-        public static readonly string[] DodgeDefaults = { "<Keyboard>/leftCtrl", "<Keyboard>/rightCtrl", "<Gamepad>/buttonEast" };
+        /// <summary>b14 (owner decision: the class ability KEEPS B; Left Shift was bound to two actions): Dodge is Left Shift
+        /// (mouse and W A S D hands) and Right Ctrl (Arrows hand), and the controller's right bumper. Walk to pointer's second
+        /// key moved to Y and the Arrows layout's lock facing to Left Ctrl; the Builder's next-tool button is the left bumper
+        /// alone. ControlsSettingsTests.TheDefaultsHaveNoConflicts checks every slot.</summary>
+        public static readonly string[] DodgeDefaults = { "<Keyboard>/leftShift", "<Keyboard>/rightCtrl", "<Gamepad>/rightShoulder" };
 
         /// <summary>CM b13 J: adds the Dodge action with DodgeDefaults when the actions asset lacks it (in memory only) and
         /// moves the east face button off the ability. A no-op once the asset carries Dodge (the routed asset patch).</summary>
@@ -149,10 +150,6 @@ namespace CriticalMass.Runtime.Input
             d.AddBinding(DodgeDefaults[0], groups: "KeyboardMouse");
             d.AddBinding(DodgeDefaults[1], groups: "KeyboardMouse");
             d.AddBinding(DodgeDefaults[2], groups: "Gamepad");
-            InputAction ability = map.FindAction("Ability", false);
-            if (ability != null)
-                for (int i = ability.bindings.Count - 1; i >= 0; i--)
-                    if (ability.bindings[i].path == DodgeDefaults[2]) ability.ChangeBinding(i).Erase();
             if (was) map.Enable();
         }
 
@@ -166,6 +163,7 @@ namespace CriticalMass.Runtime.Input
         {
             GameSettings.Changed -= ReadSettings;
             State.BindWorld(null);
+            if (BuilderToolbelt.Local == State.Toolbelt) BuilderToolbelt.Local = null;
             for (int i = 0; i < _actions.Length; i++)
             {
                 InputAction a = _actions[i];
@@ -196,12 +194,27 @@ namespace CriticalMass.Runtime.Input
             // scroll frame or while a bumper is held; only the rising edge counts, so a held bumper switches once.
             if (_switchDigPlace != null)
             {
-                bool active = Mathf.Abs(_switchDigPlace.ReadValue<float>()) > 0.5f;
+                float sv = _switchDigPlace.ReadValue<float>();
+                bool active = Mathf.Abs(sv) > 0.5f;
                 // 2026-11-12: the wheel (and its bumpers) zoom the full map while it is open and the spectator camera
-                // while spectating; only in play does it switch dig / place (InputContext).
-                if (active && !_switchWasActive && InputContext.DigSwitchOwnsWheel(InputContext.Current)) State.SwitchDigPlace();
+                // while spectating; only in play does it switch dig / place (InputContext). b14: wheel up, R / I and the
+                // left bumper step the Builder's tool wheel forward, wheel down steps it back.
+                if (active && !_switchWasActive && InputContext.DigSwitchOwnsWheel(InputContext.Current)) State.SwitchDigPlace(sv > 0f ? 1 : -1);
                 _switchWasActive = active;
             }
+            // b14: number keys 1 to 7 pick a Builder tool directly (BuilderTool order); ignored for every other class.
+            Keyboard kbd = Keyboard.current;
+            if (kbd != null && !Online.OnlineChatHud.EatsKeys && InputContext.DigSwitchOwnsWheel(InputContext.Current))
+            {
+                if (kbd.digit1Key.wasPressedThisFrame) State.PickBuilderTool(0);
+                else if (kbd.digit2Key.wasPressedThisFrame) State.PickBuilderTool(1);
+                else if (kbd.digit3Key.wasPressedThisFrame) State.PickBuilderTool(2);
+                else if (kbd.digit4Key.wasPressedThisFrame) State.PickBuilderTool(3);
+                else if (kbd.digit5Key.wasPressedThisFrame) State.PickBuilderTool(4);
+                else if (kbd.digit6Key.wasPressedThisFrame) State.PickBuilderTool(5);
+                else if (kbd.digit7Key.wasPressedThisFrame) State.PickBuilderTool(6);
+            }
+            State.Toolbelt.Actor = LocalSeat.Actor;
             bool fromKeys = m.sqrMagnitude > 0f && _move.activeControl != null && _move.activeControl.device is Keyboard;
             State.SetMove(m.x, m.y, fromKeys);
             bool arrowsMove = false;
@@ -236,8 +249,7 @@ namespace CriticalMass.Runtime.Input
                 Aim.SetMode(ControlBindings.KeyboardOnly ? AimResolver.Mode.Keys : AimResolver.Mode.Pointer);
             }
 
-            // Walk to pointer acts only while the mouse aims (it shares L SHIFT with lock facing, which acts only while
-            // the keys aim).
+            // Walk to pointer acts only while the mouse aims; lock facing only while the keys aim (b14: they no longer share a key).
             bool walk = _walk != null && _walk.IsPressed() && Aim.Current == AimResolver.Mode.Pointer;
             State.SetPointerWalk(walk);
             FacingLocked = _lock != null && _lock.IsPressed() && Aim.Current == AimResolver.Mode.Keys;

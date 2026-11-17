@@ -91,7 +91,9 @@ namespace CriticalMass.Runtime.Tests
             CollectionAssert.AreEqual(new[] { "<Gamepad>/leftTrigger", "<Gamepad>/buttonEast" }, Paths(A("Ability"), G));
             CollectionAssert.AreEqual(new[] { "<Gamepad>/buttonWest" }, Paths(A("Interact"), G));
             CollectionAssert.AreEqual(new[] { "<Gamepad>/buttonNorth" }, Paths(A("DigPlace"), G));
-            CollectionAssert.AreEqual(new[] { "<Gamepad>/leftShoulder", "<Gamepad>/rightShoulder" }, Paths(A("SwitchDigPlace"), G));
+            // b14 (owner decision): the class ability keeps B; dodge moved to the right bumper; the Builder's next tool is LB.
+            CollectionAssert.AreEqual(new[] { "<Gamepad>/leftShoulder" }, Paths(A("SwitchDigPlace"), G));
+            CollectionAssert.AreEqual(new[] { "<Gamepad>/rightShoulder" }, Paths(A("Dodge"), G));
             CollectionAssert.AreEqual(new[] { "<Gamepad>/start" }, Paths(A("Pause"), G));
             CollectionAssert.AreEqual(new[] { "<Gamepad>/select" }, Paths(A("Scoreboard"), G));
             StringAssert.Contains("StickDeadzone", A("Move").bindings.First(b => b.path == "<Gamepad>/leftStick").processors);

@@ -109,16 +109,16 @@ namespace CriticalMass.Runtime.View.Mechanics
         {
             "Guard your carriers and push the hill",
             "Gather food and feed the egg",
-            "Dig paths and chop wood for your team",
+            "Mine ore and feed your Blacksmith hut",
             "Mine the routes and blast the walls",
-            "Fetch wood and water for upgrades",
+            "Build walls, ladders and bridges for your team",
             "Keep your team standing",
         };
         public static string[] ObjClassHatched =
         {
             "Take and hold the hill",
             "Keep the food moving",
-            "Open paths to the hill",
+            "Mine ore: every hut level makes your team stronger",
             "Blast the enemy off the hill",
             "Build your team onto the hill",
             "Heal the fighters on the hill",

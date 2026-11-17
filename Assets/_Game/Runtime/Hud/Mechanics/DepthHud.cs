@@ -522,6 +522,8 @@ namespace CriticalMass.Runtime.Hud.Mechanics
             if (show && want) HudText.Set(_objText, View.Mechanics.Objective.Words(id, f.Cls));
         }
 
+        int _promptSlot = -2;
+
         void TickPrompt(World w, int me, float real)
         {
             Actor a = w.Actors[me];
@@ -548,9 +550,23 @@ namespace CriticalMass.Runtime.Hud.Mechanics
                 if (words == null && g > 0f) { words = DepthWords.Gathering; progress = g; }
             }
             bool show = words != null;
+            // b14: one stacking region for the bottom-centre prompts (PromptStack): the station prompt has the first slot,
+            // the terrain pill and the Builder's tool strip queue behind it, at most two show, none overlaps.
+            int slot = -1;
+            if (show) { PromptStack.Want(PromptStack.Source.Station); slot = PromptStack.SlotOf(PromptStack.Source.Station); }
+            else PromptStack.Release(PromptStack.Source.Station);
+            show = show && slot >= 0;
             if (_prompt.gameObject.activeSelf != show) _prompt.gameObject.SetActive(show);
             if (show) HudZones.HoldPromptRow();   // fix/hud-containment-3: the terrain pill yields the shared prompt row
             if (!show) return;
+            if (slot != _promptSlot)
+            {
+                _promptSlot = slot;
+                _prompt.anchorMin = _prompt.anchorMax = new Vector2(0.5f, 0f);
+                _prompt.pivot = new Vector2(0.5f, 0f);
+                _prompt.sizeDelta = new Vector2(HudZones.PromptW, HudZones.PromptH);
+                _prompt.anchoredPosition = new Vector2(PromptStack.CentreX[(int)PromptStack.Source.Station], PromptStack.Bottom(slot, HudZones.PromptH));
+            }
             HudText.Set(_promptText, words);
             _promptPanel.SetRim(refusal ? (Color)CMTokens.MeterOrange.Color : CMTokens.WarmCream.Color);
             if (action != _promptAction) { _promptAction = action; _glyphDirty = true; }

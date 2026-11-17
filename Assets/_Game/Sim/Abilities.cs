@@ -115,7 +115,7 @@ namespace CriticalMass.Sim.Core
                 else if (a.Cls == ClassId.Farmer) CastFarmerRoots(w, i);
                 else if (a.Cls == ClassId.Miner) CastMinerBarricade(w, i);
                 else if (a.Cls == ClassId.Demolitions) Demolitions.CastMine(w, i); // DG-22 (CM-38): land mine on Space
-                else if (a.Cls == ClassId.Builder) BuiltPieces.CastBuild(w, i); // DG-24 (U-060): a ladder or a rope bridge on Space
+                else if (a.Cls == ClassId.Builder) BuiltPieces.CastBuild(w, i); // DG-24 (U-060): a ladder or a rope bridge on InputFrame.Ability (b14: the human layer sends it for the Builder's LADDER / BRIDGE tool)
                 else if (a.Cls == ClassId.Healer) Healer.CastPulse(w, i); // DG-40 (U-061): the healing pulse on Space
                 // DG-69: an accepted cast starts its action on this tick (the view's per-kind clip); casts have no wind-up.
                 if (a.AbilityCd > 0 && Phys.On(w, true))

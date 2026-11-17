@@ -413,8 +413,8 @@ namespace CriticalMass.Runtime.Menus
     /// <summary>
     /// b13-v: the batch 13 class words, laid over whichever source the cards loaded (the words pack or the built-in copy),
     /// so every card reads the new jobs: the Miner mines ore for the Blacksmith hut and hauls it (no more barricades or
-    /// digging), the Builder builds walls and blocks with F and puts stairs and bridges down with Space. Players read
-    /// STAIRS where the sim says ladder. The attack lines and the cooldown numbers stay as loaded.
+    /// digging), the Builder uses ONE tool wheel with F (b14: dig, place, ladder, bridge, short wall, tall wall, block; right
+    /// click is the same press). The attack lines and the cooldown numbers stay as loaded.
     /// </summary>
     public static class B13ClassWords
     {
@@ -423,16 +423,16 @@ namespace CriticalMass.Runtime.Menus
         public const string MinerMine = "MINE: hold near an ore vein (up to 3 ore).";
         public const string MinerHaul = "HAUL: run faster with your load for 5 s.";
         public const string MinerBank = "Bank ore at the hut.";
-        public const string BuilderRole = "Builds walls and stairs.";
-        public const string BuilderBio = "Builds walls and blocks for cover and traps, stairs over walls and bridges over gaps.";
-        public const string BuilderBuild = "BUILD the selected piece where the outline shows; on the dig tool F digs and places.";
-        public const string BuilderSwitch = "Dig, place, short wall, tall wall (hut level 2), block. A block dropped in a hole fills it.";
-        public const string BuilderStairs = "STAIRS over a wall, BRIDGE over a gap.";
+        public const string BuilderRole = "Builds walls, ladders and bridges.";
+        public const string BuilderBio = "Flat cap, pencil behind the ear. Give the Builder wood and a gap, and he hands you a wall, a ladder or a bridge.";
+        public const string BuilderBuild = "F uses the selected tool where the outline shows. Right click does the same.";
+        public const string BuilderSwitch = "One wheel: dig, place, ladder, bridge, short wall, tall wall (hut level 2), block. The wheel or 1-7 picks.";
+        public const string BuilderStairs = "A LADDER lies flat against the cliff you face; a BRIDGE spans straight out from your edge.";
         /// <summary>b13 r2 (owner decision: terrain belongs to the Builder and the Demolitionist): the Builder's F while the hut rule is on.</summary>
-        public const string BuilderDig = "DIG a block of ground with F, then F at an edge or a hole places it back.";
-        public const string BuilderDigSwitch = "The wheel or LB / RB flips between dig and place.";
+        public const string BuilderDig = "With DIG on the wheel, F digs a block of ground; with PLACE, F at an edge or a hole puts it back.";
+        public const string BuilderDigSwitch = "The wheel or LB picks the next tool: dig, place, ladder, bridge.";
         public const string BuilderDigRole = "Digs, fills and builds ways.";
-        public const string BuilderDigBio = "Give the Builder a gap and he hands you a way across: he digs and fills the ground, builds stairs and bridges.";
+        public const string BuilderDigBio = "Give the Builder a gap and he hands you a way across: he digs and fills the ground, builds ladders and bridges.";
         public const string Dodge = "DODGE: a quick dash; you cannot be hit for a moment. 3 s to recharge.";
         public const string Jump = "JUMP clears gaps and short walls.";
 
@@ -464,8 +464,8 @@ namespace CriticalMass.Runtime.Menus
                 w.Abilities = new[]
                 {
                     new AbilityWords { Input = "throw", Name = "Build", Text = BuilderBuild, Cooldown = "", NeedsRule = "" },
-                    new AbilityWords { Input = "switch", Name = "Switch Piece", Text = BuilderSwitch, Cooldown = "", NeedsRule = "" },
-                    new AbilityWords { Input = "ability", Name = "Stairs and Bridges", Text = BuilderStairs, Cooldown = "", NeedsRule = "" },
+                    new AbilityWords { Input = "switch", Name = "Tool Wheel", Text = BuilderSwitch, Cooldown = "", NeedsRule = "" },
+                    new AbilityWords { Input = "ability", Name = "Ladders and Bridges", Text = BuilderStairs, Cooldown = "", NeedsRule = "" },
                 };
                 w.Early = false;
             }
@@ -481,8 +481,8 @@ namespace CriticalMass.Runtime.Menus
                     w.Abilities = new[]
                     {
                         new AbilityWords { Input = "throw", Name = "Dig and Place", Text = BuilderDig, Cooldown = "", NeedsRule = "" },
-                        new AbilityWords { Input = "switch", Name = "Dig or Place", Text = BuilderDigSwitch, Cooldown = "", NeedsRule = "" },
-                        new AbilityWords { Input = "ability", Name = "Stairs and Bridges", Text = BuilderStairs, Cooldown = "", NeedsRule = "" },
+                        new AbilityWords { Input = "switch", Name = "Tool Wheel", Text = BuilderDigSwitch, Cooldown = "", NeedsRule = "" },
+                        new AbilityWords { Input = "ability", Name = "Ladders and Bridges", Text = BuilderStairs, Cooldown = "", NeedsRule = "" },
                     };
                     w.Early = false;
                 }

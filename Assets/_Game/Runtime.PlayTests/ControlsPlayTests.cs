@@ -227,12 +227,15 @@ namespace CriticalMass.Runtime.PlayTests
             Assert.IsTrue(f.Terraform, "Y = dig / place");
             yield return Release(f);
 
+            // b14 (owner decision): the class ability keeps B; dodge is the right bumper; LB steps the Builder's tool wheel.
             InputAction sw = InputSystem.actions.FindAction("Player/SwitchDigPlace");
-            yield return Press(new GamepadState().WithButton(GamepadButton.RightShoulder));
-            Assert.AreEqual(1f, sw.ReadValue<float>(), "RB = switch to place");
-            yield return Release(f);
             yield return Press(new GamepadState().WithButton(GamepadButton.LeftShoulder));
-            Assert.AreEqual(-1f, sw.ReadValue<float>(), "LB = switch to dig");
+            Assert.AreEqual(1f, sw.ReadValue<float>(), "LB = next tool");
+            yield return Release(f);
+            yield return Press(new GamepadState().WithButton(GamepadButton.RightShoulder));
+            st.Fill(f);
+            Assert.IsTrue(f.Dodge, "RB = dodge");
+            Assert.AreEqual(0f, sw.ReadValue<float>(), "RB no longer switches");
             yield return Release(f);
 
             yield return Press(new GamepadState().WithButton(GamepadButton.Select));
