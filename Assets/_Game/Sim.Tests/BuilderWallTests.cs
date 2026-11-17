@@ -124,6 +124,85 @@ namespace CriticalMass.Sim.Tests
         }
 
         [Test]
+        public void MirroredBuildersGetMirroredPieces()
+        {
+            // b13 r3 tilt check: an Azure Builder and a Crimson Builder standing and aiming as mirror images (x' = 2 x hill x - x)
+            // must get mirror-image pieces (cell cx' = W - 1 - cx), the same axis, length and verdict.
+            World w = Field();
+            int j = -1;
+            for (int k = 0; k < w.ActorCount; k++) if (w.Actors[k].Team == TeamId.Crimson) { j = k; break; }
+            Assert.GreaterOrEqual(j, 0);
+            w.Actors[j].Cls = ClassId.Builder;
+            double mx = 2 * w.Map.Hill.X;
+            int W = w.Map.Width, bad = 0, cases = 0;
+            Console.WriteLine($"[b13-b] mirror: map width {W}, hill x {w.Map.Hill.X}, pads A x {w.Map.Pads[0].X} C x {w.Map.Pads[1].X} (mirror sum {w.Map.Pads[0].X + w.Map.Pads[1].X}, want {mx})");
+            double[] xs = { 38.0, 40.5, 43.25, 46.0, 49.75 };
+            double[] zs = { 30.0, 34.5, 40.0, 45.5, 50.25 };
+            double[] off = { 0.0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0 };
+            foreach (double x in xs) foreach (double z in zs) foreach (double ox in off) foreach (double oz in new[] { -2.0, -0.5, 0.0, 1.0, 2.5 })
+            {
+                Put(w, Me, x, z);
+                Put(w, j, mx - x, z);
+                w.Actors[Me].Facing = 0; w.Actors[j].Facing = Math.PI;
+                w.Inputs[Me].AimX = x + ox; w.Inputs[Me].AimZ = z + oz; w.HasAim[Me] = 1;
+                w.Inputs[j].AimX = mx - (x + ox); w.Inputs[j].AimZ = z + oz; w.HasAim[j] = 1;
+                bool ha = BuilderWalls.Ghost(w, Me, out int ax, out int az, out int adx, out int adz, out int alen, out bool at, out bool aok);
+                bool hc = BuilderWalls.Ghost(w, j, out int cx, out int cz, out int cdx, out int cdz, out int clen, out bool ct, out bool cok);
+                int wa = BuilderWalls.GhostWhy(w, Me), wc = BuilderWalls.GhostWhy(w, j);
+                cases++;
+                bool pass = ha == hc && cx == W - 1 - ax && cz == az && cdx == adx && cdz == adz && clen == alen && wa == wc;
+                if (!pass)
+                {
+                    bad++;
+                    if (bad <= 12) Console.WriteLine($"[b13-b] mirror MISMATCH: Azure at ({x},{z}) aim +({ox},{oz}) -> cell ({ax},{az}) axis ({adx},{adz}) why {wa}; Crimson -> cell ({cx},{cz}) axis ({cdx},{cdz}) why {wc} (want cell ({W - 1 - ax},{az}))");
+                }
+            }
+            Console.WriteLine($"[b13-b] mirror: {cases - bad} of {cases} mirrored aims give mirrored pieces, mismatches {bad} (limit 0)");
+            Assert.AreEqual(0, bad);
+        }
+
+        [Test]
+        public void KeyLayoutDigPlaceThenWallsOnTheSwitch()
+        {
+            // b13 r3 key layout (the Builder owns dig / place with the hut rule): the switch walks DIG -> PLACE -> WALL SHORT ->
+            // (WALL TALL from tier 1) -> BLOCK -> DIG; F digs / places with the dig tool and builds with a piece.
+            World w = Field();
+            Open(w, 4, out int ox, out int oz);
+            Put(w, Me, ox + 0.5, oz + 0.5);
+            Aim(w, ox + 2.5, oz + 0.5);
+            int bad = 0;
+            void Step(string what, bool tool, TerraformMode mode, BuildPiece piece, bool pressTaken)
+            {
+                bool gotTool = BuilderWalls.TerrainTool(w, Me);
+                bool taken = BuilderWalls.TakeBuilderPress(w, Me);
+                bool ok = gotTool == tool && (!tool || Terraform.ModeOf(w, Me) == mode) && (tool || BuilderWalls.Piece(w, Me) == piece) && taken == pressTaken;
+                Console.WriteLine($"[b13-b] keys {what}: dig tool {gotTool} mode {Terraform.ModeOf(w, Me)} piece {BuilderWalls.Piece(w, Me)} tall {BuilderWalls.TallSelected(w, Me)}, F taken by walls {taken} (want tool {tool}, F taken {pressTaken}) {(ok ? "PASS" : "FAIL")}");
+                if (!ok) bad++;
+                w.Tick += 30;
+            }
+            Console.WriteLine($"[b13-b] keys: terrain owner {Terraform.OwnerClass(w)} (want Builder with the hut rule)");
+            Step("start", true, TerraformMode.Dig, BuildPiece.Wall, false);
+            BuilderWalls.TakeBuilderSwitch(w, Me);
+            Step("switch 1", true, TerraformMode.Place, BuildPiece.Wall, false);
+            BuilderWalls.TakeBuilderSwitch(w, Me);
+            Step("switch 2 (wall)", false, TerraformMode.Place, BuildPiece.Wall, true);
+            BuilderWalls.TakeBuilderSwitch(w, Me);
+            Step("switch 3 (block at tier 0)", false, TerraformMode.Place, BuildPiece.Block, true);
+            BuilderWalls.TakeBuilderSwitch(w, Me);
+            Step("switch 4 (back to dig)", true, TerraformMode.Dig, BuildPiece.Block, false);
+            Tier(w, 1);
+            BuilderWalls.TakeBuilderSwitch(w, Me);
+            BuilderWalls.TakeBuilderSwitch(w, Me);
+            Step("tier 1, switch x2 (short wall)", false, TerraformMode.Place, BuildPiece.Wall, true);
+            bool shortSel = !BuilderWalls.TallSelected(w, Me);
+            BuilderWalls.TakeBuilderSwitch(w, Me);
+            bool tallSel = BuilderWalls.TallSelected(w, Me) && BuilderWalls.Piece(w, Me) == BuildPiece.Wall;
+            Console.WriteLine($"[b13-b] keys tier 1: short first {shortSel}, then tall {tallSel} (want True, True)");
+            if (!shortSel || !tallSel) bad++;
+            Assert.AreEqual(0, bad);
+        }
+
+        [Test]
         public void EachRefusalReason()
         {
             World w = Field();
@@ -442,6 +521,50 @@ namespace CriticalMass.Sim.Tests
             public readonly List<int> Walls16 = new List<int>();
             public readonly int[] ClassKills = new int[6];
             public int WallsAll;
+            // b13 r3 tilt diagnostics (index = team; [t * 2 + u] = team t's actors near team u's walls)
+            public int Matches16, AzureWins16, Matches5, AzureWins5;
+            public readonly int[] WallsTeam = new int[2];
+            public readonly int[] ByRule = new int[8];
+            public readonly double[] OwnDelta = new double[2], EnemyDelta = new double[2], ToEnemy = new double[2], HillDist = new double[2];
+            public readonly int[] OwnLonger = new int[2], EnemyLonger = new int[2], OwnHalf = new int[2];
+            public readonly int[] Near = new int[4];
+            public readonly double[] HillSec = new double[2];
+            public readonly List<string> PerMatch = new List<string>();
+        }
+
+        /// <summary>Walking distance (flow field, cells) from each pad to the hill on the CURRENT grid.</summary>
+        private static void PadHill(World w, out double a, out double c)
+        {
+            MapDef m = w.Map;
+            FlowField f = FlowField.ComputeFlowField(m, new[] { new PointXZ(m.Hill.X, m.Hill.Z) });
+            double D(TeamId t) { PadDef p = m.Pads[(int)t]; return f.Dist[JsMath.FloorToInt(p.Z) * m.Width + JsMath.FloorToInt(p.X)]; }
+            a = D(TeamId.Azure);
+            c = D(TeamId.Crimson);
+        }
+
+        /// <summary>The newest piece of Builder id: its standing wall slots.</summary>
+        private static List<int> NewestPieceSlots(World w, int id)
+        {
+            WallsState s = w.Walls;
+            int best = -1;
+            for (int p = 0; p < s.PAlive.Length; p++) if (s.PAlive[p] > 0 && s.POwner[p] == id && (best < 0 || s.PSeq[p] > s.PSeq[best])) best = p;
+            var slots = new List<int>();
+            if (best < 0) return slots;
+            for (int k = 0; k < s.Kind.Length; k++) if (BuilderWalls.IsWallSlot(w, k) && s.PieceOf[k] == best) slots.Add(k);
+            return slots;
+        }
+
+        /// <summary>Route-length delta of a just-built piece: pad-to-hill distance now minus with the piece's cells back to what they were.</summary>
+        private static void PieceDelta(World w, List<int> slots, out double da, out double dc)
+        {
+            PadHill(w, out double a1, out double c1);
+            byte[] cells = w.Map.Cells;
+            var keep = new byte[slots.Count];
+            for (int k = 0; k < slots.Count; k++) { Barricade b = w.Barricades[slots[k]]; int i = b.Cz * w.Map.Width + b.Cx; keep[k] = cells[i]; cells[i] = b.PrevCell; }
+            PadHill(w, out double a0, out double c0);
+            for (int k = 0; k < slots.Count; k++) { Barricade b = w.Barricades[slots[k]]; cells[b.Cz * w.Map.Width + b.Cx] = keep[k]; }
+            da = a1 - a0;
+            dc = c1 - c0;
         }
 
         private static void Play(int seed, int teamSize, bool on, Arm arm)
@@ -457,6 +580,8 @@ namespace CriticalMass.Sim.Tests
             int cursor = w.EventHead;
             double firstKo = -1;
             int walls = 0, lastSign = 0;
+            int[] wallsTeam = new int[2];
+            var wallLog = new List<string>();
             double kx = double.NaN, kz = double.NaN;
             int stillSince = -1;
             bool inStall = false;
@@ -473,7 +598,44 @@ namespace CriticalMass.Sim.Tests
                         if (firstKo < 0) firstKo = w.Match.Time;
                         if (e.B >= 0 && e.B < w.ActorCount && w.Actors[e.B].Team != w.Actors[e.A].Team) { arm.Kills++; arm.ClassKills[(int)w.Actors[e.B].Cls]++; }
                     }
-                    else if (e.Type == SimEventType.WallBuilt && e.Value > 0) walls++;
+                    else if (e.Type == SimEventType.WallBuilt && e.Value > 0)
+                    {
+                        walls++;
+                        if (!on || e.A < 0 || e.A >= w.ActorCount) continue;
+                        int t = (int)w.Actors[e.A].Team;
+                        wallsTeam[t]++;
+                        arm.WallsTeam[t]++;
+                        List<int> slots = NewestPieceSlots(w, e.A);
+                        PieceDelta(w, slots, out double da, out double dc);
+                        double own = t == 0 ? da : dc, enemy = t == 0 ? dc : da;
+                        arm.OwnDelta[t] += own; arm.EnemyDelta[t] += enemy;
+                        if (own > 0.01) arm.OwnLonger[t]++;
+                        if (enemy > 0.01) arm.EnemyLonger[t]++;
+                        double toEnemy = t == 0 ? e.X - w.Map.Hill.X : w.Map.Hill.X - e.X;   // + = on the enemy's half of the mirror line
+                        arm.ToEnemy[t] += toEnemy;
+                        if (toEnemy < 0) arm.OwnHalf[t]++;
+                        double hd = Math.Sqrt((e.X - w.Map.Hill.X) * (e.X - w.Map.Hill.X) + (e.Z - w.Map.Hill.Z) * (e.Z - w.Map.Hill.Z));
+                        arm.HillDist[t] += hd;
+                        if (wallLog.Count < 6) wallLog.Add($"{(TeamId)t} t{w.Tick} ({e.X - 0.5:F0},{e.Z - 0.5:F0}) mirror-x {(t == 0 ? e.X : 2 * w.Map.Hill.X - e.X) - 0.5:F0} len {e.Value} hill {hd:F1} dOwn {own:F0} dEnemy {enemy:F0}");
+                    }
+                }
+                if (on && w.Tick % sampleEvery == 0)
+                {
+                    // Who walls get in the way of: per team, living actors within 1.2 u of a standing wall cell, by the wall's team.
+                    for (int j = 0; j < w.ActorCount; j++)
+                    {
+                        if (!w.Actors[j].Alive) continue;
+                        int tj = (int)w.Actors[j].Team;
+                        bool[] seen = { false, false };
+                        for (int k = w.Walls.BaseSlots; k < w.Barricades.Length; k++)
+                        {
+                            if (!BuilderWalls.IsWallSlot(w, k)) continue;
+                            Barricade b = w.Barricades[k];
+                            double dx = b.Cx + 0.5 - w.X[j], dz = b.Cz + 0.5 - w.Z[j];
+                            if (dx * dx + dz * dz < 1.44) seen[(int)b.Team] = true;
+                        }
+                        for (int u = 0; u < 2; u++) if (seen[u]) arm.Near[tj * 2 + u]++;
+                    }
                 }
                 if (w.Tick % sampleEvery != 0) continue;
                 arm.RouteSamples++;
@@ -501,6 +663,12 @@ namespace CriticalMass.Sim.Tests
             arm.Minutes += w.Match.Time / 60.0;
             if (w.Match.Winner == MatchResult.Azure || w.Match.Winner == MatchResult.Crimson) arm.Decided++;
             if (w.Match.Winner == MatchResult.Azure) arm.AzureWins++;
+            if (teamSize == 16) { arm.Matches16++; if (w.Match.Winner == MatchResult.Azure) arm.AzureWins16++; }
+            else { arm.Matches5++; if (w.Match.Winner == MatchResult.Azure) arm.AzureWins5++; }
+            arm.HillSec[0] += w.Match.HillSeconds.Azure;
+            arm.HillSec[1] += w.Match.HillSeconds.Crimson;
+            for (int k = 0; k < 8; k++) arm.ByRule[k] += w.Walls.BuiltByRule[k];
+            arm.PerMatch.Add($"{teamSize}v{teamSize} seed {seed}: winner {w.Match.Winner}, hill s A {w.Match.HillSeconds.Azure:F0} C {w.Match.HillSeconds.Crimson:F0}, walls A {wallsTeam[0]} C {wallsTeam[1]}" + (wallLog.Count > 0 ? " | " + string.Join(" ; ", wallLog) : ""));
             if (firstKo >= 0) arm.FirstKo.Add(firstKo);
             arm.WallsAll += walls;
             if (teamSize == 16) arm.Walls16.Add(walls);
@@ -526,7 +694,11 @@ namespace CriticalMass.Sim.Tests
             var lines = new List<(string line, bool pass)>();
             Arm on = arms[0], off = arms[1];
             double winOn = (double)on.AzureWins / on.Matches, winOff = (double)off.AzureWins / off.Matches;
-            lines.Add(($"team win share (Azure): on {winOn:F3} control {winOff:F3} (limit within 0.15)", Math.Abs(winOn - winOff) <= 0.15));
+            lines.Add(($"team win share (Azure), all: on {winOn:F3} control {winOff:F3} (limit within 0.15)", Math.Abs(winOn - winOff) <= 0.15));
+            double w16On = (double)on.AzureWins16 / Math.Max(1, on.Matches16), w16Off = (double)off.AzureWins16 / Math.Max(1, off.Matches16);
+            double w5On = (double)on.AzureWins5 / Math.Max(1, on.Matches5), w5Off = (double)off.AzureWins5 / Math.Max(1, off.Matches5);
+            lines.Add(($"team win share (Azure), 16v16 ({on.Matches16} matches): on {w16On:F3} control {w16Off:F3} (limit within 0.15)", Math.Abs(w16On - w16Off) <= 0.15 + 1e-9));
+            lines.Add(($"team win share (Azure), 5v5 ({on.Matches5} matches): on {w5On:F3} control {w5Off:F3} (limit within 0.15)", Math.Abs(w5On - w5Off) <= 0.15 + 1e-9));
             double koOn = Median(on.FirstKo), koOff = Median(off.FirstKo);
             lines.Add(($"median first knock-out: on {koOn:F1} s control {koOff:F1} s (limit -10% / +20%)", koOn >= koOff * 0.9 && koOn <= koOff * 1.2));
             double kpmOn = on.Kills / on.Minutes, kpmOff = off.Kills / off.Minutes;
@@ -543,6 +715,14 @@ namespace CriticalMass.Sim.Tests
             double stOn = (double)on.Stalls / on.Matches, stOff = (double)off.Stalls / off.Matches;
             lines.Add(($"Kaiju no-progress stalls over 10 s per match: on {stOn:F2} control {stOff:F2} (limit control + 1)", stOn <= stOff + 1));
             foreach (var l in lines) Console.WriteLine($"[b13-b] BALANCE {l.line} {(l.pass ? "PASS" : "FAIL")}");
+            for (int t = 0; t < 2; t++)
+            {
+                int n = Math.Max(1, on.WallsTeam[t]);
+                Console.WriteLine($"[b13-b] TILT {(TeamId)t}: walls {on.WallsTeam[t]} (rule hill {on.ByRule[t * 4 + 1]}, guard {on.ByRule[t * 4 + 2]}, fill {on.ByRule[t * 4 + 3]}, player {on.ByRule[t * 4]}); mean offset toward the enemy half {on.ToEnemy[t] / n:F2} u, on own half {on.OwnHalf[t]}; mean distance to hill {on.HillDist[t] / n:F2} u; own pad-to-hill route longer after {on.OwnLonger[t]} walls (mean delta {on.OwnDelta[t] / n:F2}), enemy route longer after {on.EnemyLonger[t]} (mean delta {on.EnemyDelta[t] / n:F2})");
+                Console.WriteLine($"[b13-b] TILT {(TeamId)t} actors within 1.2 u of a wall (samples every 30 ticks): own team's walls {on.Near[t * 2 + t]}, enemy walls {on.Near[t * 2 + 1 - t]}; hill seconds on {on.HillSec[t]:F0} control {off.HillSec[t]:F0}");
+            }
+            for (int k = 0; k < on.PerMatch.Count; k++) Console.WriteLine($"[b13-b] MATCH on  {on.PerMatch[k]}");
+            for (int k = 0; k < off.PerMatch.Count; k++) Console.WriteLine($"[b13-b] MATCH off {off.PerMatch[k]}");
             Console.WriteLine($"[b13-b] BALANCE matches {on.Matches} per arm (5v5 Full 1..20 with one Builder per team, 16v16 Full 1337 4242 7 99 2024 31337); decided on {on.Decided} control {off.Decided}");
             Assert.IsTrue(lines.All(l => l.pass), "a balance limit failed (see the BALANCE lines): the rule is CUT under lesson 1");
         }

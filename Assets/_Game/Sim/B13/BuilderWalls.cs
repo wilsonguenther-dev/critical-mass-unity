@@ -33,6 +33,16 @@ namespace CriticalMass.Sim.Core
         public int[] BotGuardTick;
         /// <summary>Pieces (walls and blocks, fills not counted) each actor built this match.</summary>
         public int[] Built;
+        /// <summary>
+        /// b13 r3 key layout: 0 = the DIG / PLACE tool is selected (F digs or places through Terraform, the switch steps DIG ->
+        /// PLACE -> WALL), 1 = a build piece is selected (F builds it). The dig tool exists only while the Builder owns terrain
+        /// (Terraform.OwnerClass); otherwise 0 reads as a build piece.
+        /// </summary>
+        public byte[] Tool;
+        /// <summary>Bots: the BotBuild rule behind the queued press (1 hill edge, 2 guard, 3 crater fill; 0 = a player's press).</summary>
+        public byte[] BotRule;
+        /// <summary>Stats (tests print them): pieces and fills committed per team x rule (index team * 4 + rule).</summary>
+        public readonly int[] BuiltByRule = new int[8];
 
         // ---- per World.Barricades slot
         /// <summary>0 = not a wall cell (free or a Miner barricade), 1 = short (Cell.LowWall), 2 = tall (Cell.Barricade).</summary>
@@ -84,6 +94,8 @@ namespace CriticalMass.Sim.Core
             BotHillTick = new int[n];
             BotGuardTick = new int[n];
             Built = new int[n];
+            Tool = new byte[n];
+            BotRule = new byte[n];
             BaseSlots = w.Barricades.Length;
             if (BuilderWalls.On(w))
             {
@@ -129,7 +141,10 @@ namespace CriticalMass.Sim.Core
                 BotHillTick[i] = int.MinValue / 2;
                 BotGuardTick[i] = int.MinValue / 2;
                 Built[i] = 0;
+                Tool[i] = 0;
+                BotRule[i] = 0;
             }
+            Array.Clear(BuiltByRule, 0, BuiltByRule.Length);
             for (int s = 0; s < Kind.Length; s++)
             {
                 Kind[s] = 0;
@@ -266,6 +281,7 @@ namespace CriticalMass.Sim.Core
             if (!On(w) || !Valid(w, id)) return false;
             Actor a = w.Actors[id];
             if (!a.Alive || a.Cls != ClassId.Builder) return false;
+            if (TerrainTool(w, id)) return false;   // b13 r3: the DIG / PLACE tool is selected, Terraform digs or places
             if (a.StandUp > 0) return true;
             bool hasAim = w.HasAim[id] == 1;
             InputFrame inp = w.Inputs[id];
@@ -280,12 +296,31 @@ namespace CriticalMass.Sim.Core
             Actor a = w.Actors[id];
             if (!a.Alive || a.Cls != ClassId.Builder) return false;
             WallsState s = w.Walls;
+            bool owns = OwnsTerrain(w);
             bool tierTall = Tier(w, a.Team) >= 1;
             bool tallEff = s.Tall[id] == 1 && tierTall;
+            TerraformState t = w.Terraform;
+            if (owns && s.Tool[id] == 0)
+            {
+                // b13 r3 key layout: DIG -> PLACE -> WALL (the switch keeps the old dig / place flip, then walks into the pieces).
+                if (t.Mode[id] != (byte)TerraformMode.Place) t.Mode[id] = (byte)TerraformMode.Place;
+                else
+                {
+                    s.Tool[id] = 1;
+                    s.Piece[id] = (byte)BuildPiece.Wall;
+                    s.Tall[id] = 0;
+                }
+                return true;
+            }
             if (s.Piece[id] == (byte)BuildPiece.Wall)
             {
                 if (!tallEff && tierTall) s.Tall[id] = 1;           // WALL SHORT -> WALL TALL
                 else s.Piece[id] = (byte)BuildPiece.Block;          // WALL TALL (or SHORT at tier 0) -> BLOCK
+            }
+            else if (owns)
+            {
+                s.Tool[id] = 0;                                     // BLOCK -> DIG (the cycle starts again)
+                t.Mode[id] = (byte)TerraformMode.Dig;
             }
             else
             {
@@ -294,6 +329,12 @@ namespace CriticalMass.Sim.Core
             }
             return true;
         }
+
+        /// <summary>b13 r3: the Builder owns the dig / place terraform (the hut rule moved it from the Miner).</summary>
+        public static bool OwnsTerrain(World w) => Terraform.OwnerClass(w) == ClassId.Builder;
+
+        /// <summary>b13 r3: Builder id has the DIG / PLACE tool selected (F goes to Terraform, no wall ghost).</summary>
+        public static bool TerrainTool(World w, int id) => On(w) && Valid(w, id) && w.Walls.Tool[id] == 0 && OwnsTerrain(w);
 
         /// <summary>Per tick, after Barricades.BarricadesSystem: a wall cell whose slot broke, expired or was reused is released (WallBroken once per piece).</summary>
         public static void WallsSystem(World w)
@@ -309,6 +350,7 @@ namespace CriticalMass.Sim.Core
             if (!On(w) || !Valid(w, id)) return false;
             Actor a = w.Actors[id];
             if (!a.Alive || a.Cls != ClassId.Builder) return false;
+            if (TerrainTool(w, id)) return false;   // b13 r3: the dig / place affordance shows instead
             bool hasAim = w.HasAim[id] == 1;
             InputFrame inp = w.Inputs[id];
             int why = Plan(w, id, hasAim ? inp.AimX : double.NaN, hasAim ? inp.AimZ : double.NaN, out cx, out cz, out dx, out dz, out len, out tall, out bool fill);
@@ -520,6 +562,8 @@ namespace CriticalMass.Sim.Core
                 Terraform.CommitFill(w, id, cx, cz);
                 s.ReadyTick[id] = w.Tick + Durations.T30(w.Config, b.LockTicks);
                 s.Fills++;
+                s.BuiltByRule[(int)a.Team * 4 + (s.BotRule[id] & 3)]++;
+                s.BotRule[id] = 0;
                 return Filled;
             }
 
@@ -589,6 +633,8 @@ namespace CriticalMass.Sim.Core
             s.ReadyTick[id] = w.Tick + Durations.T30(w.Config, b.LockTicks);
             s.Builds++;
             s.Built[id]++;
+            s.BuiltByRule[(int)a.Team * 4 + (s.BotRule[id] & 3)]++;
+            s.BotRule[id] = 0;
             World.PushEvent(w, SimEventType.WallBuilt, id, first, cx + 0.5, cz + 0.5, len);
             return Built;
         }
@@ -691,7 +737,7 @@ namespace CriticalMass.Sim.Core
         // Bots
 
         /// <summary>BotBuild: queue one F press for Builder bot id aimed at (x, z) with the given piece, if the sim would accept it now.</summary>
-        public static bool QueueBotPress(World w, int id, double x, double z, BuildPiece piece, bool tall)
+        public static bool QueueBotPress(World w, int id, double x, double z, BuildPiece piece, bool tall, int rule = 0)
         {
             if (!On(w) || !Valid(w, id)) return false;
             WallsState s = w.Walls;
@@ -708,6 +754,7 @@ namespace CriticalMass.Sim.Core
             s.BotZ[id] = JsMath.F32(z);
             s.BotPiece[id] = (byte)piece;
             s.BotTall[id] = tall ? (byte)1 : (byte)0;
+            s.BotRule[id] = (byte)(rule & 3);
             return true;
         }
 
@@ -719,6 +766,7 @@ namespace CriticalMass.Sim.Core
             if (s.BotReq[id] != 1) return false;
             s.BotReq[id] = 0;
             if (!w.Actors[id].Alive || w.Actors[id].Cls != ClassId.Builder) return false;
+            s.Tool[id] = 1;   // b13 r3: a bot's build press always uses a piece (bots never dig)
             s.Piece[id] = s.BotPiece[id];
             s.Tall[id] = s.BotTall[id];
             output.AimX = s.BotX[id];

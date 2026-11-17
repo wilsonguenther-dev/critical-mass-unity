@@ -7,7 +7,7 @@ namespace CriticalMass.Sim.Config
     public sealed class BuildConfig
     {
         /// <summary>The rule's own switch (Full profile only: systems read it through DepthRules.On).</summary>
-        public bool On = false;   // b13 integrator: item B is CUT this batch (stub only); off so no build kit, ghost hint or wall words show
+        public bool On = true;   // b13 r3: walls brought back (the round 1 win-share tilt fixed at its cause; see BuilderWallTests)
 
         // ---- Placement (the ghost)
         /// <summary>The aim point is clamped to this distance from the Builder; the cell under it is the piece's centre.</summary>

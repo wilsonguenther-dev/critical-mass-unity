@@ -59,7 +59,7 @@ namespace CriticalMass.Sim.Bots
                     {
                         double tx = x + (w.X[e] - x) / d * b.BotGuardDistance;
                         double tz = z + (w.Z[e] - z) / d * b.BotGuardDistance;
-                        if (BuilderWalls.QueueBotPress(w, id, tx, tz, BuildPiece.Wall, false)) return true;
+                        if (BuilderWalls.QueueBotPress(w, id, tx, tz, BuildPiece.Wall, false, 2)) return true;
                     }
                 }
             }
@@ -117,7 +117,7 @@ namespace CriticalMass.Sim.Bots
                         }
                         if (ox * ox + oz * oz <= (b.Reach + 2.0) * (b.Reach + 2.0))
                         {
-                            if (BuilderWalls.QueueBotPress(w, id, tx, tz, BuildPiece.Wall, tier >= 1))
+                            if (BuilderWalls.QueueBotPress(w, id, tx, tz, BuildPiece.Wall, tier >= 1, 1))
                             {
                                 ws.BotHillTick[id] = w.Tick;
                                 return true;
@@ -150,7 +150,7 @@ namespace CriticalMass.Sim.Bots
                 {
                     int dx = pick == 0 ? 1 : pick == 1 ? -1 : 0;
                     int dz = pick == 2 ? 1 : pick == 3 ? -1 : 0;
-                    if (BuilderWalls.QueueBotPress(w, id, bx + dx + 0.5, bz + dz + 0.5, BuildPiece.Block, false)) return true;
+                    if (BuilderWalls.QueueBotPress(w, id, bx + dx + 0.5, bz + dz + 0.5, BuildPiece.Block, false, 3)) return true;
                 }
             }
             return false;
