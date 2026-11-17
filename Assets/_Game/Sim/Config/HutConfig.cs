@@ -57,6 +57,32 @@ namespace CriticalMass.Sim.Config
         public double BotFightRange = 8;   // b13 r2: back from 14 (round 1 tuning pass): 14 u cost a fifth of the ore and moved no kill share
         /// <summary>b13 integrator tuning pass: a Miner bot carrying ore still fights back when an enemy is this close (u).</summary>
         public double BotFightWithOreRange = 4;
+        /// <summary>
+        /// b13 r3 (Miner bots fight): the Fight utility BotMine offers when an empty-handed Miner bot sees an enemy within
+        /// BotFightRange (with ore: BotFightWithOreRange), and at the top level when he stands on the hill (radius plus
+        /// BotTopFightHillMargin). 1.0 beats holding the hill (0.7 + 0.25 inertia) and loses to nothing a hurt bot needs (he
+        /// offers it only above BotFsm.LowHp, where Retreat does not apply). 0 = round 2 (he walked to the hill instead).
+        /// </summary>
+        public double BotDefendUtility = 1.0;
+        public double BotTopFightHillMargin = 2;
+        /// <summary>
+        /// b13 r3: the HILL SHIFT (BotMine): from this hut level a Miner bot that has just banked his ore spends
+        /// BotHillShiftSeconds on the hill before mining again (0 s = off). Measured on the hut balance seeds (diag runs on
+        /// ci/b13r3-tune-diag; Miner kill share / 16v16 median end hut level / 16v16 seeds with a team at L5): no shift
+        /// 0.020 / 4 / 3 of 6; from L3 20 s one Miner per team 0.067 / 4 / 1; from L2 20 s 0.081 / 4 / 0; from L1 20 s
+        /// 0.096 / 4 / 1. Shipped: from L3, 15 s, one per team.
+        /// </summary>
+        public int BotHillShiftFromLevel = 3;
+        public double BotHillShiftSeconds = 15;
+        /// <summary>
+        /// b13 r3 integrator (snowball guard, "higher-level team at 6:00 wins at most 75%"): the shift when his team's hut is
+        /// AHEAD of the enemy's (longer, and no per-team cap: the leader's Miners mine less) and when it is BEHIND (0 s: the trailing Miner keeps
+        /// mining to catch up). Level teams use BotHillShiftSeconds.
+        /// </summary>
+        public double BotHillShiftAheadSeconds = 45;
+        public double BotHillShiftBehindSeconds = 0;
+        /// <summary>At most this many of a team's Miners are on a hill shift at once (the others keep mining).</summary>
+        public int BotHillShiftMaxPerTeam = 1;
         /// <summary>A Miner bot that ended up in Deliver with ore (the shrine would refuse it) is pulled back to the hut at this utility.</summary>
         public double BotEscapeUtility = 2;
         /// <summary>A task lasts this long without a fresh think (s).</summary>

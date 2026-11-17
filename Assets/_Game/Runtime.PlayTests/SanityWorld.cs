@@ -68,10 +68,19 @@ namespace CriticalMass.Runtime.PlayTests
         /// Loads Boot (actor 0 as humanClass when given, through the game flow's own match request), stops the clock and
         /// settles settleSeconds of sim time with no input so the spawn crowd has left the pad.
         /// </summary>
-        public IEnumerator Load(ClassId? humanClass = null, bool manualInput = true, bool autopilot = false, double settleSeconds = 3)
+        /// <summary>
+        /// b13 r3 (AnimationPass moonwalk noise): the match seed every sanity world plays. QueueMatch without a seed drew
+        /// GameFlow.NewSeed() from the wall clock, so every run was a different match (a different crowd and a different
+        /// stretch of ground in front of actor 0): NoMoonwalkingInEightDirectionsWithAFixedAim read "moving screen up" 0.103,
+        /// 0.234 and 0.261 u/u on the same commit, and "up-left" 0.000, 1.220 and 2.203 u/u. A fixed seed makes every
+        /// sanity measurement repeatable; a test that wants another match passes its own seed.
+        /// </summary>
+        public const int SanitySeed = 4242;
+
+        public IEnumerator Load(ClassId? humanClass = null, bool manualInput = true, bool autopilot = false, double settleSeconds = 3, int seed = SanitySeed)
         {
             if (humanClass.HasValue)
-                GameFlow.QueueMatch(new MatchSetupChoice { Team = TeamId.Azure, Class = humanClass.Value, TeamSize = 16, Pace = 2 });
+                GameFlow.QueueMatch(new MatchSetupChoice { Team = TeamId.Azure, Class = humanClass.Value, TeamSize = 16, Pace = 2 }, seed);
             // ci/playmode-triage (P-05): until TimeScale is 0 below, the driver runs the sim on unscaled frame time (Pace 2,
             // up to the tick cap per frame), so the two load frames advanced the world by however long they took: a few
             // ticks on the Mac, dozens on a slow runner, and every sanity test started from a different state there

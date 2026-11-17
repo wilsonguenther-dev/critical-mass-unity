@@ -191,6 +191,16 @@ namespace CriticalMass.Sim.Bots
         /// <summary>CM b13: the items' bot files offer a state's utility to the current ThinkBot choice (same rule as Consider).</summary>
         internal static void ConsiderExternal(World w, AiState s, double u) => Consider(w, s, u);   // b13-hook
 
+        /// <summary>
+        /// CM b13 r3 [H]: the enemy the current ThinkBot's Perceive picked (-1 none; visible, not blinded) and its squared
+        /// distance. BotMine's defend rule offers Fight on it through ConsiderExternal (the Fight target is this same enemy).
+        /// </summary>
+        internal static int PerceivedEnemy(out double d2)
+        {
+            d2 = P.EnemyD2;
+            return P.Enemy;
+        }
+
         private static void Consider(World w, AiState s, double u)
         {
             if (u <= 0) return;
@@ -652,7 +662,8 @@ namespace CriticalMass.Sim.Bots
             bool fighting = cur == AiState.Fight;
             bool cocky = BotDirector.IsCocky(w, a.Team);
             BotSkillConfig sk = BotSkill.Profile(w, id); // DG-21: null = Normal (the browser bots)
-            Perceive(w, st, id, fighting || cocky ? FightKeepRange : FightRange, sk);
+            // b13 r3 [H]: a Miner bot under the hut rule perceives fights out to HutConfig.BotFightRange (8 u, FightKeepRange).
+            Perceive(w, st, id, fighting || cocky || BotMine.WidePerception(w, st, id) ? FightKeepRange : FightRange, sk);
             int role = st.Role[id];
             ClassConfig cc = w.Config.Class(a.Cls);
             double hpFrac = a.MaxHp > 0 ? a.Hp / a.MaxHp : 0;

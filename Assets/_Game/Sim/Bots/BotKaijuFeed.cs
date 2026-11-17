@@ -2,6 +2,7 @@
 using System;
 using CriticalMass.Sim.Config;
 using CriticalMass.Sim.Core;
+using CriticalMass.Sim.Grid;
 
 namespace CriticalMass.Sim.Bots
 {
@@ -55,6 +56,55 @@ namespace CriticalMass.Sim.Bots
             if (!Live(w) || !(id >= 0 && id < w.ActorCount)) return false;
             int plan = Plan(w, w.Actors[id].Team);
             return (plan == PlanWood && kind == BiomassType.Wood) || (plan == PlanWater && kind == BiomassType.Water);
+        }
+
+        /// <summary>b13 r3: how far outside the SHROUD's edge (u) a bot already stops stepping inward.</summary>
+        public const double CloudMargin = 1.0;
+        /// <summary>b13 r3: a bot this close to the hill (radius plus this, u) is contesting it and may stay in a cloud.</summary>
+        public const double ContestMargin = 0.5;
+
+        /// <summary>
+        /// b13 r3 [K]: a bot the SHROUD would blind (KaijuTypes.Affected) leaves the cloud and does not walk into it, unless it is
+        /// contesting the hill (standing within the hill radius plus ContestMargin). Inside the cloud its step points straight
+        /// out from the cloud's centre (the Kaiju); within CloudMargin of the edge the inward part of its step is dropped, so it
+        /// slides round the rim instead of turning back and forth on it. Rewrites o.MoveX / o.MoveZ; true = it steered. Full
+        /// profile only (KaijuTypes.On), no allocation, no RNG.
+        /// </summary>
+        public static bool AvoidCloud(World w, int id, InputFrame o)
+        {
+            if (!KaijuTypes.On(w) || !w.Config.Depth.KaijuTypes.BotsAvoidCloud || !(id >= 0 && id < w.ActorCount)) return false;
+            if (!KaijuTypes.CloudActive(w, out double cx, out double cz, out double r)) return false;
+            if (!w.Actors[id].Alive || !KaijuTypes.Affected(w, id)) return false;
+            double x = w.X[id], z = w.Z[id];
+            HillDef hill = w.Map.Hill;
+            double hx = x - hill.X, hz = z - hill.Z, hr = hill.R + ContestMargin;
+            if (hx * hx + hz * hz <= hr * hr) return false;   // contesting the hill: it holds its ground in the cloud
+            double dx = x - cx, dz = z - cz, d2 = dx * dx + dz * dz, band = r + CloudMargin;
+            if (d2 > band * band) return false;
+            double d = Math.Sqrt(d2);
+            double ux = d > 1e-6 ? dx / d : ((id & 1) == 0 ? 1 : -1), uz = d > 1e-6 ? dz / d : 0;
+            if (d < r)
+            {
+                o.MoveX = ux;
+                o.MoveZ = uz;
+                return true;
+            }
+            double mx = o.MoveX, mz = o.MoveZ, inward = -(mx * ux + mz * uz);
+            if (!(inward > 0)) return false;   // already going out or round
+            mx += inward * ux;
+            mz += inward * uz;
+            double l = Math.Sqrt(mx * mx + mz * mz);
+            if (l < 1e-6)
+            {
+                // straight at the centre: round the rim, the side by id parity
+                double side = (id & 1) == 0 ? 1 : -1;
+                mx = -uz * side;
+                mz = ux * side;
+                l = 1;
+            }
+            o.MoveX = mx / l;
+            o.MoveZ = mz / l;
+            return true;
         }
 
         /// <summary>"plant" / "meat" / "wood" / "water", for logs.</summary>
