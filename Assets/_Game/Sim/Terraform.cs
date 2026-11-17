@@ -365,6 +365,10 @@ namespace CriticalMass.Sim.Core
                     t.Mode[i] = (byte)TerraformMode.Dig;
                     continue;
                 }
+                // CM b13: a switch press, then a rising F press, are offered to the items first (bookkeeping above still ran).
+                bool b13Switch = flip && B13Hooks.TakeTerraformSwitch(w, i);   // b13-hook
+                bool b13Press = rising && B13Hooks.TakeTerraformPress(w, i);   // b13-hook
+                if (b13Switch || b13Press) continue;   // b13-hook
                 if (a.Cls != ClassId.Miner) continue;
                 if (flip) t.Mode[i] = t.Mode[i] == (byte)TerraformMode.Place ? (byte)TerraformMode.Dig : (byte)TerraformMode.Place;
                 if (!rising || a.StandUp > 0) continue;

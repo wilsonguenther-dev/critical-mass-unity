@@ -79,6 +79,12 @@ namespace CriticalMass.Sim.Bots
         /// <summary>U-066: the power-up spot an AiState.Grab bot walks to.</summary>
         public double[] GrabX;
         public double[] GrabZ;
+        /// <summary>CM b13: the point an AiState.Task bot walks to (BotSteer), and the match time the task ends (back to None).</summary>
+        public double[] TaskX;   // b13-hook
+        public double[] TaskZ;   // b13-hook
+        public double[] TaskUntil;   // b13-hook
+        /// <summary>CM b13: who owns the task (B13Hooks.BotTaskAct routes it): 1-9 H, 10-19 B, 20-29 C, 30-39 K; 0 = none.</summary>
+        public byte[] TaskKind;   // b13-hook
 
         /// <summary>Browser createBotsState: allocate every per-actor array at ActorCapacity (no reset).</summary>
         public static BotsState CreateBotsState(World w)
@@ -129,6 +135,10 @@ namespace CriticalMass.Sim.Bots
                 HillSquad = new byte[cap],
                 GrabX = new double[cap],
                 GrabZ = new double[cap],
+                TaskX = new double[cap],   // b13-hook
+                TaskZ = new double[cap],   // b13-hook
+                TaskUntil = new double[cap],   // b13-hook
+                TaskKind = new byte[cap],   // b13-hook
             };
         }
 
@@ -178,6 +188,10 @@ namespace CriticalMass.Sim.Bots
                 st.HillSquad[id] = 0;
                 st.AbilityX[id] = JsMath.F32(0);
                 st.AbilityZ[id] = JsMath.F32(0);
+                st.TaskX[id] = 0;   // b13-hook
+                st.TaskZ[id] = 0;   // b13-hook
+                st.TaskUntil[id] = 0;   // b13-hook
+                st.TaskKind[id] = 0;   // b13-hook
             }
             BotFields.ResetFields(st.Fields, w);
             BotFields.BuildAllFields(st.Fields, w);

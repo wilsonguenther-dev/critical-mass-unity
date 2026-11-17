@@ -50,6 +50,7 @@ namespace CriticalMass.Sim.Core
                 else a.UnsupportedTicks++;
                 // DG-09 fall rule (U-053): ground gone under the centre for longer than the coyote window = fall in, climb out.
                 if (Terraform.FallIfUnsupported(w, i)) continue;
+                if (B13Hooks.DodgeStep(w, i, dt)) continue;   // b13-hook
                 double mx = inp.MoveX;
                 double mz = inp.MoveZ;
                 // DG-70: a staggered actor ignores its input (no move, no jump) while the stun counts down.
@@ -82,6 +83,7 @@ namespace CriticalMass.Sim.Core
                     if (slowLen > 0 && w.Tick > a.SwingTick && w.Tick <= a.SwingTick + slowLen)
                         speed *= cfg.Physics.SwingMoveMultiplier;
                     speed *= Pickups.SpeedScale(w, i); // U-066 Haste (exactly 1 without it)
+                    speed *= B13Hooks.SpeedScale(w, i);   // b13-hook
                     tx = mx * speed;
                     tz = mz * speed;
                 }

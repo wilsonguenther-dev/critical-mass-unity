@@ -660,6 +660,7 @@ namespace CriticalMass.Sim.Core
                 if (k.KoIn <= 0)
                 {
                     k.Hp = k.MaxHp;
+                    Corruption.AtGetUp(w);   // b13-hook
                     World.PushEvent(w, SimEventType.KaijuRecover, -1, -1, k.X, k.Z, 0);
                 }
                 return;

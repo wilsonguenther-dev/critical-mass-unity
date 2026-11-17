@@ -96,9 +96,11 @@ namespace CriticalMass.Sim.Core
             if (t.SpawnProtect > 0) return 0;
             bool fromActor = sourceId >= 0 && sourceId < w.ActorCount;
             if (fromActor && w.Actors[sourceId].Team == t.Team) return 0;
+            if (B13Hooks.Immune(w, targetId, cause)) return 0;   // b13-hook
             // The id written to lastAttacker and the events: the actor, KaijuSource, else -1.
             int credit = fromActor || sourceId == KaijuSource ? sourceId : -1;
 
+            amount *= B13Hooks.DamageScale(w, sourceId, targetId, cause);   // b13-hook
             double dmg = amount;
             if (t.Cls == ClassId.Warrior && t.AbilityActive > 0 && IsFrontal(w, targetId, srcX, srcZ))
             {

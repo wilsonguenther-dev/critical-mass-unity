@@ -125,6 +125,7 @@ namespace CriticalMass.Sim.Core
             if (!(sourceId >= 0 && sourceId < w.ActorCount)) return 0;
             Actor src = w.Actors[sourceId];
             if (!src.Alive) return 0;
+            amount *= B13Hooks.DamageScale(w, sourceId, -1, DamageCause.None);   // b13-hook: target -1 = the Kaiju
             if (k.State == KaijuState.Azure && src.Team != TeamId.Crimson) return 0;
             if (k.State == KaijuState.Crimson && src.Team != TeamId.Azure) return 0;
             if (k.State == KaijuState.Neutral) k.Threat[sourceId] = JsMath.F32(w.Config.Kaiju.NeutralThreatMemorySeconds);
@@ -479,7 +480,7 @@ namespace CriticalMass.Sim.Core
             Kaiju k = w.Kaiju;
             MapDef map = w.Map;
             RefreshClearance(w);
-            KaijuState state = ResolveHatch(m);
+            KaijuState state = Corruption.AtHatch(w, ResolveHatch(m));   // b13-hook
             k.State = state;
             m.Hatched = true;
             w.ForceHatch = false;
@@ -518,6 +519,7 @@ namespace CriticalMass.Sim.Core
             nav.SiegeCx = nav.SiegeCz = nav.StandCx = nav.StandCz = -1;
             nav.SiegeIn = 0;
             Array.Fill(nav.HitBy, 0.0);
+            KaijuTypes.OnHatch(w);   // b13-hook
             World.PushEvent(w, SimEventType.Hatch, -1, -1, x, z, HatchCode(state));
         }
 
@@ -531,6 +533,7 @@ namespace CriticalMass.Sim.Core
             {
                 if (m.Delivered[(int)TeamId.Azure].Biomass > m.Delivered[(int)TeamId.Crimson].Biomass) bigFeeder = 0;
                 else if (m.Delivered[(int)TeamId.Crimson].Biomass > m.Delivered[(int)TeamId.Azure].Biomass) bigFeeder = 1;
+                bigFeeder = Corruption.WildTargetTeam(w, bigFeeder);   // b13-hook
             }
             int best = -1;
             double bestScore = double.PositiveInfinity;

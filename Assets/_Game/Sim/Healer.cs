@@ -105,6 +105,7 @@ namespace CriticalMass.Sim.Core
         private static double Restore(World w, int target, int healer, double amount)
         {
             Actor t = w.Actors[target];
+            amount *= B13Hooks.HealScale(w, healer);   // b13-hook
             double room = t.MaxHp - t.Hp;
             double d = amount < room ? amount : room;
             if (!(d > 0)) return 0;
