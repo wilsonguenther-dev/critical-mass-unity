@@ -27,16 +27,16 @@ namespace CriticalMass.Sim.Config
 
         // ---- bots (Sim/Bots/BotReflex.cs). Arrays: Easy, Normal, Hard.
         /// <summary>A bot reacts to a threat only once it has existed this many ticks.</summary>
-        public int[] ReactionTicks = { 12, 8, 5 };
+        public int[] ReactionTicks = { 9, 5, 3 };   // b13 integrator: was {12, 8, 5}; most melee wind-ups ended before a Normal bot reacted (0.38-0.55 dodges per bot-minute, limit 1-4)
         /// <summary>Chance a bot dodges a threat (one decision per threat per bot, a stateless hash of seed, tick and id).</summary>
-        public double[] DodgeChance = { 0.15, 0.35, 0.60 };
+        public double[] DodgeChance = { 0.30, 0.70, 0.90 };   // b13 integrator: was {0.15, 0.35, 0.60} (same reason)
         /// <summary>Kaiju slam: the telegraph circle covers the bot with this many ticks or fewer left.</summary>
         public int SlamTicksLeft = 15;
         /// <summary>Enemy TNT: landed, this many fuse ticks or fewer left, the bot within BlastRadius + TntSlack.</summary>
         public int TntFuseTicksLeft = 20;
         public double TntSlack = 0.3;
         /// <summary>Enemy melee wind-up at the bot within the attacker's reach + MeleeSlack (+ the bot's body).</summary>
-        public double MeleeSlack = 0.3;
+        public double MeleeSlack = 0.5;   // b13 integrator: was 0.3
         /// <summary>Jump: a LowWall within JumpProbe u ahead of the steering and the cell past it walkable; at most once per JumpEveryTicks.</summary>
         public double JumpProbe = 1.0;
         public int JumpEveryTicks = 30;
