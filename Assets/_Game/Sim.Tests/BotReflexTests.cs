@@ -120,7 +120,7 @@ namespace CriticalMass.Sim.Tests
                         }
                         if (o.Dodge) dodged++;
                     }
-                    double share = dodged / 200.0, want = dc.DodgeChance[di];
+                    double share = dodged / 200.0, want = kinds[n] == BotReflex.KindTnt ? dc.TntChance[di] : dc.DodgeChance[di];   // b13 r3: TNT has its own roll
                     bool ok = Math.Abs(share - want) <= 0.12;
                     Console.WriteLine("{\"item\":\"b13-jd reflex\",\"difficulty\":\"" + d + "\",\"threat\":\"" + names[n] + "\",\"dodged\":" + dodged + ",\"trials\":200,\"share\":" + share.ToString("F3") +
                                       ",\"chance\":" + want.ToString("F2") + ",\"limit\":0.12,\"verdict\":\"" + (ok ? "PASS" : "FAIL") + "\"}");
@@ -137,7 +137,7 @@ namespace CriticalMass.Sim.Tests
             {
                 World w = Field(d, out int bot, out int foe);
                 DodgeConfig dc = w.Config.Depth.Dodge;
-                for (int i = 0; i < 3; i++) dc.DodgeChance[i] = 1.0;
+                for (int i = 0; i < 3; i++) { dc.DodgeChance[i] = 1.0; dc.TntChance[i] = 1.0; }
                 int delay = dc.ReactionTicks[BotReflex.DiffIndex(w, bot)];
                 w.Tick = 5000;
                 Fresh(w, bot);
@@ -153,6 +153,66 @@ namespace CriticalMass.Sim.Tests
                 Assert.IsTrue(late.Dodge, d + ": at the delay (chance 1)");
                 Assert.Greater(late.MoveX * -1, 0.5, "away from the bomb (it lies to +x)");
             }
+        }
+
+        /// <summary>
+        /// b13 r3: (a) a melee threat lasts the attacker's swing cycle (wind-up, then its cooldown), so a bot can read it after
+        /// the 3-4 tick wind-up; past the cycle it is gone. (b) a Normal bot near the hill edge whose threat pushes it off the
+        /// ring dodges along the ring instead (end inside R - HillMargin, never toward the threat); with every turn blocked it
+        /// holds the hill on a non-lethal hit and leaves only on a lethal one. All printed.
+        /// </summary>
+        [Test]
+        public void AMeleeCycleIsAThreatAndAHillBotDodgesAlongTheRing()
+        {
+            World w = Field(BotDifficulty.Normal, out int bot, out int foe);
+            DodgeConfig dc = w.Config.Depth.Dodge;
+            GameConfig c = w.Config;
+            LightWeapon lw = LightWeapons.Of(w, w.Actors[foe].Cls);
+            int cycle = (int)((lw != null ? lw.CooldownSeconds : c.Class(w.Actors[foe].Cls).AttackCooldown) * c.SimHz + 0.5);
+            w.Tick = 3000;
+            Fresh(w, bot);
+            Stage(w, 0, bot, foe, 0);
+            Actor f = w.Actors[foe];
+            f.SwingPending = false; f.SwingFacing = Math.PI; f.Facing = Math.PI;
+            f.SwingTick = w.Tick - (cycle - 1);
+            bool inCycle = BotReflex.FindThreat(w, null, dc, bot, out int key1, out int age1, out double _, out double _);
+            f.SwingTick = w.Tick - cycle;
+            bool past = BotReflex.FindThreat(w, null, dc, bot, out int _, out int _, out double _, out double _);
+            Console.WriteLine("{\"item\":\"b13-jd melee cycle\",\"cycleTicks\":" + cycle + ",\"threatAtCycleMinus1\":" + (inCycle ? "true" : "false") + ",\"age\":" + age1 +
+                              ",\"kind\":" + (key1 & 7) + ",\"threatAtCycle\":" + (past ? "true" : "false") + ",\"reactionNormal\":" + dc.ReactionTicks[1] + "}");
+            Assert.IsTrue(inCycle, "the swing cycle is a threat");
+            Assert.AreEqual(BotReflex.KindMelee, key1 & 7);
+            Assert.Greater(cycle, dc.ReactionTicks[1], "a Normal bot can react inside the cycle");
+            Assert.IsFalse(past, "past the cycle: no threat");
+
+            // (b) the hill ring: the bot 4.5 u east of the centre, a threat to its west pushing it east (off the ring)
+            CriticalMass.Sim.Grid.HillDef hill = w.Map.Hill;
+            double bx = hill.X + 4.5, bz = hill.Z;
+            for (int cz = (int)bz - 5; cz <= (int)bz + 5; cz++)
+                for (int cx = (int)bx - 5; cx <= (int)bx + 5; cx++) w.Map.Cells[cz * w.Map.Width + cx] = Cell.Floor;
+            w.X[bot] = bx; w.Z[bot] = bz;
+            DodgeState s = w.Dodges;
+            double dx = 1, dz = 0;
+            bool go = BotReflex.HillAware(w, s, dc, bot, 1, 0, 10, ref dx, ref dz);
+            double ex = bx + dx * dc.Distance - hill.X, ez = bz + dz * dc.Distance - hill.Z;
+            double endR = Math.Sqrt(ex * ex + ez * ez);
+            Console.WriteLine("{\"item\":\"b13-jd hill dodge\",\"case\":\"pushed off the ring\",\"dodges\":" + (go ? "true" : "false") + ",\"dirX\":" + dx.ToString("F3") + ",\"dirZ\":" + dz.ToString("F3") +
+                              ",\"endR\":" + endR.ToString("F2") + ",\"limit\":" + (hill.R - dc.HillMargin).ToString("F2") + ",\"awayDot\":" + dx.ToString("F3") + "}");
+            Assert.IsTrue(go, "a turn fits");
+            Assert.LessOrEqual(endR, hill.R - dc.HillMargin + 1e-9, "ends on the hill");
+            Assert.GreaterOrEqual(dx, -0.05, "never toward the threat");
+            // every turn blocked: walls all round the bot
+            for (int cz = (int)bz - 5; cz <= (int)bz + 5; cz++)
+                for (int cx = (int)bx - 5; cx <= (int)bx + 5; cx++)
+                    if (cx != (int)bx || cz != (int)bz) w.Map.Cells[cz * w.Map.Width + cx] = Cell.Wall;
+            dx = 1; dz = 0;
+            bool hold = BotReflex.HillAware(w, s, dc, bot, 1, 0, 10, ref dx, ref dz);
+            dx = 1; dz = 0;
+            bool lethal = BotReflex.HillAware(w, s, dc, bot, 1, 0, w.Actors[bot].Hp, ref dx, ref dz);
+            Console.WriteLine("{\"item\":\"b13-jd hill dodge\",\"case\":\"no turn fits\",\"nonLethalDodges\":" + (hold ? "true" : "false") + ",\"lethalDodges\":" + (lethal ? "true" : "false") + ",\"lethalDirX\":" + dx.ToString("F3") + "}");
+            Assert.IsFalse(hold, "holds the hill on a non-lethal hit");
+            Assert.IsTrue(lethal, "leaves on a lethal one");
+            Assert.AreEqual(1.0, dx, 1e-9, "along the threat direction");
         }
 
         [Test]
@@ -191,7 +251,7 @@ namespace CriticalMass.Sim.Tests
         public void CarriersNeverDodgeAndTheRuleOffDoesNothing()
         {
             World w = Field(BotDifficulty.Hard, out int bot, out int foe);
-            for (int i = 0; i < 3; i++) w.Config.Depth.Dodge.DodgeChance[i] = 1.0;
+            for (int i = 0; i < 3; i++) { w.Config.Depth.Dodge.DodgeChance[i] = 1.0; w.Config.Depth.Dodge.TntChance[i] = 1.0; }
             w.Tick = 7000;
             Fresh(w, bot);
             Stage(w, BotReflex.KindTnt, bot, foe, 25);

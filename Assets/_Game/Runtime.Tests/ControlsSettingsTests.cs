@@ -124,7 +124,7 @@ namespace CriticalMass.Runtime.Tests
             int kb = ControlBindings.FindBindingIndex(jump, new RebindSlot("Jump", ControlDevice.KeyboardMouse));
             jump.ApplyBindingOverride(kb, "<Keyboard>/f");
             List<string> c = ControlBindings.Conflicts(jump, kb);
-            CollectionAssert.AreEqual(new[] { "Dig / place" }, c);
+            CollectionAssert.AreEqual(new[] { "Build / mine" }, c);   // b13-jd (routed): the row is renamed
 
             // A on the controller as jump and as dig: a gamepad conflict; the keyboard F above is not in it.
             InputAction dig = A("DigPlace");

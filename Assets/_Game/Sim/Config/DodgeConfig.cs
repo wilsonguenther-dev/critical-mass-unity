@@ -26,17 +26,35 @@ namespace CriticalMass.Sim.Config
         public int MinClearTicks = 2;
 
         // ---- bots (Sim/Bots/BotReflex.cs). Arrays: Easy, Normal, Hard.
-        /// <summary>A bot reacts to a threat only once it has existed this many ticks.</summary>
-        public int[] ReactionTicks = { 9, 5, 3 };   // b13 integrator: was {12, 8, 5}; most melee wind-ups ended before a Normal bot reacted (0.38-0.55 dodges per bot-minute, limit 1-4)
-        /// <summary>Chance a bot dodges a threat (one decision per threat per bot, a stateless hash of seed, tick and id).</summary>
-        public double[] DodgeChance = { 0.30, 0.70, 0.90 };   // b13 integrator: was {0.15, 0.35, 0.60} (same reason)
+        /// <summary>A bot reacts to a threat only once it has existed this many ticks (the ORDER's numbers).</summary>
+        public int[] ReactionTicks = { 12, 8, 5 };
+        /// <summary>Chance a bot dodges a slam, claw or melee threat (one decision per threat per bot, a stateless hash of seed,
+        /// tick and id). b13 r3: back to the ORDER's numbers; round 2's {0.30, 0.70, 0.90} did not fix the rate because the
+        /// cause was the window, not the chance (see MeleeThreat below).</summary>
+        public double[] DodgeChance = { 0.15, 0.35, 0.60 };
+        /// <summary>b13 r3: chance a bot dodges an enemy TNT it stands next to (its own roll, lower than the others). The landed
+        /// bundle and its 33-tick fuse are the telegraph: a bot that reads it walks or dashes out, one that does not takes the
+        /// blast. Round 2 rolled the 0.70 melee chance on every TNT with the reaction always met (the fuse window opens 13 ticks
+        /// after landing), so 70% of throws missed and the Demolitions kill share fell 0.189 to 0.103.</summary>
+        public double[] TntChance = { 0.10, 0.25, 0.40 };
         /// <summary>Kaiju slam: the telegraph circle covers the bot with this many ticks or fewer left.</summary>
         public int SlamTicksLeft = 15;
         /// <summary>Enemy TNT: landed, this many fuse ticks or fewer left, the bot within BlastRadius + TntSlack.</summary>
         public int TntFuseTicksLeft = 20;
         public double TntSlack = 0.3;
-        /// <summary>Enemy melee wind-up at the bot within the attacker's reach + MeleeSlack (+ the bot's body).</summary>
-        public double MeleeSlack = 0.5;   // b13 integrator: was 0.3
+        /// <summary>Enemy melee at the bot within the attacker's reach + MeleeSlack (+ the bot's body).</summary>
+        public double MeleeSlack = 0.3;
+        /// <summary>b13 r3: a melee threat is the attacker's whole swing CYCLE aimed at the bot (wind-up, then its attack
+        /// cooldown until the next swing), not only the wind-up. On this base every light weapon winds up 3 or 4 ticks
+        /// (0.10-0.12 s), shorter than every reaction delay, so a wind-up-only threat was over before any Normal bot could
+        /// react (the cause of 0.38-0.68 dodges per bot-minute). Reading the attacker's rhythm and leaving before the next
+        /// swing is the counterplay a person has too.</summary>
+        public bool MeleeThreatIsTheCycle = true;
+        /// <summary>b13 r3 hill-aware dodges: a bot standing inside the hill ring only takes a dodge whose end stays at least
+        /// HillMargin inside the ring (it tries the threat direction, then turned 45, 90, 135 and 180 degrees, never toward
+        /// the threat); none fits = it holds the hill and takes the hit, unless the hit would knock it out.</summary>
+        public bool HillAware = true;
+        public double HillMargin = 0.5;
         /// <summary>Jump: a LowWall within JumpProbe u ahead of the steering and the cell past it walkable; at most once per JumpEveryTicks.</summary>
         public double JumpProbe = 1.0;
         public int JumpEveryTicks = 30;
@@ -46,6 +64,7 @@ namespace CriticalMass.Sim.Config
             var c = (DodgeConfig)MemberwiseClone();
             c.ReactionTicks = (int[])ReactionTicks.Clone();
             c.DodgeChance = (double[])DodgeChance.Clone();
+            c.TntChance = (double[])TntChance.Clone();
             return c;
         }
     }

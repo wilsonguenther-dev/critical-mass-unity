@@ -201,7 +201,10 @@ namespace CriticalMass.Sim.Tests
         private sealed class Arm
         {
             public readonly int[] KillsByClass = new int[6];
-            public int Kills, LeadChanges, Dodges, Matches;
+            public int Kills, LeadChanges, Dodges, Matches, BlastKills;
+            // b13 r3 evidence (BotReflex / Dodge counters, summed over the arm's matches)
+            public readonly int[] Seen = new int[8], Decided = new int[8], Pressed = new int[8];
+            public int StartedOnHill, LeftHill, HillTurned, HillHeld, HillLethalOut;
             public double Minutes, BotMinutes, SlamDamage, AllDamage;
             public readonly int[] Wins = new int[3];
             public readonly List<double> FirstKo = new List<double>();
@@ -238,7 +241,11 @@ namespace CriticalMass.Sim.Tests
                     if (ev.Type != SimEventType.Death || ev.A < 0 || ev.A >= w.ActorCount) continue;
                     if (firstKo < 0) firstKo = w.Match.Time;
                     arm.Kills++;
-                    if (ev.B >= 0 && ev.B < w.ActorCount && w.Actors[ev.B].Team != w.Actors[ev.A].Team) arm.KillsByClass[(int)w.Actors[ev.B].Cls]++;
+                    if (ev.B >= 0 && ev.B < w.ActorCount && w.Actors[ev.B].Team != w.Actors[ev.A].Team)
+                    {
+                        arm.KillsByClass[(int)w.Actors[ev.B].Cls]++;
+                        if (ev.Cause == DamageCause.Explosion && w.Actors[ev.B].Cls == ClassId.Demolitions) arm.BlastKills++;
+                    }
                 }
                 lastHead = w.EventHead;
                 double lead = w.Match.HillSeconds.Azure - w.Match.HillSeconds.Crimson;
@@ -246,6 +253,9 @@ namespace CriticalMass.Sim.Tests
                 if (leader != 0) { if (lastLeader != 0 && leader != lastLeader) arm.LeadChanges++; lastLeader = leader; }
             }
             arm.Matches++;
+            DodgeState ds = w.Dodges;
+            for (int k = 0; k < 8; k++) { arm.Seen[k] += ds.SeenByKind[k]; arm.Decided[k] += ds.DecidedByKind[k]; arm.Pressed[k] += ds.PressedByKind[k]; }
+            arm.StartedOnHill += ds.StartedOnHill; arm.LeftHill += ds.LeftHill; arm.HillTurned += ds.HillTurned; arm.HillHeld += ds.HillHeld; arm.HillLethalOut += ds.HillLethalOut;
             arm.Minutes += w.Match.Time / 60.0;
             int bots = 0;
             for (int i = 0; i < w.ActorCount; i++) if (!w.Actors[i].IsHuman) bots++;
@@ -295,6 +305,14 @@ namespace CriticalMass.Sim.Tests
                 Limit(failures, tag + " hill lead changes", arms[0].LeadChanges, arms[1].LeadChanges, Math.Abs(arms[0].LeadChanges - arms[1].LeadChanges) <= 0.30 * Math.Max(1, arms[1].LeadChanges) + 1e-9, "+-30%");
                 double dpm = arms[0].Dodges / Math.Max(1e-9, arms[0].BotMinutes);
                 Limit(failures, tag + " dodges per bot-minute (Normal)", dpm, arms[1].Dodges / Math.Max(1e-9, arms[1].BotMinutes), dpm >= 1 && dpm <= 4, "1 to 4");
+                string[] kn = { "", "slam", "tnt", "claw", "melee" };
+                for (int k = 1; k <= 4; k++)
+                    Console.WriteLine("{\"item\":\"b13-jd threats\",\"size\":" + size + ",\"threat\":\"" + kn[k] + "\",\"seenPerBotMin\":" + (arms[0].Seen[k] / Math.Max(1e-9, arms[0].BotMinutes)).ToString("F2") +
+                                      ",\"decidedPerBotMin\":" + (arms[0].Decided[k] / Math.Max(1e-9, arms[0].BotMinutes)).ToString("F2") + ",\"pressedPerBotMin\":" + (arms[0].Pressed[k] / Math.Max(1e-9, arms[0].BotMinutes)).ToString("F2") +
+                                      ",\"seen\":" + arms[0].Seen[k] + ",\"decided\":" + arms[0].Decided[k] + ",\"pressed\":" + arms[0].Pressed[k] + "}");
+                Console.WriteLine("{\"item\":\"b13-jd hill dodges\",\"size\":" + size + ",\"startedOnHill\":" + arms[0].StartedOnHill + ",\"endedOffHill\":" + arms[0].LeftHill + ",\"turnedToStay\":" + arms[0].HillTurned +
+                                  ",\"heldNoDodge\":" + arms[0].HillHeld + ",\"lethalLeft\":" + arms[0].HillLethalOut + ",\"leadChangesOn\":" + arms[0].LeadChanges + ",\"leadChangesControl\":" + arms[1].LeadChanges + "}");
+                Console.WriteLine("{\"item\":\"b13-jd blast kills\",\"size\":" + size + ",\"demolitionsBlastKillsOn\":" + arms[0].BlastKills + ",\"control\":" + arms[1].BlastKills + ",\"killsOn\":" + arms[0].Kills + ",\"killsControl\":" + arms[1].Kills + "}");
                 Console.WriteLine("{\"item\":\"b13-jd slam damage share\",\"size\":" + size + ",\"on\":" + (arms[0].SlamDamage / Math.Max(1e-9, arms[0].AllDamage)).ToString("F3") +
                                   ",\"control\":" + (arms[1].SlamDamage / Math.Max(1e-9, arms[1].AllDamage)).ToString("F3") + "}");
                 int sOn = 0, sOff = 0;
@@ -352,6 +370,13 @@ namespace CriticalMass.Sim.Tests
                 World w = World.CreateWorld(new WorldOptions { Seed = 4242, TeamSize = 16, HumanTeam = TeamId.Azure, HumanClass = ClassId.Warrior, Config = MatchConfig(16, arm == 0) });
                 InputFrame scratch = SimInput.EmptyInput();
                 for (int t = 0; t < Warm; t++) MatchTick.Advance(w, null, scratch);
+                // b13 r3: the rule's own calls run once in the warm-up too, so a first call's one-time type set-up (static
+                // tables, JIT) is not counted as a per-tick allocation (round 1 printed 74416 B with no dodge in the window)
+                for (int id = 0; id < w.ActorCount; id++)
+                {
+                    Dodge.Active(w, id); Dodge.Immune(w, id, DamageCause.Melee); Dodge.Phase(w, id, 0.5); Dodge.CooldownTicks(w, id);
+                    BotReflex.FindThreat(w, null, w.Config.Depth.Dodge, id, out int _, out int _, out double _, out double _);
+                }
                 int d0 = w.Dodges.Count;
                 for (int t = 0; t < Ticks; t++)
                 {

@@ -25,6 +25,12 @@ namespace CriticalMass.Sim.Core
         public byte[] Decided = new byte[0];
         /// <summary>Dodges started since the reset (tests and balance prints).</summary>
         public int Count;
+        /// <summary>b13 r3 evidence counters (tests and balance prints; sized once, never hashed): per threat kind k (1..4,
+        /// BotReflex.Kind*) Seen[k] new threats a bot saw, Decided[k] rolls taken, Pressed[k] dodges pressed.</summary>
+        public readonly int[] SeenByKind = new int[8], DecidedByKind = new int[8], PressedByKind = new int[8];
+        /// <summary>b13 r3 hill evidence: dodges started inside the hill ring, of them those that ended outside it; bot
+        /// dodges turned to stay on the hill, held (no dodge: none stays on it), and taken off it because the hit was lethal.</summary>
+        public int StartedOnHill, LeftHill, HillTurned, HillHeld, HillLethalOut;
 
         /// <summary>Called once in the World constructor after the actor arrays exist.</summary>
         public void Init(World w) { Ensure(w); Reset(w); }
@@ -44,6 +50,8 @@ namespace CriticalMass.Sim.Core
                 Decided[i] = 0;
             }
             Count = 0;
+            for (int k = 0; k < SeenByKind.Length; k++) { SeenByKind[k] = 0; DecidedByKind[k] = 0; PressedByKind[k] = 0; }
+            StartedOnHill = 0; LeftHill = 0; HillTurned = 0; HillHeld = 0; HillLethalOut = 0;
         }
 
         /// <summary>Sizes the arrays for the world's actors and dash length (grows only; warm-up only).</summary>
@@ -185,6 +193,16 @@ namespace CriticalMass.Sim.Core
             s.DirX[id] = dx;
             s.DirZ[id] = dz;
             s.Count++;
+            CriticalMass.Sim.Grid.HillDef hill = w.Map != null ? w.Map.Hill : null;
+            if (hill != null)
+            {
+                double hx = w.X[id] - hill.X, hz = w.Z[id] - hill.Z, ex = s.PathX[b + clear] - hill.X, ez = s.PathZ[b + clear] - hill.Z;
+                if (hx * hx + hz * hz < hill.R * hill.R)
+                {
+                    s.StartedOnHill++;
+                    if (ex * ex + ez * ez >= hill.R * hill.R) s.LeftHill++;
+                }
+            }
             a.Facing = JsMath.Atan2(dz, dx);
             World.PushEvent(w, SimEventType.Dodge, id, 0, w.X[id], w.Z[id], clear);
             return true;
