@@ -332,6 +332,7 @@ namespace CriticalMass.Runtime.View.Dressing
                 }
             }
             if (_replanPending && Time.frameCount - _lastReplanFrame >= ReplanEveryFrames) RequestReplan();
+            TerrainEdits.Sync(w);   // b14: pits, fills and placed cells (planning cells, ground chunk holes)
             if (w.GridVersion == _seenGridVersion) return;
             _seenGridVersion = w.GridVersion;
             HashSet<int> dirtyChunks = _dirtyChunks;
@@ -394,7 +395,9 @@ namespace CriticalMass.Runtime.View.Dressing
         private IEnumerator ReplanSteps()
         {
             _clutterOn = QualityTable.ExtraClutter(RenderTier.Level);
-            MapDef snap = _map.WithCells((byte[])_map.Cells.Clone());
+            // b14 terrain look: plan from the painted cell wherever a dig, crater, fill or place touched the grid (no new rim
+            // and no cliff into the sky around a pit), then drop the dressing standing on those cells (TerrainEdits).
+            MapDef snap = _map.WithCells(TerrainEdits.PlanningCells(_map, out bool[] edited));
             WorldPlan old = Plan;
             bool clutter = _clutterOn;
             BasesFile bases = _bases;
@@ -402,6 +405,7 @@ namespace CriticalMass.Runtime.View.Dressing
             var task = System.Threading.Tasks.Task.Run(() =>
             {
                 WorldPlan p = WorldDresser.Plan(snap, bases, cat.Centroid, cat.Body, clutter);
+                TerrainEdits.FilterPlan(p, edited);
                 return (p, ChangedGroups(old, p));
             });
             while (!task.IsCompleted) yield return null;
@@ -411,6 +415,7 @@ namespace CriticalMass.Runtime.View.Dressing
             {
                 Debug.LogWarning("[CM.World] re-plan on a worker failed, planning on the main thread: " + task.Exception?.GetBaseException().Message);
                 next = WorldDresser.Plan(snap, bases, cat.Centroid, cat.Body, clutter);
+                TerrainEdits.FilterPlan(next, edited);
                 changed = ChangedGroups(old, next);
             }
             else (next, changed) = task.Result;
@@ -438,7 +443,7 @@ namespace CriticalMass.Runtime.View.Dressing
             _lastReplanFrame = Time.frameCount;
             Replans++;
             _clutterOn = QualityTable.ExtraClutter(RenderTier.Level);
-            WorldPlan next = WorldDresser.Plan(_map, _bases, _catalog.Centroid, _catalog.Body, _clutterOn);
+            WorldPlan next = PlanEdited();
             HashSet<int> changed = ChangedGroups(Plan, next);
             Plan = next;
             foreach (int g in changed) DestroyGroup(g);
@@ -446,6 +451,15 @@ namespace CriticalMass.Runtime.View.Dressing
             _dressed = Plan.Dressed;
             _dressedTypes = Plan.CellsAtPlan;
             DressVersion++;
+        }
+
+        /// <summary>b14: the plan on the main thread from the planning cells (TerrainEdits), dressing on edited cells dropped.</summary>
+        private WorldPlan PlanEdited()
+        {
+            MapDef planMap = _map.WithCells(TerrainEdits.PlanningCells(_map, out bool[] edited));
+            WorldPlan p = WorldDresser.Plan(planMap, _bases, _catalog.Centroid, _catalog.Body, _clutterOn);
+            TerrainEdits.FilterPlan(p, edited);
+            return p;
         }
 
         /// <summary>The combined-group key of a sim position (sky placements: -1, one group for the whole sky).</summary>
@@ -887,7 +901,8 @@ namespace CriticalMass.Runtime.View.Dressing
             double tLoad = st.Elapsed.TotalMilliseconds;
             yield return null;
             _stage = "plan";
-            Plan = WorldDresser.Plan(_map, _bases, _catalog.Centroid, _catalog.Body, _clutterOn);
+            TerrainEdits.Sync(w);
+            Plan = PlanEdited();
             double tPlan = st.Elapsed.TotalMilliseconds;
             _stage = "field start";
             int chunksX0 = (_map.Width + ChunkSize - 1) / ChunkSize, chunksZ0 = (_map.Height + ChunkSize - 1) / ChunkSize;
@@ -1059,6 +1074,7 @@ namespace CriticalMass.Runtime.View.Dressing
             {
                 int i = cz * _map.Width + cx;
                 if (!WorldDresser.Solid(_map.Cells[i])) continue;
+                if (TerrainEdits.KindAt(_map, i) != TerrainEdits.Kind.None) continue;   // b14: a placed or filled block draws its own top
                 list.Add((d, 0, Matrix4x4.Translate(new Vector3(cx + 0.5f, (float)_map.Height01[i], -(cz + 0.5f))), default(SwayInfo)));
             }
             if (list.Count == 0) return;

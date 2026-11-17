@@ -151,9 +151,146 @@ namespace CriticalMass.Runtime.View.Effects
             yield return Shot("09-fighter-on-built-stairs", stairs, "(a ladder from where he stands; NOT REACHED = no wall run within reach of the staged spot)");
 
             Tier(w, 0);
+            yield return TerrainCases(w, sx, sz);
             Log("done");
             yield return new WaitForSecondsRealtime(0.5f);
             Application.Quit(0);
+        }
+
+        /// <summary>
+        /// b14 terrain look (owner 2026-11-17: "a big hole in the dirt", "I could just see the sky", "a big brick"): a single dug
+        /// pit, a 3 x 3 dig (deeper in the middle), fills back into both, three short BLOCK pieces in a row, and two cells
+        /// placed out over the island edge; each from the gameplay camera and from a low side camera.
+        /// </summary>
+        IEnumerator TerrainCases(World w, double sx, double sz)
+        {
+            Actor me = w.Actors[0];
+            if (!OpenArea(w, sx, sz, out int px, out int pz)) { Log("10-pit NOT REACHED (no open 7 x 7 floor area away from the first spot)"); yield break; }
+            double g = GroundHeight.At(w.Map, px + 0.5, pz + 0.5);
+            Stand(w, px + 0.5, pz + 3.2);
+            MapGrid.SetCell(w, px + 3, pz, Cell.Void);
+            for (int dz = -1; dz <= 1; dz++)
+            for (int dx = -1; dx <= 1; dx++)
+                MapGrid.SetCell(w, px - 1 + dx, pz + dz, Cell.Void);
+            yield return Shot("10-pit-gameplay", GridChunkMeshView.EditPits >= 10, Terrain("single pit at (" + (px + 3) + "," + pz + "), 3x3 pit centred (" + (px - 1) + "," + pz + ")"));
+            LowStill(Prefix + "11-pit-low-side.png", px + 3.5, g + 1.0, pz - 4.0, px + 0.5, g - 0.7, pz + 0.5);
+            Log("11-pit-low-side " + (GridChunkMeshView.EditPits >= 10 ? "REACHED " : "NOT REACHED ") + Terrain("low camera south-east of the pits, 1.0 u above the ground"));
+
+            // Fill both pits' middles (filled blocks), then three BLOCK pieces in a row beside them (short stone blocks).
+            MapGrid.SetCell(w, px - 1, pz, Cell.Floor);
+            MapGrid.SetCell(w, px + 3, pz, Cell.Floor);
+            w.Walls.Piece[0] = (byte)BuildPiece.Block;
+            w.Walls.Tall[0] = 0;
+            w.Walls.Credit[(int)me.Team] = 99;
+            int built = 0;
+            for (int k = 0; k < 3; k++)
+            {
+                w.Walls.ReadyTick[0] = 0;
+                if (BuilderWalls.Build(w, 0, px + 0.5 + k, pz + 2.5) == BuilderWalls.Built) built++;
+            }
+            yield return Shot("12-blocks-gameplay", built == 3 && GridChunkMeshView.EditShortWalls >= 3 && GridChunkMeshView.EditBlocks >= 2,
+                Terrain("filled (" + (px - 1) + "," + pz + ") and (" + (px + 3) + "," + pz + "); BLOCK pieces built " + built + "/3 on row z=" + (pz + 2)));
+            LowStill(Prefix + "13-blocks-low-side.png", px + 4.5, g + 0.7, pz + 6.0, px + 1.0, g + 0.2, pz + 2.0);
+            Log("13-blocks-low-side " + (built == 3 ? "REACHED " : "NOT REACHED ") + Terrain("low camera north-east of the block row, 0.7 u above the ground"));
+
+            // Two cells placed out over the island edge (earth blocks with sides and a bottom).
+            if (!EdgeVoid(w, px, pz, out int ex, out int ez, out int ox, out int oz)) { Log("14-placed-edge NOT REACHED (no island edge with two void cells nearby)"); yield break; }
+            MapGrid.SetCell(w, ex, ez, Cell.Floor);
+            MapGrid.SetCell(w, ex + oz, ez + ox, Cell.Floor);   // its neighbour along the edge
+            double ge = GroundHeight.At(w.Map, ex + 0.5, ez + 0.5);
+            Stand(w, ex + 0.5 - ox * 2.0, ez + 0.5 - oz * 2.0);
+            yield return Shot("14-placed-edge-gameplay", GridChunkMeshView.EditBlocks >= 4, Terrain("placed (" + ex + "," + ez + ") and (" + (ex + oz) + "," + (ez + ox) + ") out over the edge, outward (" + ox + "," + oz + ")"));
+            LowStill(Prefix + "15-placed-edge-low-side.png", ex + 0.5 + ox * 4.5 + oz * 2.0, ge - 0.2, ez + 0.5 + oz * 4.5 + ox * 2.0, ex + 0.5 + oz * 0.5, ge - 0.4, ez + 0.5 + ox * 0.5);
+            Log("15-placed-edge-low-side REACHED " + Terrain("low camera out over the void, 0.2 u below the ground, looking back at the blocks"));
+        }
+
+        static string Terrain(string what) => what + " pits=" + GridChunkMeshView.EditPits + " blocks=" + GridChunkMeshView.EditBlocks + " shortWalls=" + GridChunkMeshView.EditShortWalls
+            + " touched=" + TerrainEdits.TouchedCount + " lastRebuildMs=" + GridChunkMeshView.LastRebuildMs.ToString("0.00");
+
+        static void Stand(World w, double x, double z)
+        {
+            w.X[0] = w.PrevX[0] = x;
+            w.Z[0] = w.PrevZ[0] = z;
+            w.Actors[0].Facing = -Math.PI / 2;
+        }
+
+        /// <summary>A still from an extra camera (eye and target in sim coordinates), 1280 x 720, beside the other shots.</summary>
+        static void LowStill(string file, double ex, double ey, double ez, double tx, double ty, double tz)
+        {
+            UnityEngine.Camera main = UnityEngine.Camera.main;
+            var go = new GameObject("WallShots Low Camera");
+            UnityEngine.Camera cam = go.AddComponent<UnityEngine.Camera>();
+            if (main != null) cam.CopyFrom(main);
+            cam.fieldOfView = 40f;
+            cam.nearClipPlane = 0.1f;
+            cam.transform.position = SimSpace.ToWorld(ex, ey, ez);
+            cam.transform.LookAt(SimSpace.ToWorld(tx, ty, tz));
+            var rt = new RenderTexture(1280, 720, 24);
+            cam.targetTexture = rt;
+            cam.Render();
+            RenderTexture prev = RenderTexture.active;
+            RenderTexture.active = rt;
+            var tex = new Texture2D(1280, 720, TextureFormat.RGB24, false);
+            tex.ReadPixels(new Rect(0, 0, 1280, 720), 0, 0);
+            tex.Apply();
+            RenderTexture.active = prev;
+            File.WriteAllBytes(Path.Combine(GamePaths.DataDir, file), tex.EncodeToPNG());
+            cam.targetTexture = null;
+            Destroy(rt);
+            Destroy(tex);
+            Destroy(go);
+        }
+
+        /// <summary>A cell whose 7 x 7 neighbourhood is untouched floor, at least 9 u from (avoidX, avoidZ).</summary>
+        static bool OpenArea(World w, double avoidX, double avoidZ, out int bx, out int bz)
+        {
+            MapDef m = w.Map;
+            bx = bz = -1;
+            double best = double.MaxValue;
+            for (int cz = 6; cz < m.Height - 6; cz++)
+            for (int cx = 6; cx < m.Width - 6; cx++)
+            {
+                double ax = cx + 0.5 - avoidX, az = cz + 0.5 - avoidZ;
+                if (ax * ax + az * az < 81) continue;
+                bool open = true;
+                for (int dz = -3; dz <= 3 && open; dz++)
+                for (int dx = -4; dx <= 4 && open; dx++)
+                {
+                    int i = (cz + dz) * m.Width + cx + dx;
+                    open = m.Cells[i] == Cell.Floor && !TerrainEdits.Touched(m, i);
+                }
+                if (!open || BuilderWalls.CellRefusal(w, cx, cz + 2) != 0) continue;
+                double ddx = cx - m.Width * 0.3, ddz = cz - m.Height * 0.5, d = ddx * ddx + ddz * ddz;
+                if (d < best) { best = d; bx = cx; bz = cz; }
+            }
+            return bx >= 0;
+        }
+
+        /// <summary>The void cell (ex, ez) nearest (px, pz) with floor behind it (outward = (ox, oz)) and a void neighbour
+        /// along the edge that also has floor behind it, so two blocks can go side by side.</summary>
+        static bool EdgeVoid(World w, int px, int pz, out int ex, out int ez, out int ox, out int oz)
+        {
+            MapDef m = w.Map;
+            ex = ez = ox = oz = 0;
+            double best = double.MaxValue;
+            bool found = false;
+            int[] dxs = { 1, -1, 0, 0 }, dzs = { 0, 0, 1, -1 };
+            for (int cz = 2; cz < m.Height - 2; cz++)
+            for (int cx = 2; cx < m.Width - 2; cx++)
+            {
+                if (m.Cells[cz * m.Width + cx] != Cell.Void) continue;
+                for (int k = 0; k < 4; k++)
+                {
+                    int ux = dxs[k], uz = dzs[k];   // outward: from the floor cell behind toward this void cell
+                    int bxx = cx - ux, bzz = cz - uz, nx = cx + uz, nz = cz + ux;
+                    if (m.Cells[bzz * m.Width + bxx] != Cell.Floor) continue;
+                    if (m.Cells[nz * m.Width + nx] != Cell.Void || m.Cells[(nz - uz) * m.Width + nx - ux] != Cell.Floor) continue;
+                    if (m.Cells[(cz + uz) * m.Width + cx + ux] != Cell.Void) continue;   // open void beyond, so the sides show
+                    double d = (cx - px) * (cx - px) + (cz - pz) * (cz - pz);
+                    if (d < best) { best = d; ex = cx; ez = cz; ox = ux; oz = uz; found = true; }
+                }
+            }
+            return found;
         }
 
         static void OpenSpot(World w, out double x, out double z)
