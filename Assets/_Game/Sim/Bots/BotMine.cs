@@ -129,6 +129,22 @@ namespace CriticalMass.Sim.Bots
                 Offer(w, st, id, TaskHut, ex, ez, H.BotEscapeUtility);
                 return;
             }
+            // b13 r3: the HILL SHIFT. Mining was 93 % of a Miner bot's time and an enemy was within 8 u for only 3.6 % of it, so
+            // the defend rule alone could not give him kills. Once his team's hut is at BotHillShiftFromLevel or higher, the bank
+            // that empties his hands sends him to the hill (today's hill and fight logic) for BotHillShiftSeconds.
+            HutState hs = w.Hut;
+            if (ore > 0) hs.BotHadOre[id] = 1;
+            else if (hs.BotHadOre[id] != 0)
+            {
+                hs.BotHadOre[id] = 0;
+                if (H.BotHillShiftSeconds > 0 && Blacksmith.Level(w, a.Team) >= H.BotHillShiftFromLevel && OnShift(w, a.Team) < H.BotHillShiftMaxPerTeam)
+                    hs.BotShiftUntil[id] = w.Match.Time + H.BotHillShiftSeconds;
+            }
+            if (ore <= 0 && w.Match.Time < hs.BotShiftUntil[id])
+            {
+                if (able && foe >= 0) BotFsm.ConsiderExternal(w, AiState.Fight, H.BotDefendUtility);
+                return;
+            }
             // Empty-handed with an enemy close: he defends himself and joins the fight (b13 r3: Fight is offered, not left to
             // the hill-biased default).
             if (ore <= 0 && EnemyWithin(w, id, H.BotFightRange))
@@ -172,6 +188,16 @@ namespace CriticalMass.Sim.Bots
         /// <summary>b13 r3: BotFsm perceives out to FightKeepRange for a Miner bot under the hut rule (his defend range).</summary>
         public static bool WidePerception(World w, BotsState st, int id) =>
             Mining(w, st, id) && w.Config.Depth.Hut.BotDefendUtility > 0 && w.Config.Depth.Hut.BotFightRange > BotFsm.FightRange;
+
+        /// <summary>b13 r3: the team's Miners on a hill shift now (actor-id order).</summary>
+        static int OnShift(World w, TeamId team)
+        {
+            int n = 0;
+            double now = w.Match.Time;
+            for (int j = 0; j < w.ActorCount; j++)
+                if (w.Actors[j].Team == team && w.Actors[j].Cls == ClassId.Miner && now < w.Hut.BotShiftUntil[j]) n++;
+            return n;
+        }
 
         /// <summary>Bot id stands within the hill radius plus margin (u) of the hill centre.</summary>
         static bool OnHill(World w, int id, double margin)

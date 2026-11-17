@@ -13,6 +13,10 @@ namespace CriticalMass.Sim.Core
         /// <summary>Per actor: the vein being channelled (-1 none), channel ticks done, HP last tick (hit test), HAUL ticks left, ore mined.</summary>
         public int[] ChannelVein, ChannelTicks, HaulLeft, MinedBy;
         public double[] PrevHp;
+        /// <summary>b13 r3 (Miner bots fight): a Miner bot's hill shift ends at this match time; BotHadOre = he carried ore at
+        /// his last think (the bank that empties his hands starts the shift).</summary>
+        public double[] BotShiftUntil;
+        public byte[] BotHadOre;
         /// <summary>Bot routes to each team's hut (the pad): built on first use, rebuilt when walls changed (one per tick).</summary>
         public FlowField[] PadField = new FlowField[2];
         public int[] PadFieldVersion = { -1, -1 };
@@ -30,6 +34,8 @@ namespace CriticalMass.Sim.Core
             HaulLeft = new int[cap];
             MinedBy = new int[cap];
             PrevHp = new double[cap];
+            BotShiftUntil = new double[cap];
+            BotHadOre = new byte[cap];
             Clear();
         }
 
@@ -48,6 +54,8 @@ namespace CriticalMass.Sim.Core
             Array.Clear(HaulLeft, 0, HaulLeft.Length);
             Array.Clear(MinedBy, 0, MinedBy.Length);
             Array.Clear(PrevHp, 0, PrevHp.Length);
+            Array.Clear(BotShiftUntil, 0, BotShiftUntil.Length);
+            Array.Clear(BotHadOre, 0, BotHadOre.Length);
             PadFieldVersion[0] = -1;
             PadFieldVersion[1] = -1;
             FieldBuildTick = -1;

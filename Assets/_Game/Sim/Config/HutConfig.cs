@@ -65,6 +65,17 @@ namespace CriticalMass.Sim.Config
         /// </summary>
         public double BotDefendUtility = 1.0;
         public double BotTopFightHillMargin = 2;
+        /// <summary>
+        /// b13 r3: the HILL SHIFT (BotMine): from this hut level a Miner bot that has just banked his ore spends
+        /// BotHillShiftSeconds on the hill before mining again (0 s = off). Measured on the hut balance seeds (diag runs on
+        /// ci/b13r3-tune-diag; Miner kill share / 16v16 median end hut level / 16v16 seeds with a team at L5): no shift
+        /// 0.020 / 4 / 3 of 6; from L3 20 s one Miner per team 0.067 / 4 / 1; from L2 20 s 0.081 / 4 / 0; from L1 20 s
+        /// 0.096 / 4 / 1. Shipped: from L3, 15 s, one per team.
+        /// </summary>
+        public int BotHillShiftFromLevel = 3;
+        public double BotHillShiftSeconds = 15;
+        /// <summary>At most this many of a team's Miners are on a hill shift at once (the others keep mining).</summary>
+        public int BotHillShiftMaxPerTeam = 1;
         /// <summary>A Miner bot that ended up in Deliver with ore (the shrine would refuse it) is pulled back to the hut at this utility.</summary>
         public double BotEscapeUtility = 2;
         /// <summary>A task lasts this long without a fresh think (s).</summary>
