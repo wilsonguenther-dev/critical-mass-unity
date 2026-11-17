@@ -204,7 +204,7 @@ namespace CriticalMass.Sim.Tests
             public int Kills, LeadChanges, Dodges, Matches, BlastKills;
             // b13 r3 evidence (BotReflex / Dodge counters, summed over the arm's matches)
             public readonly int[] Seen = new int[8], Decided = new int[8], Pressed = new int[8];
-            public int StartedOnHill, LeftHill, HillTurned, HillHeld, HillLethalOut;
+            public int StartedOnHill, LeftHill, HillTurned, HillHeld, HillLethalOut, OpenTurned;
             public double Minutes, BotMinutes, SlamDamage, AllDamage;
             public readonly int[] Wins = new int[3];
             public readonly List<double> FirstKo = new List<double>();
@@ -259,7 +259,7 @@ namespace CriticalMass.Sim.Tests
             arm.Matches++;
             DodgeState ds = w.Dodges;
             for (int k = 0; k < 8; k++) { arm.Seen[k] += ds.SeenByKind[k]; arm.Decided[k] += ds.DecidedByKind[k]; arm.Pressed[k] += ds.PressedByKind[k]; }
-            arm.StartedOnHill += ds.StartedOnHill; arm.LeftHill += ds.LeftHill; arm.HillTurned += ds.HillTurned; arm.HillHeld += ds.HillHeld; arm.HillLethalOut += ds.HillLethalOut;
+            arm.StartedOnHill += ds.StartedOnHill; arm.LeftHill += ds.LeftHill; arm.HillTurned += ds.HillTurned; arm.HillHeld += ds.HillHeld; arm.HillLethalOut += ds.HillLethalOut; arm.OpenTurned += ds.OpenTurned;
             arm.Minutes += w.Match.Time / 60.0;
             int bots = 0;
             for (int i = 0; i < w.ActorCount; i++) if (!w.Actors[i].IsHuman) bots++;
@@ -317,7 +317,7 @@ namespace CriticalMass.Sim.Tests
                                       ",\"decidedPerBotMin\":" + (arms[0].Decided[k] / Math.Max(1e-9, arms[0].BotMinutes)).ToString("F2") + ",\"pressedPerBotMin\":" + (arms[0].Pressed[k] / Math.Max(1e-9, arms[0].BotMinutes)).ToString("F2") +
                                       ",\"seen\":" + arms[0].Seen[k] + ",\"decided\":" + arms[0].Decided[k] + ",\"pressed\":" + arms[0].Pressed[k] + "}");
                 Console.WriteLine("{\"item\":\"b13-jd hill dodges\",\"size\":" + size + ",\"startedOnHill\":" + arms[0].StartedOnHill + ",\"endedOffHill\":" + arms[0].LeftHill + ",\"turnedToStay\":" + arms[0].HillTurned +
-                                  ",\"heldNoDodge\":" + arms[0].HillHeld + ",\"lethalLeft\":" + arms[0].HillLethalOut + ",\"leadChangesOn\":" + arms[0].LeadChanges + ",\"leadChangesControl\":" + arms[1].LeadChanges + "}");
+                                  ",\"heldNoDodge\":" + arms[0].HillHeld + ",\"lethalLeft\":" + arms[0].HillLethalOut + ",\"offHillTurnedToOpenGround\":" + arms[0].OpenTurned + ",\"leadChangesOn\":" + arms[0].LeadChanges + ",\"leadChangesControl\":" + arms[1].LeadChanges + "}");
                 Console.WriteLine("{\"item\":\"b13-jd blast kills\",\"size\":" + size + ",\"demolitionsBlastKillsOn\":" + arms[0].BlastKills + ",\"control\":" + arms[1].BlastKills + ",\"killsOn\":" + arms[0].Kills + ",\"killsControl\":" + arms[1].Kills + "}");
                 Console.WriteLine("{\"item\":\"b13-jd slam damage share\",\"size\":" + size + ",\"on\":" + (arms[0].SlamDamage / Math.Max(1e-9, arms[0].AllDamage)).ToString("F3") +
                                   ",\"control\":" + (arms[1].SlamDamage / Math.Max(1e-9, arms[1].AllDamage)).ToString("F3") + "}");

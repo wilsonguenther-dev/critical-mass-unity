@@ -30,7 +30,7 @@ namespace CriticalMass.Sim.Core
         public readonly int[] SeenByKind = new int[8], DecidedByKind = new int[8], PressedByKind = new int[8];
         /// <summary>b13 r3 hill evidence: dodges started inside the hill ring, of them those that ended outside it; bot
         /// dodges turned to stay on the hill, held (no dodge: none stays on it), and taken off it because the hit was lethal.</summary>
-        public int StartedOnHill, LeftHill, HillTurned, HillHeld, HillLethalOut;
+        public int StartedOnHill, LeftHill, HillTurned, HillHeld, HillLethalOut, OpenTurned;
 
         /// <summary>Called once in the World constructor after the actor arrays exist.</summary>
         public void Init(World w) { Ensure(w); Reset(w); }
@@ -51,7 +51,7 @@ namespace CriticalMass.Sim.Core
             }
             Count = 0;
             for (int k = 0; k < SeenByKind.Length; k++) { SeenByKind[k] = 0; DecidedByKind[k] = 0; PressedByKind[k] = 0; }
-            StartedOnHill = 0; LeftHill = 0; HillTurned = 0; HillHeld = 0; HillLethalOut = 0;
+            StartedOnHill = 0; LeftHill = 0; HillTurned = 0; HillHeld = 0; HillLethalOut = 0; OpenTurned = 0;
         }
 
         /// <summary>Sizes the arrays for the world's actors and dash length (grows only; warm-up only).</summary>

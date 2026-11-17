@@ -66,7 +66,8 @@ namespace CriticalMass.Sim.Bots
         private static readonly double[] TurnS = { 0, H, -H, 1, -1, H, -H, 0 };
 
         /// <summary>
-        /// b13 r3: a bot inside the hill ring keeps its dodge on the hill. Tries the threat direction (dx, dz), then turned
+        /// b13 r3: every bot dodge ends on open ground (end and half-way cells walkable), and a bot inside the hill ring
+        /// keeps its dodge on the hill. Tries the threat direction (dx, dz), then turned
         /// 45, 90, 135 and 180 degrees (the side by id parity first), and takes the first whose end (Distance along it) is
         /// walkable, at least HillMargin inside the ring, and never toward the threat (its dot with (ax, az), the unit
         /// direction away from the threat, is not below -0.05). None fits: false (the bot holds the hill and takes the hit)
@@ -74,13 +75,15 @@ namespace CriticalMass.Sim.Bots
         /// </summary>
         public static bool HillAware(World w, DodgeState s, DodgeConfig dc, int id, double ax, double az, double dmg, ref double dx, ref double dz)
         {
-            if (!dc.HillAware) return true;
             HillDef hill = w.Map != null ? w.Map.Hill : null;
-            if (hill == null) return true;
             double x = w.X[id], z = w.Z[id];
-            double hx = x - hill.X, hz = z - hill.Z;
-            if (hx * hx + hz * hz >= hill.R * hill.R) return true;
-            double keep = hill.R - dc.HillMargin;
+            bool onHill = false;
+            if (dc.HillAware && hill != null)
+            {
+                double hx = x - hill.X, hz = z - hill.Z;
+                onHill = hx * hx + hz * hz < hill.R * hill.R;
+            }
+            double keep = onHill ? hill.R - dc.HillMargin : 0;
             if (keep < 0) keep = 0;
             double sign = (id & 1) == 0 ? 1 : -1;
             for (int t = 0; t < TurnC.Length; t++)
@@ -89,14 +92,21 @@ namespace CriticalMass.Sim.Bots
                 double cx = dx * c - dz * sn, cz = dx * sn + dz * c;
                 if (cx * ax + cz * az < -0.05) continue;   // never toward the threat
                 double ex = x + cx * dc.Distance, ez = z + cz * dc.Distance;
-                double ox = ex - hill.X, oz = ez - hill.Z;
-                if (ox * ox + oz * oz > keep * keep) continue;
+                if (onHill)
+                {
+                    double ox = ex - hill.X, oz = ez - hill.Z;
+                    if (ox * ox + oz * oz > keep * keep) continue;
+                }
+                // b13 r3: open ground at the end and half way (a dash into a wall is refused or cut short, so a bot by a
+                // wall turns toward the open side instead of losing its dodge)
                 if (!MapGrid.IsWalkable(w.Map, JsMath.FloorToInt(ex), JsMath.FloorToInt(ez))) continue;
-                if (t > 0) s.HillTurned++;
+                if (!MapGrid.IsWalkable(w.Map, JsMath.FloorToInt(x + cx * dc.Distance * 0.5), JsMath.FloorToInt(z + cz * dc.Distance * 0.5))) continue;
+                if (t > 0) { if (onHill) s.HillTurned++; else s.OpenTurned++; }
                 dx = cx;
                 dz = cz;
                 return true;
             }
+            if (!onHill) return true;   // off the hill nothing fits: the threat direction (Dodge plans and may cut it short)
             if (dmg >= w.Actors[id].Hp)
             {
                 s.HillLethalOut++;
