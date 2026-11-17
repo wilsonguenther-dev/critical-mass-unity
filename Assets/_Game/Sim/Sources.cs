@@ -69,7 +69,7 @@ namespace CriticalMass.Sim.Core
         }
 
         /// <summary>The cargo kind a source type rides as.</summary>
-        public static CarryKind CarryOf(BiomassType kind) => kind == BiomassType.Water ? CarryKind.Water : CarryKind.Wood;
+        public static CarryKind CarryOf(BiomassType kind) => kind == BiomassType.Water ? CarryKind.Water : kind == BiomassType.Ore ? CarryKind.Ore : CarryKind.Wood;
 
         /// <summary>Is (x, z) inside team's base zone (BankRange of its pad centre)?</summary>
         public static bool InBase(World w, TeamId team, double x, double z)
@@ -161,13 +161,23 @@ namespace CriticalMass.Sim.Core
             }
         }
 
-        /// <summary>Place every source for this map (World.CreateWorld, once): wood first, then water; each left anchor with its mirror.</summary>
+        /// <summary>
+        /// Place every source for this map (World.CreateWorld, once): wood first, then water; each left anchor with its mirror.
+        /// CM b13 [H], only with the hut rule on (Full profile): then HutConfig.ExtraWoodAnchors (more groves) and the ore
+        /// veins (HutConfig.OreAnchors, Kind Ore), appended after the springs so every older index is unchanged.
+        /// </summary>
         public static SourceNode[] Place(GameConfig cfg, MapDef map)
         {
             SourcesConfig S = cfg.Depth.Sources;
             var list = new List<SourceNode>();
             AddAnchors(cfg, map, list, S.WoodAnchors, BiomassType.Wood, (int)S.WoodCharges);
             AddAnchors(cfg, map, list, S.WaterAnchors, BiomassType.Water, (int)S.WaterCharges);
+            if (DepthRules.On(cfg, cfg.Depth.Hut.On))
+            {
+                HutConfig H = cfg.Depth.Hut;
+                AddAnchors(cfg, map, list, H.ExtraWoodAnchors, BiomassType.Wood, (int)S.WoodCharges);
+                AddAnchors(cfg, map, list, H.OreAnchors, BiomassType.Ore, (int)H.OreCharges);
+            }
             return list.ToArray();
         }
 
@@ -176,6 +186,7 @@ namespace CriticalMass.Sim.Core
         /// <summary>Gather time multiplier of a class for a source type.</summary>
         public static double GatherScale(GameConfig cfg, ClassId cls, BiomassType kind)
         {
+            if (kind == BiomassType.Ore) return 1; // CM b13 [H]: ore is mined with F (Blacksmith), never gathered with E
             double[] m = kind == BiomassType.Water ? cfg.Depth.Sources.WaterGatherScale : cfg.Depth.Sources.WoodGatherScale;
             int k = (int)cls;
             return k >= 0 && k < m.Length ? m[k] : 1;
@@ -184,7 +195,7 @@ namespace CriticalMass.Sim.Core
         /// <summary>SourceInReach's per-source rules without the reach (terrain-affordances view): charges left, cargo of that kind or none.</summary>
         public static bool SourceTakes(Actor a, SourceNode s)
         {
-            if (s.Charges <= 0) return false;
+            if (s.Charges <= 0 || s.Kind == BiomassType.Ore) return false; // CM b13 [H]: an ore vein is mined with F, not E
             return !(a.Carry != CarryKind.None && a.CarryAmount > 0 && a.Carry != CarryOf(s.Kind));
         }
 
@@ -231,7 +242,7 @@ namespace CriticalMass.Sim.Core
                     s.RegrowIn = 0;
                     continue;
                 }
-                if (s.RegrowIn <= 0) s.RegrowIn = Durations.T30(w.Config, s.Kind == BiomassType.Water ? S.WaterRegrowTicks : S.WoodRegrowTicks);
+                if (s.RegrowIn <= 0) s.RegrowIn = Durations.T30(w.Config, s.Kind == BiomassType.Water ? S.WaterRegrowTicks : s.Kind == BiomassType.Ore ? w.Config.Depth.Hut.OreRegrowTicks : S.WoodRegrowTicks);
                 if (--s.RegrowIn <= 0) s.Charges++;
             }
 
@@ -249,6 +260,8 @@ namespace CriticalMass.Sim.Core
                     d.SourceOf[id] = -1;
                     continue;
                 }
+                // CM b13 [H]: a Miner's ore goes into the Blacksmith hut (the station zone), the same press and edge as the bank.
+                if (edge && a.Carry == CarryKind.Ore && a.CarryAmount > 0 && Blacksmith.On(w) && Stations.InStation(w, id) && Blacksmith.BankOre(w, id)) continue;
                 if (edge && InBase(w, a.Team, w.X[id], w.Z[id]) && Bank(w, id)) continue;
                 // Gathering: not while working a plant / corruption node or winding up a delivery.
                 int si = a.GatherNodeId >= 0 || a.DeliverTicks != 0 ? -1 : SourceInReach(w, id);
@@ -290,7 +303,7 @@ namespace CriticalMass.Sim.Core
             int t = (int)a.Team;
             PadDef pad = w.Map.Pads[t];
             bool moved = false;
-            if (a.CarryAmount > 0 && a.Carry != CarryKind.None && a.Carry != CarryKind.Corruption)
+            if (a.CarryAmount > 0 && a.Carry != CarryKind.None && a.Carry != CarryKind.Corruption && a.Carry != CarryKind.Ore) // CM b13 [H]: ore is the hut's
             {
                 int slot = a.Carry == CarryKind.Wood ? StockWood : a.Carry == CarryKind.Water ? StockWater : StockFood;
                 BiomassType bio = a.Carry == CarryKind.Wood ? BiomassType.Wood : a.Carry == CarryKind.Water ? BiomassType.Water : BiomassType.Plant;
@@ -317,7 +330,7 @@ namespace CriticalMass.Sim.Core
             }
             bool egg = w.Kaiju.State == KaijuState.Egg && !w.Match.Hatched;
             int food = d.Stock[t * StockKinds + StockFood];
-            if (!egg || food <= 0 || a.CarryAmount > 0 || !Roles.On(w) || !Roles.MayFeed(w, a.Cls)) return false;
+            if (!egg || food <= 0 || a.CarryAmount > 0 || a.Carry == CarryKind.Ore || !Roles.On(w) || !Roles.MayFeed(w, a.Cls)) return false;
             int cap = (int)w.Config.Class(a.Cls).CarryCapacity;
             int take = food < cap ? food : cap;
             d.Stock[t * StockKinds + StockFood] -= take;
@@ -371,7 +384,7 @@ namespace CriticalMass.Sim.Core
             for (int i = 0; i < list.Length; i++)
             {
                 SourceNode s = list[i];
-                if (s.Charges <= 0) continue;
+                if (s.Charges <= 0 || s.Kind == BiomassType.Ore) continue; // CM b13 [H]: supply bots never walk to an ore vein
                 if (a.CarryAmount > 0 && a.Carry != CarryOf(s.Kind)) continue;
                 if (waterOnly && s.Kind != BiomassType.Water) continue;
                 double dist = FieldDist(w, i, w.X[id], w.Z[id]);

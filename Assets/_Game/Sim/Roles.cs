@@ -80,6 +80,7 @@ namespace CriticalMass.Sim.Core
         /// <summary>May actor a deliver cargo of this kind at the shrine?</summary>
         public static bool MayDeliver(World w, Actor a, CarryKind kind)
         {
+            if (kind == CarryKind.Ore) return false;   // b13-h: ore goes to the hut, never to the egg
             if (kind == CarryKind.Corruption) return MayCorrupt(w, a.Cls);
             return MayFeed(w, a.Cls);
         }

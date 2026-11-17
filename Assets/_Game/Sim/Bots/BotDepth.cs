@@ -43,6 +43,8 @@ namespace CriticalMass.Sim.Bots
                     if (a.Team != team || !a.Alive || !BotsState.IsBot(st, w, id) || st.Supply[id] == Picked || st.Role[id] != BotsState.RoleHill) continue;
                     int rank = SupplyRank(w, a.Cls);
                     if (rank >= 9) continue;
+                    // CM b13 [H]: a Miner mines ore for the hut instead while his team's hut is below its top level.
+                    if (a.Cls == ClassId.Miner && Blacksmith.On(w) && Blacksmith.Level(w, team) < Blacksmith.MaxLevel(w.Config)) continue;
                     int score = rank * 2 + (st.Supply[id] == 1 ? 0 : 1);
                     if (score < bestScore)
                     {

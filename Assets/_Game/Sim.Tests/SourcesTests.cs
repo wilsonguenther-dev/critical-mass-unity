@@ -35,11 +35,11 @@ namespace CriticalMass.Sim.Tests
         {
             World w = DepthKit.Field(Cfg, ClassId.Warrior);
             SourceNode[] list = w.Depth.Sources;
-            int wood = 0, water = 0;
+            int wood = 0, water = 0, ore = 0;
             var sb = new System.Text.StringBuilder();
             foreach (SourceNode s in list)
             {
-                if (s.Kind == BiomassType.Wood) wood++; else water++;
+                if (s.Kind == BiomassType.Wood) wood++; else if (s.Kind == BiomassType.Water) water++; else ore++;
                 sb.Append(s.Kind).Append('@').Append(s.X).Append(',').Append(s.Z).Append(' ');
                 Assert.AreEqual(Cell.Floor, w.Map.Cells[(int)s.Z * w.Map.Width + (int)s.X]);
                 bool mirrored = false;
@@ -49,8 +49,10 @@ namespace CriticalMass.Sim.Tests
                 foreach (ResourceNode n in w.Nodes) Assert.Greater(Math.Abs(n.X - s.X) + Math.Abs(n.Z - s.Z), 3.0);
             }
             Console.WriteLine("{\"item\":\"U-064\",\"sources\":\"" + sb + "\"}");
-            Assert.AreEqual(6, wood);
+            Console.WriteLine("[b13 H] Full sources: groves " + wood + " (limit 10 = 6 + 4 CM b13 extra), springs " + water + " (limit 5), ore veins " + ore + " (limit 6)");
+            Assert.AreEqual(10, wood, "CM b13 [H]: HutConfig.ExtraWoodAnchors add two mirrored pairs");
             Assert.AreEqual(5, water);
+            Assert.AreEqual(6, ore, "CM b13 [H]: HutConfig.OreAnchors, three mirrored pairs");
         }
 
         [Test]

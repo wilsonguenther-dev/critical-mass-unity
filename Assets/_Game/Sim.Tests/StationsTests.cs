@@ -12,7 +12,8 @@ namespace CriticalMass.Sim.Tests
     [TestFixture]
     public sealed class StationsTests
     {
-        private static GameConfig Cfg => DepthKit.Cfg();
+        /// <summary>CM b13 [H]: the class ladder runs with the Blacksmith hut off (the hut replaces it; HutTests covers the hut).</summary>
+        private static GameConfig Cfg => DepthKit.Cfg(d => d.Hut.On = false);
 
         private static World AtBase(ClassId cls, GameConfig cfg = null)
         {

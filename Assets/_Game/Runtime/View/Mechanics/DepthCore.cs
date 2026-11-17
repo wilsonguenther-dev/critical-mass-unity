@@ -471,6 +471,7 @@ namespace CriticalMass.Runtime.View.Mechanics
 #if CM_SIM_MECHANICS
             if (i < 0 || i >= SourceCount(w)) return false;
             SourceNode s = w.Depth.Sources[i];
+            if (s.Kind == BiomassType.Ore) return false;   // b13-h (routed): ore veins are drawn by the hut view, not as wood/water sources
             water = s.Kind == BiomassType.Water;
             x = s.X; z = s.Z; charges = s.Charges; max = s.MaxCharges; regrowIn = s.RegrowIn;
             return true;

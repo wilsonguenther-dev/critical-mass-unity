@@ -56,7 +56,13 @@ namespace CriticalMass.Runtime.Hud.Mechanics
         Func<bool> _savedPause;
         bool _pauseHooked;
 
-        Text _title, _stock, _limit, _who;
+        Text _title, _stock, _limit, _who, _upgradeHead;
+        // CM b13 [H]: the Blacksmith hut block that replaces the upgrade rows while the hut rule is on.
+        RectTransform _hutBox;
+        Text _hutHead, _hutBonus, _hutOre, _hutHint;
+        readonly VectorShape[] _hutPip = new VectorShape[5];
+        int _hutKey = -1;
+        bool _hutShown;
         readonly VectorShape[] _item = new VectorShape[Items];
         readonly Text[] _itemName = new Text[Items], _itemNote = new Text[Items];
         readonly VectorShape[,] _pip = new VectorShape[Items, 3];
@@ -100,7 +106,8 @@ namespace CriticalMass.Runtime.Hud.Mechanics
                 BuildItem(k, x, ty, TileW, TileH, true);
             }
             y += 2f * (TileH + 10f) + 6f;
-            MenuUi.Label(_panel, "Upgrade Head", CMTokens.Ui, 17, CMTokens.WithAlpha(cream, 0.85f), TextAnchor.MiddleLeft, 22f, y, 200f, 30f, DepthWords.Upgrade, 2f);
+            _upgradeHead = MenuUi.Label(_panel, "Upgrade Head", CMTokens.Ui, 17, CMTokens.WithAlpha(cream, 0.85f), TextAnchor.MiddleLeft, 22f, y, 200f, 30f, DepthWords.Upgrade, 2f);
+            BuildHut(y, cream, brass);
             _who = MenuUi.Label(_panel, "Who", CMTokens.Ui, 14, CMTokens.WithAlpha(cream, 0.75f), TextAnchor.MiddleRight, 200f, y, PanelW - 222f, 30f, "", 1.5f);
             _who.resizeTextMinSize = 10;
             _who.resizeTextMaxSize = 14;
@@ -108,6 +115,49 @@ namespace CriticalMass.Runtime.Hud.Mechanics
             y += 40f;
             for (int k = 0; k < 6; k++) BuildItem(6 + k, 22f, y + k * (RowH + 6f), PanelW - 44f, RowH, false);
             _panel.gameObject.SetActive(false);
+        }
+
+        /// <summary>CM b13 [H]: the hut block (level, the bonus now, ore banked / next cost, who upgrades it), hidden until the rule is on.</summary>
+        void BuildHut(float y, Color cream, Color brass)
+        {
+            _hutBox = MenuUi.Rt(_panel, "Blacksmith Hut");
+            MenuUi.Place(_hutBox, 0f, y, PanelW, 6f * (RowH + 6f) + 40f);
+            _hutHead = MenuUi.Label(_hutBox, "Hut Head", CMTokens.Display, 22, brass, TextAnchor.MiddleLeft, 22f, 0f, 340f, 34f, HutNames.Hut, 2.5f);
+            for (int p = 0; p < 5; p++) _hutPip[p] = Pip(_hutBox, PanelW - 140f + p * 22f, 9f);
+            _hutBonus = MenuUi.Label(_hutBox, "Hut Bonus", CMTokens.Ui, 18, cream, TextAnchor.MiddleLeft, 22f, 46f, PanelW - 44f, 30f, "", 2f);
+            _hutOre = MenuUi.Label(_hutBox, "Hut Ore", CMTokens.Mono, 20, cream, TextAnchor.MiddleLeft, 22f, 86f, PanelW - 44f, 32f, "", 2f);
+            _hutHint = MenuUi.Label(_hutBox, "Hut Hint", CMTokens.Ui, 16, CMTokens.WithAlpha(cream, 0.8f), TextAnchor.MiddleLeft, 22f, 128f, PanelW - 44f, 30f, CriticalMass.Runtime.Codex.LoreText.HutLine, 1.5f);   // b13 (routed from V): the codex hut line
+            _hutBox.gameObject.SetActive(false);
+        }
+
+        /// <summary>CM b13 [H]: show the hut block instead of the class ladder rows (and back) when the rule changes.</summary>
+        void ShowHut(bool hut)
+        {
+            if (_hutShown == hut && _hutBox.gameObject.activeSelf == hut) return;
+            _hutShown = hut;
+            _hutBox.gameObject.SetActive(hut);
+            _upgradeHead.gameObject.SetActive(!hut);
+            _who.gameObject.SetActive(!hut);
+            for (int k = 6; k < Items; k++) _item[k].gameObject.SetActive(!hut);
+            if (hut && _focus >= 6) _focus = 3;
+        }
+
+        void RefreshHut(World w, TeamId t)
+        {
+            int lvl = Blacksmith.Level(w, t), ore = Blacksmith.OreBanked(w, t), cost = Blacksmith.NextCost(w, t);
+            int key = (lvl * 1000 + ore) * 1000 + cost;
+            if (key == _hutKey) return;
+            _hutKey = key;
+            var inv = CultureInfo.InvariantCulture;
+            int pct = (int)Math.Round(w.Config.Depth.Hut.StatPerLevel * 100 * lvl);
+            HudText.Set(_hutHead, HutNames.Hut + "   " + HutNames.Level + " " + lvl.ToString(inv));
+            HudText.Set(_hutBonus, "+" + pct.ToString(inv) + "% " + HutNames.Bonus);
+            HudText.Set(_hutOre, cost > 0 ? HutNames.Ore + " " + ore.ToString(inv) + " / " + cost.ToString(inv) : HutNames.Max);
+            for (int p = 0; p < 5; p++)
+            {
+                Color c = p < lvl ? CMTokens.ToolBrass.Color : CMTokens.MeterEmpty.Color;
+                if (_hutPip[p].FillColor != c) _hutPip[p].SetFill(c);
+            }
         }
 
         void BuildItem(int i, float x, float y, float w, float h, bool tile)
@@ -226,6 +276,9 @@ namespace CriticalMass.Runtime.Hud.Mechanics
             double hz = w.Config.SimHz;
             int limitS = StationRules.Seconds((int)w.Config.Respawn.ClassSwitchCooldownTicks, hz);
             HudText.Set(_limit, cd > 0 ? DepthLines.Wait(0, StationRules.Seconds(cd, hz)) : LimitLine(limitS));
+            bool hut = Blacksmith.On(w);
+            ShowHut(hut);
+            if (hut) RefreshHut(w, t);
             bool builder = a.Alive && a.Cls == ClassId.Builder;
             HudText.Set(_who, builder ? string.Empty : DepthWords.OnlyBuilders);
             int max = DepthRead.MaxLevel(w);
@@ -238,6 +291,7 @@ namespace CriticalMass.Runtime.Hud.Mechanics
                 Style(k, sw == StationRules.Switch.Ok || sw == StationRules.Switch.Current, sw == StationRules.Switch.Current);
                 HudText.Set(_itemNote[k], sw == StationRules.Switch.Current ? DepthWords.Current : sw == StationRules.Switch.Cooldown ? DepthLines.Int(StationRules.Seconds(cd, hz)) : string.Empty);
                 Pips(k, lvl, max);
+                if (hut) continue; // CM b13 [H]: no class ladder rows while the hut is on
                 // upgrade row
                 bool next = DepthRead.NextCost(w, t, c, out int cw, out int cwa);
                 StationRules.Buy b = StationRules.CanBuy(a.Alive, a.Cls == ClassId.Builder, true, next, wood, water, cw, cwa);
@@ -341,6 +395,7 @@ namespace CriticalMass.Runtime.Hud.Mechanics
                 {
                     _stickReadyAt = now + 0.18f;
                     _focus = Step(_focus, st);
+                    if (Blacksmith.On(w) && _focus >= 6) _focus = 3; // CM b13 [H]: no ladder rows to focus
                     DepthOut.Sound("depth-station-move");
                 }
                 else if (st.sqrMagnitude < 0.2f * 0.2f) _stickReadyAt = 0f;
@@ -396,6 +451,7 @@ namespace CriticalMass.Runtime.Hud.Mechanics
                 DepthOut.Sound("depth-station-pick");
                 return;
             }
+            if (Blacksmith.On(w)) { _focus = Mathf.Min(_focus, 5); return; } // CM b13 [H]: the hut replaces the ladder (StationBuy is ignored)
             TeamId t = a.Team;
             bool next = DepthRead.NextCost(w, t, c, out int cw, out int cwa);
             StationRules.Buy b = StationRules.CanBuy(a.Alive, a.Cls == ClassId.Builder, DepthRead.InStation(w, me), next,
