@@ -387,8 +387,8 @@ namespace CriticalMass.Runtime.View.Art
             new ModelSpec { Key = Warrior, AssetPath = "Assets/_Game/Art/Characters/Warrior.fbx", Kind = ArtKind.Character, Rigged = true,
                 Bones = 41, ClipSource = "Assets/_Game/Art/Characters/Warrior_Clips.fbx",
                 Meshes = new[] { "Warrior_Hero", "Warrior_LOD0", "Warrior_LOD1", "Warrior_Shadow" }, MaskCodes = new[] { 0, 6, 8 },
-                OutlinePx = CharacterHullPx, Rim = 0.6f, Authored = WarriorAzure, Crimson = WarriorCrimson, Height = 2.0f,
-                VertexColourFace = true, StrideScale = 1.118f, ArtYawDeg = 180f },   // rig-warrior-1: HY Warrior (art/characters-hy-rig ef9d2eb, shins +0.06 m so the ankles sit at KayKit height above his soles; StrideScale = the bake motion scale, hip height over KayKit 0.519 m) on its own clips baked with foot IK (Warrior_Clips.fbx, bake_clips.py); pre-HY: FaceTexture Warrior_Face.png, KayKit_Clips.fbx (Characters/_fallback~)
+                OutlinePx = CharacterHullPx, Rim = 0.6f, Authored = WarriorAzure, Crimson = WarriorCrimson, Height = 2.16f,
+                VertexColourFace = true, StrideScale = 1.118f, ArtYawDeg = 180f },   // art/parts-characters: rebuilt from clean parts (cm-art-trial parts-game-ready), same 41-bone rig, Hero bind-pose height 2.161 m (spiked hair). rig-warrior-1: HY Warrior (art/characters-hy-rig ef9d2eb, shins +0.06 m so the ankles sit at KayKit height above his soles; StrideScale = the bake motion scale, hip height over KayKit 0.519 m) on its own clips baked with foot IK (Warrior_Clips.fbx, bake_clips.py); pre-HY: FaceTexture Warrior_Face.png, KayKit_Clips.fbx (Characters/_fallback~)
             // Batch 12 AB textured Warrior pilot (-warriorTex 1): UV-mapped LOD0 (~6,000 tris) and LOD1 with a 1024 base colour, the
             // old Warrior_Shadow proxy, the Warrior's skeleton, clips, swatches, stride and facing (build_warrior_tex.py).
             new ModelSpec { Key = WarriorTex, AssetPath = "Assets/_Game/Art/Characters/WarriorTex/WarriorTex.fbx", Kind = ArtKind.Character, Rigged = true,
@@ -398,7 +398,7 @@ namespace CriticalMass.Runtime.View.Art
                 StrideScale = 1.118f, ArtYawDeg = 180f },
             new ModelSpec { Key = Miner, AssetPath = "Assets/_Game/Art/Miner/Miner.fbx", Kind = ArtKind.Character, Rigged = true,
                 Bones = 41, ClipSource = "Assets/_Game/Art/Miner/Miner_Clips.fbx",
-                Meshes = new[] { "Miner_Hero", "Miner_LOD0", "Miner_LOD1", "Miner_Shadow" }, MaskCodes = new[] { 0, 6, 8 },
+                Meshes = new[] { "Miner_Hero", "Miner_LOD0", "Miner_LOD1", "Miner_Shadow" }, MaskCodes = new[] { 0, 2, 8 },   // parts r2: the helmet lamp is a fixed glow (2), never team glow (6) inside the face
                 // Height: the Hero mesh's bind-pose bounds, 2.127 m: the pick head raised in his right hand (2.115) above the
                 // helmet. rig-miner-3 scaled the whole rig by 0.9831 so his BODY (soles to helmet top, crest and pick left out)
                 // is 2.0 m; the crest tops out at 2.07.
@@ -407,7 +407,7 @@ namespace CriticalMass.Runtime.View.Art
             new ModelSpec { Key = Farmer, AssetPath = "Assets/_Game/Art/Farmer/Farmer.fbx", Kind = ArtKind.Character, Rigged = true,
                 Bones = 41, ClipSource = "Assets/_Game/Art/Farmer/Farmer_Clips.fbx",
                 Meshes = new[] { "Farmer_Hero", "Farmer_LOD0", "Farmer_LOD1", "Farmer_Shadow" }, MaskCodes = new[] { 0, 2, 8 },
-                OutlinePx = CharacterHullPx, Rim = 0.6f, Authored = FarmerAzure, Crimson = FarmerCrimson, Height = 2.0f,
+                OutlinePx = CharacterHullPx, Rim = 0.6f, Authored = FarmerAzure, Crimson = FarmerCrimson, Height = 2.19f,
                 VertexColourFace = true, StrideScale = 0.731f, ArtYawDeg = 180f },   // rigs-2 (leg ratio 0.731, bake_clips.py): clips baked per class with foot IK (Farmer_Clips.fbx, bake_clips.py). HY (2026-11-13; legs 0.267 vs KayKit 0.374 hip to ankle); pre-HY: OutlineWeights Farmer_OutlineW.json + FaceTexture Farmer_Face.png (Farmer/_fallback~)
             // Art landing (2026-11-12): the three new classes, LOD files from art/fighter-lods d536d30 (weapons folded into
             // every level). Each body carries CM_Toon plus CM_FaceDecal on slot 1, the Miner's decal method (class READMEs).
@@ -421,13 +421,16 @@ namespace CriticalMass.Runtime.View.Art
                 Bones = 41, ClipSource = "Assets/_Game/Art/Demolitions/Demolitions_Clips.fbx",
                 Meshes = new[] { "Demolitions_Hero", "Demolitions_LOD0", "Demolitions_LOD1", "Demolitions_Shadow" }, MaskCodes = new[] { 0, 8 },
                 OutlinePx = CharacterHullPx, Rim = 0.6f, Authored = MinerAzure, Crimson = MinerCrimson, Height = 2.0f,
-                VertexColourFace = true, StrideScale = 1.271f, ArtYawDeg = 180f },
+                VertexColourFace = true, StrideScale = 1.271f, ArtYawDeg = 180f, HeldWeaponInMesh = true },   // art/parts-characters: the pry bar (handslot.r) and the barrel are modelled
+            // art/parts-characters: rebuilt from clean parts on the BuilderTex skeleton (rig-builder-4), so it plays that rig's own
+            // Builder_Clips (hip-height ratio 1.31) instead of KayKit_Clips; the face is painted in the vertex colour (no decal
+            // slot). Height: the Hero bind-pose top, the ladder on his back (2.392 m). Pre-parts: KayKit_Clips, BuilderFace.png
+            // on FaceSlot 1, Height 2.33 (git history).
             new ModelSpec { Key = Builder, AssetPath = "Assets/_Game/Art/Builder/Builder.fbx", Kind = ArtKind.Character, Rigged = true,
-                Bones = 41, ClipSource = "Assets/_Game/Art/Characters/KayKit_Clips.fbx",
+                Bones = 41, ClipSource = "Assets/_Game/Art/Builder/Builder_Clips.fbx",
                 Meshes = new[] { "Builder_Hero", "Builder_LOD0", "Builder_LOD1", "Builder_Shadow" }, MaskCodes = new[] { 0, 8 },
-                // Height: the Hero mesh's bind-pose top is the ladder corner on his back (2.329 m in the FBX; cap crown 1.895).
-                OutlinePx = CharacterHullPx, Rim = 0.6f, Authored = BuilderAzure, Crimson = BuilderCrimson, Height = 2.33f,
-                FaceTexture = "Assets/_Game/Art/Builder/BuilderFace.png", FaceSlot = 1, ArtYawDeg = 180f, HeldWeaponInMesh = true },
+                OutlinePx = CharacterHullPx, Rim = 0.6f, Authored = BuilderAzure, Crimson = BuilderCrimson, Height = 2.39f,
+                StrideScale = 1.31f, FaceTexture = null, FaceSlot = -1, VertexColourFace = true, ArtYawDeg = 180f, HeldWeaponInMesh = true },
             // Batch 12 textured Builder pilot (-builderTex 1, build_char_tex.py): UV-mapped LOD0 (~7,000 tris), LOD1 (~1,800) and Shadow
             // (<800) with a 1024 base colour (team cloth in its alpha), on the rig-builder-4 skeleton and its Builder_Clips (baked per
             // class with foot IK, hip-height ratio 1.31 = StrideScale). Empty hands: the game hangs the mallet on handslot.r
@@ -447,9 +450,9 @@ namespace CriticalMass.Runtime.View.Art
             // the head, run stance anchored at the ground speed and run lean halved (hmw_run.py rig, GitHub run of bbe6e85).
             new ModelSpec { Key = Healer, AssetPath = "Assets/_Game/Art/Healer/Healer.fbx", Kind = ArtKind.Character, Rigged = true,
                 Bones = 41, ClipSource = "Assets/_Game/Art/Healer/Healer_Clips.fbx",
-                Meshes = new[] { "Healer_Hero", "Healer_LOD0", "Healer_LOD1", "Healer_Shadow" }, MaskCodes = new[] { 0, 8 },
-                OutlinePx = CharacterHullPx, Rim = 0.6f, Authored = MinerAzure, Crimson = MinerCrimson, Height = 2.0f,
-                VertexColourFace = true, StrideScale = 1.194f, ArtYawDeg = 180f },
+                Meshes = new[] { "Healer_Hero", "Healer_LOD0", "Healer_LOD1", "Healer_Shadow" }, MaskCodes = new[] { 0, 6, 8 },
+                OutlinePx = CharacterHullPx, Rim = 0.6f, Authored = MinerAzure, Crimson = MinerCrimson, Height = 1.89f,
+                VertexColourFace = true, StrideScale = 1.194f, ArtYawDeg = 180f, HeldWeaponInMesh = true },   // art/parts-characters: the lantern is modelled (glow code 6), bind-pose height 1.89 m
             new ModelSpec { Key = DemolitionsProps, AssetPath = "Assets/_Game/Art/Demolitions/DemolitionsProps.fbx", Kind = ArtKind.Prop,
                 Meshes = new[] { MineBuried, MineArmed, MineOwnerRing, MineTriggered, TntFlight, CraterRim, Explosion },
                 OutlinePx = 2.5f, Authored = MinerAzure, Crimson = MinerCrimson },

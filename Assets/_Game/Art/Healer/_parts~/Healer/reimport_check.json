@@ -1,0 +1,134 @@
+{
+ "file": "out/Healer/Healer.fbx",
+ "bytes": 698524,
+ "bones": 41,
+ "bone_names_equal_game": true,
+ "parents_equal_game": true,
+ "rest_maxdiff_vs_game_m": 0.0,
+ "game_rig": "Art/Healer/Healer.fbx",
+ "meshes": {
+  "Healer_Hero": {
+   "tris": 9852,
+   "verts": 5338,
+   "colour_layers": [
+    "Col"
+   ],
+   "codes": [
+    0,
+    6,
+    8
+   ],
+   "max_influences": 1,
+   "uv": [
+    "UVMap"
+   ],
+   "materials": [
+    "CM_Toon"
+   ],
+   "height_m": 1.89,
+   "min_z": 0.0,
+   "parent": "Rig",
+   "armature_mod": true
+  },
+  "Healer_LOD0": {
+   "tris": 4230,
+   "verts": 2484,
+   "colour_layers": [
+    "Col"
+   ],
+   "codes": [
+    0,
+    6,
+    8
+   ],
+   "max_influences": 1,
+   "uv": [
+    "UVMap"
+   ],
+   "materials": [
+    "CM_Toon"
+   ],
+   "height_m": 1.89,
+   "min_z": 0.0,
+   "parent": "Rig",
+   "armature_mod": true
+  },
+  "Healer_LOD1": {
+   "tris": 1468,
+   "verts": 976,
+   "colour_layers": [
+    "Col"
+   ],
+   "codes": [
+    0,
+    6,
+    8
+   ],
+   "max_influences": 1,
+   "uv": [
+    "UVMap"
+   ],
+   "materials": [
+    "CM_Toon"
+   ],
+   "height_m": 1.89,
+   "min_z": 0.0075,
+   "parent": "Rig",
+   "armature_mod": true
+  },
+  "Healer_Shadow": {
+   "tris": 754,
+   "verts": 417,
+   "colour_layers": [
+    "Col"
+   ],
+   "codes": [
+    0
+   ],
+   "max_influences": 1,
+   "uv": [
+    "UVMap"
+   ],
+   "materials": [
+    "CM_Toon"
+   ],
+   "height_m": 1.8777,
+   "min_z": 0.0121,
+   "parent": "Rig",
+   "armature_mod": true
+  }
+ },
+ "face_proxy": {
+  "head_verts": 1016,
+  "skin_front_verts": 148,
+  "dark_in_skin_bbox": 88,
+  "contrast": 0.369,
+  "face_codes": [
+   0
+  ]
+ },
+ "approved_tris": 9820,
+ "poses": [
+  [
+   "idle",
+   "Idle",
+   13
+  ],
+  [
+   "walk",
+   "Walk",
+   6
+  ],
+  [
+   "attack",
+   "Cast",
+   13
+  ],
+  [
+   "action",
+   "UseItem",
+   19
+  ]
+ ],
+ "grip": {}
+}

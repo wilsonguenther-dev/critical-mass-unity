@@ -1,0 +1,131 @@
+{
+ "file": "out/Builder/Builder.fbx",
+ "bytes": 693772,
+ "bones": 41,
+ "bone_names_equal_game": true,
+ "parents_equal_game": true,
+ "rest_maxdiff_vs_game_m": 3.1e-05,
+ "game_rig": "Art/Characters/BuilderTex/BuilderTex.fbx",
+ "meshes": {
+  "Builder_Hero": {
+   "tris": 10208,
+   "verts": 5440,
+   "colour_layers": [
+    "Col"
+   ],
+   "codes": [
+    0,
+    8
+   ],
+   "max_influences": 1,
+   "uv": [
+    "UVMap"
+   ],
+   "materials": [
+    "CM_Toon"
+   ],
+   "height_m": 2.392,
+   "min_z": 0.0,
+   "parent": "Rig",
+   "armature_mod": true
+  },
+  "Builder_LOD0": {
+   "tris": 4278,
+   "verts": 2466,
+   "colour_layers": [
+    "Col"
+   ],
+   "codes": [
+    0,
+    8
+   ],
+   "max_influences": 1,
+   "uv": [
+    "UVMap"
+   ],
+   "materials": [
+    "CM_Toon"
+   ],
+   "height_m": 2.392,
+   "min_z": 0.0,
+   "parent": "Rig",
+   "armature_mod": true
+  },
+  "Builder_LOD1": {
+   "tris": 1451,
+   "verts": 1016,
+   "colour_layers": [
+    "Col"
+   ],
+   "codes": [
+    0,
+    8
+   ],
+   "max_influences": 1,
+   "uv": [
+    "UVMap"
+   ],
+   "materials": [
+    "CM_Toon"
+   ],
+   "height_m": 2.3659,
+   "min_z": 0.015,
+   "parent": "Rig",
+   "armature_mod": true
+  },
+  "Builder_Shadow": {
+   "tris": 752,
+   "verts": 418,
+   "colour_layers": [
+    "Col"
+   ],
+   "codes": [
+    0
+   ],
+   "max_influences": 1,
+   "uv": [
+    "UVMap"
+   ],
+   "materials": [
+    "CM_Toon"
+   ],
+   "height_m": 2.3523,
+   "min_z": 0.019,
+   "parent": "Rig",
+   "armature_mod": true
+  }
+ },
+ "face_proxy": {
+  "head_verts": 1218,
+  "skin_front_verts": 319,
+  "dark_in_skin_bbox": 88,
+  "contrast": 0.364,
+  "face_codes": [
+   0
+  ]
+ },
+ "approved_tris": 9856,
+ "poses": [
+  [
+   "idle",
+   "Idle",
+   13
+  ],
+  [
+   "walk",
+   "Walk",
+   6
+  ],
+  [
+   "attack",
+   "Attack",
+   15
+  ],
+  [
+   "action",
+   "UseItem",
+   19
+  ]
+ ],
+ "grip": {}
+}

@@ -1,0 +1,135 @@
+{
+ "file": "out/Miner/Miner.fbx",
+ "bytes": 695740,
+ "bones": 41,
+ "bone_names_equal_game": true,
+ "parents_equal_game": true,
+ "rest_maxdiff_vs_game_m": 0.0,
+ "game_rig": "Art/Miner/Miner.fbx",
+ "meshes": {
+  "Miner_Hero": {
+   "tris": 10142,
+   "verts": 5480,
+   "colour_layers": [
+    "Col"
+   ],
+   "codes": [
+    0,
+    2,
+    8
+   ],
+   "max_influences": 1,
+   "uv": [
+    "UVMap"
+   ],
+   "materials": [
+    "CM_Toon"
+   ],
+   "height_m": 2.2133,
+   "min_z": -0.0,
+   "parent": "Rig",
+   "armature_mod": true
+  },
+  "Miner_LOD0": {
+   "tris": 4228,
+   "verts": 2457,
+   "colour_layers": [
+    "Col"
+   ],
+   "codes": [
+    0,
+    2,
+    8
+   ],
+   "max_influences": 1,
+   "uv": [
+    "UVMap"
+   ],
+   "materials": [
+    "CM_Toon"
+   ],
+   "height_m": 2.2081,
+   "min_z": -0.0,
+   "parent": "Rig",
+   "armature_mod": true
+  },
+  "Miner_LOD1": {
+   "tris": 1465,
+   "verts": 1033,
+   "colour_layers": [
+    "Col"
+   ],
+   "codes": [
+    0,
+    2,
+    8
+   ],
+   "max_influences": 1,
+   "uv": [
+    "UVMap"
+   ],
+   "materials": [
+    "CM_Toon"
+   ],
+   "height_m": 2.2039,
+   "min_z": 0.0167,
+   "parent": "Rig",
+   "armature_mod": true
+  },
+  "Miner_Shadow": {
+   "tris": 706,
+   "verts": 393,
+   "colour_layers": [
+    "Col"
+   ],
+   "codes": [
+    0
+   ],
+   "max_influences": 1,
+   "uv": [
+    "UVMap"
+   ],
+   "materials": [
+    "CM_Toon"
+   ],
+   "height_m": 2.1903,
+   "min_z": 0.0204,
+   "parent": "Rig",
+   "armature_mod": true
+  }
+ },
+ "face_proxy": {
+  "head_verts": 1296,
+  "skin_front_verts": 265,
+  "dark_in_skin_bbox": 118,
+  "contrast": 0.523,
+  "face_codes": [
+   0,
+   2
+  ]
+ },
+ "approved_tris": 9870,
+ "poses": [
+  [
+   "idle",
+   "Idle",
+   13
+  ],
+  [
+   "walk",
+   "Walk",
+   6
+  ],
+  [
+   "attack",
+   "Attack2HChop",
+   24
+  ],
+  [
+   "action",
+   "UseItem",
+   19
+  ]
+ ],
+ "grip": {}
+}
