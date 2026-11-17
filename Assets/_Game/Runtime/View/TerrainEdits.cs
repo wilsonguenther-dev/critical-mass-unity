@@ -160,13 +160,37 @@ namespace CriticalMass.Runtime.View
         /// Remove every placement whose pivot is on an edited cell (except KeptOnEdited categories) and mark the edited cells
         /// undressed, so the grey-box view (GridChunkMeshView + TerrainEditMesh) draws them. Returns how many were dropped.
         /// </summary>
-        public static int FilterPlan(WorldPlan plan, bool[] edited)
+        /// <para>b14 review: with the current cells, two kept categories still go: WATER dressing (waterfall, pond) whose cell
+        /// is solid ground now (a placed block, never a rope bridge over water), and EDGE lip rims (the grass fringe) touching
+        /// a pit (an edited cell that is Void now), where the pit's own walls are the edge.</para>
+        public static int FilterPlan(WorldPlan plan, bool[] edited, byte[] current = null)
         {
             if (plan == null || edited == null) return 0;
             int w = plan.Width, h = plan.Height;
+            bool cur = current != null && current.Length == edited.Length && current.Length == w * h;
             int dropped = plan.Placements.RemoveAll(p =>
             {
-                if (KeptOnEdited(p.Cat)) return false;
+                if (KeptOnEdited(p.Cat))
+                {
+                    if (!cur) return false;
+                    if (p.Cat == "water")
+                    {
+                        int qx = (int)System.Math.Floor(p.SimX), qz = (int)System.Math.Floor(p.SimZ);
+                        if (qx < 0 || qz < 0 || qx >= w || qz >= h) return false;
+                        int qi = qz * w + qx;
+                        return edited[qi] && current[qi] != Cell.Bridge && Land(current[qi]);
+                    }
+                    if (p.Cat != "edge") return false;
+                    for (int k = 0; k < 4; k++)
+                    {
+                        int ex = (int)System.Math.Floor(p.SimX + ((k & 1) == 0 ? -NearEdge : NearEdge));
+                        int ez = (int)System.Math.Floor(p.SimZ + ((k & 2) == 0 ? -NearEdge : NearEdge));
+                        if (ex < 0 || ez < 0 || ex >= w || ez >= h) continue;
+                        int ei = ez * w + ex;
+                        if (edited[ei] && current[ei] == Cell.Void) return true;
+                    }
+                    return false;
+                }
                 int cx = (int)System.Math.Floor(p.SimX), cz = (int)System.Math.Floor(p.SimZ);
                 if (cx < 0 || cz < 0 || cx >= w || cz >= h) return false;
                 if (edited[cz * w + cx]) return true;
