@@ -19,10 +19,18 @@ namespace CriticalMass.Sim.Tests
             Seed = 4242, TeamSize = 16, HumanTeam = TeamId.Azure, HumanClass = ClassId.Warrior, Config = GameConfig.CreateDefault(),
         });
 
+        static World Full16AllB13Off()
+        {
+            GameConfig c = GameConfig.CreateDefault();
+            c.Depth.Hut.On = false; c.Depth.Build.On = false; c.Depth.Dodge.On = false; c.Depth.KaijuTypes.On = false; c.Depth.Corruption.On = false;
+            return World.CreateWorld(new WorldOptions { Seed = 4242, TeamSize = 16, HumanTeam = TeamId.Azure, HumanClass = ClassId.Warrior, Config = c });
+        }
+
         [Test]
         public void EveryStubAndHookIsAnIdentityOnAFull16v16World()
         {
-            World w = Full16();
+            // b13 integrator: the items fill the stubs, so the identity is proved with every item's own On flag off.
+            World w = Full16AllB13Off();
             for (int t = 0; t < 120; t++) SimStep.Step(w);
             Assert.IsNotNull(w.Hut); Assert.IsNotNull(w.Walls); Assert.IsNotNull(w.Dodges); Assert.IsNotNull(w.KaijuKind); Assert.IsNotNull(w.Corrupt);
             BotsState st = BotsState.CreateBotsState(w);
@@ -69,7 +77,8 @@ namespace CriticalMass.Sim.Tests
             DepthConfig d = w.Config.Depth, c = d.Clone();
             bool deep = !ReferenceEquals(c.Hut, d.Hut) && !ReferenceEquals(c.Build, d.Build) && !ReferenceEquals(c.Dodge, d.Dodge) &&
                         !ReferenceEquals(c.KaijuTypes, d.KaijuTypes) && !ReferenceEquals(c.Corruption, d.Corruption);
-            bool on = d.Hut.On && d.Build.On && d.Dodge.On && d.KaijuTypes.On && d.Corruption.On;
+            DepthConfig dd = GameConfig.CreateDefault().Depth;
+            bool on = dd.Hut.On && dd.Build.On && dd.Dodge.On && dd.KaijuTypes.On && dd.Corruption.On;
             Console.WriteLine($"[b13 scaffold] 16v16 Full seed 4242: {n} actors, stub/hook identity failures {bad}, config On flags {on}, deep clone {deep} (limit: 0 failures, true, true)");
             Assert.AreEqual(0, bad);
             Assert.IsTrue(on && deep);

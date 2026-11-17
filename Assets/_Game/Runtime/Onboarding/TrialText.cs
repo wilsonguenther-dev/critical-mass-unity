@@ -1,6 +1,9 @@
 using System.Text;
 using CriticalMass.Runtime.Hud;
 using CriticalMass.Runtime.Input;
+using CriticalMass.Sim.Config;
+using CriticalMass.Sim.Core;
+using UnityEngine;
 using UnityEngine.InputSystem;
 
 namespace CriticalMass.Runtime.Onboarding
@@ -10,6 +13,67 @@ namespace CriticalMass.Runtime.Onboarding
     /// MascotLines) with the step's own Prompt as the built-in fallback, and its action tokens become the glyphs of the
     /// device used last. Formatting runs only when a step starts or the device changes, never per frame.
     /// </summary>
+    /// <summary>
+    /// b13-v: the first-match hints for the batch 13 actions: one line each the first time the player can dodge, mine (a
+    /// Miner) and build (a Builder), with the bound key, shown once ever (PlayerPrefs) and dismissed by doing it. Pure
+    /// reads of the S0 getters, so with the rules off none is ever due.
+    /// </summary>
+    public static class B13Hints
+    {
+        public const int Dodge = 0, Mine = 1, Build = 2, Count = 3;
+        public const string PrefsKey = "cm.b13.hints";
+        public static readonly string[] Lines =
+        {
+            "{Dodge} to dodge. A quick dash; you cannot be hit for a moment.",
+            "Hold {DigPlace} near an ore vein to MINE, then bank the ore at your hut.",
+            "{DigPlace} BUILDS where the outline shows. {Switch} picks the piece.",
+        };
+
+        public static string Line(int i, ControlDevice device) => TrialText.Fill(Lines[Mathf.Clamp(i, 0, Count - 1)], device);
+
+        public static int ShownMask() => PlayerPrefs.GetInt(PrefsKey, 0);
+        public static void MarkShown(int i)
+        {
+            PlayerPrefs.SetInt(PrefsKey, ShownMask() | (1 << i));
+            PlayerPrefs.Save();
+        }
+
+        /// <summary>The player can do it now (the rule is on, the class fits, the player is up).</summary>
+        public static bool Available(int i, World w, int id)
+        {
+            if (w == null || id < 0 || id >= w.ActorCount || !w.Actors[id].Alive) return false;
+            Actor a = w.Actors[id];
+            switch (i)
+            {
+                case Dodge: return CriticalMass.Sim.Core.Dodge.On(w) && CriticalMass.Sim.Core.Dodge.CooldownTicks(w, id) <= 0;
+                case Mine: return a.Cls == ClassId.Miner && Blacksmith.On(w);
+                case Build: return a.Cls == ClassId.Builder && BuilderWalls.On(w) && BuilderWalls.Ghost(w, id, out _, out _, out _, out _, out _, out _, out _);
+                default: return false;
+            }
+        }
+
+        /// <summary>The player did it (pressedF: the F action was pressed this frame).</summary>
+        public static bool Done(int i, World w, int id, bool pressedF)
+        {
+            if (w == null || id < 0 || id >= w.ActorCount) return true;
+            Actor a = w.Actors[id];
+            switch (i)
+            {
+                case Dodge: return CriticalMass.Sim.Core.Dodge.Active(w, id);
+                case Mine: return a.Carry == CarryKind.Ore || a.Cls != ClassId.Miner;
+                case Build: return pressedF || a.Cls != ClassId.Builder;
+                default: return true;
+            }
+        }
+
+        /// <summary>The first hint not yet shown that the player can act on now, or -1.</summary>
+        public static int Due(int shownMask, World w, int id)
+        {
+            for (int i = 0; i < Count; i++) if ((shownMask & (1 << i)) == 0 && Available(i, w, id)) return i;
+            return -1;
+        }
+    }
+
     public static class TrialText
     {
         public const string Offer = "trial.offer";
@@ -91,6 +155,7 @@ namespace CriticalMass.Runtime.Onboarding
                 case "DigPlace": return Action("DigPlace", device, pad ? "Y" : "F");
                 case "Map": return Action("Map", device, pad ? "D-PAD UP" : "M");
                 case "Switch": return pad ? "LB / RB" : "WHEEL";   // creator acceptance: the dig / place mode switch
+                case "Dodge": return Action("Dodge", device, pad ? "B" : "SHIFT");   // b13-v: J's default dodge keys
                 default: return null;
             }
         }

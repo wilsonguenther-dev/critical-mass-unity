@@ -205,6 +205,16 @@ namespace CriticalMass.Runtime.Hud
         public static Banner Instance { get; private set; }
 
         public static void Show(BannerSpec spec) => Queue.Show(spec, Now());
+
+        /// <summary>b13-v: the corruption roll's result banner, seen by both teams: "THE KAIJU GOES WILD" or "THE KAIJU RESISTED".</summary>
+        public static BannerSpec CorruptionRollSpec(bool wild) => new BannerSpec
+        {
+            Headline = wild ? Progression.ProgressionWords.WildHeadline : Progression.ProgressionWords.ResistedHeadline,
+            Reason = wild ? Progression.ProgressionWords.WildReason : Progression.ProgressionWords.ResistedReason,
+            Style = wild ? BannerStyle.Corruption : BannerStyle.Neutral,
+            Priority = wild ? 8 : 6,
+            HoldSeconds = wild ? 2.6 : 2.0,
+        };
         public static void Hide() => Queue.Hide(Now());
         /// <summary>Drops the banner on screen and every waiting one at once.</summary>
         public static void ClearAll() => Queue.Clear();

@@ -242,6 +242,7 @@ namespace CriticalMass.Runtime.Menus
             for (int i = 0; i < result.Length; i++)
                 if (result[i] == null)
                     result[i] = new ClassWords { Id = ClassIds.All[i], Name = ClassIds.All[i].ToString(), Role = "", Bio = "", Difficulty = 1, Abilities = new AbilityWords[0] };
+            B13ClassWords.Apply(result);   // b13-v: the Miner mines and the Builder builds walls (pack or built in)
             _classes = result;
         }
 
@@ -407,6 +408,71 @@ namespace CriticalMass.Runtime.Menus
 {""id"":""ll-06"",""text"":""Azure fights under the shield. Crimson fights under the flame. Both fight uphill.""}]}";
     }
 
+    // ===================================================================================================== b13 words
+
+    /// <summary>
+    /// b13-v: the batch 13 class words, laid over whichever source the cards loaded (the words pack or the built-in copy),
+    /// so every card reads the new jobs: the Miner mines ore for the Blacksmith hut and hauls it (no more barricades or
+    /// digging), the Builder builds walls and blocks with F and puts stairs and bridges down with Space. Players read
+    /// STAIRS where the sim says ladder. The attack lines and the cooldown numbers stay as loaded.
+    /// </summary>
+    public static class B13ClassWords
+    {
+        public const string MinerRole = "Mines ore for the hut.";
+        public const string MinerBio = "Mines ore to upgrade your team's Blacksmith hut, and dark crystals that can turn the Kaiju wild.";
+        public const string MinerMine = "MINE: hold near an ore vein (up to 3 ore).";
+        public const string MinerHaul = "HAUL: run faster with your load for 5 s.";
+        public const string MinerBank = "Bank ore at the hut.";
+        public const string BuilderRole = "Builds walls and stairs.";
+        public const string BuilderBio = "Builds walls and blocks for cover and traps, stairs over walls and bridges over gaps.";
+        public const string BuilderBuild = "BUILD the selected piece where the outline shows.";
+        public const string BuilderSwitch = "Short wall, tall wall (hut level 2), block. A block dropped in a hole fills it.";
+        public const string BuilderStairs = "STAIRS over a wall, BRIDGE over a gap.";
+        public const string Dodge = "DODGE: a quick dash; you cannot be hit for a moment. 3 s to recharge.";
+        public const string Jump = "JUMP clears gaps and short walls.";
+
+        public static void Apply(ClassWords[] all)
+        {
+            if (all == null) return;
+            int m = (int)ClassId.Miner, b = (int)ClassId.Builder;
+            if (m < all.Length && all[m] != null)
+            {
+                ClassWords w = all[m];
+                AbilityWords attack = Find(w, "attack");
+                string cd = Find(w, "ability")?.Cooldown ?? "";
+                w.Role = MinerRole;
+                w.Bio = MinerBio;
+                w.Abilities = new[]
+                {
+                    attack ?? new AbilityWords { Input = "attack", Name = "Pick-Hammer", Text = "A short, heavy swing.", Cooldown = "", NeedsRule = "" },
+                    new AbilityWords { Input = "throw", Name = "Mine", Text = MinerMine + " " + MinerBank, Cooldown = "", NeedsRule = "" },
+                    new AbilityWords { Input = "ability", Name = "Haul", Text = MinerHaul, Cooldown = cd, NeedsRule = "" },
+                };
+                w.Early = false;
+            }
+            if (b < all.Length && all[b] != null)
+            {
+                ClassWords w = all[b];
+                w.Role = BuilderRole;
+                w.Bio = BuilderBio;
+                w.Abilities = new[]
+                {
+                    new AbilityWords { Input = "throw", Name = "Build", Text = BuilderBuild, Cooldown = "", NeedsRule = "" },
+                    new AbilityWords { Input = "switch", Name = "Switch Piece", Text = BuilderSwitch, Cooldown = "", NeedsRule = "" },
+                    new AbilityWords { Input = "ability", Name = "Stairs and Bridges", Text = BuilderStairs, Cooldown = "", NeedsRule = "" },
+                };
+                w.Early = false;
+            }
+        }
+
+        static AbilityWords Find(ClassWords w, string input)
+        {
+            if (w.Abilities == null) return null;
+            foreach (AbilityWords a in w.Abilities) if (a != null && a.Input == input) return a;
+            return null;
+        }
+    }
+
     // ===================================================================================================== glyphs
 
     /// <summary>Key glyph text for a words-pack input on a device, from the CURRENT bindings (after rebinding).</summary>
@@ -421,6 +487,8 @@ namespace CriticalMass.Runtime.Menus
                 case "ability": return "Ability";
                 case "interact": return "Interact";
                 case "throw": return "DigPlace";
+                case "switch": return "SwitchDigPlace";   // b13-v: the Builder's piece switch
+                case "dodge": return "Dodge";             // b13-v: every class's dodge
                 default: return "";
             }
         }

@@ -149,7 +149,7 @@ namespace CriticalMass.Runtime.Onboarding
             // shows both. Non-miners hear that miners reshape the ground; everyone knocks a pillar down.
             new TrialStep
             {
-                Id = "terrain", Prompt = "Miners dig the ground up and drop it anywhere. Try one next match.", Goal = TrialGoal.Timer,
+                Id = "terrain", Prompt = "Builders put up walls and blocks, Miners mine ore for the hut. Try one next match.", Goal = TrialGoal.Timer,
                 Target = TrialTarget.Self, Param = 5, NotClass = ClassId.Miner,
             },
             new TrialStep
@@ -180,7 +180,7 @@ namespace CriticalMass.Runtime.Onboarding
             },
             new TrialStep
             {
-                Id = "corruption", Prompt = "Violet ore is corruption. Feed the egg enough and it hatches berserk.", Goal = TrialGoal.Timer,
+                Id = "corruption", Prompt = "Violet crystals are corruption. Feed them to the egg and the Kaiju may go wild.", Goal = TrialGoal.Timer,
                 Target = TrialTarget.CorruptionNode, Param = 6,
             },
         };

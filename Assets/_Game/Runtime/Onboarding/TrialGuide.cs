@@ -38,6 +38,7 @@ namespace CriticalMass.Runtime.Onboarding
         float _cheerUntil = -1f;
         int _cheers;
         bool _wasAlive = true;
+        int _hint = -1, _hintMask;   // b13-v: the first-match dodge / mine / build hint on screen, and those shown ever
         bool _finishedShown;
         float _skipDownAt = -1f;
         bool _skipHoldFired;
@@ -73,6 +74,8 @@ namespace CriticalMass.Runtime.Onboarding
             _finishedShown = false;
             _cheerUntil = -1f;
             _wasAlive = true;
+            _hint = -1;
+            _hintMask = B13Hints.ShownMask();
             ControlBindings.ActiveDeviceChanged += OnDevice;
             Runner.Begin(Driver.World);
         }
@@ -194,6 +197,7 @@ namespace CriticalMass.Runtime.Onboarding
                 else if (_lastDevice != (int)ControlBindings.ActiveDevice && _cheerUntil < 0f && me.Alive) SayStep();
                 else if (!paused && me.Alive && _cheerUntil < 0f && _stepSaidAt >= 0f) IdleFaces();
             }
+            if (!paused) TickHints(w);
             _wasAlive = me.Alive;
 
             // b11-af (results chevron): the green chevron and the edge pointer never outlive the match. A guided match that
@@ -204,6 +208,26 @@ namespace CriticalMass.Runtime.Onboarding
                 return;
             }
             UpdateArrow(w, me.Alive);
+        }
+
+        /// <summary>b13-v: a first-time hint (dodge, mine, build) when the player can first do it; doing it brings the step back.</summary>
+        void TickHints(World w)
+        {
+            if (_mascot == null || _cheerUntil > 0f) return;
+            int id = TrialChecks.Player;
+            if (_hint >= 0)
+            {
+                InputAction f = InputSystem.actions != null ? InputSystem.actions.FindAction("DigPlace", false) : null;
+                if (B13Hints.Done(_hint, w, id, f != null && f.WasPressedThisFrame())) { _hint = -1; SayStep(); }
+                return;
+            }
+            int due = B13Hints.Due(_hintMask, w, id);
+            if (due < 0) return;
+            _hint = due;
+            _hintMask |= 1 << due;
+            B13Hints.MarkShown(due);
+            _mascot.SayText(B13Hints.Line(due, ControlBindings.ActiveDevice));
+            _mascot.React(MascotReaction.Point);
         }
 
         /// <summary>

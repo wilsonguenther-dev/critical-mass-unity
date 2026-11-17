@@ -25,6 +25,74 @@ namespace CriticalMass.Runtime.Hud.Mechanics
     /// "BLOCKED" pops, and the minimap and full-map markers with their legend rows. Team feed lines go to the ping feed.
     /// View only; never writes the sim. Added to the driver by MechanicsWorldViewInstaller.
     /// </summary>
+    /// <summary>
+    /// b13-v: the words and places of the hut badge and the corruption meter (pure; tests). The badge ("HUT 3 +15%", "ore
+    /// 4/18": banked / next cost) sits right of the match cluster, the meter under it; both are clear of the match and Kaiju
+    /// clusters, the kill feed and the centre stack at every screen shape (HudZones registers them as panels).
+    /// </summary>
+    public static class B13Hud
+    {
+        public static readonly Rect HutRect = new Rect(HudLayout.RefRect(HudCluster.Match).xMax + HudZones.ColumnGap, 10f,
+            HudLayout.RefRect(HudCluster.Kaiju).x - HudZones.ColumnGap - (HudLayout.RefRect(HudCluster.Match).xMax + HudZones.ColumnGap), 54f);
+        public static readonly Rect CorruptionRect = new Rect(HutRect.x, HutRect.yMax + 6f, HutRect.width, 60f);
+        static readonly string[] HutLines = { "HUT 0 +0%", "HUT 1 +5%", "HUT 2 +10%", "HUT 3 +15%", "HUT 4 +20%", "HUT 5 +25%" };
+        /// <summary>The chance bar is full at the 70% cap.</summary>
+        public const double ChanceCap = 0.70;
+
+        public static string HutLine(int level) => HutLines[Mathf.Clamp(level, 0, HutLines.Length - 1)];
+        public static string OreLine(int banked, int nextCost) => nextCost <= 0 ? "max level" : "ore " + banked + "/" + nextCost;
+        public static bool MeterShown(bool on, double pool) => on && pool > 0;
+        public static string ChanceLine(double chance) => "CORRUPTION " + Math.Round(Math.Max(0, chance) * 100).ToString("0", CultureInfo.InvariantCulture) + "%";
+        public static string PoolLine(double pool)
+        {
+            double r = Math.Round(pool, 1);
+            string n = r.ToString(r == Math.Floor(r) ? "0" : "0.0", CultureInfo.InvariantCulture);
+            return n + (r == 1 ? " crystal" : " crystals");
+        }
+        public static int SecondsUntil(int tick, int now, double hz) => hz > 0 ? Math.Max(0, (int)Math.Ceiling((tick - now) / hz)) : 0;
+        public static string RollLine(int seconds, bool hatched)
+        {
+            if (seconds < 0) return string.Empty;
+            string t = (seconds / 60).ToString(CultureInfo.InvariantCulture) + ":" + (seconds % 60).ToString("00", CultureInfo.InvariantCulture);
+            return (hatched ? "roll when it wakes " : "roll at hatch ") + t;
+        }
+        public static float ChanceBar01(double chance) => Mathf.Clamp01((float)(chance / ChanceCap));
+    }
+
+    /// <summary>b13-v: the badge and meter texts, rebuilt only when their value changes (no allocation while unchanged).</summary>
+    public sealed class B13HudCache
+    {
+        int _banked = int.MinValue, _cost = int.MinValue, _pct = int.MinValue, _poolTenths = int.MinValue, _secs = int.MinValue;
+        bool _hatched;
+        string _ore = "", _chance = "", _pool = "", _roll = "";
+
+        public string Ore(int banked, int cost)
+        {
+            if (banked != _banked || cost != _cost) { _banked = banked; _cost = cost; _ore = B13Hud.OreLine(banked, cost); }
+            return _ore;
+        }
+
+        public string Chance(double chance)
+        {
+            int pct = (int)Math.Round(Math.Max(0, chance) * 100);
+            if (pct != _pct) { _pct = pct; _chance = B13Hud.ChanceLine(chance); }
+            return _chance;
+        }
+
+        public string Pool(double pool)
+        {
+            int t = (int)Math.Round(pool * 10);
+            if (t != _poolTenths) { _poolTenths = t; _pool = B13Hud.PoolLine(pool); }
+            return _pool;
+        }
+
+        public string Roll(int seconds, bool hatched)
+        {
+            if (seconds != _secs || hatched != _hatched) { _secs = seconds; _hatched = hatched; _roll = B13Hud.RollLine(seconds, hatched); }
+            return _roll;
+        }
+    }
+
     public sealed class DepthHud : MonoBehaviour
     {
         public const int SortingOrder = 14;
@@ -43,6 +111,16 @@ namespace CriticalMass.Runtime.Hud.Mechanics
 
         Canvas _canvas;
         RectTransform _root, _space;
+
+        // b13-v: the team's hut badge and the corruption meter (top bar, right of the match cluster), the roll banner
+        RectTransform _hut, _corrupt;
+        Text _hutLevel, _hutOre, _corruptHead, _corruptPool, _corruptRoll;
+        VectorShape _corruptFill;
+        readonly B13HudCache _b13 = new B13HudCache();
+        int _rollCursor = -1, _rollEpoch = -1;
+        /// <summary>b13-v: shown flags (tests and captures).</summary>
+        public bool HutShown => _hut != null && _hut.gameObject.activeSelf;
+        public bool CorruptionShown => _corrupt != null && _corrupt.gameObject.activeSelf;
         SimDriverBehaviour _driver;
         CombatLog _log;
 
@@ -198,6 +276,8 @@ namespace CriticalMass.Runtime.Hud.Mechanics
             Chip(_obj, "Mark", ShapeKind.TriangleRight, 14f, 11f, 16f, 18f, brass, 3f);
             _objText = MenuUi.Label(_obj, "Text", CMTokens.Ui, 20, cream, TextAnchor.MiddleLeft, 40f, 0f, 708f, 40f, "", 2f);
             _obj.gameObject.SetActive(false);
+
+            BuildB13(cream, brass, panel);
 
             // team stock: three chips under the objective (own team only)
             _stock = MenuUi.Rt(_space, "Team Stock");
@@ -380,6 +460,7 @@ namespace CriticalMass.Runtime.Hud.Mechanics
             TickGather(w, me, cam, on);
             TickCoins(w, view, me, cam, on, real);
             TickPower(w, me, on);
+            TickB13(w, me);
             // fix/hud-containment-3 (by eye: name tags over the knock-out recap): no world name tags under a full panel
             TickTags(w, view, me, cam, on && !HudZones.Blocked(HudZone.Callout, HudPriority.Lockout));
             TickFloats(w, view, cam);
@@ -583,6 +664,79 @@ namespace CriticalMass.Runtime.Hud.Mechanics
                 if (!fly) continue;
                 float t = PowerTimers.Fly01(age, life);
                 _coinFly[i].anchoredPosition = Vector2.Lerp(from, target, t) + Vector2.up * (FeelGate.ReduceMotion ? 0f : 120f * t * (1f - t));
+            }
+        }
+
+        // ------------------------------------------------------------------ b13-v: hut badge, corruption meter, roll banner
+
+        void BuildB13(Color cream, Color brass, Color panel)
+        {
+            Rect h = B13Hud.HutRect, c = B13Hud.CorruptionRect;
+            _hut = MenuUi.Rt(_space, "Hut Badge");
+            HudZones.RegisterPanel(_hut);
+            MenuUi.Place(_hut, h.x, h.y, h.width, h.height);
+            VectorShape hp = Chip(_hut, "Panel", ShapeKind.RoundRect, 0f, 0f, h.width, h.height, CMTokens.WithAlpha(panel, 0.92f), 12f);
+            hp.RimPx = 2f;
+            hp.RimColor = brass;
+            _hutLevel = MenuUi.Fit(MenuUi.Label(_hut, "Level", CMTokens.Display, 20, brass, TextAnchor.MiddleCenter, 6f, 2f, h.width - 12f, 28f, "", 2f), 12);
+            _hutOre = MenuUi.Fit(MenuUi.Label(_hut, "Ore", CMTokens.Mono, 16, cream, TextAnchor.MiddleCenter, 6f, 28f, h.width - 12f, 24f, "", 1.5f), 10);
+            _hut.gameObject.SetActive(false);
+
+            _corrupt = MenuUi.Rt(_space, "Corruption Meter");
+            HudZones.RegisterPanel(_corrupt);
+            MenuUi.Place(_corrupt, c.x, c.y, c.width, c.height);
+            VectorShape cp = Chip(_corrupt, "Panel", ShapeKind.RoundRect, 0f, 0f, c.width, c.height, CMTokens.WithAlpha(panel, 0.92f), 12f);
+            cp.RimPx = 2f;
+            cp.RimColor = CMTokens.Corruption.Color;
+            _corruptFill = Chip(_corrupt, "Chance", ShapeKind.RoundRect, 6f, c.height - 9f, c.width - 12f, 5f, CMTokens.Corruption.Color, 2f);
+            _corruptFill.OutlinePx = 0f;
+            _corruptHead = MenuUi.Fit(MenuUi.Label(_corrupt, "Head", CMTokens.Display, 15, cream, TextAnchor.MiddleCenter, 6f, 2f, c.width - 12f, 20f, "", 1.5f), 10);
+            _corruptPool = MenuUi.Fit(MenuUi.Label(_corrupt, "Pool", CMTokens.Ui, 14, cream, TextAnchor.MiddleCenter, 6f, 21f, c.width - 12f, 18f, "", 1.5f), 10);
+            _corruptRoll = MenuUi.Fit(MenuUi.Label(_corrupt, "Roll", CMTokens.Ui, 13, CMTokens.WithAlpha(cream, 0.85f), TextAnchor.MiddleCenter, 6f, 38f, c.width - 12f, 17f, "", 1.5f), 9);
+            _corrupt.gameObject.SetActive(false);
+        }
+
+        void TickB13(World w, int me)
+        {
+            TeamId team = w.Actors[me].Team;
+            bool hut = Blacksmith.On(w);
+            if (_hut.gameObject.activeSelf != hut) _hut.gameObject.SetActive(hut);
+            if (hut)
+            {
+                HudText.Set(_hutLevel, B13Hud.HutLine(Blacksmith.Level(w, team)));
+                HudText.Set(_hutOre, _b13.Ore(Blacksmith.OreBanked(w, team), Blacksmith.NextCost(w, team)));
+            }
+            bool corruptOn = CriticalMass.Sim.Core.Corruption.On(w);
+            double pool = corruptOn ? CriticalMass.Sim.Core.Corruption.Pool(w) : 0;
+            bool meter = B13Hud.MeterShown(corruptOn, pool);
+            if (_corrupt.gameObject.activeSelf != meter) _corrupt.gameObject.SetActive(meter);
+            if (meter)
+            {
+                double chance = CriticalMass.Sim.Core.Corruption.Chance(w);
+                HudText.Set(_corruptHead, _b13.Chance(chance));
+                HudText.Set(_corruptPool, _b13.Pool(pool));
+                int next = CriticalMass.Sim.Core.Corruption.NextRollTick(w);
+                bool hatched = w.Kaiju != null && w.Kaiju.State != KaijuState.Egg;
+                HudText.Set(_corruptRoll, _b13.Roll(next < 0 ? -1 : B13Hud.SecondsUntil(next, w.Tick, w.Config.SimHz), hatched));
+                float f = B13Hud.ChanceBar01(chance);
+                RectTransform fr = _corruptFill.rectTransform;
+                float fw = Mathf.Max(0.01f, (B13Hud.CorruptionRect.width - 12f) * f);
+                if (Mathf.Abs(fr.sizeDelta.x - fw) > 0.5f) MenuUi.Place(fr, 6f, B13Hud.CorruptionRect.height - 9f, fw, 5f);
+            }
+            ReadRolls(w);
+        }
+
+        /// <summary>A CorruptionRoll event raises the result banner: the Kaiju is wild (Berserk) on the tick it rolled, or not.</summary>
+        void ReadRolls(World w)
+        {
+            if (w.Epoch != _rollEpoch || _rollCursor < 0 || _rollCursor > w.EventHead) { _rollEpoch = w.Epoch; _rollCursor = w.EventHead; return; }
+            if (w.EventHead - _rollCursor > World.EventCapacity) _rollCursor = w.EventHead - World.EventCapacity;
+            for (; _rollCursor < w.EventHead; _rollCursor++)
+            {
+                SimEvent e = w.Events[_rollCursor % World.EventCapacity];
+                if (e == null || e.Type != SimEventType.CorruptionRoll) continue;
+                bool wild = w.Kaiju != null && w.Kaiju.State == KaijuState.Berserk;
+                Banner.Show(Banner.CorruptionRollSpec(wild));
             }
         }
 

@@ -287,8 +287,8 @@ namespace CriticalMass.Runtime.Tests
             // skills-and-walls-audit-1: the Miner's Space skill places a barricade; a Healer was labelled BUILDER on the
             // info cards and the full map because their class lists stopped at five.
             string[][] slots = CriticalMass.Runtime.Hud.GameHud.AbilitySlotNames();
-            Assert.AreEqual("BARRICADE", slots[1][(int)ClassId.Miner]);
-            Assert.AreEqual("BARRICADE", CriticalMass.Runtime.Progression.ProgressionWords.AbilityNames[(int)ClassId.Miner]);
+            Assert.AreEqual("HAUL", slots[1][(int)ClassId.Miner]);
+            Assert.AreEqual("HAUL", CriticalMass.Runtime.Progression.ProgressionWords.AbilityNames[(int)ClassId.Miner]);
             foreach (string[] slot in slots) CollectionAssert.DoesNotContain(slot, "WALL BREAK");
             Assert.AreEqual(6, CriticalMass.Runtime.Hud.GameHud.ClassNames.Length, "one name per class");
             Assert.AreEqual(CriticalMass.Sim.Core.HealerNames.ClassName, CriticalMass.Runtime.Hud.GameHud.ClassNames[(int)ClassId.Healer]);

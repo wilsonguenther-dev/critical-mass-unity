@@ -72,6 +72,16 @@ namespace CriticalMass.Runtime.Codex
                 t.Line2 = MenuUi.Label(rt, "Line 2", CMTokens.Ui, UiScale.TypeSmall, CMTokens.WarmCream.Color, TextAnchor.MiddleLeft, 100f, 94f, TileW - 120f, 32f, "", 2f);
                 _tiles[i] = t;
             }
+            // b13: the hut, the dark crystals and what hatches, read from LoreText (three small lines under the relic grid).
+            string[] notes =
+            {
+                LoreText.KaijuTypesTitle + ": " + LoreText.KaijuTypesLead,
+                LoreText.HutTitle + ": " + LoreText.HutLine,
+                LoreText.CorruptionTitle + ": " + LoreText.CorruptionLine,
+            };
+            for (int k = 0; k < notes.Length; k++)
+                MenuUi.Fit(MenuUi.Label(page, "B13 Note " + (k + 1), CMTokens.Ui, UiScale.TypeSmall, CMTokens.WarmCream.Color, TextAnchor.MiddleLeft,
+                    PauseMenu.ContentX, GridY + 4 * (TileH + GapY) + 2f + k * 34f, PauseMenu.PanelW - 80f, 32f, notes[k], 2f), 14);
             Refresh();
             return back;
         }

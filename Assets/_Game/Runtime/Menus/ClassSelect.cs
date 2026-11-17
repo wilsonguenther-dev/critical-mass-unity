@@ -141,6 +141,8 @@ namespace CriticalMass.Runtime.Menus
         readonly List<ClassCard> _respawnTiles = new List<ClassCard>(5);
         ClassCard _detail;
         MenuItem _confirm;
+        MenuItem _howTo;   // b13-v: SEE HOW TO PLAY opens the CHARACTERS screen on the focused class
+        const float HowW = 230f;
         Text _hint, _respawnLine, _setupTitle;
         RawImage _previewImage;
         Text _previewNote;
@@ -266,7 +268,11 @@ namespace CriticalMass.Runtime.Menus
                 12f, PrevH - 52f, PrevW - 24f, 36f, "DRAG TO TURN   ·   CLICK TO CUSTOMISE", 2f);
             _previewNote.raycastTarget = false;
             _previewNote.color = CMTokens.WithAlpha(Cream, 0.7f);
-            _confirm = MenuUi.Item(_setupPage, "Confirm", PrevX, PrevY + PrevH + 20f, PrevW, 70f, "PLAY AS WARRIOR", MenuItem.Kind.Button, UiScale.TypeHeading, true, CMTokens.Display);
+            _confirm = MenuUi.Item(_setupPage, "Confirm", PrevX, PrevY + PrevH + 20f, PrevW - HowW - 12f, 70f, "PLAY AS WARRIOR", MenuItem.Kind.Button, UiScale.TypeHeading, true, CMTokens.Display);
+            _howTo = MenuUi.Item(_setupPage, "How To Play", PrevX + PrevW - HowW, PrevY + PrevH + 20f, HowW, 70f, "SEE HOW TO PLAY", MenuItem.Kind.Button, UiScale.TypeLead, true, CMTokens.Display);
+            _howTo.Body.Radius = 16f;
+            ClassCard.Fit(_howTo.Label, 14);
+            _howTo.Submitted = OpenHowTo;
             _confirm.Body.Radius = 16f;
             ClassCard.Fit(_confirm.Label, 18);
             _confirm.Submitted = () => ConfirmSetup(Focused);
@@ -319,7 +325,8 @@ namespace CriticalMass.Runtime.Menus
 
         void UpdateConfirmUp()
         {
-            _confirm.navigation = new Navigation { mode = Navigation.Mode.Explicit, selectOnUp = _setupTiles[(int)Focused].Tile };
+            _confirm.navigation = new Navigation { mode = Navigation.Mode.Explicit, selectOnUp = _setupTiles[(int)Focused].Tile, selectOnRight = _howTo };
+            if (_howTo != null) _howTo.navigation = new Navigation { mode = Navigation.Mode.Explicit, selectOnUp = _setupTiles[(int)Focused].Tile, selectOnLeft = _confirm };
         }
 
         // ---------------------------------------------------------------- open / close
@@ -474,7 +481,7 @@ namespace CriticalMass.Runtime.Menus
             if (_hint == null) return;
             bool pad = ControlBindings.ActiveDevice == ControlDevice.Gamepad;
             string s;
-            if (Mode == SelectMode.Setup) s = pad ? "A CHOOSE   ·   B BACK   ·   R STICK TURNS" : "ENTER OR CLICK TO CHOOSE   ·   ESC BACK   ·   DRAG TO TURN";
+            if (Mode == SelectMode.Setup) s = pad ? "A CHOOSE   ·   Y HOW TO PLAY   ·   B BACK   ·   R STICK TURNS" : "ENTER OR CLICK TO CHOOSE   ·   H HOW TO PLAY   ·   ESC BACK   ·   DRAG TO TURN";
             else s = pad ? "D-PAD PICKS   ·   A CONFIRMS" : "1-6 OR CLICK TO PICK";
             HudText.Set(_hint, s);
         }
@@ -547,8 +554,15 @@ namespace CriticalMass.Runtime.Menus
             // Owner walk 1: the Barracks opened from the class card own the input until they close (and the closing press
             // must not also close this screen).
             if (CharacterPanel.IsOpen || CharacterPanel.ClosedFrame >= Time.frameCount - 1) return;
+            // b13-v: the CHARACTERS screen opened from here owns the input the same way
+            if (Characters.CharactersScreen.IsOpenNow || Characters.CharactersScreen.ClosedFrame >= Time.frameCount - 1) return;
             Keyboard kb = Keyboard.current;
             Gamepad gp = Gamepad.current;
+            if ((kb != null && kb.hKey.wasPressedThisFrame) || (gp != null && gp.buttonNorth.wasPressedThisFrame))
+            {
+                OpenHowTo();
+                return;
+            }
             if ((kb != null && kb.escapeKey.wasPressedThisFrame) || (gp != null && gp.buttonEast.wasPressedThisFrame))
             {
                 Action back = _onBack;
@@ -584,6 +598,14 @@ namespace CriticalMass.Runtime.Menus
             if (keyLeft != keyRight) return keyLeft ? -1f : 1f;
             if (keyLeft) return 0f;
             return Mathf.Abs(stickX) > 0.2f ? Mathf.Clamp(stickX, -1f, 1f) : 0f;
+        }
+
+        /// <summary>b13-v: "See how to play": the CHARACTERS screen over this one, on the focused class; back returns here.</summary>
+        internal void OpenHowTo()
+        {
+            if (Mode != SelectMode.Setup || CharacterPanel.IsOpen || Characters.CharactersScreen.IsOpenNow) return;
+            ClassId cls = Focused;
+            Characters.CharactersScreen.ShowFor(cls, () => Select(_setupTiles[(int)cls].Tile));
         }
 
         /// <summary>Owner walk 1: a click on the class card's model opens the Barracks for that class over this screen.</summary>

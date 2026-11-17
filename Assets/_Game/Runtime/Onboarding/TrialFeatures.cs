@@ -50,13 +50,17 @@ namespace CriticalMass.Runtime.Onboarding
             return Enum.IsDefined(typeof(SimEventType), TerraformEvent);
         }
 
+        /// <summary>b13 (item H): with the hut rule on (the default Full config) the Miner no longer digs or places, so the
+        /// Miner-only Terraform steps would stall; they are skipped. Read from the default config (the trial runs Full).</summary>
+        public static bool MinerOnlyMines() => GameConfig.CreateDefault().Depth.Hut.On;
+
         /// <summary>True when the mechanic a step needs is exposed.</summary>
         public static bool Has(TrialFeature f)
         {
             switch (f)
             {
                 case TrialFeature.Jump: return HasJump();
-                case TrialFeature.Terraform: return HasTerraform();
+                case TrialFeature.Terraform: return HasTerraform() && !MinerOnlyMines();   // b13: with the hut rule the Miner mines, so his dig/place steps are off
                 case TrialFeature.Map: return HasMap();
                 default: return true;
             }

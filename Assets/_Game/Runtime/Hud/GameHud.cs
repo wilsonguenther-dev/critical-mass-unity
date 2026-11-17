@@ -396,7 +396,7 @@ namespace CriticalMass.Runtime.Hud
         };
         /// <summary>skills-and-walls-audit-1: the Miner's Space skill places a barricade (Barricades.cs); breaking walls is
         /// his normal swing. The HUD said WALL BREAK.</summary>
-        public const string MinerAbility = "BARRICADE";
+        public const string MinerAbility = "HAUL";   // b13: the Miner's Space is HAUL (item H)
         static readonly string[] AttackNames =
         {
             // feat/light-weapons-1: the Demolitions slot names her pry bar (was NO SWORD), the Builder's his mallet; the

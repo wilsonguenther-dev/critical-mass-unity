@@ -347,6 +347,50 @@ namespace CriticalMass.Runtime.Tests
             }
         }
 
+        /// <summary>b13-v: every new word of the batch 13 mechanics (class cards, the CHARACTERS slides, the codex, the HUD
+        /// banner) reads clean: no technology or other games' names, none of the banned abbreviations, and short lines.</summary>
+        [Test]
+        public void B13WordsReadClean()
+        {
+            var lines = new List<string>
+            {
+                CriticalMass.Runtime.Menus.B13ClassWords.MinerRole, CriticalMass.Runtime.Menus.B13ClassWords.MinerBio,
+                CriticalMass.Runtime.Menus.B13ClassWords.MinerMine, CriticalMass.Runtime.Menus.B13ClassWords.MinerHaul,
+                CriticalMass.Runtime.Menus.B13ClassWords.MinerBank, CriticalMass.Runtime.Menus.B13ClassWords.BuilderRole,
+                CriticalMass.Runtime.Menus.B13ClassWords.BuilderBio, CriticalMass.Runtime.Menus.B13ClassWords.BuilderBuild,
+                CriticalMass.Runtime.Menus.B13ClassWords.BuilderSwitch, CriticalMass.Runtime.Menus.B13ClassWords.BuilderStairs,
+                CriticalMass.Runtime.Menus.B13ClassWords.Dodge, CriticalMass.Runtime.Menus.B13ClassWords.Jump,
+                CriticalMass.Runtime.Progression.ProgressionWords.HutLine, CriticalMass.Runtime.Progression.ProgressionWords.CorruptionLine,
+                CriticalMass.Runtime.Progression.ProgressionWords.WildReason, CriticalMass.Runtime.Progression.ProgressionWords.ResistedReason,
+                CriticalMass.Runtime.Codex.LoreText.KaijuTypesLead,
+            };
+            foreach (string[] k in CriticalMass.Runtime.Codex.LoreText.KaijuTypeLines) lines.Add(k[2]);
+            foreach (var c in CriticalMass.Runtime.Menus.Characters.CharacterShowcaseData.All)
+            {
+                lines.Add(c.Role);
+                lines.Add(c.Summary);
+                foreach (var sl in c.Slides) lines.Add(sl.Line);
+                Assert.LessOrEqual(Words(c.Role), 5, c.Name + " role line");
+            }
+            foreach (string line in lines)
+            {
+                string lower = line.ToLowerInvariant();
+                foreach (string bad in Forbidden)
+                    Assert.IsFalse(Regex.IsMatch(lower, @"\b" + Regex.Escape(bad) + @"\b"), $"'{bad}' in \"{line}\"");
+                Assert.IsFalse(CriticalMass.Runtime.Input.InputGlyphs.ContainsBannedAbbreviation(line), line);
+                Assert.LessOrEqual(Words(line), 40, line);
+                Debug.Log("[B13Words] " + Words(line) + " words (limit 40): " + line);
+            }
+            var miner = CriticalMass.Runtime.Menus.LoreWords.Class(ClassId.Miner);
+            var builder = CriticalMass.Runtime.Menus.LoreWords.Class(ClassId.Builder);
+            Debug.Log("[B13Words] Miner card: " + miner.Role + " | " + string.Join(" | ", Array.ConvertAll(miner.Abilities, x => x.Input + " " + x.Name)));
+            Debug.Log("[B13Words] Builder card: " + builder.Role + " | " + string.Join(" | ", Array.ConvertAll(builder.Abilities, x => x.Input + " " + x.Name)));
+            Assert.AreEqual(CriticalMass.Runtime.Menus.B13ClassWords.MinerRole, miner.Role);
+            Assert.AreEqual(3, miner.Abilities.Length);
+            Assert.AreEqual(3, builder.Abilities.Length);
+            foreach (var x in builder.Abilities) Assert.AreNotEqual("Ladder", x.Name, "players read STAIRS");
+        }
+
         static void CheckRuleFlag(string what, string text, string needsRule)
         {
             if (!string.IsNullOrEmpty(needsRule))

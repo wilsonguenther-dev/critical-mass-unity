@@ -60,13 +60,13 @@ namespace CriticalMass.Runtime.Progression
         {
             "Front line. Holds the hill and turns blows aside with a shield.",
             "Harvester. Carries the most biomass and roots anyone who chases.",
-            "Sapper. Breaks walls open and throws up barricades.",
+            "Prospector. Mines ore for the team's Blacksmith hut and dark crystals for the Kaiju.",   // b13-v
             "Blast expert. Her attack throws TNT; her ability lays mines.",
-            "Ladders and rope bridges for the whole team; anyone can carry them.",
+            "Walls and blocks for cover and traps, stairs over walls and bridges over gaps.",   // b13-v
             "Battle healer. Mends allies, heals in a burst and purifies the shrine. Never deals damage.",
         };
 
-        public static readonly string[] AbilityNames = { "SHIELD", "ROOTS", CriticalMass.Runtime.Hud.GameHud.MinerAbility, "MINE", "BUILD", "HEALING WINGS" };
+        public static readonly string[] AbilityNames = { "SHIELD", "ROOTS", CriticalMass.Runtime.Hud.GameHud.MinerAbility, "MINE", "STAIRS", "HEALING WINGS" };
 
         public static string ClassName(ClassId c) => ClassNames[(int)c];
 
@@ -93,14 +93,22 @@ namespace CriticalMass.Runtime.Progression
                 case ClassId.Farmer:
                     return "Throw a root seed up to " + N(a.FarmerRoots.CastRange) + " m: enemies within " + N(a.FarmerRoots.Radius) +
                            " m move at " + Pct(a.FarmerRoots.SlowMultiplier) + " for " + N(a.FarmerRoots.SlowSeconds) + " s.";
-                case ClassId.Miner:
-                    return "Each pick hit knocks a breakable wall down one stage (reach " + N(a.MinerWallBreak.Reach) +
-                           " m). Barricades: up to " + N(a.MinerBarricade.MaxActivePerMiner) + ", " + N(a.MinerBarricade.MaxHp) +
-                           " HP, " + N(a.MinerBarricade.LifetimeSeconds) + " s.";
+                case ClassId.Miner:   // b13-v: the Miner mines and hauls (no barricades, no digging)
+                    return CriticalMass.Runtime.Menus.B13ClassWords.MinerHaul + " " + CriticalMass.Runtime.Menus.B13ClassWords.MinerMine;
+                case ClassId.Builder:   // b13-v: players read STAIRS where the sim says ladder
+                    return CriticalMass.Runtime.Menus.B13ClassWords.BuilderStairs + " " + CriticalMass.Runtime.Menus.B13ClassWords.BuilderBuild;
                 default:
                     return "Arrives in a later build.";
             }
         }
+
+        // ---- b13-v: the words of the new mechanics (one place; the HUD, the cards, the codex and the tutorial read these)
+        public const string DodgeLine = CriticalMass.Runtime.Menus.B13ClassWords.Dodge;
+        public const string JumpLine = CriticalMass.Runtime.Menus.B13ClassWords.Jump;
+        public const string HutLine = "Each hut level gives your whole team +5% health, damage and healing. Only Miners upgrade it. It keeps its level when you die.";
+        public const string CorruptionLine = "Carry dark crystals from the south island to the egg, or to the Kaiju while it is knocked out. More crystals, better odds, never certain. If it works the Kaiju goes wild and turns on the leading team.";
+        public const string WildHeadline = "THE KAIJU GOES WILD", ResistedHeadline = "THE KAIJU RESISTED";
+        public const string WildReason = "It turns on the leading team and holds the hill for nobody.", ResistedReason = "The crystals are spent. Feed more for the next roll.";
 
         public static string Seconds(double s) => N(s) + " S";
         public static string Number(double v) => N(v);
