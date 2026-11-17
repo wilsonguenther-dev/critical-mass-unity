@@ -7,7 +7,7 @@
 #                        [--quality High] [--results-seconds 10] [--timeout S] [--keep-frames] [--scout-only]
 # --scout A-B: sim-only matches on seeds A..B first (-batchmode -nographics -simScout, seconds each, no window) and
 #   records the best one: the Kaiju hatched, both teams hold the hill, the closest final score (ties: more knock-outs).
-# Output: FINAL_DIR/CriticalMass-match-<version>-1080p.mp4 (H.264 CRF 18 + AAC 192k) and -720p-text.mp4 (two-pass,
+# Output: FINAL_DIR/CriticalMass-match-<version>-1080p.mp4 (H.264 CRF 19 capped at 14 Mb/s + AAC 192k) and -720p-text.mp4 (two-pass,
 #   sized under 95 MB); OUT keeps Player.log, video.json, scout.txt (frames are deleted unless --keep-frames).
 # The recording runs inside ~/bin/cm-heavy's Unity slot. Exit: 0 ok, 1 failed, 66 no app, 64 usage, 124 timeout.
 set -euo pipefail
@@ -102,10 +102,10 @@ read -r RATE CH < <(python3 -I -c 'import json,sys; j=json.load(open(sys.argv[1]
 NAME="CriticalMass-match-$VERSION"; M1080="$FINAL/$NAME-1080p.mp4"; M720="$FINAL/$NAME-720p-text.mp4"
 VF="format=yuv420p"; (( VFLIP )) && VF="vflip,$VF"
 ffmpeg -hide_banner -loglevel error -y -framerate "$FPS" -i "$CAP/frames/f%06d.jpg" -f f32le -ar "$RATE" -ac "$CH" -i "$CAP/audio.f32" \
-  -map 0:v -map 1:a -vf "$VF" -c:v libx264 -preset slow -crf 18 -profile:v high -r "$FPS" \
+  -map 0:v -map 1:a -vf "$VF" -c:v libx264 -preset slow -crf 19 -maxrate 14M -bufsize 28M -profile:v high -r "$FPS" \
   -c:a aac -b:a 192k -ac 2 -shortest -movflags +faststart "$M1080"
 DUR="$(ffprobe -v error -show_entries format=duration -of csv=p=0 "$M1080")"
-VBR="$(python3 -I -c 'import sys; d=float(sys.argv[1]); print(int((90*8*1024*1024/d - 128000)/1000))' "$DUR")"
+VBR="$(python3 -I -c 'import sys; d=float(sys.argv[1]); print(int((86*8*1000*1000/d - 128000)/1000))' "$DUR")"
 PASS="$OUT/x264-pass"
 ffmpeg -hide_banner -loglevel error -y -i "$M1080" -vf scale=1280:720:flags=lanczos -c:v libx264 -preset slow -b:v "${VBR}k" \
   -pass 1 -passlogfile "$PASS" -an -f mp4 /dev/null
