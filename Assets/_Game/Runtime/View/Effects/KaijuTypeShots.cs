@@ -10,6 +10,7 @@ using CriticalMass.Runtime.View.B13;
 using CriticalMass.Runtime.View.Fog;
 using CriticalMass.Sim.Config;
 using CriticalMass.Sim.Core;
+using CriticalMass.Sim.Grid;
 using UnityEngine;
 
 namespace CriticalMass.Runtime.View.Effects
