@@ -167,13 +167,30 @@ namespace CriticalMass.Sim.Tests
             Assert.GreaterOrEqual((double)wins / PassiveSweepSeeds, PassiveSweepShareMin);
         }
 
+        /// <summary>
+        /// b14-c item 4 (corrected with evidence, a human rules on it): the old form judged the first OutcomeBatches.C.Count (10)
+        /// AFK seeds with a margin of 0 wins, so one seed decided it. It is PhysicsOnly (CreateBrowser5v5), untouched by batch 13.
+        /// Azure wins with actor 0 bot / passive / wandering, measured (diag 44156834080): seeds 201-210 5 / 7 / 5 (red by 2),
+        /// 201-250 21 / 19 / 19, 201-300 44 / 32 / 33: on any sample past ten seeds a competent actor 0 wins clearly more. The
+        /// first ten now print, and the limit (AfkWinsOverPlayingMax) is judged on the 100 seeds 201-300.
+        /// </summary>
         [Test, Category("Slow")]
         public void AFKOnBatchCSSeedsANonContributingActor0PassiveOrWanderingNeverWinsMoreThanACompetentOne()
         {
             int n = OutcomeBatches.C.Count;
-            int played = Wins(AfkBot, MatchResult.Azure, n);
-            Assert.LessOrEqual(Wins(AfkPassive, MatchResult.Azure, n) - played, OutcomeThresholds.AfkWinsOverPlayingMax);
-            Assert.LessOrEqual(Wins(AfkWander, MatchResult.Azure, n) - played, OutcomeThresholds.AfkWinsOverPlayingMax);
+            Console.WriteLine("{\"item\":\"AFK first " + n + "\",\"bot\":" + Wins(AfkBot, MatchResult.Azure, n) + ",\"passive\":" + Wins(AfkPassive, MatchResult.Azure, n) +
+                              ",\"wander\":" + Wins(AfkWander, MatchResult.Azure, n) + "} (printed)");
+            const int first = 201, seeds = 100;
+            int bot = 0, passive = 0, wander = 0;
+            for (int seed = first; seed < first + seeds; seed++)
+            {
+                if (OutcomeRunner.RunOutcomeMatch(seed, 5, HumanMode.Bot).Winner == MatchResult.Azure) bot++;
+                if (OutcomeRunner.RunOutcomeMatch(seed, 5, HumanMode.Passive).Winner == MatchResult.Azure) passive++;
+                if (OutcomeRunner.RunOutcomeMatch(seed, 5, HumanMode.Wander).Winner == MatchResult.Azure) wander++;
+            }
+            Console.WriteLine("{\"item\":\"AFK 201-300\",\"bot\":" + bot + ",\"passive\":" + passive + ",\"wander\":" + wander + ",\"limit\":\"passive and wander at most bot + " + OutcomeThresholds.AfkWinsOverPlayingMax + "\"}");
+            Assert.LessOrEqual(passive - bot, OutcomeThresholds.AfkWinsOverPlayingMax);
+            Assert.LessOrEqual(wander - bot, OutcomeThresholds.AfkWinsOverPlayingMax);
         }
 
         [Test, Category("Slow")]

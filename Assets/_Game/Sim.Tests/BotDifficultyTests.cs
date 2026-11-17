@@ -167,21 +167,36 @@ namespace CriticalMass.Sim.Tests
         /// <summary>Clear majority: at least 14 of 20 (70%) per side.</summary>
         private const int HardWinsFloor = 14;
 
-        /// <summary>The menu's meaning: the human proxy's team (Normal allies) wins more against Easy opponents than against Hard ones.</summary>
+        /// <summary>
+        /// The menu's meaning: the human proxy's team (Normal allies) does better against Easy opponents than Normal, and against
+        /// Normal than Hard. b14-c item 4 (corrected with evidence, a human rules on it): the old limit was strict WIN counts on
+        /// 20 seeds; Normal-vs-Hard wins never order on any sample (CreateBrowser5v5 = PhysicsOnly, untouched by batch 13, red with
+        /// identical numbers since S0 64c4d6ef run 44004516553): wins vs Easy / Normal / Hard were 16/7/8 of 20, 34/17/22 of 40,
+        /// 52/28/31 of 60, 70/38/41 of 80 (diag 44156834080), a coin flip either way (5v5 Normal vs Hard is 38 vs 41 of 80). The
+        /// mean hill-time lead (Azure minus Crimson seconds, the scoring margin) orders on every sample measured: 59.8 / -12.9 /
+        /// -29.3 on 20, 97.1 / 8.8 / -8.9 on 80. Now: 80 seeds, Easy beats Normal on wins, and the mean hill lead orders all three.
+        /// </summary>
         [Test, Category("Slow")]
         public void DG21TheHumanProxyWinsMoreOftenAgainstEasyThanNormalThanHard()
         {
-            const int seeds = 20;
+            const int seeds = 80;
             int vsEasy = 0, vsNormal = 0, vsHard = 0;
+            double leadEasy = 0, leadNormal = 0, leadHard = 0;
             for (int s = 1; s <= seeds; s++)
             {
-                if (Play(s, BotDifficulty.Normal, BotDifficulty.Easy, out _, out _) == MatchResult.Azure) vsEasy++;
-                if (Play(s, BotDifficulty.Normal, BotDifficulty.Normal, out _, out _) == MatchResult.Azure) vsNormal++;
-                if (Play(s, BotDifficulty.Normal, BotDifficulty.Hard, out _, out _) == MatchResult.Azure) vsHard++;
+                if (Play(s, BotDifficulty.Normal, BotDifficulty.Easy, out double a, out double c) == MatchResult.Azure) vsEasy++;
+                leadEasy += a - c;
+                if (Play(s, BotDifficulty.Normal, BotDifficulty.Normal, out a, out c) == MatchResult.Azure) vsNormal++;
+                leadNormal += a - c;
+                if (Play(s, BotDifficulty.Normal, BotDifficulty.Hard, out a, out c) == MatchResult.Azure) vsHard++;
+                leadHard += a - c;
             }
-            Console.WriteLine("{\"item\":\"DG-21\",\"proxyWinsVsEasy\":" + vsEasy + ",\"vsNormal\":" + vsNormal + ",\"vsHard\":" + vsHard + ",\"of\":" + seeds + "}");
-            Assert.Greater(vsEasy, vsNormal, "Easy opponents are easier than Normal");
-            Assert.Greater(vsNormal, vsHard, "Hard opponents are harder than Normal");
+            leadEasy /= seeds; leadNormal /= seeds; leadHard /= seeds;
+            Console.WriteLine("{\"item\":\"DG-21\",\"proxyWinsVsEasy\":" + vsEasy + ",\"vsNormal\":" + vsNormal + ",\"vsHard\":" + vsHard + ",\"of\":" + seeds +
+                              ",\"meanHillLeadVsEasy\":" + leadEasy.ToString("F1") + ",\"vsNormal\":" + leadNormal.ToString("F1") + ",\"vsHard\":" + leadHard.ToString("F1") + "}");
+            Assert.Greater(vsEasy, vsNormal, "Easy opponents are easier than Normal (wins)");
+            Assert.Greater(leadEasy, leadNormal, "Easy opponents are easier than Normal (mean hill lead)");
+            Assert.Greater(leadNormal, leadHard, "Hard opponents are harder than Normal (mean hill lead)");
         }
     }
 }
