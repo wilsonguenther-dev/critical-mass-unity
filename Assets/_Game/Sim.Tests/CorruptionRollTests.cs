@@ -316,9 +316,15 @@ namespace CriticalMass.Sim.Tests
             int lead = Corruption.WildTargetTeam(w, 1);
             w.Match.HillSeconds.Crimson = 30;
             int level = Corruption.WildTargetTeam(w, 1);
-            Console.WriteLine($"[b13-c wild target] azure leads: team {lead} (expect 0, bigFeeder 1 ignored); level: {level} (expect -1); bias {Corruption.TargetBias(w, 4)} (expect 6); tame Kaiju: team {Corruption.WildTargetTeam(tame, 1)} bias {Corruption.TargetBias(tame, 4)} (expect 1, 4)");
+            w.Match.HillSeconds.Crimson = 44;
+            int near = Corruption.WildTargetTeam(w, 1);
+            w.Match.HillSeconds.Crimson = 45;
+            int flipped = Corruption.WildTargetTeam(w, 1);
+            Console.WriteLine($"[b13-c wild target] azure leads 30-10: team {lead} (expect 0, bigFeeder 1 ignored); level 30-30: {level} (expect 0, sticky); crimson +14: {near} (expect 0, sticky); crimson +15: {flipped} (expect 1, WildSwitchMargin 15); bias {Corruption.TargetBias(w, 4)} (expect 6); tame Kaiju: team {Corruption.WildTargetTeam(tame, 1)} bias {Corruption.TargetBias(tame, 4)} (expect 1, 4)");
             Assert.AreEqual(0, lead);
-            Assert.AreEqual(-1, level);
+            Assert.AreEqual(0, level);
+            Assert.AreEqual(0, near);
+            Assert.AreEqual(1, flipped);
             Assert.AreEqual(6, Corruption.TargetBias(w, 4));
             Assert.AreEqual(1, Corruption.WildTargetTeam(tame, 1));
             Assert.AreEqual(4, Corruption.TargetBias(tame, 4));
@@ -406,14 +412,17 @@ namespace CriticalMass.Sim.Tests
         public void ZeroAllocationOver300TicksWithCarriersAndSimCostOnVsOff()
         {
             double onUs = 0, offUs = 0;
-            long onBytes = 0;
+            long onBytes = 0, offBytes = 0;
             foreach (bool on in new[] { true, false })
             {
                 World w = Make(4242, 16, c => c.Depth.Corruption.On = on);
                 InputFrame scratch = SimInput.EmptyInput();
                 for (int t = 0; t < 600; t++)
                 {
+                    if (t == 30) w.ForceHatch = true;   // b13 r3: measure after the hatch, where the base sim allocates nothing (K's window)
+                    if (t == 40) w.ForceHatch = false;
                     if (t % 100 == 0) GiveCrystals(w);
+                    if (t == 300 && w.Match.Hatched) { w.Kaiju.Hp = 0; w.Kaiju.KoIn = 12; }   // a downed Kaiju: feed, guard and purify paths run once
                     MatchTick.Advance(w, null, scratch);
                 }
                 GiveCrystals(w);
@@ -425,11 +434,70 @@ namespace CriticalMass.Sim.Tests
                 sw.Stop();
                 long bytes = GC.GetAllocatedBytesForCurrentThread() - b0;
                 double us = sw.Elapsed.TotalMilliseconds * 1000.0 / 300;
-                if (on) { onUs = us; onBytes = bytes; } else offUs = us;
+                if (on) { onUs = us; onBytes = bytes; } else { offUs = us; offBytes = bytes; }
                 Console.WriteLine($"[b13-c alloc] 16v16 seed 4242 Full, rule {(on ? "on" : "off")}: 300 ticks after 600 warm-up with carriers: {bytes} B allocated, {us:0.0} us per tick (limit: 0 B)");
             }
             Console.WriteLine($"[b13-c cost] mean sim us per tick on {onUs:0.0} vs off {offUs:0.0}: {(offUs > 0 ? (onUs / offUs - 1) * 100 : 0):+0.0;-0.0}% (limit +10%; printed, timing is not asserted on shared runners)");
-            Assert.AreEqual(0, onBytes);
+            Console.WriteLine($"[b13-c alloc] rule's own allocation (on - off): {onBytes - offBytes} B (limit 0 B)");
+            Assert.LessOrEqual(onBytes, offBytes, "the corruption rule adds no allocation over the same-seed control");
+            Assert.AreEqual(0, onBytes, "0 B in the post-hatch window");
+        }
+
+        /// <summary>
+        /// b13 r3 correctness probe (round 1: SimPhysicsSoakTests seed 101 "actor inside the Kaiju" at Normal and Hard with the rule
+        /// on): the same soak config and seed, rule on and off, printing every grounded living actor whose centre is inside the
+        /// hatched Kaiju's body (what it was doing, where the Kaiju and the actor came from, blocked cells around it).
+        /// </summary>
+        [Test, Category("Slow")]
+        public void NobodyEndsInsideTheKaijuInTheSoakSeedWithTheRuleOnAndOff()
+        {
+            int onCount = 0;
+            foreach (BotDifficulty d in new[] { BotDifficulty.Normal, BotDifficulty.Hard })
+            foreach (bool on in new[] { true, false })
+            {
+                GameConfig cfg = SimPhysicsSoakTests.SixClassMix(false);
+                cfg.Depth.Corruption.On = on;
+                World w = World.CreateWorld(new WorldOptions
+                {
+                    Seed = 101, TeamSize = 16, HumanTeam = TeamId.Azure, HumanClass = ClassId.Warrior, Config = cfg,
+                    BotDifficulty = d, AllyBotDifficulty = d,
+                });
+                InputFrame scratch = SimInput.EmptyInput();
+                int n = w.ActorCount;
+                var px = new double[n];
+                var pz = new double[n];
+                double kpx = w.Kaiju.X, kpz = w.Kaiju.Z;
+                double body = cfg.Physics.KaijuBodyRadius;
+                int max = (int)(cfg.MatchSeconds * cfg.SimHz) + (int)cfg.SimHz, count = 0, printed = 0;
+                for (int s = 0; s < max && w.Match.Phase != MatchPhase.Ended; s++)
+                {
+                    for (int id = 0; id < n; id++) { px[id] = w.X[id]; pz[id] = w.Z[id]; }
+                    kpx = w.Kaiju.X;
+                    kpz = w.Kaiju.Z;
+                    MatchTick.Advance(w, null, scratch);
+                    Kaiju k = w.Kaiju;
+                    if (k.State == KaijuState.Egg) continue;
+                    for (int id = 0; id < n; id++)
+                    {
+                        Actor a = w.Actors[id];
+                        if (!a.Alive || a.AirLen > 0) continue;
+                        double dx = w.X[id] - k.X, dz = w.Z[id] - k.Z;
+                        if (dx * dx + dz * dz >= body * body) continue;
+                        count++;
+                        if (printed >= 20) continue;
+                        printed++;
+                        int blocked = 0;
+                        for (int oz = -1; oz <= 1; oz++)
+                        for (int ox = -1; ox <= 1; ox++)
+                            if ((ox != 0 || oz != 0) && !Terraform.WalkableAt(w.Map, w.X[id] + ox, w.Z[id] + oz)) blocked++;
+                        double pdx = px[id] - kpx, pdz = pz[id] - kpz;
+                        Console.WriteLine($"[b13-c inside] rule {(on ? "on" : "off")} {d} tick {w.Tick}: actor {id} {a.Cls} {a.Team} state {a.AiState} carry {a.Carry} x{a.CarryAmount} standUp {a.StandUp:0.00} at ({w.X[id]:0.00}, {w.Z[id]:0.00}) dist {Math.Sqrt(dx * dx + dz * dz):0.000} (last tick {Math.Sqrt(pdx * pdx + pdz * pdz):0.000}); Kaiju {k.State} koIn {k.KoIn:0.00} wild {Corruption.Wild(w)} target {k.TargetId} at ({k.X:0.00}, {k.Z:0.00}) moved {Math.Sqrt((k.X - kpx) * (k.X - kpx) + (k.Z - kpz) * (k.Z - kpz)):0.000}; actor moved {Math.Sqrt((w.X[id] - px[id]) * (w.X[id] - px[id]) + (w.Z[id] - pz[id]) * (w.Z[id] - pz[id])):0.000}; blocked cells around {blocked}/8");
+                    }
+                }
+                Console.WriteLine($"[b13-c inside] rule {(on ? "on" : "off")} {d} seed 101 16v16: {count} actor-ticks inside the Kaiju body (limit 0 with the rule on); wild {Corruption.Wild(w)} rolls {w.Corrupt.RollIndex}");
+                if (on) onCount += count;
+            }
+            Assert.AreEqual(0, onCount, "with the corruption rule on nobody ends a tick inside the Kaiju");
         }
 
         static void GiveCrystals(World w)
@@ -479,7 +547,7 @@ namespace CriticalMass.Sim.Tests
             int head = w.EventHead;
             int maxSteps = (int)Math.Ceiling(w.Config.MatchSeconds * w.Config.SimHz) + (int)w.Config.SimHz;
             double firstPlayerKo = -1, firstKaijuKo = -1;
-            int trailingAt4 = -2, behindAtWild = -2, lastSign = 0, hz = (int)w.Config.SimHz;
+            int trailingAt4 = -2, behindAtWild = -2, lastSign = 0, hz = (int)w.Config.SimHz, lc0 = arm.LeadChanges;
             bool wasKo = false;
             success = false;
             for (int s = 0; s < maxSteps && w.Match.Phase != MatchPhase.Ended; s++)
@@ -533,6 +601,7 @@ namespace CriticalMass.Sim.Tests
                 if (cls >= 0 && cls < 6) arm.ClassKills[cls] += w.Actors[i].Kills;
             }
             arm.Minutes += fm.Time / 60.0;
+            arm.RollLines.Add($"match {size}v{size} seed {seed}: winner {(winner == 0 ? "azure" : winner == 1 ? "crimson" : "draw")}, behind at 4:00 {(trailingAt4 == 0 ? "azure" : trailingAt4 == 1 ? "crimson" : "level")}, lead changes {arm.LeadChanges - lc0}, wild {(success ? "yes" : "no")}, crystals mined {w.Corrupt.Mined[0]}/{w.Corrupt.Fed[0]} fed azure, {w.Corrupt.Mined[1]}/{w.Corrupt.Fed[1]} fed crimson, hill {fm.HillSeconds.Azure:0}/{fm.HillSeconds.Crimson:0}");
         }
 
         [Test]

@@ -8,13 +8,15 @@ namespace CriticalMass.Sim.Bots
     /// CM b13 item C: corruption bots, offered through BotFsm.ConsiderExternal as AiState.Task (BotSteer walks to TaskX / TaskZ
     /// and calls Act within 1.2 u). TaskKind 20 = to the nearest crystal vein with charges (runner of the trailing team, at most
     /// MaxRunners per team), 21 = feed the knocked-out Kaiju (any carrier of a team that may feed it), 22 = guard the downed
-    /// Kaiju against an enemy carrier (owner team, at most MaxGuards), 23 = the owner Healer purifies the pool. Before the hatch
-    /// a carrier hands its crystals in through the existing Deliver / Corrupt states (the shrine wind-up). Identity with the
+    /// Kaiju against an enemy carrier (owner team, at most MaxGuards; b13 r3: also the not-trailing team intercepting a carrier
+    /// near it, at most MaxInterceptors), 23 = the owner Healer purifies the pool, 24 = escort a crystal runner (b13 r3, big
+    /// teams). Before the hatch a carrier hands its crystals in through the Deliver state (the shrine wind-up). Only the trailing
+    /// team runs crystals: BotDirector's old corruption flag is off while the rule is on (routed patch). Identity with the
     /// rule off. Stateless apart from BotsState's task fields: no allocation.
     /// </summary>
     public static class BotCorrupt
     {
-        public const byte TaskVein = 20, TaskFeed = 21, TaskGuard = 22, TaskPurify = 23;
+        public const byte TaskVein = 20, TaskFeed = 21, TaskGuard = 22, TaskPurify = 23, TaskEscort = 24;
 
         /// <summary>Offers the corruption task utilities (BotFsm.ConsiderExternal) before the state is chosen.</summary>
         public static void Consider(World w, BotsState st, int id)
@@ -22,8 +24,6 @@ namespace CriticalMass.Sim.Bots
             if (!Corruption.On(w)) return;
             Actor a = w.Actors[id];
             if (!a.Alive || a.StandUp > 0) return;
-            // H's Miner bots mine ore until the hut is at level 5: never take a Miner off H's task.
-            if (a.Cls == ClassId.Miner && Blacksmith.On(w) && Blacksmith.Level(w, a.Team) < 5) return;
             CorruptionConfig c = w.Config.Depth.Corruption;
             MatchState m = w.Match;
             Kaiju k = w.Kaiju;
@@ -34,13 +34,18 @@ namespace CriticalMass.Sim.Bots
 
             if (carrying)
             {
-                if (down && Corruption.MayFeedTeam(w, team))
+                // b13 r3: before the hatch a crystal carrier hands it in at the egg (BotFsm only offers Deliver for a full class
+                // load or no vein nearby, so a one-crystal runner on the island used to stand there holding it).
+                if (egg) BotFsm.ConsiderExternal(w, AiState.Deliver, c.FeedUtility);
+                else if (down && Corruption.MayFeedTeam(w, team))
                 {
                     RingPoint(w, id, out double fx, out double fz);
                     Offer(w, st, id, TaskFeed, fx, fz, c.FeedUtility);
                 }
                 return;
             }
+            // H's Miner bots mine ore until the hut is at level 5: never take a Miner off H's task.
+            if (a.Cls == ClassId.Miner && Blacksmith.On(w) && Blacksmith.Level(w, a.Team) < 5) return;
 
             if (down && Corruption.OwnerTeam(w) == team)
             {
@@ -55,29 +60,60 @@ namespace CriticalMass.Sim.Bots
                     return;
                 }
                 if (carrier >= 0 && (IsOnTask(w, st, id, TaskGuard) || CountTask(w, st, a.Team, id, TaskGuard, TaskGuard) < c.MaxGuards))
+                {
                     Offer(w, st, id, TaskGuard, w.X[carrier], w.Z[carrier], c.GuardUtility);
-                return;
+                    return;
+                }
             }
 
+            bool trailing = Trailing(w, a.Team);
+            if (!trailing)
+            {
+                // b13 r3: the team that is not behind intercepts an enemy crystal carrier near it (never its hill squad, never
+                // the Healer), at most MaxInterceptors at a time.
+                if (a.Cls == ClassId.Healer || st.HillSquad[id] != 0) return;
+                int carrier = EnemyCarrierNear(w, team, w.X[id], w.Z[id], c.InterceptRadius);
+                if (carrier < 0) return;
+                if (!IsOnTask(w, st, id, TaskGuard) && CountTask(w, st, a.Team, id, TaskGuard, TaskGuard) >= c.MaxInterceptors) return;
+                Offer(w, st, id, TaskGuard, w.X[carrier], w.Z[carrier], c.InterceptUtility);
+                return;
+            }
+            if (!egg && !Corruption.MayFeedTeam(w, team)) return;
+
             // Runners: the trailing team's runner classes fetch crystals (before the hatch: behind on allegiance).
-            if (!Roles.IsRunner(w, a.Cls) || !Roles.MayCorrupt(w, a.Cls) || a.CarryAmount > 0 || a.CarryMeat > 0) return;
-            if (st.Corrupt[id] != 0) return; // already on the director's pre-hatch corruption run
-            bool trailing;
-            if (egg)
+            bool runner = Roles.IsRunner(w, a.Cls) && Roles.MayCorrupt(w, a.Cls) && a.CarryAmount <= 0 && a.CarryMeat <= 0 && st.Corrupt[id] == 0;
+            int maxRunners = w.Opts.TeamSize < c.SmallTeamSize ? c.SmallTeamRunners : c.MaxRunners;
+            if (runner && (IsOnTask(w, st, id, TaskVein) || CountTask(w, st, a.Team, id, TaskVein, TaskFeed) < maxRunners))
             {
-                TeamId other = a.Team == TeamId.Azure ? TeamId.Crimson : TeamId.Azure;
-                trailing = m.Allegiance[other] - m.Allegiance[a.Team] >= w.Config.Bots.CorruptWhenBehindBy;
+                int vein = NearestVein(w, id);
+                if (vein >= 0)
+                {
+                    ResourceNode nd = w.Nodes[vein];
+                    Offer(w, st, id, TaskVein, nd.X, nd.Z, c.RunnerUtility);
+                    return;
+                }
             }
-            else
+
+            // b13 r3: escorts. In a big team a fighter (not a Healer, not the hill squad) walks with the nearest crystal runner and
+            // fights whoever comes for it; at most MaxEscorts and never more escorts than runners.
+            if (w.Opts.TeamSize < c.EscortMinTeam || a.Cls == ClassId.Healer || st.HillSquad[id] != 0 || a.CarryAmount > 0 || a.CarryMeat > 0) return;
+            int run = NearestRunner(w, st, a.Team, id, c.EscortPickRadius);
+            if (run < 0) return;
+            int escorts = CountTask(w, st, a.Team, id, TaskEscort, TaskEscort);
+            if (!IsOnTask(w, st, id, TaskEscort) && (escorts >= c.MaxEscorts || escorts >= CountRunners(w, st, a.Team))) return;
+            Offer(w, st, id, TaskEscort, w.X[run], w.Z[run], c.EscortUtility);
+        }
+
+        /// <summary>Team is the trailing team: before the hatch behind on allegiance by Bots.CorruptWhenBehindBy, after it behind on hill seconds by TrailingMargin.</summary>
+        public static bool Trailing(World w, TeamId team)
+        {
+            MatchState m = w.Match;
+            if (!m.Hatched)
             {
-                trailing = Corruption.TrailingTeam(w) == team && Corruption.MayFeedTeam(w, team);
+                TeamId other = team == TeamId.Azure ? TeamId.Crimson : TeamId.Azure;
+                return m.Allegiance[other] - m.Allegiance[team] >= w.Config.Bots.CorruptWhenBehindBy;
             }
-            if (!trailing) return;
-            if (!IsOnTask(w, st, id, TaskVein) && CountTask(w, st, a.Team, id, TaskVein, TaskFeed) >= c.MaxRunners) return;
-            int vein = NearestVein(w, id);
-            if (vein < 0) return;
-            ResourceNode nd = w.Nodes[vein];
-            Offer(w, st, id, TaskVein, nd.X, nd.Z, c.RunnerUtility);
+            return Corruption.TrailingTeam(w) == (team == TeamId.Azure ? 0 : 1);
         }
 
         /// <summary>Acts at the task point (TaskKind 20-29); true = the frame was written.</summary>
@@ -89,13 +125,22 @@ namespace CriticalMass.Sim.Bots
             switch (kind)
             {
                 case TaskVein:
+                {
                     if (a.Carry == CarryKind.Corruption && a.CarryAmount >= Corruption.CrystalCap(w, a.Cls))
                     {
-                        st.TaskUntil[id] = 0; // full: the task ends, ThinkBot offers the feed next
+                        st.TaskUntil[id] = 0; // full: the task ends, ThinkBot offers the delivery or the feed next
+                        return false;
+                    }
+                    // b13 r3: the vein was emptied before this runner got there: give the run up instead of holding E for 8 s.
+                    int ni = SimResources.GatherNode(w, id);
+                    if (ni < 0 || w.Nodes[ni].Kind != NodeKind.Corruption)
+                    {
+                        st.TaskUntil[id] = 0;
                         return false;
                     }
                     Hold(w, id, o);
                     return true;
+                }
                 case TaskFeed:
                 case TaskPurify:
                     Hold(w, id, o);
@@ -110,8 +155,74 @@ namespace CriticalMass.Sim.Bots
                     o.Attack = true;
                     return true;
                 }
+                case TaskEscort:
+                {
+                    int team = a.Team == TeamId.Azure ? 0 : 1;
+                    int enemy = EnemyNear(w, team, st.TaskX[id], st.TaskZ[id], w.Config.Depth.Corruption.EscortGuardRadius);
+                    if (enemy < 0) return false;
+                    o.AimX = w.X[enemy];
+                    o.AimZ = w.Z[enemy];
+                    o.Attack = true;
+                    return true;
+                }
             }
             return false;
+        }
+
+        /// <summary>The nearest teammate of team (not self) on a crystal run (vein or feed task, or carrying crystals) within r of self, or -1.</summary>
+        private static int NearestRunner(World w, BotsState st, TeamId team, int self, double r)
+        {
+            int best = -1;
+            double bestD2 = r * r;
+            for (int j = 0; j < w.ActorCount; j++)
+            {
+                if (j == self || !IsRunning(w, st, j, team)) continue;
+                double dx = w.X[j] - w.X[self];
+                double dz = w.Z[j] - w.Z[self];
+                double d2 = dx * dx + dz * dz;
+                if (d2 <= bestD2)
+                {
+                    bestD2 = d2;
+                    best = j;
+                }
+            }
+            return best;
+        }
+
+        private static int CountRunners(World w, BotsState st, TeamId team)
+        {
+            int count = 0;
+            for (int j = 0; j < w.ActorCount; j++) if (IsRunning(w, st, j, team)) count++;
+            return count;
+        }
+
+        private static bool IsRunning(World w, BotsState st, int j, TeamId team)
+        {
+            Actor b = w.Actors[j];
+            if (!b.Alive || b.Team != team) return false;
+            if (b.Carry == CarryKind.Corruption && b.CarryAmount > 0) return true;
+            return b.AiState == AiState.Task && (st.TaskKind[j] == TaskVein || st.TaskKind[j] == TaskFeed);
+        }
+
+        /// <summary>The nearest living, standing enemy of team teamIdx within r of (x, z), or -1.</summary>
+        private static int EnemyNear(World w, int teamIdx, double x, double z, double r)
+        {
+            int best = -1;
+            double bestD2 = r * r;
+            for (int j = 0; j < w.ActorCount; j++)
+            {
+                Actor b = w.Actors[j];
+                if (!b.Alive || b.StandUp > 0 || (b.Team == TeamId.Azure ? 0 : 1) == teamIdx) continue;
+                double dx = w.X[j] - x;
+                double dz = w.Z[j] - z;
+                double d2 = dx * dx + dz * dz;
+                if (d2 <= bestD2)
+                {
+                    bestD2 = d2;
+                    best = j;
+                }
+            }
+            return best;
         }
 
         private static void Hold(World w, int id, InputFrame o)

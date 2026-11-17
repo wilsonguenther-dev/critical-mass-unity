@@ -7,7 +7,7 @@ namespace CriticalMass.Sim.Config
     public sealed class CorruptionConfig
     {
         /// <summary>The rule's own switch (Full profile only: systems read it through DepthRules.On).</summary>
-        public bool On = false;   // b13 integrator: item C is OUT this batch (stub only); off so the meter and roll banner never show
+        public bool On = true;   // b13 r3: item C back in (rule change, Full profile only; the meter, roll banner and crystal view show behind it)
 
         // --- crystal veins (the existing corruption nodes on the south island) ---
         /// <summary>Charges per crystal vein while the rule is on.</summary>
@@ -59,10 +59,30 @@ namespace CriticalMass.Sim.Config
         // --- the wild Kaiju ---
         /// <summary>A wild Kaiju's target score bias (u) toward the team leading on hill seconds (replaces BigFeederBias 4 while wild; K's patch).</summary>
         public double WildLeaderBias = 6;
+        /// <summary>b13 r3: a wild Kaiju keeps going after the team it picked as the leader until the other team leads on hill
+        /// seconds by this many seconds (hysteresis: without it the leader-biased Kaiju flipped the lead back and forth near a tie,
+        /// round 1 hill lead changes 92 vs 67).</summary>
+        public double WildSwitchMargin = 15;
 
         // --- bots ---
         /// <summary>Most runner-class bots per team on a crystal run at a time.</summary>
         public int MaxRunners = 2;
+        /// <summary>b13 r3: teams smaller than SmallTeamSize send at most SmallTeamRunners (a 5v5 team cannot spare two of five;
+        /// round 1 a short-handed 5v5 team emptied its egg crew onto the island and the idle-player floor fell to 0.025).</summary>
+        public int SmallTeamSize = 8;
+        public int SmallTeamRunners = 1;
+        /// <summary>b13 r3: escorts (task 24): the trailing team sends up to this many fighters with its runners (teams of
+        /// EscortMinTeam or more); an escort walks with the runner and fights an enemy within EscortGuardRadius of it.</summary>
+        public int MaxEscorts = 2;
+        public int EscortMinTeam = 8;
+        public double EscortPickRadius = 25;
+        public double EscortGuardRadius = 5;
+        public double EscortUtility = 0.84;
+        /// <summary>b13 r3: interceptors (task 22 off the Kaiju): the team that is not trailing sends up to MaxInterceptors
+        /// off-hill bots at an enemy crystal carrier within InterceptRadius of them.</summary>
+        public int MaxInterceptors = 2;
+        public double InterceptRadius = 12;
+        public double InterceptUtility = 0.88;
         /// <summary>Most owner-team guards on a downed Kaiju at a time.</summary>
         public int MaxGuards = 3;
         /// <summary>Owner-team bots guard when an enemy crystal carrier is within this distance (u) of the downed Kaiju.</summary>

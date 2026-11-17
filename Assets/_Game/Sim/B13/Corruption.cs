@@ -28,6 +28,8 @@ namespace CriticalMass.Sim.Core
         public int LastRollTrailing = -1;
         /// <summary>The tick of the successful roll (-1 none).</summary>
         public int WildTick = -1;
+        /// <summary>b13 r3: the team a wild Kaiju is going after (0 azure, 1 crimson, -1 none yet); sticky until the other team leads by WildSwitchMargin.</summary>
+        public int WildLeader = -1;
         /// <summary>Crystals mined per team (0 azure, 1 crimson).</summary>
         public int[] Mined = new int[2];
         /// <summary>Crystals fed per team (unweighted, both phases).</summary>
@@ -76,6 +78,7 @@ namespace CriticalMass.Sim.Core
             LastSuccess = false;
             LastRollTrailing = -1;
             WildTick = -1;
+            WildLeader = -1;
             Mined[0] = Mined[1] = 0;
             Fed[0] = Fed[1] = 0;
             FeedTick = -1;
@@ -249,7 +252,15 @@ namespace CriticalMass.Sim.Core
         public static int WildTargetTeam(World w, int bigFeeder)
         {
             if (!Wild(w)) return bigFeeder;
-            return LeadingTeam(w);
+            // b13 r3: hysteresis. The Kaiju keeps after the team it picked until the other team leads by WildSwitchMargin; a
+            // pure "current leader" flipped its target at every near-tie and with it the hill lead (round 1: 92 vs 67).
+            CorruptionState s = w.Corrupt;
+            double d = w.Match.HillSeconds.Azure - w.Match.HillSeconds.Crimson;
+            double margin = w.Config.Depth.Corruption.WildSwitchMargin;
+            if (s.WildLeader < 0) s.WildLeader = LeadingTeam(w);
+            else if (s.WildLeader == 0 && -d >= margin) s.WildLeader = 1;
+            else if (s.WildLeader == 1 && d >= margin) s.WildLeader = 0;
+            return s.WildLeader;
         }
 
         /// <summary>Crystals in the pool since the last roll (weighted by TrailingBonus; before the hatch net of cleanse and purify).</summary>
@@ -496,6 +507,7 @@ namespace CriticalMass.Sim.Core
             {
                 s.Successes++;
                 s.WildTick = w.Tick;
+                s.WildLeader = LeadingTeam(w);
             }
             World.PushEvent(w, SimEventType.CorruptionRoll, idx, ok ? 1 : 0, x, z, p);
             return ok;
