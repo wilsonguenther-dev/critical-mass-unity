@@ -59,8 +59,24 @@ namespace CriticalMass.Runtime.View.Anim
             return i >= 0 && i + 1 < a.Length ? a[i + 1] : null;
         }
 
-        /// <summary>The dummy's distance in front: inside the weapon's reach with room for the lunge (pure; tests).</summary>
-        public static double DummyAhead(double range) => Math.Max(0.9, Math.Min(1.2, range * 0.75));
+        /// <summary>b12-c2: the dummy's body SURFACE stands this far inside the class's sim reach, so the hit lands at the edge.</summary>
+        public const double SurfaceInset = 0.02;
+
+        /// <summary>
+        /// b12-c2 (pure; tests): the dummy's CENTRE distance in front of the attacker's centre, so its body surface is at the
+        /// class's sim reach (Combat.ReachOf, the swing's own range to the target's surface) minus SurfaceInset: the hit
+        /// lands, at the very edge of the range. Before: 0.75 x range clamped 0.9 to 1.2 u, body to body (not at the reach).
+        /// </summary>
+        public static double DummyAhead(double reach, double dummyRadius) => reach - SurfaceInset + dummyRadius;
+
+        /// <summary>
+        /// b12-c2: the one-argument form is the dummy's body SURFACE ahead for a reach (reach - SurfaceInset), kept for
+        /// HitFeelTests.TheCaptureDummyStandsInsideTheReach (not this item's file); the placement uses the centre form above.
+        /// </summary>
+        public static double DummyAhead(double reach) => reach - SurfaceInset;
+
+        /// <summary>The dummy's body surface ahead of the attacker's centre for a centre distance ahead (pure; tests).</summary>
+        public static double DummySurface(double ahead, double dummyRadius) => ahead - dummyRadius;
 
         void Start() => StartCoroutine(Run());
 
@@ -177,7 +193,11 @@ namespace CriticalMass.Runtime.View.Anim
             for (int i = 1; i < w.ActorCount; i++)
                 if (w.Actors[i].Alive && w.Actors[i].Team != w.Actors[0].Team) { _dummy = i; break; }
             if (_dummy < 0) { Log(n + ": no enemy to use as the dummy"); yield break; }
-            _dummyX = x + DummyAhead(LightWeaponView.Range(w.Config, cls));
+            double dummyAhead = DummyAhead(LightWeaponView.Range(w.Config, cls), w.Config.Class(w.Actors[_dummy].Cls).Radius);
+            _dummyX = x + dummyAhead;
+            Log(n + ": dummy centre " + dummyAhead.ToString("0.00") + " u ahead, body surface " +
+                DummySurface(dummyAhead, w.Config.Class(w.Actors[_dummy].Cls).Radius).ToString("0.00") + " u = sim reach " +
+                LightWeaponView.Range(w.Config, cls).ToString("0.00") + " u - " + SurfaceInset.ToString("0.00") + " u");
             _dummyZ = z;
             Put(w, _dummy, _dummyX, _dummyZ);
             w.Actors[_dummy].Facing = Math.PI;   // facing the attacker: a frontal hit
@@ -188,10 +208,10 @@ namespace CriticalMass.Runtime.View.Anim
             _frame.AimX = _dummyX;
             _frame.AimZ = _dummyZ;
             Step(4);
-            double fx0 = x + 0.5 * DummyAhead(LightWeaponView.Range(w.Config, cls));
+            double fx0 = x + 0.5 * dummyAhead;
             double g0 = GroundHeight.At(w.Map, fx0, z);
             Vector3 focus = SimSpace.ToWorld(fx0, g0 + 0.9, z);
-            PickSide(w, fx0, z, g0);
+            PickSide(w, n, fx0, z, g0);
             ActorViews views0 = _driver.GetComponent<ActorViews>();
             // fix/hit-feel-6: one rendered frame so the views put the LIVE models on the staged pair, then check them
             // there (the second and later classes measured a pooled model parked about 46 u away and framed empty sky).
@@ -218,6 +238,12 @@ namespace CriticalMass.Runtime.View.Anim
             int windup = w.Actors[0].SwingWindup;
             int damageTick = -1;
             double facingErr = 0, lungePeak = 0, handReach = double.NaN, surface = double.NaN, tipAhead = double.NaN, stepAt = 0, leanAt = 0;
+            // b11-c: the tip is also read on the frame AFTER the damage tick, with each frame's render alpha, and the gap is
+            // judged on the frame where the strike is drawn (the one with the tip further forward): the wind-up craft makes
+            // the whole strike inside the last tick, so a frame drawn at alpha 0 still shows the drawn-back extreme.
+            double tipContact = double.NaN, tipNext = double.NaN, alphaContact = double.NaN, alphaNext = double.NaN;
+            bool readNext = false;
+            string liveSrc = "no model";
             ActorViews views = _driver.GetComponent<ActorViews>();
             var side = new Texture2D(FrameW * Frames, FrameH, TextureFormat.RGB24, false);
             var game = new Texture2D(FrameW * Frames, FrameH, TextureFormat.RGB24, false);
@@ -236,6 +262,12 @@ namespace CriticalMass.Runtime.View.Anim
                 bool contact = damageTick == w.Tick;
                 RenderInto(side, f, focus, true, contact);
                 RenderInto(game, f, focus, false, contact);
+                if (readNext)
+                {
+                    readNext = false;
+                    alphaNext = _driver.Alpha;
+                    tipNext = TipAhead(views, w, cls, out _);
+                }
                 if (contact)
                 {
                     // feat/hit-feel-2: weapon-hand reach at the contact frame, along the line to the dummy, from the drawn body.
@@ -243,17 +275,24 @@ namespace CriticalMass.Runtime.View.Anim
                     double ddx = w.X[_dummy] - w.X[0], ddz = w.Z[_dummy] - w.Z[0];
                     surface = Math.Sqrt(ddx * ddx + ddz * ddz) - w.Config.Class(w.Actors[_dummy].Cls).Radius;
                     // fix/hit-feel-5: the weapon TIP's distance ahead of the SIM position along the line to the dummy
-                    tipAhead = TipAhead(views, w, out string liveSrc);
-                    if (double.IsNaN(tipAhead) || Math.Abs(surface - tipAhead) > MaxGap)
-                    {
-                        _failed++;
-                        Log(n + ": FAILED: tip gap " + (surface - tipAhead).ToString("0.00") + " u is not a measurement (over " + MaxGap +
-                            " u or no tip; tip from " + liveSrc + ")");
-                    }
+                    tipContact = TipAhead(views, w, cls, out liveSrc);
+                    alphaContact = _driver.Alpha;
+                    readNext = true;
                     stepAt = HitFeel.Lunge(w, 0, 0).magnitude;
                     if (HitFeel.StrikeLean(w, 0, 0, out double ld, out _, out _)) leanAt = ld;
                 }
                 Step(1);
+            }
+            // b11-c: the strike frame: the contact frame or the one after it, whichever draws the tip further forward.
+            tipAhead = double.IsNaN(tipNext) || (!double.IsNaN(tipContact) && tipContact >= tipNext) ? tipContact : tipNext;
+            Log(n + ": strike frame: tip " + tipContact.ToString("0.00") + " u at the damage-tick frame (render alpha " +
+                alphaContact.ToString("0.00") + "), " + tipNext.ToString("0.00") + " u on the frame after (alpha " + alphaNext.ToString("0.00") +
+                "); judged on " + (tipAhead.Equals(tipContact) ? "the damage-tick frame" : "the frame after"));
+            if (damageTick >= 0 && (double.IsNaN(tipAhead) || Math.Abs(surface - tipAhead) > MaxGap))
+            {
+                _failed++;
+                Log(n + ": FAILED: tip gap " + (surface - tipAhead).ToString("0.00") + " u is not a measurement (over " + MaxGap +
+                    " u or no tip; tip from " + liveSrc + ")");
             }
             SwingTable(views, w, n, cls);
             Write(side, Prefix + n + "-side.png");
@@ -261,7 +300,9 @@ namespace CriticalMass.Runtime.View.Anim
             Destroy(side);
             Destroy(game);
 
-            string clip = ArtMapping.ClassClips(cls).Attack;
+            // b11-c: the clip the animator really played (the Healer's lantern swing plays Attack, not Cast)
+            ActorAnimator played = views != null ? views.AnimatorOf(0) : null;
+            string clip = played != null && played.MeasuredClip != null ? played.MeasuredClip : ArtMapping.ClassClips(cls).Attack;
             double c = ClipFacts.Contact(clip, 0.567f);
             double viewOffMs = (AttackTiming.ContactAge(c, windup / hz) - windup / hz) * 1000;
             int expect = press + windup;
@@ -282,7 +323,7 @@ namespace CriticalMass.Runtime.View.Anim
             // surface" is the target body surface minus the weapon TIP's distance ahead of the SIM position: 0 or less is
             // a touch (negative: the tip is that far into the body), positive is the gap left.
             ModelView mv = views != null ? views.ModelOf(0) : null;
-            HitPose.TipLocal(mv, out _, out string tipSrc);
+            HitPose.StrikeEnds(mv, cls, out _, out _, out string tipSrc);
             int ci = (int)cls;
             double reach = HitFeel.ViewReach(cls), lever = HitFeel.MeasuredLever[ci];
             double cover = reach + HitFeel.MaxViewOffset + HitPose.LeanGain(HitPose.MaxStrikeLeanDeg, lever > 0 ? lever : 0.5);
@@ -297,7 +338,8 @@ namespace CriticalMass.Runtime.View.Anim
                 reach.ToString("0.00") + (HitFeel.MeasuredReach[ci] > 0 ? " u measured" : " u ESTIMATE (not measured)") +
                 ", lever " + lever.ToString("0.00") + " u, step-in " + stepAt.ToString("0.00") + " u, strike lean " + leanAt.ToString("0") +
                 " deg; covers a body surface up to " + cover.ToString("0.00") + " u, sim range (to the surface) " + range.ToString("0.00") +
-                " u" + (range > cover + 1e-3 ? ": SHORT by " + (range - cover).ToString("0.00") + " u (rules question: shorten the range)" : ": covered") +
+                " u" + (range > cover + 1e-3 ? ": SHORT by " + (range - cover).ToString("0.00") + " u (weapon-reach table row to re-measure)" : ": covered") +
+                " (weapon-reach rule " + (Combat.WeaponReachOn(w.Config) ? "on" : "off") + ")" +
                 "; reaction recoil " + HitPose.RecoilDeg(tier).ToString("0") + " deg, head snap " + HitPose.HeadSnapDeg(tier).ToString("0") +
                 " deg, squash " + (HitPose.SquashMax * 100).ToString("0") + "% for " + (HitPose.SquashSeconds * 1000).ToString("0") +
                 " ms; side camera on the " + (_sideSign > 0 ? "-z" : "+z") + " side, lift " + _sideLift.ToString("0.00") + " u");
@@ -311,10 +353,25 @@ namespace CriticalMass.Runtime.View.Anim
         /// </summary>
         bool PlaceSideCamera(World w, string n, Vector3 focus, Vector3 feet, double simX, double simZ)
         {
-            Vector3 pos = focus + new Vector3(0f, SideHeight, -SideDistance * _sideSign);
+            Vector3 pos = focus + new Vector3(0f, SideHeight + _sideLift, -SideDistance * _sideSign);   // b12-c2: the lift is applied
             double offset = feet.y - GroundHeight.At(w.Map, simX, simZ);
             float groundAtCam = (float)(GroundHeight.At(w.Map, pos.x, -pos.z) + offset);
             if (pos.y < groundAtCam + CamGroundClear) pos.y = groundAtCam + CamGroundClear;
+            // b12-c2: world dressing (rock or wall art with no sim cell) is not in the grid: one ray against the drawn
+            // renderers' bounds (capture only). Blocked: try the other side once at the same lift, and log it.
+            string blocker = DressingBlocker(pos, focus);
+            if (blocker != null)
+            {
+                Vector3 other = focus + new Vector3(0f, SideHeight + _sideLift, SideDistance * _sideSign);
+                float gOther = (float)(GroundHeight.At(w.Map, other.x, -other.z) + offset);
+                if (other.y < gOther + CamGroundClear) other.y = gOther + CamGroundClear;
+                string blocker2 = DressingBlocker(other, focus);
+                Log(n + ": side camera dressing check: " + blocker + " blocks the " + (_sideSign > 0 ? "sim +z" : "sim -z") + " side; other side " +
+                    (blocker2 == null ? "clear: switched" : "blocked too by " + blocker2 + ": kept, FAILED"));
+                if (blocker2 == null) { _sideSign = -_sideSign; pos = other; }
+                else _failed++;
+            }
+            else Log(n + ": side camera dressing check: clear");
             _sideCamPos = pos;
             _sideCamRot = Quaternion.LookRotation(focus - pos, Vector3.up);
             Vector3 vp = new Vector3(float.NaN, float.NaN, float.NaN);
@@ -370,7 +427,8 @@ namespace CriticalMass.Runtime.View.Anim
             ModelView mv = views != null ? views.ModelOf(0) : null;
             ActorAnimator anim = views != null ? views.AnimatorOf(0) : null;
             if (mv == null || anim == null || anim.TipHand == null) { Log(n + ": swing table: no measured tip"); return; }
-            string clip = AttackTiming.AttackClip(mv, cls);
+            // b11-c: the clip the animator measured and plays (Healer: the lantern swing's Attack), on the drawn pose
+            string clip = anim.MeasuredClip != null && anim.TipModel == mv ? anim.MeasuredClip : AttackTiming.SwingClip(mv, cls, w.Config);
             float len = clip != null ? mv.ClipLength(clip) : 0f;
             if (len <= 0f) { Log(n + ": swing table: no attack clip"); return; }
             double fact = ClipFacts.Contact(clip, len * 0.5f), view = anim.ViewContact(clip, fact);
@@ -378,16 +436,14 @@ namespace CriticalMass.Runtime.View.Anim
             dir.y = 0f;
             dir.Normalize();
             var sb = new System.Text.StringBuilder();
-            sb.Append(n).Append(": swing table (clip ").Append(clip).Append(", striking end ").Append(anim.StrikingEnd)
+            sb.Append(n).Append(": swing table (drawn pose: idle legs, clip on the upper layer; clip ").Append(clip).Append(", striking end ").Append(anim.StrikingEnd)
               .Append(", C contact ").Append(fact.ToString("0.000")).Append(" s, V view contact ").Append(view.ToString("0.000")).Append(" s):");
             double bestF = double.NegativeInfinity, bestT = 0;
             const int samples = 24;
             for (int k = 0; k <= samples; k++)
             {
                 double t = len * k / samples;
-                mv.BeginPose();
-                mv.Pose(clip, t, 1f, false);
-                if (!mv.Evaluate(true)) break;
+                if (!AttackTiming.PoseDrawn(mv, clip, t)) break;
                 double f = Vector3.Dot(anim.TipHand.TransformPoint(anim.TipLocalNow) - mv.Transform.position, dir);
                 if (f > bestF) { bestF = f; bestT = t; }
                 bool atC = Math.Abs(t - fact) <= len / samples * 0.5, atV = Math.Abs(t - view) <= len / samples * 0.5;
@@ -402,12 +458,23 @@ namespace CriticalMass.Runtime.View.Anim
         /// the LIVE model (ActorViews.ModelOf(0) now, its own hand and tip: never the animator's cache, which kept the first
         /// class's model after the views swapped actor 0 to the next class). NaN: no model or hand.
         /// </summary>
-        double TipAhead(ActorViews views, World w, out string source)
+        double TipAhead(ActorViews views, World w, ClassId cls, out string source)
         {
             source = "no model";
             ModelView mv = views != null ? views.ModelOf(0) : null;
             if (mv == null) return double.NaN;
-            Vector3 local = HitPose.TipLocal(mv, out Transform hand, out source);
+            // b11-c: the STRIKING end the animator measured on this live model (hit-feel-7 read end "a" here even when the
+            // swing strikes with the other end), else the class's strike ends (the Healer's lantern hand).
+            ActorAnimator anim = views.AnimatorOf(0);
+            Vector3 local;
+            Transform hand;
+            if (anim != null && anim.TipModel == mv && anim.TipHand != null)
+            {
+                local = anim.TipLocalNow;
+                hand = anim.TipHand;
+                source = "striking end " + anim.StrikingEnd + " on " + hand.name;
+            }
+            else local = HitPose.StrikeEnds(mv, cls, out hand, out _, out source);
             if (hand == null) return double.NaN;
             Vector3 dir = SimSpace.ToWorld(w.X[_dummy] - w.X[0], 0, w.Z[_dummy] - w.Z[0]);
             dir.y = 0f;
@@ -447,27 +514,102 @@ namespace CriticalMass.Runtime.View.Anim
         }
 
         /// <summary>
-        /// fix/hit-feel-5 (the empty dark side strips: the camera stood inside a wall or under higher ground on the -z
-        /// side): the side with more open floor at or below the pair's ground over the camera's 6 u, and a lift over any
-        /// higher ground left on that line.
+        /// b12-c2 (capture only, once per class): the name of the first drawn renderer whose bounds the ray from the camera
+        /// to the pair's chest enters more than 1 u short of the pair, else null. Skipped: renderers near the pair (the two
+        /// fighters, their rings and props: bounds centre within 1.5 u of the chest point horizontally) and large ones (more
+        /// than 6 u across: the ground and water chunks, which the grid check covers).
         /// </summary>
-        void PickSide(World w, double x, double z, double g0)
+        static string DressingBlocker(Vector3 cam, Vector3 focus)
         {
-            int bestClear = -1;
-            for (int s = 0; s < 2; s++)
+            Vector3 d = focus - cam;
+            float len = d.magnitude;
+            if (len < 1e-3f) return null;
+            var ray = new Ray(cam, d / len);
+            foreach (Renderer r in UnityEngine.Object.FindObjectsByType<Renderer>(FindObjectsSortMode.None))
             {
-                double sign = s == 0 ? 1 : -1;   // world -z camera = sim +z
-                int clear = 0;
-                double top = g0;
-                for (int k = 1; k <= 6; k++)
-                {
-                    double cz = z + sign * k;
-                    double g = GroundHeight.At(w.Map, x, cz);
-                    if (Floor(w, x, cz) && g <= g0 + 0.3) clear++;
-                    if (g > top) top = g;
-                }
-                if (clear > bestClear) { bestClear = clear; _sideSign = (float)sign; _sideLift = (float)Math.Max(0, top - g0); }
+                if (r == null || !r.enabled || !r.gameObject.activeInHierarchy) continue;
+                Bounds b = r.bounds;
+                if (b.size.x > 6f || b.size.z > 6f) continue;
+                Vector2 h = new Vector2(b.center.x - focus.x, b.center.z - focus.z);
+                if (h.magnitude < 1.5f) continue;
+                if (b.IntersectRay(ray, out float at) && at < len - 1f) return r.name;
             }
+            return null;
+        }
+
+        /// <summary>b12-c2: half the frame's width at the pair checked beside the centre line, the sight-line step, the lifts tried.</summary>
+        public const double SightShoulder = 0.6, SightStep = 0.25, SightClearance = 0.1;
+        static readonly float[] Lifts = { 0f, 0.5f, 1f, 1.5f, 2f, 3f };
+
+        /// <summary>
+        /// b12-c2 (pure; the Builder side strip was a wall face): samples on the sight line from the pair's chest (sim x, z,
+        /// height eye) to a camera dist u away on the sim z side sign at height cam, on the centre line and on both shoulder
+        /// lines (x +- SightShoulder), every SightStep: a sample is blocked when its cell is off the map or not walkable (a
+        /// wall, rock or void cell) or its ground rises within SightClearance of the line. Returns the blocked count (0 =
+        /// clear). Allocation-free.
+        /// </summary>
+        public static int SightBlocked(MapDef map, double x, double z, double sign, double eye, double cam, double dist)
+        {
+            int blocked = 0;
+            int steps = (int)Math.Ceiling(dist / SightStep);
+            for (int k = 1; k <= steps; k++)
+            {
+                double f = (double)k / steps;
+                double sz = z + sign * dist * f;
+                double line = eye + (cam - eye) * f;
+                for (int l = -1; l <= 1; l++)
+                {
+                    double sx = x + l * SightShoulder;
+                    int cx = (int)Math.Floor(sx), cz = (int)Math.Floor(sz);
+                    // off the map and void cells are open air (nothing drawn there): the camera may hang over them
+                    if (!MapGrid.InBounds(map, cx, cz)) continue;
+                    bool walk = MapGrid.IsWalkable(map, cx, cz);
+                    int cell = map.Cells[cz * map.Width + cx];
+                    if (!walk && cell != Cell.Void) { blocked++; continue; }
+                    if (walk && GroundHeight.At(map, sx, sz) > line - SightClearance) blocked++;
+                }
+            }
+            return blocked;
+        }
+
+        /// <summary>
+        /// b12-c2 (replaces fix/hit-feel-5's open-floor count, which looked only at floor cells on the pair's own x and could
+        /// not see a wall beside the line or a wall cell's height): the side camera's side and lift by a clear LINE OF SIGHT
+        /// over the map grid's cells (SightBlocked), both sides tried at each lift in Lifts, lowest lift first, the sim +z
+        /// side first at a tie. Logs which side and lift were used and both sides' blocked counts; if no side is clear at
+        /// any lift, the least blocked side at the highest lift, logged as FAILED (the strip may show a wall).
+        /// </summary>
+        void PickSide(World w, string n, double x, double z, double g0)
+        {
+            double eye = g0 + ChestHeight;
+            int bestBlocked = int.MaxValue;
+            float bestSign = 1f, bestLift = Lifts[Lifts.Length - 1];
+            int plus = -1, minus = -1;
+            bool found = false;
+            for (int li = 0; li < Lifts.Length && !found; li++)
+            {
+                double cam = eye + SideHeight + Lifts[li];
+                plus = SightBlocked(w.Map, x, z, 1, eye, cam, SideDistance);
+                minus = SightBlocked(w.Map, x, z, -1, eye, cam, SideDistance);
+                if (plus == 0 || minus == 0)
+                {
+                    bestSign = plus == 0 ? 1f : -1f;
+                    bestLift = Lifts[li];
+                    bestBlocked = 0;
+                    found = true;
+                }
+                else if (li == Lifts.Length - 1)
+                {
+                    bestSign = plus <= minus ? 1f : -1f;
+                    bestBlocked = Math.Min(plus, minus);
+                }
+            }
+            _sideSign = bestSign;
+            _sideLift = bestLift;
+            Log(n + ": side camera line of sight: used the sim " + (bestSign > 0 ? "+z (world -z)" : "-z (world +z)") + " side, lift " +
+                bestLift.ToString("0.00") + " u; blocked samples sim +z " + plus + ", sim -z " + minus +
+                (found ? " (clear)" : "; FAILED: no clear side at any lift, least blocked used (" + bestBlocked + ")"));
+            if (!found) _failed++;
         }
 
         /// <summary>Horizontal distance from actor 0's drawn root to its weapon hand along the line to the dummy (NaN: no rig).</summary>

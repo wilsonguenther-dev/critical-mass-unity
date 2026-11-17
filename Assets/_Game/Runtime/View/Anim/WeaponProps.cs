@@ -21,12 +21,8 @@ namespace CriticalMass.Runtime.View.Anim
             return lw != null ? lw.ArcDeg : c.Class(cls).AttackArcDeg;
         }
 
-        /// <summary>The reach a swing of cls draws (u).</summary>
-        public static double Range(GameConfig c, ClassId cls)
-        {
-            LightWeapon lw = On(c, cls);
-            return lw != null ? lw.Range : c.Class(cls).AttackRange;
-        }
+        /// <summary>The reach a swing of cls draws (u): the sim's own (b11-c: Combat.ReachOf, the weapon-reach table in Full).</summary>
+        public static double Range(GameConfig c, ClassId cls) => Combat.ReachOf(c, cls);
 
         /// <summary>True when a hit by an attacker of attCls shoves (so the hit shows the push-back dust).</summary>
         public static bool Shoves(GameConfig c, bool hasAttacker, ClassId attCls)
