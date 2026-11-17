@@ -141,7 +141,7 @@ namespace CriticalMass.Runtime.Hud
             Actor a = w.Actors[me];
             if (!a.Alive) return -1;
             int pillar = PillarModeHere(w, me);
-            bool miner = a.Cls == ClassId.Miner;
+            bool miner = a.Cls == Terraform.OwnerClass(w);   // b13 r2: the dig / place strip follows the class that owns terrain (the Builder with the hut rule)
             // feat/terrain-affordances (e): the other terrain classes keep their resource in the same strip.
             if (pillar == 0 && !miner)
             {

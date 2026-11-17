@@ -96,7 +96,7 @@ namespace CriticalMass.Runtime.Progression
                 case ClassId.Miner:   // b13-v: the Miner mines and hauls (no barricades, no digging)
                     return CriticalMass.Runtime.Menus.B13ClassWords.MinerHaul + " " + CriticalMass.Runtime.Menus.B13ClassWords.MinerMine;
                 case ClassId.Builder:   // b13-v: players read STAIRS where the sim says ladder
-                    return CriticalMass.Runtime.Menus.B13ClassWords.BuilderStairs + " " + CriticalMass.Runtime.Menus.B13ClassWords.BuilderBuild;
+                    return CriticalMass.Runtime.Menus.B13ClassWords.BuilderStairs + " " + CriticalMass.Runtime.Menus.B13ClassWords.BuilderDig;   // b13 r2: walls are cut; F digs and places
                 default:
                     return "Arrives in a later build.";
             }

@@ -60,7 +60,7 @@ namespace CriticalMass.Runtime.Onboarding
             switch (f)
             {
                 case TrialFeature.Jump: return HasJump();
-                case TrialFeature.Terraform: return HasTerraform() && !MinerOnlyMines();   // b13: with the hut rule the Miner mines, so his dig/place steps are off
+                case TrialFeature.Terraform: return HasTerraform();   // b13 r2: dig / place is the Builder's (the steps say OnlyClass Builder); was off while the Miner mines   // b13: with the hut rule the Miner mines, so his dig/place steps are off
                 case TrialFeature.Map: return HasMap();
                 default: return true;
             }

@@ -225,9 +225,9 @@ namespace CriticalMass.Runtime.PlayTests
         // ---------------------------------------------------------------- 1. ground removable and placeable by miners
 
         [UnityTest]
-        public IEnumerator Need1_MinerDigsWithF_TheHoleIsReal_CarriesTheBlock_PlacesItAtTheEdge_WalksOnIt()
+        public IEnumerator Need1_BuilderDigsWithF_TheHoleIsReal_CarriesTheBlock_PlacesItAtTheEdge_WalksOnIt()
         {
-            Restart(ClassId.Miner, 5);
+            Restart(ClassId.Builder, 5);   // b13 r2: dig / place is the Builder's (owner decision)
             PadDef pad = W.Map.Pads[(int)TeamId.Azure];
             Assert.IsTrue(OpenSpot(pad.X + 7, pad.Z, out int sx, out int sz), "an open floor patch on the base island");
             Teleport(sx + 0.5, sz + 0.5);
@@ -274,7 +274,7 @@ namespace CriticalMass.Runtime.PlayTests
             Assert.IsTrue(EdgeSpot(W.X[0], W.Z[0], out int fx, out int fz, out int vx, out int vz), "an island edge to build on");
             // Stand at the back of the edge cell so the aim point, pulled back to Reach (1.6 u), lands on the first void cell.
             double ex0 = fx + 0.5 - (vx - fx) * 0.25, ez0 = fz + 0.5 - (vz - fz) * 0.25;
-            if (!Collide.ActorFits(W, ex0, ez0, C.Class(ClassId.Miner).Radius)) { ex0 = fx + 0.5; ez0 = fz + 0.5; }
+            if (!Collide.ActorFits(W, ex0, ez0, C.Class(ClassId.Builder).Radius)) { ex0 = fx + 0.5; ez0 = fz + 0.5; }
             Teleport(ex0, ez0);
             _driver.StepTicks((int)Math.Ceiling(1.5 * C.SimHz));   // the team's terraform cooldown
             yield return Pad(Vector2.zero, Vector2.zero, 0f, GamepadButton.RightShoulder);
@@ -499,9 +499,9 @@ namespace CriticalMass.Runtime.PlayTests
         [UnityTest]
         public IEnumerator Need3_SpaceAndTheGamepadButtonJumpOverAOneCellGapAndOntoAOneStepLedge()
         {
-            Restart(ClassId.Miner, 5);
+            Restart(ClassId.Builder, 5);   // b13 r2: the Builder digs the trench (owner decision)
             var notes = new List<string>();
-            // A one-cell gap: dig one with the miner (the creator's own combo: dig a trench, jump it) in open ground.
+            // A one-cell gap: dig one with the Builder (the creator's own combo: dig a trench, jump it) in open ground.
             PadDef pad = W.Map.Pads[(int)TeamId.Azure];
             Assert.IsTrue(OpenSpot(pad.X + 7, pad.Z, out int sx, out int sz));
             Teleport(sx + 0.5, sz + 0.5);
@@ -828,14 +828,14 @@ namespace CriticalMass.Runtime.PlayTests
         // ---------------------------------------------------------------- teaching: guided match, quick demo, the tour
 
         [UnityTest]
-        public IEnumerator Teach_TheTourStartsAsAMinerWithFourPromptsAndTheFirstMatchAndDemoNameTerrainAndCorruption()
+        public IEnumerator Teach_TheTourStartsAsABuilderWithFourPromptsAndTheFirstMatchAndDemoNameTerrainAndCorruption()
         {
             yield return null;
             Assert.IsTrue(CreatorsTour.Begin(), "the tour starts on the running game");
             yield return null;
             try
             {
-                Assert.AreEqual(ClassId.Miner, W.Actors[0].Cls, "the tour plays a Miner");
+                Assert.AreEqual(ClassId.Builder, W.Actors[0].Cls, "the tour plays a Builder (b13 r2: he digs and places)");
                 Assert.AreEqual(4, CreatorsTour.Steps.Length, "four prompts");
                 Assert.IsTrue(Trial.IsRunning, "the tour's guide runs");
                 Assert.AreEqual("tour-dig", Trial.Guide.Runner.ActiveStep.Id, "the first prompt is dig and place");
@@ -852,7 +852,7 @@ namespace CriticalMass.Runtime.PlayTests
                 string[] ids = Array.ConvertAll(TrialSteps.Default, s => s.Id);
                 CollectionAssert.Contains(ids, "topple", "the first match teaches the knock-down pillar");
                 CollectionAssert.Contains(ids, "corruption", "the first match teaches corruption");
-                CollectionAssert.Contains(ids, "dig", "the first match teaches digging (Miner)");
+                CollectionAssert.Contains(ids, "dig", "the first match teaches digging (Builder)");
                 bool demoTerrain = Array.Exists(QuickDemo.Beats, b => b.Id == "demo.terrain");
                 bool demoCorrupt = Array.Exists(QuickDemo.Beats, b => b.Id == "demo.corrupt");
                 Assert.IsTrue(demoTerrain && demoCorrupt, "the quick demo names terrain and corruption");

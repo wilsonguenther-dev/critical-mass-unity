@@ -231,8 +231,15 @@ namespace CriticalMass.Runtime.View.Affordance
             double r = all ? RadiusAll : Radius;
             switch (a.Cls)
             {
-                case ClassId.Miner: ScanMiner(w, id, a, ax, az, r); return true;
-                case ClassId.Builder: ScanBuilder(w, id, a, ax, az, r); return true;
+                case ClassId.Miner:
+                    if (Terraform.OwnerClass(w) != ClassId.Miner) return false;   // b13 r2: with the hut rule the Miner mines (his F is MINE)
+                    ScanMiner(w, id, a, ax, az, r);
+                    return true;
+                case ClassId.Builder:
+                    ScanBuilder(w, id, a, ax, az, r);
+                    // b13 r2: the Builder owns dig / place with the hut rule: F on the second line unless E has a piece to carry or a bridge to mend
+                    if (Terraform.OwnerClass(w) == ClassId.Builder && !Secondary.Has) DigPlace(w, id, a, ax, az, r, Secondary, false);
+                    return true;
                 case ClassId.Farmer: ScanFarmer(w, id, a, r); return true;
                 case ClassId.Demolitions: ScanDemolitions(w, id, a, ax, az, r); return true;
                 default: return false;
@@ -289,7 +296,12 @@ namespace CriticalMass.Runtime.View.Affordance
 
         // ------------------------------------------------------------------ Miner
 
-        void ScanMiner(World w, int id, Actor a, double ax, double az, double r)
+        /// <summary>
+        /// b13 r2: the dig / place target (Terraform.Dig / Place, checks in the Sim's order) and its markers, written into p:
+        /// the Miner's primary in Classic / PhysicsOnly, the Builder's secondary while he owns terrain (Terraform.OwnerClass).
+        /// breakWalls adds the Miner's wall-break markers.
+        /// </summary>
+        void DigPlace(World w, int id, Actor a, double ax, double az, double r, AffTarget p, bool breakWalls)
         {
             GameConfig c = w.Config;
             MapDef m = w.Map;
@@ -314,7 +326,7 @@ namespace CriticalMass.Runtime.View.Affordance
                         byte t = m.Cells[cz * m.Width + cx];
                         if (t == Cell.BreakableIntact || t == Cell.BreakableCracked)
                         {
-                            Add(AffAction.BreakWall, cx, cz, cx + 0.5, cz + 0.5, D2(cx + 0.5, cz + 0.5, ox, oz) <= c.Abilities.MinerWallBreak.Reach * c.Abilities.MinerWallBreak.Reach);
+                            if (breakWalls) Add(AffAction.BreakWall, cx, cz, cx + 0.5, cz + 0.5, D2(cx + 0.5, cz + 0.5, ox, oz) <= c.Abilities.MinerWallBreak.Reach * c.Abilities.MinerWallBreak.Reach);
                             continue;
                         }
                         if (place)
@@ -327,7 +339,6 @@ namespace CriticalMass.Runtime.View.Affordance
             }
 
             // Primary: the dig / place key (Terraform.Dig / Place, checks in the Sim's order).
-            AffTarget p = Primary;
             p.Has = true;
             p.Button = "DigPlace";
             p.Action = place ? AffAction.PlaceBlock : AffAction.Dig;
@@ -352,6 +363,15 @@ namespace CriticalMass.Runtime.View.Affordance
                 if (why == 0) p.Valid = true;
                 else Refuse(p, MinerWhy(w, why, place, tx, tz));
             }
+        }
+
+        void ScanMiner(World w, int id, Actor a, double ax, double az, double r)
+        {
+            DigPlace(w, id, a, ax, az, r, Primary, true);
+            GameConfig c = w.Config;
+            MapDef m = w.Map;
+            double ox = w.X[id], oz = w.Z[id];
+            bool place = Terraform.ModeOf(w, id) == TerraformMode.Place;
 
             // Secondary: the barricade on Space (Abilities.CastMinerBarricade's aim rule, Barricades.BarricadeRefusal).
             AffTarget s = Secondary;

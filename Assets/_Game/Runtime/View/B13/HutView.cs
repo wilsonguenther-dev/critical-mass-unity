@@ -35,7 +35,7 @@ namespace CriticalMass.Runtime.View.B13
         Transform[] _flecks;
         int[] _veinIndex;
         Transform[] _lump;
-        int _cursor;
+        readonly int[] _seenLevel = { 0, 0 };
 
         void Start()
         {
@@ -63,7 +63,8 @@ namespace CriticalMass.Runtime.View.B13
         {
             if (_root != null) Destroy(_root.gameObject);
             _world = w;
-            _cursor = w.EventHead;
+            _seenLevel[0] = Blacksmith.Level(w, TeamId.Azure);
+            _seenLevel[1] = Blacksmith.Level(w, TeamId.Crimson);
             _root = new GameObject("Hut View").transform;
             _root.SetParent(transform, false);
             if (!Blacksmith.On(w)) return;
@@ -148,13 +149,13 @@ namespace CriticalMass.Runtime.View.B13
             if (!ReferenceEquals(w, _world)) Bind(w);
             if (!Blacksmith.On(w) || _vein == null) return;
             float now = Time.time;
-            // Events: the level pulse (the ring buffer may have wrapped; skip what is gone).
-            if (w.EventHead - _cursor > World.EventCapacity || w.EventHead < _cursor) _cursor = w.EventHead - World.EventCapacity;
-            if (_cursor < 0) _cursor = 0;
-            for (; _cursor < w.EventHead; _cursor++)
+            // The level pulse: a team's hut level rose since the last frame (b13 r2: read from state; views read world events
+            // only through the bus, WorldReactionsTests).
+            for (int tm = 0; tm < 2; tm++)
             {
-                SimEvent e = w.Events[_cursor % World.EventCapacity];
-                if (e.Type == SimEventType.HutLevel && e.A >= 0 && e.A < 2) _pulseAt[e.A] = now;
+                int lv = Blacksmith.Level(w, (TeamId)tm);
+                if (lv > _seenLevel[tm]) _pulseAt[tm] = now;
+                _seenLevel[tm] = lv;
             }
             for (int t = 0; t < 2; t++)
             {

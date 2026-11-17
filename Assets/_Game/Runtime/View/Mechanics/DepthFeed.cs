@@ -21,6 +21,9 @@ namespace CriticalMass.Runtime.View.Mechanics
         public static event Action<string, string> Announced;
         /// <summary>Muted by tests that drive the feed without a scene.</summary>
         public static bool Quiet;
+        /// <summary>b13 r2: a corruption roll happened (true = the Kaiju went wild). The HUD banner subscribes, so no HUD reads the event ring.</summary>
+        public static event Action<bool> CorruptionRolled;
+        public static void Rolled(bool wild) { CorruptionRolled?.Invoke(wild); }
 
         public static void Say(string line, int pickup = -1, int call = -1) { if (!string.IsNullOrEmpty(line)) Line?.Invoke(line, pickup, call); }
         public static void Tell(string prompt, float seconds = 2.5f) { if (!string.IsNullOrEmpty(prompt)) Prompt?.Invoke(prompt, seconds); }
@@ -145,6 +148,7 @@ namespace CriticalMass.Runtime.View.Mechanics
                     if (DepthEvents.DeliveryVisual(e.Bio) == DepthVisual.CoolPulse) { AddPop(e.X, e.Z, 2.4, now, PopCool, e.A, 0); DepthOut.Sound("depth-egg-cool"); }
                     continue;
                 }
+                if (e.Type == SimEventType.CorruptionRoll) DepthOut.Rolled(w.Kaiju != null && w.Kaiju.State == KaijuState.Berserk);   // b13 r2
                 int ix = DepthEvents.IndexOf((int)e.Type);
                 if (ix < 0) continue;
                 Seen++;

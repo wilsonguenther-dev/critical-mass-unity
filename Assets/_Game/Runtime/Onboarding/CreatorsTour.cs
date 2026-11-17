@@ -36,7 +36,7 @@ namespace CriticalMass.Runtime.Onboarding
             new TrialStep
             {
                 Id = "tour-dig", Prompt = "1/4  {DigPlace} digs a block. At the edge, {DigPlace} builds new ground.",
-                Goal = TrialGoal.Place, Target = TrialTarget.Gap, Param = 3.5, OnlyClass = ClassId.Miner, Needs = TrialFeature.Terraform,
+                Goal = TrialGoal.Place, Target = TrialTarget.Gap, Param = 3.5, OnlyClass = ClassId.Builder, Needs = TrialFeature.Terraform,
             },
             new TrialStep
             {
@@ -50,7 +50,7 @@ namespace CriticalMass.Runtime.Onboarding
             },
             new TrialStep
             {
-                Id = "tour-egg", Prompt = "4/4  Corruption to the egg: one load here and it hatches berserk.",
+                Id = "tour-egg", Prompt = "4/4  Walk to the egg. One corruption load here hatches it berserk.",
                 Goal = TrialGoal.ReachTarget, Target = TrialTarget.Shrine, Param = 4.5,
             },
         };
@@ -71,7 +71,7 @@ namespace CriticalMass.Runtime.Onboarding
             if (req != null)
             {
                 req.PassiveBotSeconds = PassiveSeconds;
-                req.HumanClass = ClassId.Miner;
+                req.HumanClass = ClassId.Builder;   // b13 r2: the Builder digs and places (owner decision)
             }
             if (cfg == null) return;
             cfg.MatchSeconds = Math.Max(cfg.MatchSeconds, TourMatchSeconds);
@@ -86,7 +86,7 @@ namespace CriticalMass.Runtime.Onboarding
         /// <summary>Starts the tour on the running game (in a match). False without a game.</summary>
         public static bool Begin()
         {
-            bool ok = Trial.Start(null, ClassId.Miner, Steps, Tune);
+            bool ok = Trial.Start(null, ClassId.Builder, Steps, Tune);
             IsRunning = ok;
             Trial.Finished -= OnFinished;
             if (ok) Trial.Finished += OnFinished;
@@ -111,7 +111,7 @@ namespace CriticalMass.Runtime.Onboarding
                 MatchSetupChoice keep = GameFlow.LastSetup;
                 Trial.PendingStart = true;
                 Trial.PendingTour = true;
-                GameFlow.BeginMatch(new MatchSetupChoice { Team = keep.Team, Class = ClassId.Miner, TeamSize = 5, Pace = 1, Mode = MatchMode.Training });
+                GameFlow.BeginMatch(new MatchSetupChoice { Team = keep.Team, Class = ClassId.Builder, TeamSize = 5, Pace = 1, Mode = MatchMode.Training });
                 GameFlow.LastSetup = keep;
                 return;
             }

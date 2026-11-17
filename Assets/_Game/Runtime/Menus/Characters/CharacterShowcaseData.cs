@@ -112,15 +112,15 @@ namespace CriticalMass.Runtime.Menus.Characters
             },
             new ShowcaseClass
             {
-                Id = ClassId.Builder, FileId = "builder", Name = "BUILDER", Role = "Builds stairs and bridges.",
-                Summary = "Builds stairs onto high ground and bridges over gaps, so the team gets where it needs to be.",
-                FAction = "", Ability = "STAIRS / BRIDGE",
+                Id = ClassId.Builder, FileId = "builder", Name = "BUILDER", Role = "Shapes the ground and builds the way.",
+                Summary = "Digs and fills the ground, builds stairs onto high ground and bridges over gaps.",
+                FAction = "DIG / PLACE", Ability = "STAIRS / BRIDGE",
                 Slides = new[]
                 {
+                    S("DIG", "F digs a block of ground and carries it."),
+                    S("PLACE", "F at an edge or a hole puts the block back as ground."),
                     S("STAIRS", "STAIRS lift the team onto higher ground."),
                     S("BRIDGE", "BRIDGE spans a gap the team cannot jump."),
-                    S("STAIRS AND BRIDGES", "Space builds the one the ground in front of you needs."),
-                    S("JUMP", "Jump clears gaps."),
                 },
             },
             new ShowcaseClass

@@ -923,11 +923,13 @@ namespace CriticalMass.Runtime.View.Affordance
             _promptShown = PromptPillShown = true;
         }
 
-        static string HintFor(ClassId c, ControlDevice d)
+        static string HintFor(ClassId c, ControlDevice d, bool builderDigs)
         {
             string show = Glyph(ShowAction, d);
             switch (c)
             {
+                case ClassId.Miner when builderDigs: return TrialText.Fill("MINER: {DigPlace} mines ore at a vein, {Interact} banks it at your hut, {Ability} hauls it home fast. Hold " + show + " to see everything you can use.", d);
+                case ClassId.Builder when builderDigs: return TrialText.Fill("BUILDER: {DigPlace} digs the marked ground and places it back, {Ability} builds the ladder or bridge shown. Hold " + show + " to see everything you can use.", d);
                 case ClassId.Miner: return TrialText.Fill("MINER: {DigPlace} digs the marked ground and places it back, {Ability} drops a barricade. Hold " + show + " to see everything you can use.", d);
                 case ClassId.Builder: return TrialText.Fill("BUILDER: face a cliff or a gap; {Ability} builds the ladder or bridge shown, {Interact} carries one. Hold " + show + " to see everything you can use.", d);
                 case ClassId.Farmer: return TrialText.Fill("FARMER: hold {Interact} at the green markers to gather, then feed the egg at the shrine. Hold " + show + " to see everything you can use.", d);
@@ -964,7 +966,7 @@ namespace CriticalMass.Runtime.View.Affordance
             if (key != _hintKey)
             {
                 _hintKey = key;
-                _hint = HintFor(me.Cls, ControlBindings.ActiveDevice);
+                _hint = HintFor(me.Cls, ControlBindings.ActiveDevice, Terraform.OwnerClass(w) == ClassId.Builder);
                 HudText.Set(_hintLabel, _hint);
             }
             if (!_hintChip.gameObject.activeSelf) _hintChip.gameObject.SetActive(true);

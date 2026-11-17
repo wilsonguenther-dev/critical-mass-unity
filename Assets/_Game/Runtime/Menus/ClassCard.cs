@@ -428,6 +428,11 @@ namespace CriticalMass.Runtime.Menus
         public const string BuilderBuild = "BUILD the selected piece where the outline shows.";
         public const string BuilderSwitch = "Short wall, tall wall (hut level 2), block. A block dropped in a hole fills it.";
         public const string BuilderStairs = "STAIRS over a wall, BRIDGE over a gap.";
+        /// <summary>b13 r2 (owner decision: terrain belongs to the Builder and the Demolitionist): the Builder's F while the hut rule is on.</summary>
+        public const string BuilderDig = "DIG a block of ground with F, then F at an edge or a hole places it back.";
+        public const string BuilderDigSwitch = "The wheel or LB / RB flips between dig and place.";
+        public const string BuilderDigRole = "Shapes the ground and builds the way.";
+        public const string BuilderDigBio = "Digs holes and fills them, builds new ground at an edge, stairs onto high ground and bridges over gaps.";
         public const string Dodge = "DODGE: a quick dash; you cannot be hit for a moment. 3 s to recharge.";
         public const string Jump = "JUMP clears gaps and short walls.";
 
@@ -463,6 +468,24 @@ namespace CriticalMass.Runtime.Menus
                     new AbilityWords { Input = "ability", Name = "Stairs and Bridges", Text = BuilderStairs, Cooldown = "", NeedsRule = "" },
                 };
                 w.Early = false;
+            }
+            // b13 r2: with the walls cut and the hut rule on, the Builder owns the dig / place terraform (Terraform.OwnerClass)
+            else if (b < all.Length && all[b] != null)
+            {
+                CriticalMass.Sim.Config.GameConfig d = CriticalMass.Sim.Config.GameConfig.CreateDefault();
+                if (d.Depth.Hut.On && d.Depth.Hut.BuilderTerraform)
+                {
+                    ClassWords w = all[b];
+                    w.Role = BuilderDigRole;
+                    w.Bio = BuilderDigBio;
+                    w.Abilities = new[]
+                    {
+                        new AbilityWords { Input = "throw", Name = "Dig and Place", Text = BuilderDig, Cooldown = "", NeedsRule = "" },
+                        new AbilityWords { Input = "switch", Name = "Dig or Place", Text = BuilderDigSwitch, Cooldown = "", NeedsRule = "" },
+                        new AbilityWords { Input = "ability", Name = "Stairs and Bridges", Text = BuilderStairs, Cooldown = "", NeedsRule = "" },
+                    };
+                    w.Early = false;
+                }
             }
         }
 

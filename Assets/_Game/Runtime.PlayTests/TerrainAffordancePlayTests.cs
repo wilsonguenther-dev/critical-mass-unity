@@ -96,12 +96,12 @@ namespace CriticalMass.Runtime.PlayTests
         }
 
         /// <summary>A floor cell and facing near the spawn where ok(scan) holds; actor 0 is left standing there.</summary>
-        bool FindSpot(Func<AffordanceScan, bool> ok, int maxRing = 60)
+        bool FindSpot(Func<AffordanceScan, bool> ok, int maxRing = 60, int minRing = 0)
         {
             var scan = new AffordanceScan { RouteBudget = 0 };
             MapDef m = W.Map;
             int sx = JsMath.FloorToInt(W.X[0]), sz = JsMath.FloorToInt(W.Z[0]);
-            for (int ring = 0; ring <= maxRing; ring++)
+            for (int ring = minRing; ring <= maxRing; ring++)
             for (int cz = sz - ring; cz <= sz + ring; cz++)
             for (int cx = sx - ring; cx <= sx + ring; cx++)
             {
@@ -174,15 +174,18 @@ namespace CriticalMass.Runtime.PlayTests
         }
 
         [UnityTest]
-        public IEnumerator Miner_MarkersShow_AndFDigsTheOutlinedCell()
+        public IEnumerator Builder_DigMarkersShow_AndFDigsTheOutlinedCell()
         {
-            Restart(ClassId.Miner);
+            // b13 r2 (owner decision): dig / place is the Builder's while the hut rule is on; it is his second prompt line
+            // (the first stays Space STAIRS / BRIDGE) unless E has a piece to carry.
+            Restart(ClassId.Builder);
             double start = W.Match.Time;
             TerrainAffordanceView v = View();
-            Assert.IsTrue(FindSpot(s => s.Primary.Valid && s.MarkerCount >= 3), "a diggable patch");
+            Assert.IsTrue(FindSpot(s => s.Secondary.Has && s.Secondary.Action == AffAction.Dig && s.Secondary.Valid && s.MarkerCount >= 3), "a diggable patch");
             yield return Shows(v, "DIG");
             StringAssert.Contains(TerrainAffordanceView.Glyph("DigPlace", ControlBindings.ActiveDevice), v.PromptText, "the prompt names the bound key");
-            int cx = v.Scan.Primary.Cx, cz = v.Scan.Primary.Cz;
+            Assert.AreEqual(AffAction.Dig, v.Scan.Secondary.Action, "the view's own scan offers DIG");
+            int cx = v.Scan.Secondary.Cx, cz = v.Scan.Secondary.Cz;
             int head = W.EventHead;
             yield return Keys(Key.F);
             _driver.StepTicks(1);
@@ -199,10 +202,20 @@ namespace CriticalMass.Runtime.PlayTests
             Restart(ClassId.Builder);
             double start = W.Match.Time;
             TerrainAffordanceView v = View();
-            Assert.IsTrue(FindSpot(s => s.Primary.Action == AffAction.Build && s.Primary.Valid), "a cliff or gap to build across");
-            yield return Shows(v, "BUILD");
+            // b13 r2: the spot is found with a facing-only scan, but the view scans a tick later with its own aim and a crowd
+            // that moved (bots now walk to the ore veins and the hut), so one spot can turn red in between. Each try prints the
+            // view's verdict; the ghost colour must always equal it, and some try must be green.
+            bool green = false;
+            for (int k = 0; k < 6 && !green; k++)
+            {
+                Assert.IsTrue(FindSpot(s => s.Primary.Action == AffAction.Build && s.Primary.Valid, 60, k * 6), "a cliff or gap to build across");
+                yield return Shows(v, "BUILD");
+                Debug.Log($"[Affordance] Builder try {k}: view verdict {v.Scan.Primary.Valid} ({v.Scan.Primary.Why}), ghost cells {v.GhostCellsDrawn}, ghost green {v.GhostValid}");
+                Assert.AreEqual(v.Scan.Primary.Valid, v.GhostValid, "the ghost colour is the view's own verdict");
+                green = v.GhostValid;
+            }
             Assert.Greater(v.GhostCellsDrawn, 0, "the placement ghost");
-            Assert.IsTrue(v.GhostValid, "green when valid");
+            Assert.IsTrue(green, "green when valid (tries above)");
             int head = W.EventHead;
             yield return Pad(GamepadButton.East);
             _driver.StepTicks(1);

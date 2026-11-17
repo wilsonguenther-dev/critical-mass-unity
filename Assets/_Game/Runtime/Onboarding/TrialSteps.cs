@@ -138,19 +138,19 @@ namespace CriticalMass.Runtime.Onboarding
             new TrialStep
             {
                 Id = "dig", Prompt = "Dig in. {DigPlace} scoops up the ground.", Goal = TrialGoal.Dig, Target = TrialTarget.Self,
-                Param = 2.5, OnlyClass = ClassId.Miner, Needs = TrialFeature.Terraform,
+                Param = 2.5, OnlyClass = ClassId.Builder, Needs = TrialFeature.Terraform,
             },
             new TrialStep
             {
                 Id = "place", Prompt = "Now fill the gap. {DigPlace} again.", Goal = TrialGoal.Place, Target = TrialTarget.Gap,
-                Param = 2.5, OnlyClass = ClassId.Miner, Needs = TrialFeature.Terraform,
+                Param = 2.5, OnlyClass = ClassId.Builder, Needs = TrialFeature.Terraform,
             },
             // Creator acceptance (2026-11-13): the creator pitches terrain manipulation and corruption, so every first match
-            // shows both. Non-miners hear that miners reshape the ground; everyone knocks a pillar down.
+            // shows both. b13 r2: the Builder digs and places (owner decision); everyone else hears it; everyone knocks a pillar down.
             new TrialStep
             {
-                Id = "terrain", Prompt = "Builders put up walls and blocks, Miners mine ore for the hut. Try one next match.", Goal = TrialGoal.Timer,
-                Target = TrialTarget.Self, Param = 5, NotClass = ClassId.Miner,
+                Id = "terrain", Prompt = "Builders dig and fill the ground; Miners mine ore for the hut. Try one next.", Goal = TrialGoal.Timer,
+                Target = TrialTarget.Self, Param = 5, NotClass = ClassId.Builder,
             },
             new TrialStep
             {

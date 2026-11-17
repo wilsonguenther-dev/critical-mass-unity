@@ -117,7 +117,6 @@ namespace CriticalMass.Runtime.Hud.Mechanics
         Text _hutLevel, _hutOre, _corruptHead, _corruptPool, _corruptRoll;
         VectorShape _corruptFill;
         readonly B13HudCache _b13 = new B13HudCache();
-        int _rollCursor = -1, _rollEpoch = -1;
         /// <summary>b13-v: shown flags (tests and captures).</summary>
         public bool HutShown => _hut != null && _hut.gameObject.activeSelf;
         public bool CorruptionShown => _corrupt != null && _corrupt.gameObject.activeSelf;
@@ -210,6 +209,7 @@ namespace CriticalMass.Runtime.Hud.Mechanics
             _onPrompt = OnPrompt;
             DepthOut.Line += _onLine;
             DepthOut.Prompt += _onPrompt;
+            DepthOut.CorruptionRolled += OnRoll;
             ControlBindings.BindingsChanged += MarkGlyphs;
             ControlBindings.ActiveDeviceChanged += OnDevice;
             PingWords.LineOverride = PingLine;
@@ -220,6 +220,7 @@ namespace CriticalMass.Runtime.Hud.Mechanics
             if (Instance == this) Instance = null;
             DepthOut.Line -= _onLine;
             DepthOut.Prompt -= _onPrompt;
+            DepthOut.CorruptionRolled -= OnRoll;
             ControlBindings.BindingsChanged -= MarkGlyphs;
             ControlBindings.ActiveDeviceChanged -= OnDevice;
             if (PingWords.LineOverride == (Func<CriticalMass.Runtime.Hud.Interact.Ping, string>)PingLine) PingWords.LineOverride = null;
@@ -723,22 +724,10 @@ namespace CriticalMass.Runtime.Hud.Mechanics
                 float fw = Mathf.Max(0.01f, (B13Hud.CorruptionRect.width - 12f) * f);
                 if (Mathf.Abs(fr.sizeDelta.x - fw) > 0.5f) MenuUi.Place(fr, 6f, B13Hud.CorruptionRect.height - 9f, fw, 5f);
             }
-            ReadRolls(w);
         }
 
-        /// <summary>A CorruptionRoll event raises the result banner: the Kaiju is wild (Berserk) on the tick it rolled, or not.</summary>
-        void ReadRolls(World w)
-        {
-            if (w.Epoch != _rollEpoch || _rollCursor < 0 || _rollCursor > w.EventHead) { _rollEpoch = w.Epoch; _rollCursor = w.EventHead; return; }
-            if (w.EventHead - _rollCursor > World.EventCapacity) _rollCursor = w.EventHead - World.EventCapacity;
-            for (; _rollCursor < w.EventHead; _rollCursor++)
-            {
-                SimEvent e = w.Events[_rollCursor % World.EventCapacity];
-                if (e == null || e.Type != SimEventType.CorruptionRoll) continue;
-                bool wild = w.Kaiju != null && w.Kaiju.State == KaijuState.Berserk;
-                Banner.Show(Banner.CorruptionRollSpec(wild));
-            }
-        }
+        /// <summary>A corruption roll raises the result banner (b13 r2: from DepthOut.CorruptionRolled, not the event ring).</summary>
+        static void OnRoll(bool wild) => Banner.Show(Banner.CorruptionRollSpec(wild));
 
         void TickPower(World w, int me, bool on)
         {
