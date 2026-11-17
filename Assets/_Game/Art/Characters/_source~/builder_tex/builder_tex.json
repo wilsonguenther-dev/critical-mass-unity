@@ -181,10 +181,18 @@
   "lod1_source_smooth_iters": 10,
   "lod1_smooth_iters": 0,
   "_note_tuning": "v3 runs (LOD0 gameplay worst edge): paper defaults + smooth 10 = 3.18x; smooth 30 = 2.88x; smooth 60 = 4.06x (arm weight smoothed onto the torso side); normal smoothing 6 (30% matched instead of 21%) = 5.38x; result-masking = 10.2x. LOD1 is best from the 10-iteration weights (worst 2.37x vs 3.24x from the 30-iteration ones).",
-  "_note_v3_final": "v3 final (BuilderTex_report_v3_transfer.json): gameplay worst edge LOD0 2.88x (run 9: 6.92x), LOD1 2.37x (run 9: 2.80x), but the right-arm close-up (Run, Attack raise/contact) shows the forearm skin and cuff left at the armpit while the arm moves: a visible defect the heat weights do not have. Off until fixed; the committed FBX stays on run-9 weights."
+  "_note_v3_final": "v3 final (BuilderTex_report_v3_transfer.json): gameplay worst edge LOD0 2.88x (run 9: 6.92x), LOD1 2.37x (run 9: 2.80x), but the right-arm close-up (Run, Attack raise/contact) shows the forearm skin and cuff left at the armpit while the arm moves: a visible defect the heat weights do not have. Off until fixed; the committed FBX stays on run-9 weights.",
+  "arm_mode": "hybrid",
+  "arm_band_m": 0.16,
+  "arm_extra_measure": [
+   "transfer",
+   "hybrid_hard"
+  ],
+  "_note_arm": "arm_mode: 'hybrid' = transferred weights on legs/hips/torso, run-9 heat weights where heat's dominant bone is an arm-chain bone, smoothstep cross-fade over arm_band_m of edge-path distance at the border (LOD0 edges are ~3-4 cm, so 6 cm left no vertex inside the band). 'seed' (unmatched arm vertices fixed to heat before the inpaint) measured worse: gameplay LOD0 worst 3.91x.",
+  "_note_hybrid": "Hybrid (BuilderTex_report_v3_hybrid.json) passes the stretch rule: gameplay LOD0 worst at or below run 9 in all 7 clips, with Attack equal at 3.338. It still fails the visual check: a small red/blue patch pokes through the right shoulder sleeve at the arm/torso border in the Run and Attack close-ups. Claiming more of the shoulder for heat (arm_member_min_weight 0.3) shrank the patch but made Idle 2.38x and AttackSlice 3.10x. Off; the FBX stays on run 9."
  },
  "closeups": {
-  "px": 380,
+  "px": 300,
   "poses": [
    "run",
    "attack_raise",
@@ -225,6 +233,18 @@
     ],
     "az": -55,
     "el": 0,
+    "dist": 1.7
+   },
+   "right_forearm": {
+    "bone": "lowerarm.r",
+    "t": 0.5,
+    "offset_m": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "az": -70,
+    "el": 5,
     "dist": 1.7
    }
   },

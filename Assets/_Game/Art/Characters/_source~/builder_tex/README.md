@@ -92,3 +92,15 @@ The transfer run is recorded in `BuilderTex_report_v3_transfer.json` and `Builde
 - The right-arm close-up shows the forearm skin and cuff staying at the armpit while the arm moves, in Run and in
   both Attack frames. The heat weights do not do this, so the transfer is not shipped.
 - Head weight below the neck joint: 462 vertices on LOD0 (heat: 523). On the Warrior itself it is 53.
+
+**Hybrid attempt (switched off).** This takes the transfer on legs, hips and torso and run 9 on the arms. Arm
+membership comes from run 9's dominant bone. A 16 cm cross-fade is measured as edge-path distance. The run is
+recorded in `BuilderTex_report_v3_hybrid.json`.
+
+- The gameplay worst edge on LOD0 is at or below run 9 in every clip: Idle 1.79, Walk 2.78, Run 2.88, Attack 3.34
+  (equal), AttackSlice 2.70, Hit 2.31, Block 2.60.
+- LOD1's worst gameplay edge is 2.95x (run 9: 2.80x).
+- The right-shoulder close-ups show a small patch of torso geometry poking through the sleeve at the border.
+- Seeding the unmatched arm vertices from run 9 before the inpaint measured worse (3.91x).
+- The forearm vertices were not left to the torso side: they kept 97% forearm/hand weight in the transfer, even
+  though only 25% of them matched (median 7 cm and 50 degrees off).

@@ -1,0 +1,12490 @@
+{
+ "config": {
+  "key": "BuilderTex",
+  "raw_glb": "~/cm-art-trial/builder/builder-512-tex2048-official.glb",
+  "rig_fbx": "~/cm-art-trial/builder/ref_rig4/Builder.fbx",
+  "rig_fbx_note": "rig-builder-4 Builder.fbx (fix/b12-i, git show origin/fix/b12-i:Assets/_Game/Art/Builder/Builder.fbx | git lfs smudge): the 41-bone rig the Builder clips were baked on, plus Builder_LOD0 as the stretch control and the old look in the side by side",
+  "rig_prefix": "Builder_",
+  "clips_fbx": "Assets/_Game/Art/Builder/Builder_Clips.fbx",
+  "out_dir": "~/cm-art-trial/builder/game-ready-v3",
+  "repo_fbx": "Assets/_Game/Art/Characters/BuilderTex/BuilderTex.fbx",
+  "repo_tex": "Assets/_Game/Art/Characters/BuilderTex/Resources/BuilderTex/BuilderTex_Base.png",
+  "crown_m": null,
+  "crown_front_fraction": 0.5,
+  "raw_yaw_deg": 0,
+  "lod_tris": [
+   7000,
+   1800,
+   760
+  ],
+  "head_decimate_weight": 0.85,
+  "tex": 1024,
+  "head_uv_scale": 1.7,
+  "team": {
+   "cloth_authored": "#2A9DBA",
+   "azure": "#2A9DBA",
+   "crimson": "#E46753",
+   "hue_deg": [
+    168,
+    205
+   ],
+   "sat_min": 0.33,
+   "val_min": 0.16
+  },
+  "joint_cut": {
+   "shoulder_r": 0.17,
+   "hip_r": 0.22
+  },
+  "pack": {
+   "seed_behind_m": 0.36,
+   "grow_behind_m": 0.17,
+   "z_min": 0.75
+  },
+  "fill_holes_sides": 0,
+  "speck_diag_m": 0.012,
+  "weights": {
+   "power": 5.0,
+   "smooth_iters": 3,
+   "apron_leg_factor": 0.35,
+   "pack_feather_rings": 4
+  },
+  "clips": {
+   "idle": "Idle",
+   "run": "Run",
+   "attack": "Attack",
+   "hit": "Hit",
+   "walk": "Walk"
+  },
+  "render_px": 300,
+  "remesh": {
+   "voxel_max": 0.012,
+   "voxel_min": 0.004,
+   "slab_m": 0.012,
+   "pack_voxel": 0.008,
+   "body_lod0_tris": 5500,
+   "pack_lod0_tris": 900,
+   "lod1_tris": 1800,
+   "shadow_tris": 700,
+   "head_decimate_weight": 0.3,
+   "uv_margin": 0.0025,
+   "cage_extrusion": 0.02,
+   "max_ray_m": 0.05,
+   "bake_margin_px": 8,
+   "bake_samples": 4,
+   "shirt_regions": [
+    "torso",
+    "arm.l",
+    "arm.r"
+   ],
+   "lighten_clip": [
+    0.6,
+    1.25
+   ],
+   "mallet": {
+    "length": 0.62,
+    "grip_from_end": 0.12,
+    "wood": "#8A5E3B"
+   },
+   "close_r": 0.012,
+   "region_smooth_iters": 6,
+   "pack_close_r": 0.006,
+   "smooth_iters": 24,
+   "shadow_voxel": 0.05,
+   "apron_leg_factor": 1.0,
+   "allowed_rings": 2,
+   "items_lod0_tris": 600,
+   "item_voxel": 0.006,
+   "item_close_r": 0.004,
+   "neck_band_m": 0.12,
+   "head_smooth_iters": 2,
+   "rigid_uv_angle": 89,
+   "cap_band_depth_m": 0.32,
+   "mask_open_px": 3,
+   "mask_min_blob_px": 40,
+   "dangle_below_hips_m": 0.25,
+   "zone_leg_below_m": 99.0,
+   "head_bone_reach_m": 99.0,
+   "_note_run8": "zone_leg_below_m 0.22 relabelled 3,070 hip-zone verts as leg: the crotch shells then sat 'between legs', the voxel fell to its minimum and decimation stalled (LOD0 10k). Both run-8 rules are disabled (99) = run-7 behaviour."
+  },
+  "out_dir_remesh": "~/cm-art-trial/builder/game-ready-v3",
+  "weights_rules": {
+   "hip_margin_frac": 0.15,
+   "joint_band_frac": 0.25,
+   "crotch_band_m": 0.06,
+   "hip_band_up_frac": 0.15,
+   "apron_front_m": 0.05,
+   "apron_leg_max": 0.6,
+   "shoulder_band_frac": 0.2,
+   "neck_band_m": 0.04,
+   "smooth_iters": 4,
+   "arm_side_ramp_m": 0.06,
+   "segment_softmin_m": 0.02,
+   "enabled": false,
+   "_note_run12": "Explicit region rules (runs 10-12) scored worse than run 9's heat + zone-hop blend + ring smoothing: clips under 2.5x LOD0 1/32, LOD1 15/32 (run 9: 3/32, 27/32). Kept for the record, off by default. Remaining edges: hip band seam (hips|upperleg vs upperleg|lowerleg at z 0.57-0.67), crotch/apron centre, arm zone edge at the shoulder band."
+  },
+  "weights_overrides": {
+   "knee_margin_m": 0.03,
+   "smooth_iters": 3,
+   "grow_rings": 8,
+   "grow_up_m": 0.12,
+   "grow_min_w": 0.02,
+   "enabled": false
+  },
+  "gameplay_clips": [
+   "Idle",
+   "Walk",
+   "Run",
+   "Attack",
+   "AttackSlice",
+   "Hit",
+   "Block"
+  ],
+  "weights_transfer": {
+   "enabled": true,
+   "_doc": "robust_weight_transfer.py (Abdrashitov et al. 2023). template = a well-skinned character on the same skeleton; thresholds = the paper's defaults (dist_frac x bbox diagonal, angle_deg). shell_pass overrides for pass 2 (body -> clothing shells). pydeps: scipy + robust-laplacian installed with Blender's Python (README).",
+   "pydeps": [
+    "~/cm-art-trial/tools/pydeps"
+   ],
+   "template": {
+    "fbx": "Assets/_Game/Art/Characters/Warrior.fbx",
+    "mesh_prefix": "Warrior_LOD0",
+    "exclude_dominant_bone_substrings": [
+     "slot"
+    ]
+   },
+   "terminal_bones": [
+    "head",
+    "hand.l",
+    "hand.r",
+    "toes.l",
+    "toes.r"
+   ],
+   "fit_cross_scale": true,
+   "fit_scale_clamp": [
+    0.6,
+    2.5
+   ],
+   "fit_extent_pct": 90.0,
+   "dist_frac": 0.05,
+   "angle_deg": 30.0,
+   "allow_flip": false,
+   "smooth_iters": 30,
+   "smooth_alpha": 0.2,
+   "max_influences": 4,
+   "shell_pass": {
+    "allow_flip": true
+   },
+   "region_mask": true,
+   "lod1_from": "decimate",
+   "normal_smooth_iters": 0,
+   "known_mask_head_below_neck_m": 0.1,
+   "_doc_mask": "region_mask: the run-9 region limits (allowed_for, grown by remesh.allowed_rings) applied to the MATCHED values only, before the inpaint; mask_result false (a hard mask on the result left weight cliffs, run v3-3: LOD0 Walk 10.1x).",
+   "lod1_source_smooth_iters": 10,
+   "lod1_smooth_iters": 0,
+   "_note_tuning": "v3 runs (LOD0 gameplay worst edge): paper defaults + smooth 10 = 3.18x; smooth 30 = 2.88x; smooth 60 = 4.06x (arm weight smoothed onto the torso side); normal smoothing 6 (30% matched instead of 21%) = 5.38x; result-masking = 10.2x. LOD1 is best from the 10-iteration weights (worst 2.37x vs 3.24x from the 30-iteration ones).",
+   "_note_v3_final": "v3 final (BuilderTex_report_v3_transfer.json): gameplay worst edge LOD0 2.88x (run 9: 6.92x), LOD1 2.37x (run 9: 2.80x), but the right-arm close-up (Run, Attack raise/contact) shows the forearm skin and cuff left at the armpit while the arm moves: a visible defect the heat weights do not have. Off until fixed; the committed FBX stays on run-9 weights.",
+   "arm_mode": "hybrid",
+   "arm_band_m": 0.16,
+   "arm_extra_measure": [
+    "transfer",
+    "hybrid_hard"
+   ],
+   "_note_arm": "arm_mode: 'hybrid' = transferred weights on legs/hips/torso, run-9 heat weights where heat's dominant bone is an arm-chain bone, smoothstep cross-fade over arm_band_m of edge-path distance at the border (LOD0 edges are ~3-4 cm, so 6 cm left no vertex inside the band). 'seed' (unmatched arm vertices fixed to heat before the inpaint) measured worse: gameplay LOD0 worst 3.91x."
+  },
+  "closeups": {
+   "px": 300,
+   "poses": [
+    "run",
+    "attack_raise",
+    "attack_contact"
+   ],
+   "spots": {
+    "inner_thigh_above_knee": {
+     "bone": "upperleg.l",
+     "t": 0.8,
+     "offset_m": [
+      -0.08,
+      0.0,
+      0.0
+     ],
+     "az": -25,
+     "el": 12,
+     "dist": 1.7
+    },
+    "shin_front": {
+     "bone": "lowerleg.l",
+     "t": 0.35,
+     "offset_m": [
+      0.0,
+      -0.05,
+      0.0
+     ],
+     "az": 50,
+     "el": 5,
+     "dist": 1.7
+    },
+    "right_armpit": {
+     "bone": "upperarm.r",
+     "t": 0.1,
+     "offset_m": [
+      0.06,
+      0.0,
+      -0.1
+     ],
+     "az": -55,
+     "el": 0,
+     "dist": 1.7
+    },
+    "right_forearm": {
+     "bone": "lowerarm.r",
+     "t": 0.5,
+     "offset_m": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "az": -70,
+     "el": 5,
+     "dist": 1.7
+    }
+   },
+   "show_mallet": false
+  }
+ },
+ "rig": {
+  "bones": 41,
+  "old": {
+   "Builder_Hero": 21592,
+   "Builder_LOD0": 3946,
+   "Builder_LOD1": 1344,
+   "Builder_Shadow": 794
+  }
+ },
+ "clips": {
+  "Rig.001|Attack": [
+   1.0,
+   26.0
+  ],
+  "Rig.001|Attack2HChop": [
+   1.0,
+   40.0
+  ],
+  "Rig.001|Attack2HSlice": [
+   1.0,
+   27.0
+  ],
+  "Rig.001|AttackSlice": [
+   1.0,
+   26.0
+  ],
+  "Rig.001|Block": [
+   1.0,
+   26.0
+  ],
+  "Rig.001|BlockHit": [
+   1.0,
+   26.0
+  ],
+  "Rig.001|Blocking": [
+   1.0,
+   26.0
+  ],
+  "Rig.001|Carry": [
+   1.0,
+   26.0
+  ],
+  "Rig.001|Cast": [
+   1.0,
+   23.0
+  ],
+  "Rig.001|Cheer": [
+   1.0,
+   41.0
+  ],
+  "Rig.001|Death": [
+   1.0,
+   20.0
+  ],
+  "Rig.001|DeathB": [
+   1.0,
+   64.0
+  ],
+  "Rig.001|Gather": [
+   1.0,
+   32.0
+  ],
+  "Rig.001|GetUp": [
+   1.0,
+   57.0
+  ],
+  "Rig.001|Hit": [
+   1.0,
+   17.0
+  ],
+  "Rig.001|HitHeavy": [
+   1.0,
+   21.0
+  ],
+  "Rig.001|Idle": [
+   1.0,
+   26.0
+  ],
+  "Rig.001|IdleLook": [
+   1.0,
+   26.0
+  ],
+  "Rig.001|JumpAir": [
+   1.0,
+   26.0
+  ],
+  "Rig.001|JumpLand": [
+   1.0,
+   17.0
+  ],
+  "Rig.001|JumpStart": [
+   1.0,
+   15.0
+  ],
+  "Rig.001|KnockDown": [
+   1.0,
+   73.0
+  ],
+  "Rig.001|PickUp": [
+   1.0,
+   32.0
+  ],
+  "Rig.001|Run": [
+   1.0,
+   20.0
+  ],
+  "Rig.001|SitDown": [
+   1.0,
+   25.0
+  ],
+  "Rig.001|SitIdle": [
+   1.0,
+   97.0
+  ],
+  "Rig.001|StrafeL": [
+   1.0,
+   20.0
+  ],
+  "Rig.001|StrafeR": [
+   1.0,
+   20.0
+  ],
+  "Rig.001|Throw": [
+   1.0,
+   33.0
+  ],
+  "Rig.001|UseItem": [
+   1.0,
+   39.0
+  ],
+  "Rig.001|Walk": [
+   1.0,
+   26.0
+  ],
+  "Rig.001|WalkBack": [
+   1.0,
+   26.0
+  ]
+ },
+ "winding": {
+  "components": 120,
+  "flipped_inside_out": 102,
+  "main_volume_before": 0.0171
+ },
+ "align": {
+  "crown_target_m": 2.2651,
+  "scale": 2.30834,
+  "shin_centre_y": [
+   -0.1625,
+   -0.164
+  ],
+  "shin_bone_y": 0.116,
+  "shift_y": 0.2793000042438507,
+  "bounds": [
+   [
+    -0.929,
+    -0.365,
+    0.0
+   ],
+   [
+    0.988,
+    0.947,
+    2.316
+   ]
+  ]
+ },
+ "pose_fit_deg": {
+  "upperarm.l": {
+   "deg": 3.2,
+   "target": [
+    0.767,
+    -0.042,
+    0.918
+   ]
+  },
+  "upperleg.l": {
+   "deg": 10.4,
+   "target": [
+    0.253,
+    0.053,
+    0.22
+   ]
+  },
+  "upperarm.r": {
+   "deg": 4.9,
+   "target": [
+    -0.746,
+    -0.041,
+    0.919
+   ]
+  },
+  "upperleg.r": {
+   "deg": 10.7,
+   "target": [
+    -0.253,
+    0.051,
+    0.22
+   ]
+  }
+ },
+ "pack_threshold": {
+  "shirt_back_surface_behind_spine_m": 0.2915,
+  "grow_behind_m": 0.3215
+ },
+ "parts_raw": {
+  "components": 120,
+  "main_verts": 141014,
+  "speck_components": 17,
+  "item_components": 72,
+  "pack_verts": 53235,
+  "raw_tris": 290527
+ },
+ "joint_cut_raw_apose_trials": [
+  {
+   "tag": "raw (A-pose) x1.00",
+   "radii_m": {
+    "shoulder": 0.17,
+    "hip": 0.22
+   },
+   "verts": 145760,
+   "cut_verts": 3610,
+   "components_after_cut": 17,
+   "arm.l": {
+    "probe_verts": 2575,
+    "components": 1,
+    "torso_verts_in_its_component": 17854,
+    "other_limb_verts_in_its_component": {
+     "leg.l": 5219,
+     "leg.r": 5375
+    },
+    "welded": true,
+    "nearest_torso_m": 0.2005
+   },
+   "leg.l": {
+    "probe_verts": 5219,
+    "components": 1,
+    "torso_verts_in_its_component": 17854,
+    "other_limb_verts_in_its_component": {
+     "arm.l": 2575,
+     "arm.r": 2583
+    },
+    "welded": true,
+    "nearest_torso_m": 0.2362
+   },
+   "arm.r": {
+    "probe_verts": 2583,
+    "components": 1,
+    "torso_verts_in_its_component": 17854,
+    "other_limb_verts_in_its_component": {
+     "leg.l": 5219,
+     "leg.r": 5375
+    },
+    "welded": true,
+    "nearest_torso_m": 0.1906
+   },
+   "leg.r": {
+    "probe_verts": 5375,
+    "components": 1,
+    "torso_verts_in_its_component": 17854,
+    "other_limb_verts_in_its_component": {
+     "arm.l": 2575,
+     "arm.r": 2583
+    },
+    "welded": true,
+    "nearest_torso_m": 0.2359
+   },
+   "any_welded": true
+  },
+  {
+   "tag": "raw (A-pose) x1.25",
+   "radii_m": {
+    "shoulder": 0.2125,
+    "hip": 0.275
+   },
+   "verts": 145760,
+   "cut_verts": 8564,
+   "components_after_cut": 27,
+   "arm.l": {
+    "probe_verts": 2575,
+    "components": 1,
+    "torso_verts_in_its_component": 17808,
+    "other_limb_verts_in_its_component": {
+     "leg.l": 0,
+     "leg.r": 13
+    },
+    "welded": true,
+    "nearest_torso_m": 0.2005
+   },
+   "leg.l": {
+    "probe_verts": 5119,
+    "components": 3,
+    "torso_verts_in_its_component": 0,
+    "other_limb_verts_in_its_component": {
+     "arm.l": 0,
+     "arm.r": 0
+    },
+    "welded": false,
+    "nearest_torso_m": 0.2919
+   },
+   "arm.r": {
+    "probe_verts": 2583,
+    "components": 1,
+    "torso_verts_in_its_component": 17808,
+    "other_limb_verts_in_its_component": {
+     "leg.l": 0,
+     "leg.r": 13
+    },
+    "welded": true,
+    "nearest_torso_m": 0.1906
+   },
+   "leg.r": {
+    "probe_verts": 5284,
+    "components": 3,
+    "torso_verts_in_its_component": 17808,
+    "other_limb_verts_in_its_component": {
+     "arm.l": 2575,
+     "arm.r": 2583
+    },
+    "welded": true,
+    "nearest_torso_m": 0.2831
+   },
+   "any_welded": true
+  },
+  {
+   "tag": "raw (A-pose) x1.50",
+   "radii_m": {
+    "shoulder": 0.255,
+    "hip": 0.33
+   },
+   "verts": 145760,
+   "cut_verts": 15219,
+   "components_after_cut": 24,
+   "arm.l": {
+    "probe_verts": 2575,
+    "components": 1,
+    "torso_verts_in_its_component": 0,
+    "other_limb_verts_in_its_component": {
+     "leg.l": 0,
+     "leg.r": 0
+    },
+    "welded": false,
+    "nearest_torso_m": 0.2005
+   },
+   "leg.l": {
+    "probe_verts": 4448,
+    "components": 2,
+    "torso_verts_in_its_component": 0,
+    "other_limb_verts_in_its_component": {
+     "arm.l": 0,
+     "arm.r": 0
+    },
+    "welded": false,
+    "nearest_torso_m": 0.3076
+   },
+   "arm.r": {
+    "probe_verts": 2583,
+    "components": 1,
+    "torso_verts_in_its_component": 0,
+    "other_limb_verts_in_its_component": {
+     "leg.l": 0,
+     "leg.r": 0
+    },
+    "welded": false,
+    "nearest_torso_m": 0.1906
+   },
+   "leg.r": {
+    "probe_verts": 4803,
+    "components": 2,
+    "torso_verts_in_its_component": 17611,
+    "other_limb_verts_in_its_component": {
+     "arm.l": 0,
+     "arm.r": 0
+    },
+    "welded": true,
+    "nearest_torso_m": 0.3151
+   },
+   "any_welded": true
+  },
+  {
+   "tag": "raw (A-pose) x1.75",
+   "radii_m": {
+    "shoulder": 0.2975,
+    "hip": 0.385
+   },
+   "verts": 145760,
+   "cut_verts": 23486,
+   "components_after_cut": 45,
+   "arm.l": {
+    "probe_verts": 2575,
+    "components": 1,
+    "torso_verts_in_its_component": 0,
+    "other_limb_verts_in_its_component": {
+     "leg.l": 0,
+     "leg.r": 0
+    },
+    "welded": false,
+    "nearest_torso_m": 0.2005
+   },
+   "leg.l": {
+    "probe_verts": 3755,
+    "components": 1,
+    "torso_verts_in_its_component": 0,
+    "other_limb_verts_in_its_component": {
+     "arm.l": 0,
+     "arm.r": 0
+    },
+    "welded": false,
+    "nearest_torso_m": 0.4799
+   },
+   "arm.r": {
+    "probe_verts": 2583,
+    "components": 2,
+    "torso_verts_in_its_component": 0,
+    "other_limb_verts_in_its_component": {
+     "leg.l": 0,
+     "leg.r": 0
+    },
+    "welded": false,
+    "nearest_torso_m": 0.1906
+   },
+   "leg.r": {
+    "probe_verts": 4156,
+    "components": 2,
+    "torso_verts_in_its_component": 16584,
+    "other_limb_verts_in_its_component": {
+     "arm.l": 0,
+     "arm.r": 0
+    },
+    "welded": true,
+    "nearest_torso_m": 0.4764
+   },
+   "any_welded": true
+  }
+ ],
+ "joint_cut_raw_apose": {
+  "tag": "raw (A-pose) x1.75",
+  "radii_m": {
+   "shoulder": 0.2975,
+   "hip": 0.385
+  },
+  "verts": 145760,
+  "cut_verts": 23486,
+  "components_after_cut": 45,
+  "arm.l": {
+   "probe_verts": 2575,
+   "components": 1,
+   "torso_verts_in_its_component": 0,
+   "other_limb_verts_in_its_component": {
+    "leg.l": 0,
+    "leg.r": 0
+   },
+   "welded": false,
+   "nearest_torso_m": 0.2005
+  },
+  "leg.l": {
+   "probe_verts": 3755,
+   "components": 1,
+   "torso_verts_in_its_component": 0,
+   "other_limb_verts_in_its_component": {
+    "arm.l": 0,
+    "arm.r": 0
+   },
+   "welded": false,
+   "nearest_torso_m": 0.4799
+  },
+  "arm.r": {
+   "probe_verts": 2583,
+   "components": 2,
+   "torso_verts_in_its_component": 0,
+   "other_limb_verts_in_its_component": {
+    "leg.l": 0,
+    "leg.r": 0
+   },
+   "welded": false,
+   "nearest_torso_m": 0.1906
+  },
+  "leg.r": {
+   "probe_verts": 4156,
+   "components": 2,
+   "torso_verts_in_its_component": 16584,
+   "other_limb_verts_in_its_component": {
+    "arm.l": 0,
+    "arm.r": 0
+   },
+   "welded": true,
+   "nearest_torso_m": 0.4764
+  },
+  "any_welded": true
+ },
+ "joint_cut_scale": 1.75,
+ "v2_zone_to_leg": {
+  "l": 0,
+  "r": 0
+ },
+ "v2_rigid_items": [
+  {
+   "verts": 269,
+   "centroid": [
+    0.0,
+    -0.143,
+    2.069
+   ],
+   "bone": "head"
+  },
+  {
+   "verts": 43,
+   "centroid": [
+    -0.012,
+    0.306,
+    1.981
+   ],
+   "bone": "head"
+  },
+  {
+   "verts": 7,
+   "centroid": [
+    0.059,
+    -0.16,
+    1.882
+   ],
+   "bone": "head"
+  },
+  {
+   "verts": 3,
+   "centroid": [
+    0.078,
+    -0.105,
+    2.085
+   ],
+   "bone": "head"
+  },
+  {
+   "verts": 17,
+   "centroid": [
+    0.097,
+    -0.092,
+    2.081
+   ],
+   "bone": "head"
+  },
+  {
+   "verts": 180,
+   "centroid": [
+    0.142,
+    -0.296,
+    1.11
+   ],
+   "bone": "hips"
+  },
+  {
+   "verts": 5,
+   "centroid": [
+    0.121,
+    -0.011,
+    0.547
+   ],
+   "bone": "hips"
+  },
+  {
+   "verts": 78,
+   "centroid": [
+    0.151,
+    -0.288,
+    0.834
+   ],
+   "bone": "hips"
+  },
+  {
+   "verts": 31,
+   "centroid": [
+    0.138,
+    0.377,
+    1.459
+   ],
+   "bone": "chest"
+  },
+  {
+   "verts": 7,
+   "centroid": [
+    0.129,
+    -0.096,
+    2.067
+   ],
+   "bone": "head"
+  },
+  {
+   "verts": 18,
+   "centroid": [
+    0.129,
+    -0.02,
+    0.557
+   ],
+   "bone": "hips"
+  },
+  {
+   "verts": 3,
+   "centroid": [
+    0.133,
+    -0.093,
+    1.618
+   ],
+   "bone": "chest"
+  },
+  {
+   "verts": 36,
+   "centroid": [
+    0.151,
+    -0.313,
+    0.964
+   ],
+   "bone": "hips"
+  },
+  {
+   "verts": 9,
+   "centroid": [
+    0.185,
+    0.093,
+    2.016
+   ],
+   "bone": "head"
+  },
+  {
+   "verts": 13,
+   "centroid": [
+    0.269,
+    -0.195,
+    1.049
+   ],
+   "bone": "hips"
+  },
+  {
+   "verts": 7,
+   "centroid": [
+    0.267,
+    -0.106,
+    1.555
+   ],
+   "bone": "upperarm.l"
+  },
+  {
+   "verts": 35,
+   "centroid": [
+    0.289,
+    -0.097,
+    1.589
+   ],
+   "bone": "upperarm.l"
+  },
+  {
+   "verts": 9,
+   "centroid": [
+    0.285,
+    -0.114,
+    1.552
+   ],
+   "bone": "upperarm.l"
+  },
+  {
+   "verts": 5,
+   "centroid": [
+    0.284,
+    0.368,
+    1.273
+   ],
+   "bone": "upperarm.l"
+  },
+  {
+   "verts": 5,
+   "centroid": [
+    0.293,
+    0.266,
+    1.888
+   ],
+   "bone": "head"
+  },
+  {
+   "verts": 48,
+   "centroid": [
+    0.314,
+    0.245,
+    1.888
+   ],
+   "bone": "head"
+  },
+  {
+   "verts": 8,
+   "centroid": [
+    0.301,
+    -0.206,
+    0.984
+   ],
+   "bone": "hips"
+  },
+  {
+   "verts": 56,
+   "centroid": [
+    0.332,
+    0.257,
+    1.879
+   ],
+   "bone": "head"
+  },
+  {
+   "verts": 6,
+   "centroid": [
+    0.323,
+    0.372,
+    1.176
+   ],
+   "bone": "hips"
+  },
+  {
+   "verts": 28,
+   "centroid": [
+    0.347,
+    0.384,
+    1.244
+   ],
+   "bone": "upperarm.l"
+  },
+  {
+   "verts": 110,
+   "centroid": [
+    0.371,
+    -0.083,
+    1.012
+   ],
+   "bone": "hips"
+  },
+  {
+   "verts": 40,
+   "centroid": [
+    0.385,
+    0.237,
+    2.022
+   ],
+   "bone": "head"
+  },
+  {
+   "verts": 258,
+   "centroid": [
+    0.406,
+    -0.065,
+    1.01
+   ],
+   "bone": "hips"
+  },
+  {
+   "verts": 7,
+   "centroid": [
+    0.383,
+    -0.064,
+    0.949
+   ],
+   "bone": "hips"
+  },
+  {
+   "verts": 5,
+   "centroid": [
+    0.384,
+    -0.061,
+    1.043
+   ],
+   "bone": "hips"
+  },
+  {
+   "verts": 87,
+   "centroid": [
+    0.418,
+    -0.216,
+    0.868
+   ],
+   "bone": "hips"
+  },
+  {
+   "verts": 103,
+   "centroid": [
+    0.399,
+    0.043,
+    1.01
+   ],
+   "bone": "hips"
+  },
+  {
+   "verts": 38,
+   "centroid": [
+    0.433,
+    0.308,
+    1.901
+   ],
+   "bone": "upperarm.l"
+  },
+  {
+   "verts": 48,
+   "centroid": [
+    0.445,
+    0.315,
+    1.882
+   ],
+   "bone": "upperarm.l"
+  },
+  {
+   "verts": 24,
+   "centroid": [
+    0.552,
+    0.259,
+    1.5
+   ],
+   "bone": "upperarm.l"
+  },
+  {
+   "verts": 71,
+   "centroid": [
+    0.603,
+    0.348,
+    2.065
+   ],
+   "bone": "upperarm.l"
+  },
+  {
+   "verts": 38,
+   "centroid": [
+    0.64,
+    0.231,
+    1.737
+   ],
+   "bone": "upperarm.l"
+  },
+  {
+   "verts": 36,
+   "centroid": [
+    0.742,
+    0.244,
+    1.955
+   ],
+   "bone": "upperarm.l"
+  },
+  {
+   "verts": 33,
+   "centroid": [
+    0.751,
+    0.171,
+    1.852
+   ],
+   "bone": "upperarm.l"
+  },
+  {
+   "verts": 76,
+   "centroid": [
+    0.759,
+    0.325,
+    1.957
+   ],
+   "bone": "upperarm.l"
+  },
+  {
+   "verts": 5,
+   "centroid": [
+    0.737,
+    0.18,
+    1.836
+   ],
+   "bone": "upperarm.l"
+  },
+  {
+   "verts": 104,
+   "centroid": [
+    0.757,
+    0.217,
+    1.854
+   ],
+   "bone": "upperarm.l"
+  },
+  {
+   "verts": 88,
+   "centroid": [
+    0.778,
+    0.341,
+    1.858
+   ],
+   "bone": "upperarm.l"
+  },
+  {
+   "verts": 7,
+   "centroid": [
+    0.773,
+    0.234,
+    1.865
+   ],
+   "bone": "upperarm.l"
+  },
+  {
+   "verts": 173,
+   "centroid": [
+    -0.18,
+    -0.246,
+    1.393
+   ],
+   "bone": "chest"
+  },
+  {
+   "verts": 13,
+   "centroid": [
+    -0.062,
+    -0.288,
+    0.99
+   ],
+   "bone": "hips"
+  },
+  {
+   "verts": 119,
+   "centroid": [
+    -0.134,
+    -0.203,
+    1.38
+   ],
+   "bone": "chest"
+  },
+  {
+   "verts": 8,
+   "centroid": [
+    -0.068,
+    -0.117,
+    2.086
+   ],
+   "bone": "head"
+  },
+  {
+   "verts": 23,
+   "centroid": [
+    -0.075,
+    -0.074,
+    1.865
+   ],
+   "bone": "head"
+  },
+  {
+   "verts": 4,
+   "centroid": [
+    -0.074,
+    -0.215,
+    1.438
+   ],
+   "bone": "chest"
+  },
+  {
+   "verts": 469,
+   "centroid": [
+    -0.237,
+    -0.04,
+    0.497
+   ],
+   "bone": "hips"
+  },
+  {
+   "verts": 7,
+   "centroid": [
+    -0.129,
+    -0.204,
+    1.466
+   ],
+   "bone": "chest"
+  },
+  {
+   "verts": 92,
+   "centroid": [
+    -0.127,
+    -0.09,
+    1.629
+   ],
+   "bone": "chest"
+  },
+  {
+   "verts": 7,
+   "centroid": [
+    -0.132,
+    -0.069,
+    1.656
+   ],
+   "bone": "chest"
+  },
+  {
+   "verts": 22,
+   "centroid": [
+    -0.138,
+    0.283,
+    2.013
+   ],
+   "bone": "head"
+  },
+  {
+   "verts": 4,
+   "centroid": [
+    -0.157,
+    0.063,
+    2.052
+   ],
+   "bone": "head"
+  },
+  {
+   "verts": 82,
+   "centroid": [
+    -0.18,
+    0.043,
+    2.003
+   ],
+   "bone": "head"
+  },
+  {
+   "verts": 5,
+   "centroid": [
+    -0.261,
+    -0.081,
+    1.615
+   ],
+   "bone": "chest"
+  },
+  {
+   "verts": 33,
+   "centroid": [
+    -0.278,
+    0.345,
+    1.244
+   ],
+   "bone": "upperarm.r"
+  },
+  {
+   "verts": 48,
+   "centroid": [
+    -0.29,
+    -0.097,
+    1.587
+   ],
+   "bone": "upperarm.r"
+  },
+  {
+   "verts": 6,
+   "centroid": [
+    -0.278,
+    -0.115,
+    1.549
+   ],
+   "bone": "upperarm.r"
+  },
+  {
+   "verts": 26,
+   "centroid": [
+    -0.296,
+    -0.106,
+    1.557
+   ],
+   "bone": "upperarm.r"
+  },
+  {
+   "verts": 7,
+   "centroid": [
+    -0.288,
+    0.343,
+    1.651
+   ],
+   "bone": "upperarm.r"
+  },
+  {
+   "verts": 11,
+   "centroid": [
+    -0.308,
+    0.26,
+    1.212
+   ],
+   "bone": "hips"
+  },
+  {
+   "verts": 43,
+   "centroid": [
+    -0.348,
+    0.347,
+    1.477
+   ],
+   "bone": "upperarm.r"
+  },
+  {
+   "verts": 273,
+   "centroid": [
+    -0.434,
+    -0.144,
+    0.705
+   ],
+   "bone": "hips"
+  },
+  {
+   "verts": 18,
+   "centroid": [
+    -0.385,
+    0.331,
+    1.665
+   ],
+   "bone": "upperarm.r"
+  },
+  {
+   "verts": 42,
+   "centroid": [
+    -0.385,
+    -0.08,
+    1.018
+   ],
+   "bone": "hips"
+  },
+  {
+   "verts": 125,
+   "centroid": [
+    -0.411,
+    -0.057,
+    1.037
+   ],
+   "bone": "hips"
+  },
+  {
+   "verts": 7,
+   "centroid": [
+    -0.395,
+    0.025,
+    0.979
+   ],
+   "bone": "hips"
+  },
+  {
+   "verts": 13,
+   "centroid": [
+    -0.51,
+    0.124,
+    0.774
+   ],
+   "bone": "hips"
+  },
+  {
+   "verts": 7,
+   "centroid": [
+    -0.516,
+    0.094,
+    0.735
+   ],
+   "bone": "hips"
+  }
+ ],
+ "v2_dangling_cut": {
+  "verts": 0,
+  "bbox": null
+ },
+ "v2_raw_gaps": {
+  "arm.l": {
+   "min_m": 0.0434,
+   "p01_m": 0.0825,
+   "at": [
+    0.439,
+    0.078,
+    1.151
+   ],
+   "other": "torso"
+  },
+  "arm.r": {
+   "min_m": 0.0435,
+   "p01_m": 0.081,
+   "at": [
+    -0.447,
+    0.075,
+    1.15
+   ],
+   "other": "torso"
+  },
+  "leg.l": {
+   "min_m": 0.1626,
+   "p01_m": 0.1819,
+   "at": [
+    0.083,
+    0.17,
+    0.298
+   ],
+   "other": "leg.r"
+  },
+  "leg.r": {
+   "min_m": 0.1626,
+   "p01_m": 0.1848,
+   "at": [
+    -0.079,
+    0.184,
+    0.296
+   ],
+   "other": "leg.l"
+  }
+ },
+ "v2_slab_vertices_moved": {},
+ "v2_raw_gaps_after_slab": {
+  "arm.l": {
+   "min_m": 0.0434,
+   "p01_m": 0.0825,
+   "at": [
+    0.439,
+    0.078,
+    1.151
+   ],
+   "other": "torso"
+  },
+  "arm.r": {
+   "min_m": 0.0435,
+   "p01_m": 0.081,
+   "at": [
+    -0.447,
+    0.075,
+    1.15
+   ],
+   "other": "torso"
+  },
+  "leg.l": {
+   "min_m": 0.1626,
+   "p01_m": 0.1819,
+   "at": [
+    0.083,
+    0.17,
+    0.298
+   ],
+   "other": "leg.r"
+  },
+  "leg.r": {
+   "min_m": 0.1626,
+   "p01_m": 0.1848,
+   "at": [
+    -0.079,
+    0.184,
+    0.296
+   ],
+   "other": "leg.l"
+  }
+ },
+ "v2_voxel_m": 0.012,
+ "v2_close": {
+  "close_r": 0.012,
+  "voxel_m": 0.008083333333333335
+ },
+ "v2_remesh": {
+  "body": {
+   "cavity_shells_removed": 0,
+   "genus_total": 18,
+   "tris": 717328,
+   "verts": 358652,
+   "open_edges": 0,
+   "nonmanifold_edges": 0,
+   "nonmanifold_verts": 0,
+   "winding_flips": 0,
+   "signed_volume_m3": 0.2141,
+   "components": 12
+  },
+  "pack": {
+   "cavity_shells_removed": 0,
+   "genus_total": 30,
+   "tris": 383564,
+   "verts": 191746,
+   "open_edges": 0,
+   "nonmanifold_edges": 0,
+   "nonmanifold_verts": 0,
+   "winding_flips": 0,
+   "signed_volume_m3": 0.1252,
+   "components": 12
+  },
+  "items": {
+   "cavity_shells_removed": 0,
+   "genus_total": 2,
+   "tris": 31960,
+   "verts": 16070,
+   "open_edges": 0,
+   "nonmanifold_edges": 0,
+   "nonmanifold_verts": 0,
+   "winding_flips": 0,
+   "signed_volume_m3": 0.0037,
+   "components": 47
+  }
+ },
+ "v2_remesh_gaps": {
+  "arm.l": {
+   "min_m": 0.045,
+   "p01_m": 0.0703,
+   "at": [
+    0.436,
+    0.085,
+    1.161
+   ],
+   "other": "torso",
+   "edges_to_others": 0
+  },
+  "arm.r": {
+   "min_m": 0.0446,
+   "p01_m": 0.0694,
+   "at": [
+    -0.439,
+    0.109,
+    1.168
+   ],
+   "other": "torso",
+   "edges_to_others": 0
+  },
+  "leg.l": {
+   "min_m": 0.1637,
+   "p01_m": 0.1827,
+   "at": [
+    0.084,
+    0.174,
+    0.303
+   ],
+   "other": "leg.r",
+   "edges_to_others": 0
+  },
+  "leg.r": {
+   "min_m": 0.1637,
+   "p01_m": 0.1828,
+   "at": [
+    -0.079,
+    0.174,
+    0.303
+   ],
+   "other": "leg.l",
+   "edges_to_others": 0
+  }
+ },
+ "v2_decimate": {
+  "body": [
+   5334
+  ],
+  "pack": [
+   1916,
+   900
+  ],
+  "items": [
+   600
+  ],
+  "lod1": [
+   1800
+  ],
+  "shadow": [
+   700
+  ]
+ },
+ "v2_head_cleanup": {
+  "verts": 697,
+  "faces": 1279,
+  "smooth_iters": 2
+ },
+ "v2_lod0_parts": {
+  "body": {
+   "genus_total": 18,
+   "tris": 5334,
+   "verts": 2655,
+   "open_edges": 0,
+   "nonmanifold_edges": 0,
+   "nonmanifold_verts": 0,
+   "winding_flips": 0,
+   "signed_volume_m3": 0.2134,
+   "components": 12
+  },
+  "pack": {
+   "genus_total": 30,
+   "tris": 900,
+   "verts": 414,
+   "open_edges": 0,
+   "nonmanifold_edges": 0,
+   "nonmanifold_verts": 0,
+   "winding_flips": 0,
+   "signed_volume_m3": 0.1206,
+   "components": 12
+  },
+  "items": {
+   "genus_total": 2,
+   "tris": 600,
+   "verts": 390,
+   "open_edges": 0,
+   "nonmanifold_edges": 0,
+   "nonmanifold_verts": 0,
+   "winding_flips": 0,
+   "signed_volume_m3": 0.0034,
+   "components": 47
+  }
+ },
+ "v2_lod0_head_tris": 1346,
+ "uv": {
+  "coverage": 0.5823,
+  "islands": 530,
+  "seams": 413,
+  "head_texel_density_vs_body": 2.945,
+  "uv_min": [
+   0.0025,
+   0.0025
+  ],
+  "uv_max": [
+   0.993,
+   0.9966
+  ]
+ },
+ "bake": {
+  "result": [
+   "FINISHED"
+  ],
+  "engine": "CYCLES selected-to-active",
+  "cage_extrusion_m": 0.02,
+  "max_ray_m": 0.05,
+  "margin_px": 8
+ },
+ "team_colour_match": {
+  "azure": {
+   "current_builder": "#1D6B7F",
+   "new_median": "#1D6B7F",
+   "k_current": 0.683,
+   "k_new_median": 0.683
+  },
+  "crimson": {
+   "current_builder": "#9C4639",
+   "new_median": "#9C4639",
+   "k_current": 0.683,
+   "k_new_median": 0.683
+  }
+ },
+ "team_mask": {
+  "method": "region: navy/teal in shirt+sleeves, teal cap band; opened, no pack",
+  "team_fraction_of_covered": 0.1365,
+  "shirt_median_value_srgb": 0.239,
+  "texels_covered": 0.5781,
+  "by_region": {
+   "torso": 0.303,
+   "head": 0.0,
+   "arm.l": 0.422,
+   "arm.r": 0.346,
+   "leg.l": 0.0,
+   "leg.r": 0.0,
+   "pack": 0.0
+  }
+ },
+ "v2_heat": {
+  "verts": 2604,
+  "weighted": 2604
+ },
+ "weights": {
+  "bone_heat_result": [
+   "FINISHED"
+  ],
+  "LOD0_heat": {
+   "max_influences": 4,
+   "mean_influences": 2.64,
+   "unweighted": 0,
+   "heat_unweighted": 855,
+   "fallback_verts": 58,
+   "rules": {
+    "enabled": false,
+    "overrides": {
+     "enabled": false
+    }
+   },
+   "sum_err": 2.220446049250313e-16,
+   "regions": {
+    "torso": 730,
+    "head": 676,
+    "arm.l": 125,
+    "arm.r": 114,
+    "leg.l": 129,
+    "leg.r": 134,
+    "pack": 414,
+    "zarm.l": 161,
+    "zarm.r": 151,
+    "zleg.l": 162,
+    "zleg.r": 273,
+    "item": 390
+   },
+   "leaks": {
+    "leg.r_on_leg.l_label": {
+     "verts": 0,
+     "of": 129,
+     "max": 0.0
+    },
+    "leg.r_on_leg.l_side": {
+     "verts": 58,
+     "of": 304,
+     "max": 0.194
+    },
+    "arm.r_on_arm.l_label": {
+     "verts": 0,
+     "of": 125,
+     "max": 0.0
+    },
+    "arm.r_on_arm.l_side": {
+     "verts": 0,
+     "of": 772,
+     "max": 0.0
+    },
+    "leg.l_on_leg.r_label": {
+     "verts": 2,
+     "of": 134,
+     "max": 0.05
+    },
+    "leg.l_on_leg.r_side": {
+     "verts": 9,
+     "of": 322,
+     "max": 0.05
+    },
+    "arm.l_on_arm.r_label": {
+     "verts": 0,
+     "of": 114,
+     "max": 0.0
+    },
+    "arm.l_on_arm.r_side": {
+     "verts": 0,
+     "of": 572,
+     "max": 0.0
+    },
+    "head_below_neck_0cm": {
+     "verts": 523,
+     "max": 0.958,
+     "neck_z": 1.72
+    },
+    "head_below_neck_2cm": {
+     "verts": 486,
+     "max": 0.942,
+     "neck_z": 1.72
+    },
+    "head_below_neck_10cm": {
+     "verts": 397,
+     "max": 0.919,
+     "neck_z": 1.72
+    }
+   }
+  },
+  "LOD0": {
+   "method": "robust transfer",
+   "max_influences": 4,
+   "mean_influences": 3.04,
+   "unweighted": 0,
+   "rigid_verts": 804,
+   "sum_err": 2.220446049250313e-16,
+   "leaks": {
+    "leg.r_on_leg.l_label": {
+     "verts": 0,
+     "of": 129,
+     "max": 0.0
+    },
+    "leg.r_on_leg.l_side": {
+     "verts": 42,
+     "of": 304,
+     "max": 0.313
+    },
+    "arm.r_on_arm.l_label": {
+     "verts": 0,
+     "of": 125,
+     "max": 0.0
+    },
+    "arm.r_on_arm.l_side": {
+     "verts": 50,
+     "of": 772,
+     "max": 0.106
+    },
+    "leg.l_on_leg.r_label": {
+     "verts": 2,
+     "of": 134,
+     "max": 0.159
+    },
+    "leg.l_on_leg.r_side": {
+     "verts": 45,
+     "of": 322,
+     "max": 0.23
+    },
+    "arm.l_on_arm.r_label": {
+     "verts": 0,
+     "of": 114,
+     "max": 0.0
+    },
+    "arm.l_on_arm.r_side": {
+     "verts": 0,
+     "of": 572,
+     "max": 0.003
+    },
+    "head_below_neck_0cm": {
+     "verts": 365,
+     "max": 0.858,
+     "neck_z": 1.72
+    },
+    "head_below_neck_2cm": {
+     "verts": 328,
+     "max": 0.812,
+     "neck_z": 1.72
+    },
+    "head_below_neck_10cm": {
+     "verts": 228,
+     "max": 0.71,
+     "neck_z": 1.72
+    }
+   },
+   "arm_mode": "hybrid",
+   "arm_diagnosis": {
+    "fore_hand_verts": 123,
+    "matched_share": 0.252,
+    "rejected_by_distance": 12,
+    "rejected_by_angle_only": 80,
+    "dist_median_m": 0.0716,
+    "angle_median_deg": 50.1,
+    "transfer_arm_weight_mean": 1.0,
+    "transfer_arm_weight_below_half": 0,
+    "forearm_hand_weight_transfer_mean": 0.973,
+    "forearm_hand_weight_heat_mean": 0.9,
+    "forearm_verts_mostly_upperarm_in_transfer": 0,
+    "transfer_top_bone_of_those": {},
+    "arm_verts": 372,
+    "arm_matched_share": 0.188,
+    "seed_pass1": {
+     "seeded_unmatched": 302
+    },
+    "hybrid": {
+     "arm_verts": 372,
+     "band_verts": 36
+    }
+   },
+   "template": {
+    "fbx": "Assets/_Game/Art/Characters/Warrior.fbx",
+    "mesh": "Warrior_LOD0",
+    "verts_total": 2217,
+    "prop_verts_dropped": 378,
+    "verts": 1839,
+    "tris": 3698,
+    "pieces": 1,
+    "pieces_reoriented": 0,
+    "own_head_weight_below_its_neck": {
+     "verts": 53,
+     "max": 0.353
+    },
+    "target_pieces_reoriented": 0
+   },
+   "fit": {
+    "hips": {
+     "src_verts": 9,
+     "tgt_verts": 112,
+     "len_src": 0.201,
+     "len_tgt": 0.191,
+     "scale_pos_neg_xyz": [
+      [
+       1.0,
+       1.0
+      ],
+      [
+       0.949,
+       1.0
+      ],
+      [
+       1.0,
+       1.0
+      ]
+     ]
+    },
+    "spine": {
+     "src_verts": 173,
+     "tgt_verts": 257,
+     "len_src": 0.375,
+     "len_tgt": 0.272,
+     "scale_pos_neg_xyz": [
+      [
+       1.21,
+       1.21
+      ],
+      [
+       0.724,
+       1.0
+      ],
+      [
+       1.396,
+       1.572
+      ]
+     ]
+    },
+    "chest": {
+     "src_verts": 139,
+     "tgt_verts": 308,
+     "len_src": 0.257,
+     "len_tgt": 0.508,
+     "scale_pos_neg_xyz": [
+      [
+       1.412,
+       1.412
+      ],
+      [
+       1.978,
+       1.0
+      ],
+      [
+       1.283,
+       1.38
+      ]
+     ]
+    },
+    "head": {
+     "src_verts": 839,
+     "tgt_verts": 795,
+     "len_src": 0.257,
+     "len_tgt": 0.508,
+     "scale_pos_neg_xyz": [
+      [
+       2.5,
+       2.5
+      ],
+      [
+       0.718,
+       1.0
+      ],
+      [
+       0.831,
+       0.755
+      ]
+     ]
+    },
+    "upperarm.l": {
+     "src_verts": 91,
+     "tgt_verts": 182,
+     "len_src": 0.242,
+     "len_tgt": 0.284,
+     "scale_pos_neg_xyz": [
+      [
+       0.6,
+       0.6
+      ],
+      [
+       1.174,
+       1.0
+      ],
+      [
+       1.307,
+       1.217
+      ]
+     ]
+    },
+    "lowerarm.l": {
+     "src_verts": 62,
+     "tgt_verts": 38,
+     "len_src": 0.26,
+     "len_tgt": 0.145,
+     "scale_pos_neg_xyz": [
+      [
+       0.768,
+       0.768
+      ],
+      [
+       0.556,
+       1.0
+      ],
+      [
+       1.458,
+       1.245
+      ]
+     ]
+    },
+    "wrist.l": {
+     "src_verts": 0,
+     "tgt_verts": 12,
+     "len_src": 0.074,
+     "len_tgt": 0.135,
+     "scale_pos_neg_xyz": [
+      [
+       1.0,
+       1.0
+      ],
+      [
+       1.829,
+       1.0
+      ],
+      [
+       1.0,
+       1.0
+      ]
+     ]
+    },
+    "hand.l": {
+     "src_verts": 51,
+     "tgt_verts": 49,
+     "len_src": 0.112,
+     "len_tgt": 0.1,
+     "scale_pos_neg_xyz": [
+      [
+       0.821,
+       0.821
+      ],
+      [
+       1.7,
+       1.0
+      ],
+      [
+       1.408,
+       1.94
+      ]
+     ]
+    },
+    "upperarm.r": {
+     "src_verts": 103,
+     "tgt_verts": 170,
+     "len_src": 0.242,
+     "len_tgt": 0.284,
+     "scale_pos_neg_xyz": [
+      [
+       0.6,
+       0.6
+      ],
+      [
+       1.174,
+       1.0
+      ],
+      [
+       1.206,
+       1.175
+      ]
+     ]
+    },
+    "lowerarm.r": {
+     "src_verts": 62,
+     "tgt_verts": 36,
+     "len_src": 0.26,
+     "len_tgt": 0.145,
+     "scale_pos_neg_xyz": [
+      [
+       0.682,
+       0.682
+      ],
+      [
+       0.556,
+       1.0
+      ],
+      [
+       1.583,
+       1.247
+      ]
+     ]
+    },
+    "wrist.r": {
+     "src_verts": 0,
+     "tgt_verts": 11,
+     "len_src": 0.074,
+     "len_tgt": 0.135,
+     "scale_pos_neg_xyz": [
+      [
+       1.0,
+       1.0
+      ],
+      [
+       1.829,
+       1.0
+      ],
+      [
+       1.0,
+       1.0
+      ]
+     ]
+    },
+    "hand.r": {
+     "src_verts": 54,
+     "tgt_verts": 46,
+     "len_src": 0.112,
+     "len_tgt": 0.1,
+     "scale_pos_neg_xyz": [
+      [
+       0.988,
+       0.988
+      ],
+      [
+       1.575,
+       1.0
+      ],
+      [
+       1.269,
+       1.955
+      ]
+     ]
+    },
+    "upperleg.l": {
+     "src_verts": 47,
+     "tgt_verts": 149,
+     "len_src": 0.227,
+     "len_tgt": 0.238,
+     "scale_pos_neg_xyz": [
+      [
+       1.325,
+       1.325
+      ],
+      [
+       1.047,
+       1.0
+      ],
+      [
+       2.365,
+       1.39
+      ]
+     ]
+    },
+    "lowerleg.l": {
+     "src_verts": 33,
+     "tgt_verts": 58,
+     "len_src": 0.209,
+     "len_tgt": 0.284,
+     "scale_pos_neg_xyz": [
+      [
+       1.24,
+       1.24
+      ],
+      [
+       1.357,
+       1.0
+      ],
+      [
+       1.0,
+       1.347
+      ]
+     ]
+    },
+    "foot.l": {
+     "src_verts": 37,
+     "tgt_verts": 64,
+     "len_src": 0.166,
+     "len_tgt": 0.269,
+     "scale_pos_neg_xyz": [
+      [
+       1.285,
+       1.285
+      ],
+      [
+       1.621,
+       1.0
+      ],
+      [
+       0.6,
+       0.996
+      ]
+     ]
+    },
+    "toes.l": {
+     "src_verts": 9,
+     "tgt_verts": 7,
+     "len_src": 0.166,
+     "len_tgt": 0.269,
+     "scale_pos_neg_xyz": [
+      [
+       1.0,
+       1.0
+      ],
+      [
+       1.621,
+       1.0
+      ],
+      [
+       1.0,
+       1.0
+      ]
+     ]
+    },
+    "upperleg.r": {
+     "src_verts": 49,
+     "tgt_verts": 231,
+     "len_src": 0.227,
+     "len_tgt": 0.238,
+     "scale_pos_neg_xyz": [
+      [
+       1.957,
+       1.957
+      ],
+      [
+       1.047,
+       1.0
+      ],
+      [
+       1.972,
+       1.33
+      ]
+     ]
+    },
+    "lowerleg.r": {
+     "src_verts": 32,
+     "tgt_verts": 31,
+     "len_src": 0.209,
+     "len_tgt": 0.284,
+     "scale_pos_neg_xyz": [
+      [
+       1.207,
+       1.207
+      ],
+      [
+       1.357,
+       1.0
+      ],
+      [
+       1.0,
+       1.223
+      ]
+     ]
+    },
+    "foot.r": {
+     "src_verts": 38,
+     "tgt_verts": 91,
+     "len_src": 0.166,
+     "len_tgt": 0.269,
+     "scale_pos_neg_xyz": [
+      [
+       1.302,
+       1.302
+      ],
+      [
+       1.621,
+       1.0
+      ],
+      [
+       0.6,
+       1.483
+      ]
+     ]
+    },
+    "toes.r": {
+     "src_verts": 11,
+     "tgt_verts": 8,
+     "len_src": 0.166,
+     "len_tgt": 0.269,
+     "scale_pos_neg_xyz": [
+      [
+       1.0,
+       1.0
+      ],
+      [
+       1.621,
+       1.0
+      ],
+      [
+       1.0,
+       1.0
+      ]
+     ]
+    }
+   },
+   "pass1_body": {
+    "verts": 2604,
+    "bbox_diag_m": 3.0699,
+    "dist_thr_m": 0.1535,
+    "angle_deg": 30.0,
+    "matched": 510,
+    "matched_share": 0.1959,
+    "rejected_by_distance": 52,
+    "rejected_by_angle_only": 2042,
+    "dist_m": {
+     "median": 0.0362,
+     "p90": 0.0997,
+     "max": 0.4015
+    },
+    "inpaint": {
+     "orphan_piece_verts": 0,
+     "solved": 2094,
+     "min_raw_weight": -1.3979
+    },
+    "smoothed_verts": 2593,
+    "matched_share_at_angle": {
+     "30": 0.21,
+     "45": 0.312,
+     "60": 0.397,
+     "90": 0.521
+    },
+    "matched_rejected_by_mask": 38,
+    "normal_smooth_iters": 0,
+    "masked": true,
+    "seeded_unmatched": 0
+   },
+   "pass2_shells": {
+    "verts": 51,
+    "bbox_diag_m": 2.4551,
+    "dist_thr_m": 0.1228,
+    "angle_deg": 30.0,
+    "matched": 1,
+    "matched_share": 0.0196,
+    "rejected_by_distance": 14,
+    "rejected_by_angle_only": 36,
+    "dist_m": {
+     "median": 0.0272,
+     "p90": 0.1581,
+     "max": 0.2287
+    },
+    "inpaint": {
+     "orphan_piece_verts": 30,
+     "solved": 20,
+     "min_raw_weight": -0.0
+    },
+    "smoothed_verts": 51,
+    "matched_share_at_angle": {
+     "30": 0.039,
+     "45": 0.059,
+     "60": 0.098,
+     "90": 0.725
+    },
+    "matched_rejected_by_mask": 1,
+    "normal_smooth_iters": 0,
+    "masked": true,
+    "seeded_unmatched": 0,
+    "pieces": 11,
+    "unmatched_pieces_rigid_verts": 30,
+    "piece_list": [
+     {
+      "verts": 3,
+      "centroid": [
+       -0.299,
+       -0.073,
+       0.582
+      ],
+      "region": "zleg.r",
+      "bone": "upperleg.r"
+     },
+     {
+      "verts": 3,
+      "centroid": [
+       -0.307,
+       -0.081,
+       0.589
+      ],
+      "region": "zleg.r",
+      "bone": "upperleg.r"
+     },
+     {
+      "verts": 3,
+      "centroid": [
+       -0.718,
+       0.411,
+       0.975
+      ],
+      "region": "torso",
+      "bone": "wrist.r"
+     },
+     {
+      "verts": 21,
+      "centroid": [
+       -0.466,
+       0.357,
+       0.941
+      ],
+      "region": "torso",
+      "bone": "spine"
+     },
+     {
+      "verts": 3,
+      "centroid": [
+       -0.145,
+       0.226,
+       0.073
+      ],
+      "region": "leg.r",
+      "bone": "foot.r"
+     },
+     {
+      "verts": 3,
+      "centroid": [
+       -0.389,
+       0.38,
+       1.357
+      ],
+      "region": "zarm.r",
+      "bone": "upperarm.r"
+     },
+     {
+      "verts": 3,
+      "centroid": [
+       -0.388,
+       0.383,
+       1.413
+      ],
+      "region": "torso",
+      "bone": "upperarm.r"
+     },
+     {
+      "verts": 3,
+      "centroid": [
+       -0.315,
+       0.146,
+       1.148
+      ],
+      "region": "torso",
+      "bone": "upperarm.r"
+     },
+     {
+      "verts": 3,
+      "centroid": [
+       0.072,
+       0.226,
+       1.787
+      ],
+      "region": "head",
+      "bone": "head"
+     },
+     {
+      "verts": 3,
+      "centroid": [
+       0.736,
+       0.226,
+       1.868
+      ],
+      "region": "torso",
+      "bone": "upperarm.l"
+     },
+     {
+      "verts": 3,
+      "centroid": [
+       0.765,
+       0.293,
+       1.931
+      ],
+      "region": "torso",
+      "bone": "upperarm.l"
+     }
+    ]
+   },
+   "surface_distance": {
+    "target_to_template_m": {
+     "median": 0.0362,
+     "p90": 0.0997,
+     "p99": 0.1844,
+     "max": 0.4015
+    },
+    "template_to_target_m": {
+     "median": 0.0444,
+     "p90": 0.1977,
+     "p99": 0.2884,
+     "max": 0.4079
+    }
+   },
+   "matched_by_region": {
+    "torso": {
+     "verts": 700,
+     "matched_share": 0.241
+    },
+    "head": {
+     "verts": 673,
+     "matched_share": 0.11
+    },
+    "arm.l": {
+     "verts": 125,
+     "matched_share": 0.248
+    },
+    "arm.r": {
+     "verts": 114,
+     "matched_share": 0.246
+    },
+    "leg.l": {
+     "verts": 129,
+     "matched_share": 0.248
+    },
+    "leg.r": {
+     "verts": 131,
+     "matched_share": 0.244
+    },
+    "zarm.l": {
+     "verts": 161,
+     "matched_share": 0.099
+    },
+    "zarm.r": {
+     "verts": 148,
+     "matched_share": 0.115
+    },
+    "zleg.l": {
+     "verts": 162,
+     "matched_share": 0.253
+    },
+    "zleg.r": {
+     "verts": 261,
+     "matched_share": 0.268
+    }
+   },
+   "thresholds": {
+    "dist_frac": 0.05,
+    "angle_deg": 30.0,
+    "allow_flip": false
+   }
+  },
+  "LOD0_transfer": {
+   "method": "robust transfer",
+   "max_influences": 4,
+   "mean_influences": 3.06,
+   "unweighted": 0,
+   "rigid_verts": 804,
+   "sum_err": 3.3306690738754696e-16,
+   "leaks": {
+    "leg.r_on_leg.l_label": {
+     "verts": 0,
+     "of": 129,
+     "max": 0.0
+    },
+    "leg.r_on_leg.l_side": {
+     "verts": 42,
+     "of": 304,
+     "max": 0.313
+    },
+    "arm.r_on_arm.l_label": {
+     "verts": 0,
+     "of": 125,
+     "max": 0.0
+    },
+    "arm.r_on_arm.l_side": {
+     "verts": 50,
+     "of": 772,
+     "max": 0.106
+    },
+    "leg.l_on_leg.r_label": {
+     "verts": 2,
+     "of": 134,
+     "max": 0.159
+    },
+    "leg.l_on_leg.r_side": {
+     "verts": 45,
+     "of": 322,
+     "max": 0.23
+    },
+    "arm.l_on_arm.r_label": {
+     "verts": 0,
+     "of": 114,
+     "max": 0.0
+    },
+    "arm.l_on_arm.r_side": {
+     "verts": 0,
+     "of": 572,
+     "max": 0.003
+    },
+    "head_below_neck_0cm": {
+     "verts": 462,
+     "max": 0.858,
+     "neck_z": 1.72
+    },
+    "head_below_neck_2cm": {
+     "verts": 425,
+     "max": 0.812,
+     "neck_z": 1.72
+    },
+    "head_below_neck_10cm": {
+     "verts": 324,
+     "max": 0.71,
+     "neck_z": 1.72
+    }
+   }
+  },
+  "LOD0_hybrid_hard": {
+   "method": "robust transfer",
+   "max_influences": 4,
+   "mean_influences": 3.03,
+   "unweighted": 0,
+   "rigid_verts": 804,
+   "sum_err": 2.220446049250313e-16,
+   "leaks": {
+    "leg.r_on_leg.l_label": {
+     "verts": 0,
+     "of": 129,
+     "max": 0.0
+    },
+    "leg.r_on_leg.l_side": {
+     "verts": 42,
+     "of": 304,
+     "max": 0.313
+    },
+    "arm.r_on_arm.l_label": {
+     "verts": 0,
+     "of": 125,
+     "max": 0.0
+    },
+    "arm.r_on_arm.l_side": {
+     "verts": 50,
+     "of": 772,
+     "max": 0.106
+    },
+    "leg.l_on_leg.r_label": {
+     "verts": 2,
+     "of": 134,
+     "max": 0.159
+    },
+    "leg.l_on_leg.r_side": {
+     "verts": 45,
+     "of": 322,
+     "max": 0.23
+    },
+    "arm.l_on_arm.r_label": {
+     "verts": 0,
+     "of": 114,
+     "max": 0.0
+    },
+    "arm.l_on_arm.r_side": {
+     "verts": 0,
+     "of": 572,
+     "max": 0.003
+    },
+    "head_below_neck_0cm": {
+     "verts": 365,
+     "max": 0.858,
+     "neck_z": 1.72
+    },
+    "head_below_neck_2cm": {
+     "verts": 328,
+     "max": 0.812,
+     "neck_z": 1.72
+    },
+    "head_below_neck_10cm": {
+     "verts": 228,
+     "max": 0.71,
+     "neck_z": 1.72
+    }
+   }
+  },
+  "LOD1": {
+   "method": "robust transfer",
+   "max_influences": 4,
+   "mean_influences": 2.49,
+   "unweighted": 0,
+   "rigid_verts": 380,
+   "sum_err": 2.220446049250313e-16,
+   "leaks": {
+    "leg.r_on_leg.l_label": {
+     "verts": 0,
+     "of": 32,
+     "max": 0.0
+    },
+    "leg.r_on_leg.l_side": {
+     "verts": 4,
+     "of": 74,
+     "max": 0.178
+    },
+    "arm.r_on_arm.l_label": {
+     "verts": 0,
+     "of": 30,
+     "max": 0.0
+    },
+    "arm.r_on_arm.l_side": {
+     "verts": 7,
+     "of": 144,
+     "max": 0.035
+    },
+    "leg.l_on_leg.r_label": {
+     "verts": 0,
+     "of": 32,
+     "max": 0.0
+    },
+    "leg.l_on_leg.r_side": {
+     "verts": 5,
+     "of": 87,
+     "max": 0.075
+    },
+    "arm.l_on_arm.r_label": {
+     "verts": 0,
+     "of": 32,
+     "max": 0.0
+    },
+    "arm.l_on_arm.r_side": {
+     "verts": 0,
+     "of": 103,
+     "max": 0.0
+    },
+    "head_below_neck_0cm": {
+     "verts": 69,
+     "max": 0.803,
+     "neck_z": 1.72
+    },
+    "head_below_neck_2cm": {
+     "verts": 64,
+     "max": 0.803,
+     "neck_z": 1.72
+    },
+    "head_below_neck_10cm": {
+     "verts": 41,
+     "max": 0.626,
+     "neck_z": 1.72
+    }
+   },
+   "lod1_from": "decimation of the transferred LOD0",
+   "lod1_smooth_iters": 0
+  },
+  "Shadow": {
+   "method": "robust transfer",
+   "max_influences": 4,
+   "mean_influences": 2.73,
+   "unweighted": 0,
+   "rigid_verts": 3,
+   "sum_err": 2.220446049250313e-16,
+   "leaks": {
+    "leg.r_on_leg.l_label": {
+     "verts": 0,
+     "of": 15,
+     "max": 0.0
+    },
+    "leg.r_on_leg.l_side": {
+     "verts": 4,
+     "of": 32,
+     "max": 0.151
+    },
+    "arm.r_on_arm.l_label": {
+     "verts": 0,
+     "of": 16,
+     "max": 0.0
+    },
+    "arm.r_on_arm.l_side": {
+     "verts": 0,
+     "of": 128,
+     "max": 0.0
+    },
+    "leg.l_on_leg.r_label": {
+     "verts": 0,
+     "of": 12,
+     "max": 0.0
+    },
+    "leg.l_on_leg.r_side": {
+     "verts": 4,
+     "of": 35,
+     "max": 0.065
+    },
+    "arm.l_on_arm.r_label": {
+     "verts": 0,
+     "of": 14,
+     "max": 0.0
+    },
+    "arm.l_on_arm.r_side": {
+     "verts": 0,
+     "of": 61,
+     "max": 0.0
+    },
+    "head_below_neck_0cm": {
+     "verts": 21,
+     "max": 0.621,
+     "neck_z": 1.72
+    },
+    "head_below_neck_2cm": {
+     "verts": 19,
+     "max": 0.621,
+     "neck_z": 1.72
+    },
+    "head_below_neck_10cm": {
+     "verts": 11,
+     "max": 0.157,
+     "neck_z": 1.72
+    }
+   }
+  }
+ },
+ "tris": {
+  "BuilderTex_LOD0": 6834,
+  "BuilderTex_LOD1": 1800,
+  "BuilderTex_Shadow": 700
+ },
+ "v2_lod_surfaces": {
+  "BuilderTex_LOD0": {
+   "genus_total": 50,
+   "tris": 6834,
+   "verts": 3459,
+   "open_edges": 0,
+   "nonmanifold_edges": 0,
+   "nonmanifold_verts": 0,
+   "winding_flips": 0,
+   "signed_volume_m3": 0.3374,
+   "components": 71
+  },
+  "BuilderTex_LOD1": {
+   "genus_total": 50,
+   "tris": 1800,
+   "verts": 942,
+   "open_edges": 0,
+   "nonmanifold_edges": 0,
+   "nonmanifold_verts": 0,
+   "winding_flips": 0,
+   "signed_volume_m3": 0.3256,
+   "components": 71
+  },
+  "BuilderTex_Shadow": {
+   "genus_total": 5,
+   "tris": 700,
+   "verts": 346,
+   "open_edges": 0,
+   "nonmanifold_edges": 0,
+   "nonmanifold_verts": 0,
+   "winding_flips": 0,
+   "signed_volume_m3": 0.9201,
+   "components": 3
+  }
+ },
+ "v2_gaps_apose": {
+  "BuilderTex_LOD0": {
+   "arm.l": {
+    "min_m": 0.0764,
+    "p01_m": 0.0825,
+    "at": [
+     0.462,
+     0.056,
+     1.145
+    ],
+    "other": "torso",
+    "edges_to_others": 0
+   },
+   "arm.r": {
+    "min_m": 0.0713,
+    "p01_m": 0.0743,
+    "at": [
+     -0.467,
+     0.055,
+     1.154
+    ],
+    "other": "torso",
+    "edges_to_others": 0
+   },
+   "leg.l": {
+    "min_m": 0.1838,
+    "p01_m": 0.1872,
+    "at": [
+     0.095,
+     0.19,
+     0.012
+    ],
+    "other": "leg.r",
+    "edges_to_others": 0
+   },
+   "leg.r": {
+    "min_m": 0.1838,
+    "p01_m": 0.1886,
+    "at": [
+     -0.088,
+     0.172,
+     0.014
+    ],
+    "other": "leg.l",
+    "edges_to_others": 0
+   }
+  },
+  "BuilderTex_LOD1": {
+   "arm.l": {
+    "min_m": 0.117,
+    "p01_m": 0.1253,
+    "at": [
+     0.484,
+     -0.014,
+     1.181
+    ],
+    "other": "torso",
+    "edges_to_others": 0
+   },
+   "arm.r": {
+    "min_m": 0.1166,
+    "p01_m": 0.1191,
+    "at": [
+     -0.483,
+     0.159,
+     1.135
+    ],
+    "other": "torso",
+    "edges_to_others": 0
+   },
+   "leg.l": {
+    "min_m": 0.185,
+    "p01_m": 0.1889,
+    "at": [
+     0.094,
+     0.242,
+     0.011
+    ],
+    "other": "leg.r",
+    "edges_to_others": 0
+   },
+   "leg.r": {
+    "min_m": 0.185,
+    "p01_m": 0.1889,
+    "at": [
+     -0.083,
+     0.188,
+     0.011
+    ],
+    "other": "leg.l",
+    "edges_to_others": 0
+   }
+  },
+  "BuilderTex_Shadow": {
+   "arm.l": {
+    "min_m": 0.1918,
+    "p01_m": 0.1965,
+    "at": [
+     0.57,
+     0.105,
+     1.023
+    ],
+    "other": "zleg.l",
+    "edges_to_others": 0
+   },
+   "arm.r": {
+    "min_m": 0.2078,
+    "p01_m": 0.2092,
+    "at": [
+     -0.574,
+     0.295,
+     1.192
+    ],
+    "other": "torso",
+    "edges_to_others": 0
+   },
+   "leg.l": {
+    "min_m": 0.2077,
+    "p01_m": 0.2128,
+    "at": [
+     0.108,
+     0.216,
+     0.168
+    ],
+    "other": "leg.r",
+    "edges_to_others": 0
+   },
+   "leg.r": {
+    "min_m": 0.2077,
+    "p01_m": 0.2117,
+    "at": [
+     -0.097,
+     0.192,
+     0.188
+    ],
+    "other": "leg.l",
+    "edges_to_others": 0
+   }
+  }
+ },
+ "lod0_head_tris": 1346,
+ "unskin_max_move_m": {
+  "BuilderTex_LOD0": 0.1431,
+  "BuilderTex_LOD1": 0.1385,
+  "BuilderTex_Shadow": 0.1349,
+  "BuilderTex_LOD0_heat": 0.1431,
+  "BuilderTex_LOD0_transfer": 0.1431,
+  "BuilderTex_LOD0_hybrid_hard": 0.1431
+ },
+ "joint_cut_rest": {
+  "BuilderTex_LOD0": {
+   "tag": "BuilderTex_LOD0 rest",
+   "radii_m": {
+    "shoulder": 0.2975,
+    "hip": 0.385
+   },
+   "verts": 3459,
+   "cut_verts": 830,
+   "components_after_cut": 68,
+   "arm.l": {
+    "probe_verts": 47,
+    "components": 2,
+    "torso_verts_in_its_component": 0,
+    "other_limb_verts_in_its_component": {
+     "leg.l": 0,
+     "leg.r": 0
+    },
+    "welded": false,
+    "nearest_torso_m": 0.2623
+   },
+   "leg.l": {
+    "probe_verts": 129,
+    "components": 1,
+    "torso_verts_in_its_component": 0,
+    "other_limb_verts_in_its_component": {
+     "arm.l": 0,
+     "arm.r": 0
+    },
+    "welded": false,
+    "nearest_torso_m": 0.5243
+   },
+   "arm.r": {
+    "probe_verts": 50,
+    "components": 2,
+    "torso_verts_in_its_component": 0,
+    "other_limb_verts_in_its_component": {
+     "leg.l": 0,
+     "leg.r": 0
+    },
+    "welded": false,
+    "nearest_torso_m": 0.2381
+   },
+   "leg.r": {
+    "probe_verts": 129,
+    "components": 3,
+    "torso_verts_in_its_component": 0,
+    "other_limb_verts_in_its_component": {
+     "arm.l": 0,
+     "arm.r": 0
+    },
+    "welded": false,
+    "nearest_torso_m": 0.5316
+   },
+   "any_welded": false
+  },
+  "BuilderTex_LOD1": {
+   "tag": "BuilderTex_LOD1 rest",
+   "radii_m": {
+    "shoulder": 0.2975,
+    "hip": 0.385
+   },
+   "verts": 942,
+   "cut_verts": 208,
+   "components_after_cut": 68,
+   "arm.l": {
+    "probe_verts": 9,
+    "components": 2,
+    "torso_verts_in_its_component": 0,
+    "other_limb_verts_in_its_component": {
+     "leg.l": 0,
+     "leg.r": 0
+    },
+    "welded": false,
+    "nearest_torso_m": 0.3749
+   },
+   "leg.l": {
+    "probe_verts": 33,
+    "components": 1,
+    "torso_verts_in_its_component": 0,
+    "other_limb_verts_in_its_component": {
+     "arm.l": 0,
+     "arm.r": 0
+    },
+    "welded": false,
+    "nearest_torso_m": 0.6539
+   },
+   "arm.r": {
+    "probe_verts": 11,
+    "components": 2,
+    "torso_verts_in_its_component": 0,
+    "other_limb_verts_in_its_component": {
+     "leg.l": 0,
+     "leg.r": 0
+    },
+    "welded": false,
+    "nearest_torso_m": 0.3751
+   },
+   "leg.r": {
+    "probe_verts": 31,
+    "components": 3,
+    "torso_verts_in_its_component": 0,
+    "other_limb_verts_in_its_component": {
+     "arm.l": 0,
+     "arm.r": 0
+    },
+    "welded": false,
+    "nearest_torso_m": 0.6805
+   },
+   "any_welded": false
+  },
+  "BuilderTex_Shadow": {
+   "tag": "BuilderTex_Shadow rest",
+   "radii_m": {
+    "shoulder": 0.2975,
+    "hip": 0.385
+   },
+   "verts": 346,
+   "cut_verts": 68,
+   "components_after_cut": 7,
+   "arm.l": {
+    "probe_verts": 6,
+    "components": 1,
+    "torso_verts_in_its_component": 56,
+    "other_limb_verts_in_its_component": {
+     "leg.l": 0,
+     "leg.r": 0
+    },
+    "welded": true,
+    "nearest_torso_m": 0.46,
+    "bridge_path_m": [
+     [
+      0.244,
+      0.333,
+      1.098
+     ],
+     [
+      0.438,
+      0.106,
+      1.161
+     ],
+     [
+      0.59,
+      0.091,
+      1.029
+     ],
+     [
+      0.7,
+      -0.112,
+      0.957
+     ]
+    ]
+   },
+   "leg.l": {
+    "probe_verts": 15,
+    "components": 1,
+    "torso_verts_in_its_component": 0,
+    "other_limb_verts_in_its_component": {
+     "arm.l": 0,
+     "arm.r": 0
+    },
+    "welded": false,
+    "nearest_torso_m": 0.6915
+   },
+   "arm.r": {
+    "probe_verts": 5,
+    "components": 1,
+    "torso_verts_in_its_component": 0,
+    "other_limb_verts_in_its_component": {
+     "leg.l": 0,
+     "leg.r": 0
+    },
+    "welded": false,
+    "nearest_torso_m": 0.4877
+   },
+   "leg.r": {
+    "probe_verts": 11,
+    "components": 1,
+    "torso_verts_in_its_component": 0,
+    "other_limb_verts_in_its_component": {
+     "arm.l": 0,
+     "arm.r": 0
+    },
+    "welded": false,
+    "nearest_torso_m": 0.7149
+   },
+   "any_welded": true
+  }
+ },
+ "v2_gaps_rest": {
+  "BuilderTex_LOD0": {
+   "arm.l": {
+    "min_m": 0.092,
+    "p01_m": 0.0932,
+    "at": [
+     0.476,
+     0.046,
+     1.147
+    ],
+    "other": "torso",
+    "edges_to_others": 0
+   },
+   "arm.r": {
+    "min_m": 0.0896,
+    "p01_m": 0.0923,
+    "at": [
+     -0.479,
+     0.126,
+     1.121
+    ],
+    "other": "torso",
+    "edges_to_others": 0
+   },
+   "leg.l": {
+    "min_m": 0.1718,
+    "p01_m": 0.1771,
+    "at": [
+     0.089,
+     0.305,
+     0.035
+    ],
+    "other": "leg.r",
+    "edges_to_others": 0
+   },
+   "leg.r": {
+    "min_m": 0.1718,
+    "p01_m": 0.1789,
+    "at": [
+     -0.082,
+     0.289,
+     0.035
+    ],
+    "other": "leg.l",
+    "edges_to_others": 0
+   }
+  },
+  "BuilderTex_LOD1": {
+   "arm.l": {
+    "min_m": 0.1267,
+    "p01_m": 0.1363,
+    "at": [
+     0.493,
+     -0.021,
+     1.185
+    ],
+    "other": "torso",
+    "edges_to_others": 0
+   },
+   "arm.r": {
+    "min_m": 0.127,
+    "p01_m": 0.134,
+    "at": [
+     -0.507,
+     0.145,
+     1.137
+    ],
+    "other": "torso",
+    "edges_to_others": 0
+   },
+   "leg.l": {
+    "min_m": 0.171,
+    "p01_m": 0.1757,
+    "at": [
+     0.086,
+     0.356,
+     0.044
+    ],
+    "other": "leg.r",
+    "edges_to_others": 0
+   },
+   "leg.r": {
+    "min_m": 0.171,
+    "p01_m": 0.1757,
+    "at": [
+     -0.077,
+     0.306,
+     0.035
+    ],
+    "other": "leg.l",
+    "edges_to_others": 0
+   }
+  },
+  "BuilderTex_Shadow": {
+   "arm.l": {
+    "min_m": 0.2115,
+    "p01_m": 0.2158,
+    "at": [
+     0.59,
+     0.091,
+     1.029
+    ],
+    "other": "zleg.l",
+    "edges_to_others": 0
+   },
+   "arm.r": {
+    "min_m": 0.225,
+    "p01_m": 0.2274,
+    "at": [
+     -0.594,
+     0.284,
+     1.194
+    ],
+    "other": "torso",
+    "edges_to_others": 0
+   },
+   "leg.l": {
+    "min_m": 0.1965,
+    "p01_m": 0.2015,
+    "at": [
+     0.103,
+     0.301,
+     0.192
+    ],
+    "other": "leg.r",
+    "edges_to_others": 0
+   },
+   "leg.r": {
+    "min_m": 0.1965,
+    "p01_m": 0.2004,
+    "at": [
+     -0.092,
+     0.278,
+     0.209
+    ],
+    "other": "leg.l",
+    "edges_to_others": 0
+   }
+  }
+ },
+ "height_lod0_rest_m": 2.3143,
+ "joint_cut_rest_spheres": {
+  "l": {
+   "shoulder": [
+    0.44999998807907104,
+    0.10000000149011612,
+    1.4600000381469727
+   ],
+   "hip": [
+    0.17000000178813934,
+    0.11999999731779099,
+    0.6800000071525574
+   ]
+  },
+  "r": {
+   "shoulder": [
+    -0.44999998807907104,
+    0.10000000149011612,
+    1.4600000381469727
+   ],
+   "hip": [
+    -0.17000000178813934,
+    0.11999999731779099,
+    0.6800000071525574
+   ]
+  }
+ },
+ "v2_clip_offset_check": {
+  "hips": {
+   "rig_m": 0.75,
+   "clip_idle_m": 0.723,
+   "diff_m": -0.027
+  },
+  "spine": {
+   "rig_m": 0.211,
+   "clip_idle_m": 0.211,
+   "diff_m": -0.0
+  },
+  "chest": {
+   "rig_m": 0.272,
+   "clip_idle_m": 0.272,
+   "diff_m": 0.0
+  },
+  "head": {
+   "rig_m": 0.502,
+   "clip_idle_m": 0.502,
+   "diff_m": -0.0
+  },
+  "upperarm.l": {
+   "rig_m": 0.511,
+   "clip_idle_m": 0.511,
+   "diff_m": -0.0
+  },
+  "lowerarm.l": {
+   "rig_m": 0.284,
+   "clip_idle_m": 0.284,
+   "diff_m": -0.0
+  },
+  "wrist.l": {
+   "rig_m": 0.145,
+   "clip_idle_m": 0.145,
+   "diff_m": 0.0
+  },
+  "hand.l": {
+   "rig_m": 0.135,
+   "clip_idle_m": 0.135,
+   "diff_m": -0.0
+  },
+  "upperarm.r": {
+   "rig_m": 0.511,
+   "clip_idle_m": 0.511,
+   "diff_m": -0.0
+  },
+  "lowerarm.r": {
+   "rig_m": 0.284,
+   "clip_idle_m": 0.284,
+   "diff_m": -0.0
+  },
+  "wrist.r": {
+   "rig_m": 0.145,
+   "clip_idle_m": 0.145,
+   "diff_m": 0.0
+  },
+  "hand.r": {
+   "rig_m": 0.135,
+   "clip_idle_m": 0.135,
+   "diff_m": -0.0
+  },
+  "upperleg.l": {
+   "rig_m": 0.18,
+   "clip_idle_m": 0.18,
+   "diff_m": 0.0
+  },
+  "lowerleg.l": {
+   "rig_m": 0.238,
+   "clip_idle_m": 0.238,
+   "diff_m": -0.0
+  },
+  "foot.l": {
+   "rig_m": 0.284,
+   "clip_idle_m": 0.284,
+   "diff_m": -0.0
+  },
+  "toes.l": {
+   "rig_m": 0.269,
+   "clip_idle_m": 0.269,
+   "diff_m": -0.0
+  },
+  "upperleg.r": {
+   "rig_m": 0.18,
+   "clip_idle_m": 0.18,
+   "diff_m": -0.0
+  },
+  "lowerleg.r": {
+   "rig_m": 0.238,
+   "clip_idle_m": 0.238,
+   "diff_m": -0.0
+  },
+  "foot.r": {
+   "rig_m": 0.284,
+   "clip_idle_m": 0.284,
+   "diff_m": -0.0
+  },
+  "toes.r": {
+   "rig_m": 0.269,
+   "clip_idle_m": 0.269,
+   "diff_m": 0.0
+  }
+ },
+ "clip_stretch": {
+  "Attack": {
+   "new_LOD0": {
+    "max": 3.338,
+    "p999": 2.386,
+    "worst_frame": 12,
+    "worst_bone": "upperarm.r",
+    "worst_at": [
+     -0.428,
+     0.234,
+     1.222
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "upperarm.r",
+       0.57
+      ],
+      [
+       "chest",
+       0.17
+      ],
+      [
+       "spine",
+       0.16
+      ],
+      [
+       "lowerarm.r",
+       0.1
+      ]
+     ],
+     [
+      [
+       "upperarm.r",
+       0.41
+      ],
+      [
+       "chest",
+       0.32
+      ],
+      [
+       "spine",
+       0.27
+      ]
+     ]
+    ]
+   },
+   "new_LOD1": {
+    "max": 2.948,
+    "p999": 2.487,
+    "worst_frame": 10,
+    "worst_bone": "upperarm.r",
+    "worst_at": [
+     -0.406,
+     0.099,
+     1.194
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "spine",
+       0.41
+      ],
+      [
+       "hips",
+       0.2
+      ],
+      [
+       "upperarm.r",
+       0.2
+      ],
+      [
+       "chest",
+       0.19
+      ]
+     ],
+     [
+      [
+       "upperarm.r",
+       0.43
+      ],
+      [
+       "spine",
+       0.27
+      ],
+      [
+       "chest",
+       0.27
+      ],
+      [
+       "lowerarm.r",
+       0.03
+      ]
+     ]
+    ]
+   },
+   "current_LOD0": {
+    "max": 13.933,
+    "p999": 7.353,
+    "worst_frame": 10,
+    "worst_bone": "toes.r",
+    "worst_at": [
+     -0.637,
+     -1.077,
+     0.169
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "lowerarm.r",
+       0.5
+      ],
+      [
+       "wrist.r",
+       0.28
+      ],
+      [
+       "chest",
+       0.12
+      ],
+      [
+       "upperarm.r",
+       0.1
+      ]
+     ],
+     [
+      [
+       "chest",
+       0.97
+      ],
+      [
+       "lowerarm.r",
+       0.02
+      ],
+      [
+       "wrist.r",
+       0.01
+      ]
+     ]
+    ]
+   },
+   "heat_LOD0": {
+    "max": 3.338,
+    "p999": 2.345,
+    "worst_frame": 12,
+    "worst_bone": "upperarm.r",
+    "worst_at": [
+     -0.428,
+     0.234,
+     1.222
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "upperarm.r",
+       0.57
+      ],
+      [
+       "chest",
+       0.17
+      ],
+      [
+       "spine",
+       0.16
+      ],
+      [
+       "lowerarm.r",
+       0.1
+      ]
+     ],
+     [
+      [
+       "upperarm.r",
+       0.41
+      ],
+      [
+       "chest",
+       0.32
+      ],
+      [
+       "spine",
+       0.27
+      ]
+     ]
+    ]
+   },
+   "transfer_LOD0": {
+    "max": 2.863,
+    "p999": 2.106,
+    "worst_frame": 12,
+    "worst_bone": "lowerarm.r",
+    "worst_at": [
+     -0.503,
+     0.048,
+     1.136
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "lowerarm.r",
+       0.52
+      ],
+      [
+       "upperarm.r",
+       0.19
+      ],
+      [
+       "chest",
+       0.14
+      ],
+      [
+       "hand.r",
+       0.14
+      ]
+     ],
+     [
+      [
+       "lowerarm.r",
+       0.43
+      ],
+      [
+       "upperarm.r",
+       0.23
+      ],
+      [
+       "chest",
+       0.19
+      ],
+      [
+       "spine",
+       0.15
+      ]
+     ]
+    ]
+   },
+   "hybrid_hard_LOD0": {
+    "max": 3.338,
+    "p999": 2.386,
+    "worst_frame": 12,
+    "worst_bone": "upperarm.r",
+    "worst_at": [
+     -0.428,
+     0.234,
+     1.222
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "upperarm.r",
+       0.57
+      ],
+      [
+       "chest",
+       0.17
+      ],
+      [
+       "spine",
+       0.16
+      ],
+      [
+       "lowerarm.r",
+       0.1
+      ]
+     ],
+     [
+      [
+       "upperarm.r",
+       0.41
+      ],
+      [
+       "chest",
+       0.32
+      ],
+      [
+       "spine",
+       0.27
+      ]
+     ]
+    ]
+   }
+  },
+  "Attack2HChop": {
+   "new_LOD0": {
+    "max": 2.734,
+    "p999": 1.984,
+    "worst_frame": 22,
+    "worst_bone": "upperarm.l",
+    "worst_at": [
+     0.421,
+     0.301,
+     1.299
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "chest",
+       0.38
+      ],
+      [
+       "upperarm.l",
+       0.37
+      ],
+      [
+       "spine",
+       0.18
+      ],
+      [
+       "lowerarm.l",
+       0.07
+      ]
+     ],
+     [
+      [
+       "chest",
+       0.38
+      ],
+      [
+       "upperarm.l",
+       0.3
+      ],
+      [
+       "spine",
+       0.23
+      ],
+      [
+       "hips",
+       0.1
+      ]
+     ]
+    ]
+   },
+   "new_LOD1": {
+    "max": 2.326,
+    "p999": 1.818,
+    "worst_frame": 26,
+    "worst_bone": "upperarm.r",
+    "worst_at": [
+     -0.406,
+     0.099,
+     1.194
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "spine",
+       0.41
+      ],
+      [
+       "hips",
+       0.2
+      ],
+      [
+       "upperarm.r",
+       0.2
+      ],
+      [
+       "chest",
+       0.19
+      ]
+     ],
+     [
+      [
+       "upperarm.r",
+       0.43
+      ],
+      [
+       "spine",
+       0.27
+      ],
+      [
+       "chest",
+       0.27
+      ],
+      [
+       "lowerarm.r",
+       0.03
+      ]
+     ]
+    ]
+   },
+   "current_LOD0": {
+    "max": 8.381,
+    "p999": 4.841,
+    "worst_frame": 22,
+    "worst_bone": "toes.l",
+    "worst_at": [
+     0.84,
+     -0.768,
+     0.062
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "hand.l",
+       0.95
+      ],
+      [
+       "hips",
+       0.03
+      ],
+      [
+       "wrist.l",
+       0.02
+      ]
+     ],
+     [
+      [
+       "hand.l",
+       0.67
+      ],
+      [
+       "hips",
+       0.32
+      ]
+     ]
+    ]
+   },
+   "heat_LOD0": {
+    "max": 4.86,
+    "p999": 2.099,
+    "worst_frame": 18,
+    "worst_bone": "lowerleg.l",
+    "worst_at": [
+     0.15,
+     0.331,
+     0.381
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "hips",
+       0.31
+      ],
+      [
+       "upperleg.l",
+       0.28
+      ],
+      [
+       "lowerleg.l",
+       0.24
+      ],
+      [
+       "foot.l",
+       0.17
+      ]
+     ],
+     [
+      [
+       "hips",
+       0.61
+      ],
+      [
+       "upperleg.l",
+       0.38
+      ]
+     ]
+    ]
+   },
+   "transfer_LOD0": {
+    "max": 2.747,
+    "p999": 1.926,
+    "worst_frame": 22,
+    "worst_bone": "upperarm.l",
+    "worst_at": [
+     0.421,
+     0.301,
+     1.299
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "chest",
+       0.38
+      ],
+      [
+       "upperarm.l",
+       0.37
+      ],
+      [
+       "spine",
+       0.18
+      ],
+      [
+       "lowerarm.l",
+       0.07
+      ]
+     ],
+     [
+      [
+       "chest",
+       0.38
+      ],
+      [
+       "upperarm.l",
+       0.3
+      ],
+      [
+       "spine",
+       0.23
+      ],
+      [
+       "hips",
+       0.1
+      ]
+     ]
+    ]
+   },
+   "hybrid_hard_LOD0": {
+    "max": 2.747,
+    "p999": 1.968,
+    "worst_frame": 22,
+    "worst_bone": "upperarm.l",
+    "worst_at": [
+     0.421,
+     0.301,
+     1.299
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "chest",
+       0.38
+      ],
+      [
+       "upperarm.l",
+       0.37
+      ],
+      [
+       "spine",
+       0.18
+      ],
+      [
+       "lowerarm.l",
+       0.07
+      ]
+     ],
+     [
+      [
+       "chest",
+       0.38
+      ],
+      [
+       "upperarm.l",
+       0.3
+      ],
+      [
+       "spine",
+       0.23
+      ],
+      [
+       "hips",
+       0.1
+      ]
+     ]
+    ]
+   }
+  },
+  "Attack2HSlice": {
+   "new_LOD0": {
+    "max": 3.255,
+    "p999": 2.291,
+    "worst_frame": 20,
+    "worst_bone": "upperarm.l",
+    "worst_at": [
+     0.643,
+     0.177,
+     1.774
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "chest",
+       0.52
+      ],
+      [
+       "head",
+       0.25
+      ],
+      [
+       "upperarm.l",
+       0.23
+      ]
+     ],
+     [
+      [
+       "chest",
+       0.53
+      ],
+      [
+       "head",
+       0.34
+      ],
+      [
+       "upperarm.l",
+       0.13
+      ]
+     ]
+    ]
+   },
+   "new_LOD1": {
+    "max": 2.93,
+    "p999": 2.0,
+    "worst_frame": 16,
+    "worst_bone": "upperarm.r",
+    "worst_at": [
+     -0.406,
+     0.099,
+     1.194
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "spine",
+       0.41
+      ],
+      [
+       "hips",
+       0.2
+      ],
+      [
+       "upperarm.r",
+       0.2
+      ],
+      [
+       "chest",
+       0.19
+      ]
+     ],
+     [
+      [
+       "upperarm.r",
+       0.43
+      ],
+      [
+       "spine",
+       0.27
+      ],
+      [
+       "chest",
+       0.27
+      ],
+      [
+       "lowerarm.r",
+       0.03
+      ]
+     ]
+    ]
+   },
+   "current_LOD0": {
+    "max": 7.715,
+    "p999": 5.035,
+    "worst_frame": 20,
+    "worst_bone": "toes.l",
+    "worst_at": [
+     0.84,
+     -0.768,
+     0.062
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "hand.l",
+       0.95
+      ],
+      [
+       "hips",
+       0.03
+      ],
+      [
+       "wrist.l",
+       0.02
+      ]
+     ],
+     [
+      [
+       "hand.l",
+       0.67
+      ],
+      [
+       "hips",
+       0.32
+      ]
+     ]
+    ]
+   },
+   "heat_LOD0": {
+    "max": 3.256,
+    "p999": 2.617,
+    "worst_frame": 9,
+    "worst_bone": "lowerleg.l",
+    "worst_at": [
+     0.15,
+     0.331,
+     0.381
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "hips",
+       0.31
+      ],
+      [
+       "upperleg.l",
+       0.28
+      ],
+      [
+       "lowerleg.l",
+       0.24
+      ],
+      [
+       "foot.l",
+       0.17
+      ]
+     ],
+     [
+      [
+       "hips",
+       0.61
+      ],
+      [
+       "upperleg.l",
+       0.38
+      ]
+     ]
+    ]
+   },
+   "transfer_LOD0": {
+    "max": 3.255,
+    "p999": 2.196,
+    "worst_frame": 20,
+    "worst_bone": "upperarm.l",
+    "worst_at": [
+     0.643,
+     0.177,
+     1.774
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "chest",
+       0.52
+      ],
+      [
+       "head",
+       0.25
+      ],
+      [
+       "upperarm.l",
+       0.23
+      ]
+     ],
+     [
+      [
+       "chest",
+       0.53
+      ],
+      [
+       "head",
+       0.34
+      ],
+      [
+       "upperarm.l",
+       0.13
+      ]
+     ]
+    ]
+   },
+   "hybrid_hard_LOD0": {
+    "max": 3.255,
+    "p999": 2.291,
+    "worst_frame": 20,
+    "worst_bone": "upperarm.l",
+    "worst_at": [
+     0.643,
+     0.177,
+     1.774
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "chest",
+       0.52
+      ],
+      [
+       "head",
+       0.25
+      ],
+      [
+       "upperarm.l",
+       0.23
+      ]
+     ],
+     [
+      [
+       "chest",
+       0.53
+      ],
+      [
+       "head",
+       0.34
+      ],
+      [
+       "upperarm.l",
+       0.13
+      ]
+     ]
+    ]
+   }
+  },
+  "AttackSlice": {
+   "new_LOD0": {
+    "max": 2.7,
+    "p999": 1.997,
+    "worst_frame": 17,
+    "worst_bone": "upperarm.l",
+    "worst_at": [
+     0.643,
+     0.177,
+     1.774
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "chest",
+       0.52
+      ],
+      [
+       "head",
+       0.25
+      ],
+      [
+       "upperarm.l",
+       0.23
+      ]
+     ],
+     [
+      [
+       "chest",
+       0.53
+      ],
+      [
+       "head",
+       0.34
+      ],
+      [
+       "upperarm.l",
+       0.13
+      ]
+     ]
+    ]
+   },
+   "new_LOD1": {
+    "max": 2.312,
+    "p999": 1.789,
+    "worst_frame": 15,
+    "worst_bone": "lowerarm.r",
+    "worst_at": [
+     -0.584,
+     -0.076,
+     1.208
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "upperarm.r",
+       0.34
+      ],
+      [
+       "hand.r",
+       0.34
+      ],
+      [
+       "lowerarm.r",
+       0.21
+      ],
+      [
+       "wrist.r",
+       0.11
+      ]
+     ],
+     [
+      [
+       "upperarm.r",
+       0.7
+      ],
+      [
+       "lowerarm.r",
+       0.18
+      ],
+      [
+       "chest",
+       0.06
+      ],
+      [
+       "spine",
+       0.05
+      ]
+     ]
+    ]
+   },
+   "current_LOD0": {
+    "max": 6.791,
+    "p999": 4.289,
+    "worst_frame": 13,
+    "worst_bone": "toes.l",
+    "worst_at": [
+     0.84,
+     -0.768,
+     0.062
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "hand.l",
+       0.95
+      ],
+      [
+       "hips",
+       0.03
+      ],
+      [
+       "wrist.l",
+       0.02
+      ]
+     ],
+     [
+      [
+       "hand.l",
+       0.67
+      ],
+      [
+       "hips",
+       0.32
+      ]
+     ]
+    ]
+   },
+   "heat_LOD0": {
+    "max": 2.791,
+    "p999": 2.1,
+    "worst_frame": 5,
+    "worst_bone": "chest",
+    "worst_at": [
+     0.23,
+     -0.106,
+     1.51
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "head",
+       0.52
+      ],
+      [
+       "spine",
+       0.24
+      ],
+      [
+       "chest",
+       0.18
+      ],
+      [
+       "upperarm.l",
+       0.05
+      ]
+     ],
+     [
+      [
+       "spine",
+       0.48
+      ],
+      [
+       "chest",
+       0.35
+      ],
+      [
+       "upperarm.l",
+       0.17
+      ]
+     ]
+    ]
+   },
+   "transfer_LOD0": {
+    "max": 2.7,
+    "p999": 1.843,
+    "worst_frame": 17,
+    "worst_bone": "upperarm.l",
+    "worst_at": [
+     0.643,
+     0.177,
+     1.774
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "chest",
+       0.52
+      ],
+      [
+       "head",
+       0.25
+      ],
+      [
+       "upperarm.l",
+       0.23
+      ]
+     ],
+     [
+      [
+       "chest",
+       0.53
+      ],
+      [
+       "head",
+       0.34
+      ],
+      [
+       "upperarm.l",
+       0.13
+      ]
+     ]
+    ]
+   },
+   "hybrid_hard_LOD0": {
+    "max": 2.7,
+    "p999": 1.997,
+    "worst_frame": 17,
+    "worst_bone": "upperarm.l",
+    "worst_at": [
+     0.643,
+     0.177,
+     1.774
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "chest",
+       0.52
+      ],
+      [
+       "head",
+       0.25
+      ],
+      [
+       "upperarm.l",
+       0.23
+      ]
+     ],
+     [
+      [
+       "chest",
+       0.53
+      ],
+      [
+       "head",
+       0.34
+      ],
+      [
+       "upperarm.l",
+       0.13
+      ]
+     ]
+    ]
+   }
+  },
+  "Block": {
+   "new_LOD0": {
+    "max": 2.599,
+    "p999": 1.88,
+    "worst_frame": 10,
+    "worst_bone": "upperarm.l",
+    "worst_at": [
+     0.421,
+     0.301,
+     1.299
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "chest",
+       0.38
+      ],
+      [
+       "upperarm.l",
+       0.37
+      ],
+      [
+       "spine",
+       0.18
+      ],
+      [
+       "lowerarm.l",
+       0.07
+      ]
+     ],
+     [
+      [
+       "chest",
+       0.38
+      ],
+      [
+       "upperarm.l",
+       0.3
+      ],
+      [
+       "spine",
+       0.23
+      ],
+      [
+       "hips",
+       0.1
+      ]
+     ]
+    ]
+   },
+   "new_LOD1": {
+    "max": 2.377,
+    "p999": 1.602,
+    "worst_frame": 16,
+    "worst_bone": "upperarm.r",
+    "worst_at": [
+     -0.406,
+     0.099,
+     1.194
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "spine",
+       0.41
+      ],
+      [
+       "hips",
+       0.2
+      ],
+      [
+       "upperarm.r",
+       0.2
+      ],
+      [
+       "chest",
+       0.19
+      ]
+     ],
+     [
+      [
+       "upperarm.r",
+       0.43
+      ],
+      [
+       "spine",
+       0.27
+      ],
+      [
+       "chest",
+       0.27
+      ],
+      [
+       "lowerarm.r",
+       0.03
+      ]
+     ]
+    ]
+   },
+   "current_LOD0": {
+    "max": 7.024,
+    "p999": 3.938,
+    "worst_frame": 10,
+    "worst_bone": "toes.l",
+    "worst_at": [
+     0.84,
+     -0.768,
+     0.062
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "hand.l",
+       0.95
+      ],
+      [
+       "hips",
+       0.03
+      ],
+      [
+       "wrist.l",
+       0.02
+      ]
+     ],
+     [
+      [
+       "hand.l",
+       0.67
+      ],
+      [
+       "hips",
+       0.32
+      ]
+     ]
+    ]
+   },
+   "heat_LOD0": {
+    "max": 3.302,
+    "p999": 1.858,
+    "worst_frame": 18,
+    "worst_bone": "lowerleg.l",
+    "worst_at": [
+     0.15,
+     0.331,
+     0.381
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "hips",
+       0.31
+      ],
+      [
+       "upperleg.l",
+       0.28
+      ],
+      [
+       "lowerleg.l",
+       0.24
+      ],
+      [
+       "foot.l",
+       0.17
+      ]
+     ],
+     [
+      [
+       "hips",
+       0.61
+      ],
+      [
+       "upperleg.l",
+       0.38
+      ]
+     ]
+    ]
+   },
+   "transfer_LOD0": {
+    "max": 2.608,
+    "p999": 1.921,
+    "worst_frame": 10,
+    "worst_bone": "upperarm.l",
+    "worst_at": [
+     0.421,
+     0.301,
+     1.299
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "chest",
+       0.38
+      ],
+      [
+       "upperarm.l",
+       0.37
+      ],
+      [
+       "spine",
+       0.18
+      ],
+      [
+       "lowerarm.l",
+       0.07
+      ]
+     ],
+     [
+      [
+       "chest",
+       0.38
+      ],
+      [
+       "upperarm.l",
+       0.3
+      ],
+      [
+       "spine",
+       0.23
+      ],
+      [
+       "hips",
+       0.1
+      ]
+     ]
+    ]
+   },
+   "hybrid_hard_LOD0": {
+    "max": 2.608,
+    "p999": 1.873,
+    "worst_frame": 10,
+    "worst_bone": "upperarm.l",
+    "worst_at": [
+     0.421,
+     0.301,
+     1.299
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "chest",
+       0.38
+      ],
+      [
+       "upperarm.l",
+       0.37
+      ],
+      [
+       "spine",
+       0.18
+      ],
+      [
+       "lowerarm.l",
+       0.07
+      ]
+     ],
+     [
+      [
+       "chest",
+       0.38
+      ],
+      [
+       "upperarm.l",
+       0.3
+      ],
+      [
+       "spine",
+       0.23
+      ],
+      [
+       "hips",
+       0.1
+      ]
+     ]
+    ]
+   }
+  },
+  "BlockHit": {
+   "new_LOD0": {
+    "max": 2.595,
+    "p999": 1.871,
+    "worst_frame": 1,
+    "worst_bone": "upperarm.l",
+    "worst_at": [
+     0.421,
+     0.301,
+     1.299
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "chest",
+       0.38
+      ],
+      [
+       "upperarm.l",
+       0.37
+      ],
+      [
+       "spine",
+       0.18
+      ],
+      [
+       "lowerarm.l",
+       0.07
+      ]
+     ],
+     [
+      [
+       "chest",
+       0.38
+      ],
+      [
+       "upperarm.l",
+       0.3
+      ],
+      [
+       "spine",
+       0.23
+      ],
+      [
+       "hips",
+       0.1
+      ]
+     ]
+    ]
+   },
+   "new_LOD1": {
+    "max": 2.579,
+    "p999": 1.632,
+    "worst_frame": 9,
+    "worst_bone": "upperarm.r",
+    "worst_at": [
+     -0.406,
+     0.099,
+     1.194
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "spine",
+       0.41
+      ],
+      [
+       "hips",
+       0.2
+      ],
+      [
+       "upperarm.r",
+       0.2
+      ],
+      [
+       "chest",
+       0.19
+      ]
+     ],
+     [
+      [
+       "upperarm.r",
+       0.43
+      ],
+      [
+       "spine",
+       0.27
+      ],
+      [
+       "chest",
+       0.27
+      ],
+      [
+       "lowerarm.r",
+       0.03
+      ]
+     ]
+    ]
+   },
+   "current_LOD0": {
+    "max": 7.021,
+    "p999": 4.092,
+    "worst_frame": 1,
+    "worst_bone": "toes.l",
+    "worst_at": [
+     0.84,
+     -0.768,
+     0.062
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "hand.l",
+       0.95
+      ],
+      [
+       "hips",
+       0.03
+      ],
+      [
+       "wrist.l",
+       0.02
+      ]
+     ],
+     [
+      [
+       "hand.l",
+       0.67
+      ],
+      [
+       "hips",
+       0.32
+      ]
+     ]
+    ]
+   },
+   "heat_LOD0": {
+    "max": 3.835,
+    "p999": 1.904,
+    "worst_frame": 8,
+    "worst_bone": "lowerleg.l",
+    "worst_at": [
+     0.15,
+     0.331,
+     0.381
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "hips",
+       0.31
+      ],
+      [
+       "upperleg.l",
+       0.28
+      ],
+      [
+       "lowerleg.l",
+       0.24
+      ],
+      [
+       "foot.l",
+       0.17
+      ]
+     ],
+     [
+      [
+       "hips",
+       0.61
+      ],
+      [
+       "upperleg.l",
+       0.38
+      ]
+     ]
+    ]
+   },
+   "transfer_LOD0": {
+    "max": 2.604,
+    "p999": 1.921,
+    "worst_frame": 1,
+    "worst_bone": "upperarm.l",
+    "worst_at": [
+     0.421,
+     0.301,
+     1.299
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "chest",
+       0.38
+      ],
+      [
+       "upperarm.l",
+       0.37
+      ],
+      [
+       "spine",
+       0.18
+      ],
+      [
+       "lowerarm.l",
+       0.07
+      ]
+     ],
+     [
+      [
+       "chest",
+       0.38
+      ],
+      [
+       "upperarm.l",
+       0.3
+      ],
+      [
+       "spine",
+       0.23
+      ],
+      [
+       "hips",
+       0.1
+      ]
+     ]
+    ]
+   },
+   "hybrid_hard_LOD0": {
+    "max": 2.607,
+    "p999": 1.864,
+    "worst_frame": 1,
+    "worst_bone": "upperarm.l",
+    "worst_at": [
+     0.377,
+     0.109,
+     1.193
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "spine",
+       0.39
+      ],
+      [
+       "hips",
+       0.24
+      ],
+      [
+       "chest",
+       0.22
+      ],
+      [
+       "upperarm.l",
+       0.15
+      ]
+     ],
+     [
+      [
+       "upperarm.l",
+       0.38
+      ],
+      [
+       "chest",
+       0.3
+      ],
+      [
+       "spine",
+       0.29
+      ],
+      [
+       "hips",
+       0.04
+      ]
+     ]
+    ]
+   }
+  },
+  "Blocking": {
+   "new_LOD0": {
+    "max": 2.66,
+    "p999": 1.899,
+    "worst_frame": 12,
+    "worst_bone": "upperarm.l",
+    "worst_at": [
+     0.421,
+     0.301,
+     1.299
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "chest",
+       0.38
+      ],
+      [
+       "upperarm.l",
+       0.37
+      ],
+      [
+       "spine",
+       0.18
+      ],
+      [
+       "lowerarm.l",
+       0.07
+      ]
+     ],
+     [
+      [
+       "chest",
+       0.38
+      ],
+      [
+       "upperarm.l",
+       0.3
+      ],
+      [
+       "spine",
+       0.23
+      ],
+      [
+       "hips",
+       0.1
+      ]
+     ]
+    ]
+   },
+   "new_LOD1": {
+    "max": 2.354,
+    "p999": 1.602,
+    "worst_frame": 14,
+    "worst_bone": "upperarm.r",
+    "worst_at": [
+     -0.406,
+     0.099,
+     1.194
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "spine",
+       0.41
+      ],
+      [
+       "hips",
+       0.2
+      ],
+      [
+       "upperarm.r",
+       0.2
+      ],
+      [
+       "chest",
+       0.19
+      ]
+     ],
+     [
+      [
+       "upperarm.r",
+       0.43
+      ],
+      [
+       "spine",
+       0.27
+      ],
+      [
+       "chest",
+       0.27
+      ],
+      [
+       "lowerarm.r",
+       0.03
+      ]
+     ]
+    ]
+   },
+   "current_LOD0": {
+    "max": 7.022,
+    "p999": 3.977,
+    "worst_frame": 2,
+    "worst_bone": "toes.l",
+    "worst_at": [
+     0.84,
+     -0.768,
+     0.062
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "hand.l",
+       0.95
+      ],
+      [
+       "hips",
+       0.03
+      ],
+      [
+       "wrist.l",
+       0.02
+      ]
+     ],
+     [
+      [
+       "hand.l",
+       0.67
+      ],
+      [
+       "hips",
+       0.32
+      ]
+     ]
+    ]
+   },
+   "heat_LOD0": {
+    "max": 3.324,
+    "p999": 1.899,
+    "worst_frame": 14,
+    "worst_bone": "lowerleg.l",
+    "worst_at": [
+     0.15,
+     0.331,
+     0.381
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "hips",
+       0.31
+      ],
+      [
+       "upperleg.l",
+       0.28
+      ],
+      [
+       "lowerleg.l",
+       0.24
+      ],
+      [
+       "foot.l",
+       0.17
+      ]
+     ],
+     [
+      [
+       "hips",
+       0.61
+      ],
+      [
+       "upperleg.l",
+       0.38
+      ]
+     ]
+    ]
+   },
+   "transfer_LOD0": {
+    "max": 2.669,
+    "p999": 1.973,
+    "worst_frame": 12,
+    "worst_bone": "upperarm.l",
+    "worst_at": [
+     0.421,
+     0.301,
+     1.299
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "chest",
+       0.38
+      ],
+      [
+       "upperarm.l",
+       0.37
+      ],
+      [
+       "spine",
+       0.18
+      ],
+      [
+       "lowerarm.l",
+       0.07
+      ]
+     ],
+     [
+      [
+       "chest",
+       0.38
+      ],
+      [
+       "upperarm.l",
+       0.3
+      ],
+      [
+       "spine",
+       0.23
+      ],
+      [
+       "hips",
+       0.1
+      ]
+     ]
+    ]
+   },
+   "hybrid_hard_LOD0": {
+    "max": 2.669,
+    "p999": 1.899,
+    "worst_frame": 12,
+    "worst_bone": "upperarm.l",
+    "worst_at": [
+     0.421,
+     0.301,
+     1.299
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "chest",
+       0.38
+      ],
+      [
+       "upperarm.l",
+       0.37
+      ],
+      [
+       "spine",
+       0.18
+      ],
+      [
+       "lowerarm.l",
+       0.07
+      ]
+     ],
+     [
+      [
+       "chest",
+       0.38
+      ],
+      [
+       "upperarm.l",
+       0.3
+      ],
+      [
+       "spine",
+       0.23
+      ],
+      [
+       "hips",
+       0.1
+      ]
+     ]
+    ]
+   }
+  },
+  "Carry": {
+   "new_LOD0": {
+    "max": 2.065,
+    "p999": 1.581,
+    "worst_frame": 1,
+    "worst_bone": "upperarm.l",
+    "worst_at": [
+     0.643,
+     0.177,
+     1.774
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "chest",
+       0.52
+      ],
+      [
+       "head",
+       0.25
+      ],
+      [
+       "upperarm.l",
+       0.23
+      ]
+     ],
+     [
+      [
+       "chest",
+       0.53
+      ],
+      [
+       "head",
+       0.34
+      ],
+      [
+       "upperarm.l",
+       0.13
+      ]
+     ]
+    ]
+   },
+   "new_LOD1": {
+    "max": 1.887,
+    "p999": 1.474,
+    "worst_frame": 26,
+    "worst_bone": "upperarm.r",
+    "worst_at": [
+     -0.406,
+     0.099,
+     1.194
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "spine",
+       0.41
+      ],
+      [
+       "hips",
+       0.2
+      ],
+      [
+       "upperarm.r",
+       0.2
+      ],
+      [
+       "chest",
+       0.19
+      ]
+     ],
+     [
+      [
+       "upperarm.r",
+       0.43
+      ],
+      [
+       "spine",
+       0.27
+      ],
+      [
+       "chest",
+       0.27
+      ],
+      [
+       "lowerarm.r",
+       0.03
+      ]
+     ]
+    ]
+   },
+   "current_LOD0": {
+    "max": 5.79,
+    "p999": 2.811,
+    "worst_frame": 1,
+    "worst_bone": "toes.l",
+    "worst_at": [
+     0.84,
+     -0.768,
+     0.062
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "hand.l",
+       0.95
+      ],
+      [
+       "hips",
+       0.03
+      ],
+      [
+       "wrist.l",
+       0.02
+      ]
+     ],
+     [
+      [
+       "hand.l",
+       0.67
+      ],
+      [
+       "hips",
+       0.32
+      ]
+     ]
+    ]
+   },
+   "heat_LOD0": {
+    "max": 3.124,
+    "p999": 1.695,
+    "worst_frame": 14,
+    "worst_bone": "lowerleg.l",
+    "worst_at": [
+     0.15,
+     0.331,
+     0.381
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "hips",
+       0.31
+      ],
+      [
+       "upperleg.l",
+       0.28
+      ],
+      [
+       "lowerleg.l",
+       0.24
+      ],
+      [
+       "foot.l",
+       0.17
+      ]
+     ],
+     [
+      [
+       "hips",
+       0.61
+      ],
+      [
+       "upperleg.l",
+       0.38
+      ]
+     ]
+    ]
+   },
+   "transfer_LOD0": {
+    "max": 2.065,
+    "p999": 1.495,
+    "worst_frame": 1,
+    "worst_bone": "upperarm.l",
+    "worst_at": [
+     0.643,
+     0.177,
+     1.774
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "chest",
+       0.52
+      ],
+      [
+       "head",
+       0.25
+      ],
+      [
+       "upperarm.l",
+       0.23
+      ]
+     ],
+     [
+      [
+       "chest",
+       0.53
+      ],
+      [
+       "head",
+       0.34
+      ],
+      [
+       "upperarm.l",
+       0.13
+      ]
+     ]
+    ]
+   },
+   "hybrid_hard_LOD0": {
+    "max": 2.065,
+    "p999": 1.578,
+    "worst_frame": 1,
+    "worst_bone": "upperarm.l",
+    "worst_at": [
+     0.643,
+     0.177,
+     1.774
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "chest",
+       0.52
+      ],
+      [
+       "head",
+       0.25
+      ],
+      [
+       "upperarm.l",
+       0.23
+      ]
+     ],
+     [
+      [
+       "chest",
+       0.53
+      ],
+      [
+       "head",
+       0.34
+      ],
+      [
+       "upperarm.l",
+       0.13
+      ]
+     ]
+    ]
+   }
+  },
+  "Cast": {
+   "new_LOD0": {
+    "max": 1.99,
+    "p999": 1.75,
+    "worst_frame": 5,
+    "worst_bone": "chest",
+    "worst_at": [
+     -0.249,
+     -0.144,
+     1.508
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "chest",
+       0.56
+      ],
+      [
+       "spine",
+       0.21
+      ],
+      [
+       "upperarm.r",
+       0.12
+      ],
+      [
+       "hips",
+       0.11
+      ]
+     ],
+     [
+      [
+       "chest",
+       0.61
+      ],
+      [
+       "head",
+       0.18
+      ],
+      [
+       "upperarm.r",
+       0.11
+      ],
+      [
+       "spine",
+       0.1
+      ]
+     ]
+    ]
+   },
+   "new_LOD1": {
+    "max": 2.024,
+    "p999": 1.502,
+    "worst_frame": 6,
+    "worst_bone": "lowerarm.r",
+    "worst_at": [
+     -0.584,
+     -0.076,
+     1.208
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "upperarm.r",
+       0.34
+      ],
+      [
+       "hand.r",
+       0.34
+      ],
+      [
+       "lowerarm.r",
+       0.21
+      ],
+      [
+       "wrist.r",
+       0.11
+      ]
+     ],
+     [
+      [
+       "upperarm.r",
+       0.7
+      ],
+      [
+       "lowerarm.r",
+       0.18
+      ],
+      [
+       "chest",
+       0.06
+      ],
+      [
+       "spine",
+       0.05
+      ]
+     ]
+    ]
+   },
+   "current_LOD0": {
+    "max": 5.547,
+    "p999": 2.916,
+    "worst_frame": 6,
+    "worst_bone": "toes.r",
+    "worst_at": [
+     -0.637,
+     -1.077,
+     0.169
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "lowerarm.r",
+       0.5
+      ],
+      [
+       "wrist.r",
+       0.28
+      ],
+      [
+       "chest",
+       0.12
+      ],
+      [
+       "upperarm.r",
+       0.1
+      ]
+     ],
+     [
+      [
+       "chest",
+       0.97
+      ],
+      [
+       "lowerarm.r",
+       0.02
+      ],
+      [
+       "wrist.r",
+       0.01
+      ]
+     ]
+    ]
+   },
+   "heat_LOD0": {
+    "max": 2.772,
+    "p999": 1.811,
+    "worst_frame": 9,
+    "worst_bone": "lowerleg.l",
+    "worst_at": [
+     0.15,
+     0.331,
+     0.381
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "hips",
+       0.31
+      ],
+      [
+       "upperleg.l",
+       0.28
+      ],
+      [
+       "lowerleg.l",
+       0.24
+      ],
+      [
+       "foot.l",
+       0.17
+      ]
+     ],
+     [
+      [
+       "hips",
+       0.61
+      ],
+      [
+       "upperleg.l",
+       0.38
+      ]
+     ]
+    ]
+   },
+   "transfer_LOD0": {
+    "max": 2.096,
+    "p999": 1.701,
+    "worst_frame": 18,
+    "worst_bone": "upperarm.r",
+    "worst_at": [
+     -0.398,
+     0.047,
+     1.228
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "chest",
+       0.28
+      ],
+      [
+       "spine",
+       0.27
+      ],
+      [
+       "upperarm.r",
+       0.27
+      ],
+      [
+       "lowerarm.r",
+       0.18
+      ]
+     ],
+     [
+      [
+       "chest",
+       0.33
+      ],
+      [
+       "spine",
+       0.3
+      ],
+      [
+       "upperarm.r",
+       0.26
+      ],
+      [
+       "hips",
+       0.11
+      ]
+     ]
+    ]
+   },
+   "hybrid_hard_LOD0": {
+    "max": 1.99,
+    "p999": 1.774,
+    "worst_frame": 5,
+    "worst_bone": "chest",
+    "worst_at": [
+     -0.249,
+     -0.144,
+     1.508
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "chest",
+       0.56
+      ],
+      [
+       "spine",
+       0.21
+      ],
+      [
+       "upperarm.r",
+       0.12
+      ],
+      [
+       "hips",
+       0.11
+      ]
+     ],
+     [
+      [
+       "chest",
+       0.61
+      ],
+      [
+       "head",
+       0.18
+      ],
+      [
+       "upperarm.r",
+       0.11
+      ],
+      [
+       "spine",
+       0.1
+      ]
+     ]
+    ]
+   }
+  },
+  "Cheer": {
+   "new_LOD0": {
+    "max": 2.146,
+    "p999": 1.753,
+    "worst_frame": 29,
+    "worst_bone": "chest",
+    "worst_at": [
+     -0.017,
+     0.305,
+     1.587
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "chest",
+       0.38
+      ],
+      [
+       "spine",
+       0.29
+      ],
+      [
+       "head",
+       0.2
+      ],
+      [
+       "upperarm.r",
+       0.13
+      ]
+     ],
+     [
+      [
+       "chest",
+       0.39
+      ],
+      [
+       "spine",
+       0.3
+      ],
+      [
+       "head",
+       0.18
+      ],
+      [
+       "hips",
+       0.12
+      ]
+     ]
+    ]
+   },
+   "new_LOD1": {
+    "max": 2.0,
+    "p999": 1.593,
+    "worst_frame": 28,
+    "worst_bone": "lowerarm.r",
+    "worst_at": [
+     -0.584,
+     -0.076,
+     1.208
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "upperarm.r",
+       0.34
+      ],
+      [
+       "hand.r",
+       0.34
+      ],
+      [
+       "lowerarm.r",
+       0.21
+      ],
+      [
+       "wrist.r",
+       0.11
+      ]
+     ],
+     [
+      [
+       "upperarm.r",
+       0.7
+      ],
+      [
+       "lowerarm.r",
+       0.18
+      ],
+      [
+       "chest",
+       0.06
+      ],
+      [
+       "spine",
+       0.05
+      ]
+     ]
+    ]
+   },
+   "current_LOD0": {
+    "max": 7.324,
+    "p999": 4.624,
+    "worst_frame": 32,
+    "worst_bone": "toes.l",
+    "worst_at": [
+     0.84,
+     -0.768,
+     0.062
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "hand.l",
+       0.95
+      ],
+      [
+       "hips",
+       0.03
+      ],
+      [
+       "wrist.l",
+       0.02
+      ]
+     ],
+     [
+      [
+       "hand.l",
+       0.67
+      ],
+      [
+       "hips",
+       0.32
+      ]
+     ]
+    ]
+   },
+   "heat_LOD0": {
+    "max": 3.537,
+    "p999": 1.766,
+    "worst_frame": 29,
+    "worst_bone": "lowerleg.l",
+    "worst_at": [
+     0.15,
+     0.331,
+     0.381
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "hips",
+       0.31
+      ],
+      [
+       "upperleg.l",
+       0.28
+      ],
+      [
+       "lowerleg.l",
+       0.24
+      ],
+      [
+       "foot.l",
+       0.17
+      ]
+     ],
+     [
+      [
+       "hips",
+       0.61
+      ],
+      [
+       "upperleg.l",
+       0.38
+      ]
+     ]
+    ]
+   },
+   "transfer_LOD0": {
+    "max": 2.146,
+    "p999": 1.698,
+    "worst_frame": 29,
+    "worst_bone": "chest",
+    "worst_at": [
+     -0.017,
+     0.305,
+     1.587
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "chest",
+       0.38
+      ],
+      [
+       "spine",
+       0.29
+      ],
+      [
+       "head",
+       0.2
+      ],
+      [
+       "upperarm.r",
+       0.13
+      ]
+     ],
+     [
+      [
+       "chest",
+       0.39
+      ],
+      [
+       "spine",
+       0.3
+      ],
+      [
+       "head",
+       0.18
+      ],
+      [
+       "hips",
+       0.12
+      ]
+     ]
+    ]
+   },
+   "hybrid_hard_LOD0": {
+    "max": 2.146,
+    "p999": 1.753,
+    "worst_frame": 29,
+    "worst_bone": "chest",
+    "worst_at": [
+     -0.017,
+     0.305,
+     1.587
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "chest",
+       0.38
+      ],
+      [
+       "spine",
+       0.29
+      ],
+      [
+       "head",
+       0.2
+      ],
+      [
+       "upperarm.r",
+       0.13
+      ]
+     ],
+     [
+      [
+       "chest",
+       0.39
+      ],
+      [
+       "spine",
+       0.3
+      ],
+      [
+       "head",
+       0.18
+      ],
+      [
+       "hips",
+       0.12
+      ]
+     ]
+    ]
+   }
+  },
+  "Death": {
+   "new_LOD0": {
+    "max": 3.695,
+    "p999": 2.011,
+    "worst_frame": 10,
+    "worst_bone": "upperarm.r",
+    "worst_at": [
+     -0.369,
+     0.056,
+     1.144
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "spine",
+       0.45
+      ],
+      [
+       "hips",
+       0.29
+      ],
+      [
+       "chest",
+       0.15
+      ],
+      [
+       "upperleg.r",
+       0.12
+      ]
+     ],
+     [
+      [
+       "spine",
+       0.45
+      ],
+      [
+       "hips",
+       0.26
+      ],
+      [
+       "chest",
+       0.15
+      ],
+      [
+       "head",
+       0.13
+      ]
+     ]
+    ]
+   },
+   "new_LOD1": {
+    "max": 2.806,
+    "p999": 1.731,
+    "worst_frame": 14,
+    "worst_bone": "upperarm.r",
+    "worst_at": [
+     -0.406,
+     0.099,
+     1.194
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "spine",
+       0.41
+      ],
+      [
+       "hips",
+       0.2
+      ],
+      [
+       "upperarm.r",
+       0.2
+      ],
+      [
+       "chest",
+       0.19
+      ]
+     ],
+     [
+      [
+       "upperarm.r",
+       0.43
+      ],
+      [
+       "spine",
+       0.27
+      ],
+      [
+       "chest",
+       0.27
+      ],
+      [
+       "lowerarm.r",
+       0.03
+      ]
+     ]
+    ]
+   },
+   "current_LOD0": {
+    "max": 7.377,
+    "p999": 5.203,
+    "worst_frame": 14,
+    "worst_bone": "toes.r",
+    "worst_at": [
+     -0.497,
+     -1.167,
+     0.022
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "upperarm.r",
+       0.38
+      ],
+      [
+       "lowerarm.r",
+       0.37
+      ],
+      [
+       "hips",
+       0.16
+      ],
+      [
+       "wrist.r",
+       0.1
+      ]
+     ],
+     [
+      [
+       "hips",
+       0.84
+      ],
+      [
+       "upperarm.r",
+       0.09
+      ],
+      [
+       "lowerarm.r",
+       0.06
+      ]
+     ]
+    ]
+   },
+   "heat_LOD0": {
+    "max": 4.519,
+    "p999": 2.359,
+    "worst_frame": 8,
+    "worst_bone": "spine",
+    "worst_at": [
+     0.329,
+     -0.107,
+     0.955
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "hips",
+       0.57
+      ],
+      [
+       "head",
+       0.34
+      ],
+      [
+       "upperleg.l",
+       0.07
+      ],
+      [
+       "spine",
+       0.02
+      ]
+     ],
+     [
+      [
+       "hips",
+       0.88
+      ],
+      [
+       "upperleg.l",
+       0.12
+      ]
+     ]
+    ]
+   },
+   "transfer_LOD0": {
+    "max": 3.695,
+    "p999": 1.882,
+    "worst_frame": 10,
+    "worst_bone": "upperarm.r",
+    "worst_at": [
+     -0.369,
+     0.056,
+     1.144
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "spine",
+       0.45
+      ],
+      [
+       "hips",
+       0.29
+      ],
+      [
+       "chest",
+       0.15
+      ],
+      [
+       "upperleg.r",
+       0.12
+      ]
+     ],
+     [
+      [
+       "spine",
+       0.45
+      ],
+      [
+       "hips",
+       0.26
+      ],
+      [
+       "chest",
+       0.15
+      ],
+      [
+       "head",
+       0.13
+      ]
+     ]
+    ]
+   },
+   "hybrid_hard_LOD0": {
+    "max": 3.695,
+    "p999": 2.011,
+    "worst_frame": 10,
+    "worst_bone": "upperarm.r",
+    "worst_at": [
+     -0.369,
+     0.056,
+     1.144
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "spine",
+       0.45
+      ],
+      [
+       "hips",
+       0.29
+      ],
+      [
+       "chest",
+       0.15
+      ],
+      [
+       "upperleg.r",
+       0.12
+      ]
+     ],
+     [
+      [
+       "spine",
+       0.45
+      ],
+      [
+       "hips",
+       0.26
+      ],
+      [
+       "chest",
+       0.15
+      ],
+      [
+       "head",
+       0.13
+      ]
+     ]
+    ]
+   }
+  },
+  "DeathB": {
+   "new_LOD0": {
+    "max": 4.07,
+    "p999": 2.518,
+    "worst_frame": 39,
+    "worst_bone": "upperarm.r",
+    "worst_at": [
+     -0.369,
+     0.056,
+     1.144
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "spine",
+       0.45
+      ],
+      [
+       "hips",
+       0.29
+      ],
+      [
+       "chest",
+       0.15
+      ],
+      [
+       "upperleg.r",
+       0.12
+      ]
+     ],
+     [
+      [
+       "spine",
+       0.45
+      ],
+      [
+       "hips",
+       0.26
+      ],
+      [
+       "chest",
+       0.15
+      ],
+      [
+       "head",
+       0.13
+      ]
+     ]
+    ]
+   },
+   "new_LOD1": {
+    "max": 2.437,
+    "p999": 2.195,
+    "worst_frame": 63,
+    "worst_bone": "upperarm.l",
+    "worst_at": [
+     0.744,
+     0.237,
+     1.896
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "chest",
+       0.49
+      ],
+      [
+       "head",
+       0.4
+      ],
+      [
+       "upperarm.l",
+       0.11
+      ]
+     ],
+     [
+      [
+       "head",
+       0.6
+      ],
+      [
+       "chest",
+       0.33
+      ],
+      [
+       "upperarm.l",
+       0.06
+      ]
+     ]
+    ]
+   },
+   "current_LOD0": {
+    "max": 5.407,
+    "p999": 3.718,
+    "worst_frame": 39,
+    "worst_bone": "toes.r",
+    "worst_at": [
+     -0.325,
+     -0.78,
+     -0.126
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "upperleg.r",
+       0.42
+      ],
+      [
+       "hips",
+       0.27
+      ],
+      [
+       "spine",
+       0.25
+      ],
+      [
+       "chest",
+       0.06
+      ]
+     ],
+     [
+      [
+       "upperleg.r",
+       0.62
+      ],
+      [
+       "hips",
+       0.18
+      ],
+      [
+       "spine",
+       0.17
+      ],
+      [
+       "chest",
+       0.03
+      ]
+     ]
+    ]
+   },
+   "heat_LOD0": {
+    "max": 10.875,
+    "p999": 4.192,
+    "worst_frame": 63,
+    "worst_bone": "lowerleg.l",
+    "worst_at": [
+     0.155,
+     0.323,
+     0.389
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "hips",
+       0.51
+      ],
+      [
+       "upperleg.l",
+       0.48
+      ]
+     ],
+     [
+      [
+       "upperleg.l",
+       0.45
+      ],
+      [
+       "hips",
+       0.21
+      ],
+      [
+       "foot.l",
+       0.2
+      ],
+      [
+       "lowerleg.l",
+       0.14
+      ]
+     ]
+    ]
+   },
+   "transfer_LOD0": {
+    "max": 4.07,
+    "p999": 2.518,
+    "worst_frame": 39,
+    "worst_bone": "upperarm.r",
+    "worst_at": [
+     -0.369,
+     0.056,
+     1.144
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "spine",
+       0.45
+      ],
+      [
+       "hips",
+       0.29
+      ],
+      [
+       "chest",
+       0.15
+      ],
+      [
+       "upperleg.r",
+       0.12
+      ]
+     ],
+     [
+      [
+       "spine",
+       0.45
+      ],
+      [
+       "hips",
+       0.26
+      ],
+      [
+       "chest",
+       0.15
+      ],
+      [
+       "head",
+       0.13
+      ]
+     ]
+    ]
+   },
+   "hybrid_hard_LOD0": {
+    "max": 4.07,
+    "p999": 2.518,
+    "worst_frame": 39,
+    "worst_bone": "upperarm.r",
+    "worst_at": [
+     -0.369,
+     0.056,
+     1.144
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "spine",
+       0.45
+      ],
+      [
+       "hips",
+       0.29
+      ],
+      [
+       "chest",
+       0.15
+      ],
+      [
+       "upperleg.r",
+       0.12
+      ]
+     ],
+     [
+      [
+       "spine",
+       0.45
+      ],
+      [
+       "hips",
+       0.26
+      ],
+      [
+       "chest",
+       0.15
+      ],
+      [
+       "head",
+       0.13
+      ]
+     ]
+    ]
+   }
+  },
+  "Gather": {
+   "new_LOD0": {
+    "max": 2.398,
+    "p999": 1.754,
+    "worst_frame": 14,
+    "worst_bone": "upperarm.l",
+    "worst_at": [
+     0.377,
+     0.109,
+     1.193
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "spine",
+       0.38
+      ],
+      [
+       "chest",
+       0.25
+      ],
+      [
+       "hips",
+       0.22
+      ],
+      [
+       "upperarm.l",
+       0.15
+      ]
+     ],
+     [
+      [
+       "upperarm.l",
+       0.35
+      ],
+      [
+       "spine",
+       0.29
+      ],
+      [
+       "chest",
+       0.29
+      ],
+      [
+       "hips",
+       0.07
+      ]
+     ]
+    ]
+   },
+   "new_LOD1": {
+    "max": 1.911,
+    "p999": 1.748,
+    "worst_frame": 18,
+    "worst_bone": "lowerarm.r",
+    "worst_at": [
+     -0.584,
+     -0.076,
+     1.208
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "upperarm.r",
+       0.34
+      ],
+      [
+       "hand.r",
+       0.34
+      ],
+      [
+       "lowerarm.r",
+       0.21
+      ],
+      [
+       "wrist.r",
+       0.11
+      ]
+     ],
+     [
+      [
+       "upperarm.r",
+       0.7
+      ],
+      [
+       "lowerarm.r",
+       0.18
+      ],
+      [
+       "chest",
+       0.06
+      ],
+      [
+       "spine",
+       0.05
+      ]
+     ]
+    ]
+   },
+   "current_LOD0": {
+    "max": 5.895,
+    "p999": 3.959,
+    "worst_frame": 13,
+    "worst_bone": "toes.r",
+    "worst_at": [
+     -0.895,
+     -0.809,
+     0.02
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "hand.r",
+       0.61
+      ],
+      [
+       "hips",
+       0.34
+      ],
+      [
+       "wrist.r",
+       0.05
+      ]
+     ],
+     [
+      [
+       "hand.r",
+       0.94
+      ],
+      [
+       "wrist.r",
+       0.05
+      ],
+      [
+       "hips",
+       0.01
+      ]
+     ]
+    ]
+   },
+   "heat_LOD0": {
+    "max": 2.577,
+    "p999": 1.964,
+    "worst_frame": 15,
+    "worst_bone": "chest",
+    "worst_at": [
+     0.23,
+     -0.106,
+     1.51
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "head",
+       0.52
+      ],
+      [
+       "spine",
+       0.24
+      ],
+      [
+       "chest",
+       0.18
+      ],
+      [
+       "upperarm.l",
+       0.05
+      ]
+     ],
+     [
+      [
+       "spine",
+       0.48
+      ],
+      [
+       "chest",
+       0.35
+      ],
+      [
+       "upperarm.l",
+       0.17
+      ]
+     ]
+    ]
+   },
+   "transfer_LOD0": {
+    "max": 2.643,
+    "p999": 1.771,
+    "worst_frame": 12,
+    "worst_bone": "upperarm.l",
+    "worst_at": [
+     0.404,
+     0.108,
+     1.195
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "lowerarm.l",
+       0.32
+      ],
+      [
+       "upperarm.l",
+       0.28
+      ],
+      [
+       "chest",
+       0.22
+      ],
+      [
+       "spine",
+       0.19
+      ]
+     ],
+     [
+      [
+       "spine",
+       0.31
+      ],
+      [
+       "chest",
+       0.27
+      ],
+      [
+       "upperarm.l",
+       0.25
+      ],
+      [
+       "hips",
+       0.17
+      ]
+     ]
+    ]
+   },
+   "hybrid_hard_LOD0": {
+    "max": 2.887,
+    "p999": 1.754,
+    "worst_frame": 14,
+    "worst_bone": "upperarm.l",
+    "worst_at": [
+     0.377,
+     0.109,
+     1.193
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "spine",
+       0.39
+      ],
+      [
+       "hips",
+       0.24
+      ],
+      [
+       "chest",
+       0.22
+      ],
+      [
+       "upperarm.l",
+       0.15
+      ]
+     ],
+     [
+      [
+       "upperarm.l",
+       0.38
+      ],
+      [
+       "chest",
+       0.3
+      ],
+      [
+       "spine",
+       0.29
+      ],
+      [
+       "hips",
+       0.04
+      ]
+     ]
+    ]
+   }
+  },
+  "GetUp": {
+   "new_LOD0": {
+    "max": 3.629,
+    "p999": 2.435,
+    "worst_frame": 1,
+    "worst_bone": "upperarm.r",
+    "worst_at": [
+     -0.369,
+     0.056,
+     1.144
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "spine",
+       0.45
+      ],
+      [
+       "hips",
+       0.29
+      ],
+      [
+       "chest",
+       0.15
+      ],
+      [
+       "upperleg.r",
+       0.12
+      ]
+     ],
+     [
+      [
+       "spine",
+       0.45
+      ],
+      [
+       "hips",
+       0.26
+      ],
+      [
+       "chest",
+       0.15
+      ],
+      [
+       "head",
+       0.13
+      ]
+     ]
+    ]
+   },
+   "new_LOD1": {
+    "max": 2.438,
+    "p999": 2.172,
+    "worst_frame": 39,
+    "worst_bone": "upperleg.r",
+    "worst_at": [
+     -0.342,
+     -0.176,
+     0.931
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "spine",
+       0.55
+      ],
+      [
+       "hips",
+       0.38
+      ],
+      [
+       "upperleg.r",
+       0.06
+      ]
+     ],
+     [
+      [
+       "spine",
+       0.46
+      ],
+      [
+       "hips",
+       0.37
+      ],
+      [
+       "upperleg.r",
+       0.16
+      ]
+     ]
+    ]
+   },
+   "current_LOD0": {
+    "max": 7.192,
+    "p999": 4.494,
+    "worst_frame": 1,
+    "worst_bone": "toes.l",
+    "worst_at": [
+     0.75,
+     -1.153,
+     0.176
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "chest",
+       1.0
+      ]
+     ],
+     [
+      [
+       "lowerarm.l",
+       0.5
+      ],
+      [
+       "wrist.l",
+       0.23
+      ],
+      [
+       "chest",
+       0.22
+      ],
+      [
+       "upperarm.l",
+       0.06
+      ]
+     ]
+    ]
+   },
+   "heat_LOD0": {
+    "max": 6.269,
+    "p999": 2.782,
+    "worst_frame": 33,
+    "worst_bone": "lowerleg.l",
+    "worst_at": [
+     0.155,
+     0.323,
+     0.389
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "hips",
+       0.51
+      ],
+      [
+       "upperleg.l",
+       0.48
+      ]
+     ],
+     [
+      [
+       "upperleg.l",
+       0.45
+      ],
+      [
+       "hips",
+       0.21
+      ],
+      [
+       "foot.l",
+       0.2
+      ],
+      [
+       "lowerleg.l",
+       0.14
+      ]
+     ]
+    ]
+   },
+   "transfer_LOD0": {
+    "max": 3.629,
+    "p999": 2.435,
+    "worst_frame": 1,
+    "worst_bone": "upperarm.r",
+    "worst_at": [
+     -0.369,
+     0.056,
+     1.144
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "spine",
+       0.45
+      ],
+      [
+       "hips",
+       0.29
+      ],
+      [
+       "chest",
+       0.15
+      ],
+      [
+       "upperleg.r",
+       0.12
+      ]
+     ],
+     [
+      [
+       "spine",
+       0.45
+      ],
+      [
+       "hips",
+       0.26
+      ],
+      [
+       "chest",
+       0.15
+      ],
+      [
+       "head",
+       0.13
+      ]
+     ]
+    ]
+   },
+   "hybrid_hard_LOD0": {
+    "max": 3.629,
+    "p999": 2.435,
+    "worst_frame": 1,
+    "worst_bone": "upperarm.r",
+    "worst_at": [
+     -0.369,
+     0.056,
+     1.144
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "spine",
+       0.45
+      ],
+      [
+       "hips",
+       0.29
+      ],
+      [
+       "chest",
+       0.15
+      ],
+      [
+       "upperleg.r",
+       0.12
+      ]
+     ],
+     [
+      [
+       "spine",
+       0.45
+      ],
+      [
+       "hips",
+       0.26
+      ],
+      [
+       "chest",
+       0.15
+      ],
+      [
+       "head",
+       0.13
+      ]
+     ]
+    ]
+   }
+  },
+  "Hit": {
+   "new_LOD0": {
+    "max": 2.31,
+    "p999": 1.674,
+    "worst_frame": 3,
+    "worst_bone": "chest",
+    "worst_at": [
+     -0.101,
+     0.299,
+     1.544
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "chest",
+       0.35
+      ],
+      [
+       "spine",
+       0.28
+      ],
+      [
+       "head",
+       0.23
+      ],
+      [
+       "upperarm.r",
+       0.14
+      ]
+     ],
+     [
+      [
+       "chest",
+       0.37
+      ],
+      [
+       "spine",
+       0.32
+      ],
+      [
+       "head",
+       0.17
+      ],
+      [
+       "hips",
+       0.13
+      ]
+     ]
+    ]
+   },
+   "new_LOD1": {
+    "max": 2.05,
+    "p999": 1.493,
+    "worst_frame": 5,
+    "worst_bone": "lowerarm.r",
+    "worst_at": [
+     -0.584,
+     -0.076,
+     1.208
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "upperarm.r",
+       0.34
+      ],
+      [
+       "hand.r",
+       0.34
+      ],
+      [
+       "lowerarm.r",
+       0.21
+      ],
+      [
+       "wrist.r",
+       0.11
+      ]
+     ],
+     [
+      [
+       "upperarm.r",
+       0.7
+      ],
+      [
+       "lowerarm.r",
+       0.18
+      ],
+      [
+       "chest",
+       0.06
+      ],
+      [
+       "spine",
+       0.05
+      ]
+     ]
+    ]
+   },
+   "current_LOD0": {
+    "max": 3.974,
+    "p999": 2.775,
+    "worst_frame": 17,
+    "worst_bone": "toes.l",
+    "worst_at": [
+     0.84,
+     -0.768,
+     0.062
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "hand.l",
+       0.95
+      ],
+      [
+       "hips",
+       0.03
+      ],
+      [
+       "wrist.l",
+       0.02
+      ]
+     ],
+     [
+      [
+       "hand.l",
+       0.67
+      ],
+      [
+       "hips",
+       0.32
+      ]
+     ]
+    ]
+   },
+   "heat_LOD0": {
+    "max": 2.902,
+    "p999": 1.677,
+    "worst_frame": 3,
+    "worst_bone": "chest",
+    "worst_at": [
+     0.23,
+     -0.106,
+     1.51
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "head",
+       0.52
+      ],
+      [
+       "spine",
+       0.24
+      ],
+      [
+       "chest",
+       0.18
+      ],
+      [
+       "upperarm.l",
+       0.05
+      ]
+     ],
+     [
+      [
+       "spine",
+       0.48
+      ],
+      [
+       "chest",
+       0.35
+      ],
+      [
+       "upperarm.l",
+       0.17
+      ]
+     ]
+    ]
+   },
+   "transfer_LOD0": {
+    "max": 2.31,
+    "p999": 1.623,
+    "worst_frame": 3,
+    "worst_bone": "chest",
+    "worst_at": [
+     -0.101,
+     0.299,
+     1.544
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "chest",
+       0.35
+      ],
+      [
+       "spine",
+       0.28
+      ],
+      [
+       "head",
+       0.23
+      ],
+      [
+       "upperarm.r",
+       0.14
+      ]
+     ],
+     [
+      [
+       "chest",
+       0.37
+      ],
+      [
+       "spine",
+       0.32
+      ],
+      [
+       "head",
+       0.17
+      ],
+      [
+       "hips",
+       0.13
+      ]
+     ]
+    ]
+   },
+   "hybrid_hard_LOD0": {
+    "max": 2.31,
+    "p999": 1.674,
+    "worst_frame": 3,
+    "worst_bone": "chest",
+    "worst_at": [
+     -0.101,
+     0.299,
+     1.544
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "chest",
+       0.35
+      ],
+      [
+       "spine",
+       0.28
+      ],
+      [
+       "head",
+       0.23
+      ],
+      [
+       "upperarm.r",
+       0.14
+      ]
+     ],
+     [
+      [
+       "chest",
+       0.37
+      ],
+      [
+       "spine",
+       0.32
+      ],
+      [
+       "head",
+       0.17
+      ],
+      [
+       "hips",
+       0.13
+      ]
+     ]
+    ]
+   }
+  },
+  "HitHeavy": {
+   "new_LOD0": {
+    "max": 3.14,
+    "p999": 1.779,
+    "worst_frame": 5,
+    "worst_bone": "upperarm.r",
+    "worst_at": [
+     -0.369,
+     0.056,
+     1.144
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "spine",
+       0.45
+      ],
+      [
+       "hips",
+       0.29
+      ],
+      [
+       "chest",
+       0.15
+      ],
+      [
+       "upperleg.r",
+       0.12
+      ]
+     ],
+     [
+      [
+       "spine",
+       0.45
+      ],
+      [
+       "hips",
+       0.26
+      ],
+      [
+       "chest",
+       0.15
+      ],
+      [
+       "head",
+       0.13
+      ]
+     ]
+    ]
+   },
+   "new_LOD1": {
+    "max": 2.429,
+    "p999": 1.587,
+    "worst_frame": 5,
+    "worst_bone": "lowerarm.r",
+    "worst_at": [
+     -0.584,
+     -0.076,
+     1.208
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "upperarm.r",
+       0.34
+      ],
+      [
+       "hand.r",
+       0.34
+      ],
+      [
+       "lowerarm.r",
+       0.21
+      ],
+      [
+       "wrist.r",
+       0.11
+      ]
+     ],
+     [
+      [
+       "upperarm.r",
+       0.7
+      ],
+      [
+       "lowerarm.r",
+       0.18
+      ],
+      [
+       "chest",
+       0.06
+      ],
+      [
+       "spine",
+       0.05
+      ]
+     ]
+    ]
+   },
+   "current_LOD0": {
+    "max": 5.702,
+    "p999": 3.025,
+    "worst_frame": 5,
+    "worst_bone": "toes.r",
+    "worst_at": [
+     -0.637,
+     -1.077,
+     0.169
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "lowerarm.r",
+       0.5
+      ],
+      [
+       "wrist.r",
+       0.28
+      ],
+      [
+       "chest",
+       0.12
+      ],
+      [
+       "upperarm.r",
+       0.1
+      ]
+     ],
+     [
+      [
+       "chest",
+       0.97
+      ],
+      [
+       "lowerarm.r",
+       0.02
+      ],
+      [
+       "wrist.r",
+       0.01
+      ]
+     ]
+    ]
+   },
+   "heat_LOD0": {
+    "max": 5.295,
+    "p999": 2.585,
+    "worst_frame": 5,
+    "worst_bone": "spine",
+    "worst_at": [
+     0.329,
+     -0.107,
+     0.955
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "hips",
+       0.57
+      ],
+      [
+       "head",
+       0.34
+      ],
+      [
+       "upperleg.l",
+       0.07
+      ],
+      [
+       "spine",
+       0.02
+      ]
+     ],
+     [
+      [
+       "hips",
+       0.88
+      ],
+      [
+       "upperleg.l",
+       0.12
+      ]
+     ]
+    ]
+   },
+   "transfer_LOD0": {
+    "max": 3.14,
+    "p999": 1.815,
+    "worst_frame": 5,
+    "worst_bone": "upperarm.r",
+    "worst_at": [
+     -0.369,
+     0.056,
+     1.144
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "spine",
+       0.45
+      ],
+      [
+       "hips",
+       0.29
+      ],
+      [
+       "chest",
+       0.15
+      ],
+      [
+       "upperleg.r",
+       0.12
+      ]
+     ],
+     [
+      [
+       "spine",
+       0.45
+      ],
+      [
+       "hips",
+       0.26
+      ],
+      [
+       "chest",
+       0.15
+      ],
+      [
+       "head",
+       0.13
+      ]
+     ]
+    ]
+   },
+   "hybrid_hard_LOD0": {
+    "max": 3.14,
+    "p999": 1.779,
+    "worst_frame": 5,
+    "worst_bone": "upperarm.r",
+    "worst_at": [
+     -0.369,
+     0.056,
+     1.144
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "spine",
+       0.45
+      ],
+      [
+       "hips",
+       0.29
+      ],
+      [
+       "chest",
+       0.15
+      ],
+      [
+       "upperleg.r",
+       0.12
+      ]
+     ],
+     [
+      [
+       "spine",
+       0.45
+      ],
+      [
+       "hips",
+       0.26
+      ],
+      [
+       "chest",
+       0.15
+      ],
+      [
+       "head",
+       0.13
+      ]
+     ]
+    ]
+   }
+  },
+  "Idle": {
+   "new_LOD0": {
+    "max": 1.789,
+    "p999": 1.589,
+    "worst_frame": 9,
+    "worst_bone": "lowerarm.r",
+    "worst_at": [
+     -0.643,
+     -0.086,
+     1.225
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "hand.r",
+       0.38
+      ],
+      [
+       "upperarm.r",
+       0.3
+      ],
+      [
+       "lowerarm.r",
+       0.2
+      ],
+      [
+       "wrist.r",
+       0.12
+      ]
+     ],
+     [
+      [
+       "upperarm.r",
+       0.44
+      ],
+      [
+       "hand.r",
+       0.24
+      ],
+      [
+       "lowerarm.r",
+       0.22
+      ],
+      [
+       "wrist.r",
+       0.1
+      ]
+     ]
+    ]
+   },
+   "new_LOD1": {
+    "max": 1.794,
+    "p999": 1.494,
+    "worst_frame": 21,
+    "worst_bone": "lowerarm.r",
+    "worst_at": [
+     -0.584,
+     -0.076,
+     1.208
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "upperarm.r",
+       0.34
+      ],
+      [
+       "hand.r",
+       0.34
+      ],
+      [
+       "lowerarm.r",
+       0.21
+      ],
+      [
+       "wrist.r",
+       0.11
+      ]
+     ],
+     [
+      [
+       "upperarm.r",
+       0.7
+      ],
+      [
+       "lowerarm.r",
+       0.18
+      ],
+      [
+       "chest",
+       0.06
+      ],
+      [
+       "spine",
+       0.05
+      ]
+     ]
+    ]
+   },
+   "current_LOD0": {
+    "max": 3.986,
+    "p999": 2.795,
+    "worst_frame": 21,
+    "worst_bone": "toes.l",
+    "worst_at": [
+     0.84,
+     -0.768,
+     0.062
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "hand.l",
+       0.95
+      ],
+      [
+       "hips",
+       0.03
+      ],
+      [
+       "wrist.l",
+       0.02
+      ]
+     ],
+     [
+      [
+       "hand.l",
+       0.67
+      ],
+      [
+       "hips",
+       0.32
+      ]
+     ]
+    ]
+   },
+   "heat_LOD0": {
+    "max": 1.936,
+    "p999": 1.534,
+    "worst_frame": 13,
+    "worst_bone": "upperarm.l",
+    "worst_at": [
+     0.384,
+     0.104,
+     1.164
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "spine",
+       0.45
+      ],
+      [
+       "chest",
+       0.3
+      ],
+      [
+       "hips",
+       0.25
+      ]
+     ],
+     [
+      [
+       "spine",
+       0.37
+      ],
+      [
+       "chest",
+       0.34
+      ],
+      [
+       "upperarm.l",
+       0.16
+      ],
+      [
+       "hips",
+       0.12
+      ]
+     ]
+    ]
+   },
+   "transfer_LOD0": {
+    "max": 2.024,
+    "p999": 1.523,
+    "worst_frame": 12,
+    "worst_bone": "upperarm.l",
+    "worst_at": [
+     0.404,
+     0.108,
+     1.195
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "lowerarm.l",
+       0.32
+      ],
+      [
+       "upperarm.l",
+       0.28
+      ],
+      [
+       "chest",
+       0.22
+      ],
+      [
+       "spine",
+       0.19
+      ]
+     ],
+     [
+      [
+       "spine",
+       0.31
+      ],
+      [
+       "chest",
+       0.27
+      ],
+      [
+       "upperarm.l",
+       0.25
+      ],
+      [
+       "hips",
+       0.17
+      ]
+     ]
+    ]
+   },
+   "hybrid_hard_LOD0": {
+    "max": 1.789,
+    "p999": 1.589,
+    "worst_frame": 9,
+    "worst_bone": "lowerarm.r",
+    "worst_at": [
+     -0.643,
+     -0.086,
+     1.225
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "hand.r",
+       0.38
+      ],
+      [
+       "upperarm.r",
+       0.3
+      ],
+      [
+       "lowerarm.r",
+       0.2
+      ],
+      [
+       "wrist.r",
+       0.12
+      ]
+     ],
+     [
+      [
+       "upperarm.r",
+       0.44
+      ],
+      [
+       "hand.r",
+       0.24
+      ],
+      [
+       "lowerarm.r",
+       0.22
+      ],
+      [
+       "wrist.r",
+       0.1
+      ]
+     ]
+    ]
+   }
+  },
+  "IdleLook": {
+   "new_LOD0": {
+    "max": 2.161,
+    "p999": 1.701,
+    "worst_frame": 10,
+    "worst_bone": "upperarm.l",
+    "worst_at": [
+     0.377,
+     0.109,
+     1.193
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "spine",
+       0.38
+      ],
+      [
+       "chest",
+       0.25
+      ],
+      [
+       "hips",
+       0.22
+      ],
+      [
+       "upperarm.l",
+       0.15
+      ]
+     ],
+     [
+      [
+       "upperarm.l",
+       0.35
+      ],
+      [
+       "spine",
+       0.29
+      ],
+      [
+       "chest",
+       0.29
+      ],
+      [
+       "hips",
+       0.07
+      ]
+     ]
+    ]
+   },
+   "new_LOD1": {
+    "max": 1.618,
+    "p999": 1.499,
+    "worst_frame": 1,
+    "worst_bone": "upperarm.l",
+    "worst_at": [
+     0.592,
+     0.282,
+     1.296
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "upperarm.l",
+       0.66
+      ],
+      [
+       "wrist.l",
+       0.25
+      ],
+      [
+       "lowerarm.l",
+       0.05
+      ],
+      [
+       "hand.l",
+       0.03
+      ]
+     ],
+     [
+      [
+       "upperarm.l",
+       0.62
+      ],
+      [
+       "spine",
+       0.31
+      ],
+      [
+       "chest",
+       0.06
+      ]
+     ]
+    ]
+   },
+   "current_LOD0": {
+    "max": 5.486,
+    "p999": 3.428,
+    "worst_frame": 10,
+    "worst_bone": "toes.l",
+    "worst_at": [
+     0.84,
+     -0.768,
+     0.062
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "hand.l",
+       0.95
+      ],
+      [
+       "hips",
+       0.03
+      ],
+      [
+       "wrist.l",
+       0.02
+      ]
+     ],
+     [
+      [
+       "hand.l",
+       0.67
+      ],
+      [
+       "hips",
+       0.32
+      ]
+     ]
+    ]
+   },
+   "heat_LOD0": {
+    "max": 2.296,
+    "p999": 1.701,
+    "worst_frame": 9,
+    "worst_bone": "upperarm.l",
+    "worst_at": [
+     0.312,
+     0.304,
+     1.231
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "spine",
+       0.37
+      ],
+      [
+       "chest",
+       0.36
+      ],
+      [
+       "upperarm.l",
+       0.18
+      ],
+      [
+       "hips",
+       0.09
+      ]
+     ],
+     [
+      [
+       "spine",
+       0.43
+      ],
+      [
+       "chest",
+       0.42
+      ],
+      [
+       "hips",
+       0.15
+      ]
+     ]
+    ]
+   },
+   "transfer_LOD0": {
+    "max": 2.143,
+    "p999": 1.534,
+    "worst_frame": 11,
+    "worst_bone": "upperarm.l",
+    "worst_at": [
+     0.643,
+     0.177,
+     1.774
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "chest",
+       0.52
+      ],
+      [
+       "head",
+       0.25
+      ],
+      [
+       "upperarm.l",
+       0.23
+      ]
+     ],
+     [
+      [
+       "chest",
+       0.53
+      ],
+      [
+       "head",
+       0.34
+      ],
+      [
+       "upperarm.l",
+       0.13
+      ]
+     ]
+    ]
+   },
+   "hybrid_hard_LOD0": {
+    "max": 2.36,
+    "p999": 1.702,
+    "worst_frame": 11,
+    "worst_bone": "upperarm.l",
+    "worst_at": [
+     0.377,
+     0.109,
+     1.193
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "spine",
+       0.39
+      ],
+      [
+       "hips",
+       0.24
+      ],
+      [
+       "chest",
+       0.22
+      ],
+      [
+       "upperarm.l",
+       0.15
+      ]
+     ],
+     [
+      [
+       "upperarm.l",
+       0.38
+      ],
+      [
+       "chest",
+       0.3
+      ],
+      [
+       "spine",
+       0.29
+      ],
+      [
+       "hips",
+       0.04
+      ]
+     ]
+    ]
+   }
+  },
+  "JumpAir": {
+   "new_LOD0": {
+    "max": 2.21,
+    "p999": 1.67,
+    "worst_frame": 12,
+    "worst_bone": "chest",
+    "worst_at": [
+     -0.017,
+     0.305,
+     1.587
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "chest",
+       0.38
+      ],
+      [
+       "spine",
+       0.29
+      ],
+      [
+       "head",
+       0.2
+      ],
+      [
+       "upperarm.r",
+       0.13
+      ]
+     ],
+     [
+      [
+       "chest",
+       0.39
+      ],
+      [
+       "spine",
+       0.3
+      ],
+      [
+       "head",
+       0.18
+      ],
+      [
+       "hips",
+       0.12
+      ]
+     ]
+    ]
+   },
+   "new_LOD1": {
+    "max": 1.745,
+    "p999": 1.45,
+    "worst_frame": 1,
+    "worst_bone": "lowerarm.r",
+    "worst_at": [
+     -0.584,
+     -0.076,
+     1.208
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "upperarm.r",
+       0.34
+      ],
+      [
+       "hand.r",
+       0.34
+      ],
+      [
+       "lowerarm.r",
+       0.21
+      ],
+      [
+       "wrist.r",
+       0.11
+      ]
+     ],
+     [
+      [
+       "upperarm.r",
+       0.7
+      ],
+      [
+       "lowerarm.r",
+       0.18
+      ],
+      [
+       "chest",
+       0.06
+      ],
+      [
+       "spine",
+       0.05
+      ]
+     ]
+    ]
+   },
+   "current_LOD0": {
+    "max": 4.513,
+    "p999": 2.807,
+    "worst_frame": 14,
+    "worst_bone": "toes.r",
+    "worst_at": [
+     -0.497,
+     -1.167,
+     0.022
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "upperarm.r",
+       0.38
+      ],
+      [
+       "lowerarm.r",
+       0.37
+      ],
+      [
+       "hips",
+       0.16
+      ],
+      [
+       "wrist.r",
+       0.1
+      ]
+     ],
+     [
+      [
+       "hips",
+       0.84
+      ],
+      [
+       "upperarm.r",
+       0.09
+      ],
+      [
+       "lowerarm.r",
+       0.06
+      ]
+     ]
+    ]
+   },
+   "heat_LOD0": {
+    "max": 3.967,
+    "p999": 1.758,
+    "worst_frame": 13,
+    "worst_bone": "lowerleg.l",
+    "worst_at": [
+     0.15,
+     0.331,
+     0.381
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "hips",
+       0.31
+      ],
+      [
+       "upperleg.l",
+       0.28
+      ],
+      [
+       "lowerleg.l",
+       0.24
+      ],
+      [
+       "foot.l",
+       0.17
+      ]
+     ],
+     [
+      [
+       "hips",
+       0.61
+      ],
+      [
+       "upperleg.l",
+       0.38
+      ]
+     ]
+    ]
+   },
+   "transfer_LOD0": {
+    "max": 2.21,
+    "p999": 1.594,
+    "worst_frame": 12,
+    "worst_bone": "chest",
+    "worst_at": [
+     -0.017,
+     0.305,
+     1.587
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "chest",
+       0.38
+      ],
+      [
+       "spine",
+       0.29
+      ],
+      [
+       "head",
+       0.2
+      ],
+      [
+       "upperarm.r",
+       0.13
+      ]
+     ],
+     [
+      [
+       "chest",
+       0.39
+      ],
+      [
+       "spine",
+       0.3
+      ],
+      [
+       "head",
+       0.18
+      ],
+      [
+       "hips",
+       0.12
+      ]
+     ]
+    ]
+   },
+   "hybrid_hard_LOD0": {
+    "max": 2.21,
+    "p999": 1.67,
+    "worst_frame": 12,
+    "worst_bone": "chest",
+    "worst_at": [
+     -0.017,
+     0.305,
+     1.587
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "chest",
+       0.38
+      ],
+      [
+       "spine",
+       0.29
+      ],
+      [
+       "head",
+       0.2
+      ],
+      [
+       "upperarm.r",
+       0.13
+      ]
+     ],
+     [
+      [
+       "chest",
+       0.39
+      ],
+      [
+       "spine",
+       0.3
+      ],
+      [
+       "head",
+       0.18
+      ],
+      [
+       "hips",
+       0.12
+      ]
+     ]
+    ]
+   }
+  },
+  "JumpLand": {
+   "new_LOD0": {
+    "max": 2.711,
+    "p999": 1.797,
+    "worst_frame": 6,
+    "worst_bone": "chest",
+    "worst_at": [
+     -0.017,
+     0.305,
+     1.587
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "chest",
+       0.38
+      ],
+      [
+       "spine",
+       0.29
+      ],
+      [
+       "head",
+       0.2
+      ],
+      [
+       "upperarm.r",
+       0.13
+      ]
+     ],
+     [
+      [
+       "chest",
+       0.39
+      ],
+      [
+       "spine",
+       0.3
+      ],
+      [
+       "head",
+       0.18
+      ],
+      [
+       "hips",
+       0.12
+      ]
+     ]
+    ]
+   },
+   "new_LOD1": {
+    "max": 1.903,
+    "p999": 1.567,
+    "worst_frame": 14,
+    "worst_bone": "lowerarm.r",
+    "worst_at": [
+     -0.584,
+     -0.076,
+     1.208
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "upperarm.r",
+       0.34
+      ],
+      [
+       "hand.r",
+       0.34
+      ],
+      [
+       "lowerarm.r",
+       0.21
+      ],
+      [
+       "wrist.r",
+       0.11
+      ]
+     ],
+     [
+      [
+       "upperarm.r",
+       0.7
+      ],
+      [
+       "lowerarm.r",
+       0.18
+      ],
+      [
+       "chest",
+       0.06
+      ],
+      [
+       "spine",
+       0.05
+      ]
+     ]
+    ]
+   },
+   "current_LOD0": {
+    "max": 4.041,
+    "p999": 3.402,
+    "worst_frame": 6,
+    "worst_bone": "toes.l",
+    "worst_at": [
+     0.84,
+     -0.768,
+     0.062
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "hand.l",
+       0.95
+      ],
+      [
+       "hips",
+       0.03
+      ],
+      [
+       "wrist.l",
+       0.02
+      ]
+     ],
+     [
+      [
+       "hand.l",
+       0.67
+      ],
+      [
+       "hips",
+       0.32
+      ]
+     ]
+    ]
+   },
+   "heat_LOD0": {
+    "max": 6.182,
+    "p999": 1.888,
+    "worst_frame": 5,
+    "worst_bone": "lowerleg.l",
+    "worst_at": [
+     0.15,
+     0.331,
+     0.381
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "hips",
+       0.31
+      ],
+      [
+       "upperleg.l",
+       0.28
+      ],
+      [
+       "lowerleg.l",
+       0.24
+      ],
+      [
+       "foot.l",
+       0.17
+      ]
+     ],
+     [
+      [
+       "hips",
+       0.61
+      ],
+      [
+       "upperleg.l",
+       0.38
+      ]
+     ]
+    ]
+   },
+   "transfer_LOD0": {
+    "max": 2.711,
+    "p999": 1.737,
+    "worst_frame": 6,
+    "worst_bone": "chest",
+    "worst_at": [
+     -0.017,
+     0.305,
+     1.587
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "chest",
+       0.38
+      ],
+      [
+       "spine",
+       0.29
+      ],
+      [
+       "head",
+       0.2
+      ],
+      [
+       "upperarm.r",
+       0.13
+      ]
+     ],
+     [
+      [
+       "chest",
+       0.39
+      ],
+      [
+       "spine",
+       0.3
+      ],
+      [
+       "head",
+       0.18
+      ],
+      [
+       "hips",
+       0.12
+      ]
+     ]
+    ]
+   },
+   "hybrid_hard_LOD0": {
+    "max": 2.711,
+    "p999": 1.797,
+    "worst_frame": 6,
+    "worst_bone": "chest",
+    "worst_at": [
+     -0.017,
+     0.305,
+     1.587
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "chest",
+       0.38
+      ],
+      [
+       "spine",
+       0.29
+      ],
+      [
+       "head",
+       0.2
+      ],
+      [
+       "upperarm.r",
+       0.13
+      ]
+     ],
+     [
+      [
+       "chest",
+       0.39
+      ],
+      [
+       "spine",
+       0.3
+      ],
+      [
+       "head",
+       0.18
+      ],
+      [
+       "hips",
+       0.12
+      ]
+     ]
+    ]
+   }
+  },
+  "JumpStart": {
+   "new_LOD0": {
+    "max": 2.368,
+    "p999": 1.744,
+    "worst_frame": 7,
+    "worst_bone": "chest",
+    "worst_at": [
+     -0.017,
+     0.305,
+     1.587
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "chest",
+       0.38
+      ],
+      [
+       "spine",
+       0.29
+      ],
+      [
+       "head",
+       0.2
+      ],
+      [
+       "upperarm.r",
+       0.13
+      ]
+     ],
+     [
+      [
+       "chest",
+       0.39
+      ],
+      [
+       "spine",
+       0.3
+      ],
+      [
+       "head",
+       0.18
+      ],
+      [
+       "hips",
+       0.12
+      ]
+     ]
+    ]
+   },
+   "new_LOD1": {
+    "max": 1.886,
+    "p999": 1.533,
+    "worst_frame": 1,
+    "worst_bone": "lowerarm.r",
+    "worst_at": [
+     -0.584,
+     -0.076,
+     1.208
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "upperarm.r",
+       0.34
+      ],
+      [
+       "hand.r",
+       0.34
+      ],
+      [
+       "lowerarm.r",
+       0.21
+      ],
+      [
+       "wrist.r",
+       0.11
+      ]
+     ],
+     [
+      [
+       "upperarm.r",
+       0.7
+      ],
+      [
+       "lowerarm.r",
+       0.18
+      ],
+      [
+       "chest",
+       0.06
+      ],
+      [
+       "spine",
+       0.05
+      ]
+     ]
+    ]
+   },
+   "current_LOD0": {
+    "max": 3.877,
+    "p999": 2.7,
+    "worst_frame": 7,
+    "worst_bone": "toes.l",
+    "worst_at": [
+     0.84,
+     -0.768,
+     0.062
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "hand.l",
+       0.95
+      ],
+      [
+       "hips",
+       0.03
+      ],
+      [
+       "wrist.l",
+       0.02
+      ]
+     ],
+     [
+      [
+       "hand.l",
+       0.67
+      ],
+      [
+       "hips",
+       0.32
+      ]
+     ]
+    ]
+   },
+   "heat_LOD0": {
+    "max": 4.913,
+    "p999": 1.724,
+    "worst_frame": 7,
+    "worst_bone": "lowerleg.l",
+    "worst_at": [
+     0.15,
+     0.331,
+     0.381
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "hips",
+       0.31
+      ],
+      [
+       "upperleg.l",
+       0.28
+      ],
+      [
+       "lowerleg.l",
+       0.24
+      ],
+      [
+       "foot.l",
+       0.17
+      ]
+     ],
+     [
+      [
+       "hips",
+       0.61
+      ],
+      [
+       "upperleg.l",
+       0.38
+      ]
+     ]
+    ]
+   },
+   "transfer_LOD0": {
+    "max": 2.368,
+    "p999": 1.718,
+    "worst_frame": 7,
+    "worst_bone": "chest",
+    "worst_at": [
+     -0.017,
+     0.305,
+     1.587
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "chest",
+       0.38
+      ],
+      [
+       "spine",
+       0.29
+      ],
+      [
+       "head",
+       0.2
+      ],
+      [
+       "upperarm.r",
+       0.13
+      ]
+     ],
+     [
+      [
+       "chest",
+       0.39
+      ],
+      [
+       "spine",
+       0.3
+      ],
+      [
+       "head",
+       0.18
+      ],
+      [
+       "hips",
+       0.12
+      ]
+     ]
+    ]
+   },
+   "hybrid_hard_LOD0": {
+    "max": 2.368,
+    "p999": 1.744,
+    "worst_frame": 7,
+    "worst_bone": "chest",
+    "worst_at": [
+     -0.017,
+     0.305,
+     1.587
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "chest",
+       0.38
+      ],
+      [
+       "spine",
+       0.29
+      ],
+      [
+       "head",
+       0.2
+      ],
+      [
+       "upperarm.r",
+       0.13
+      ]
+     ],
+     [
+      [
+       "chest",
+       0.39
+      ],
+      [
+       "spine",
+       0.3
+      ],
+      [
+       "head",
+       0.18
+      ],
+      [
+       "hips",
+       0.12
+      ]
+     ]
+    ]
+   }
+  },
+  "KnockDown": {
+   "new_LOD0": {
+    "max": 3.712,
+    "p999": 2.504,
+    "worst_frame": 45,
+    "worst_bone": "upperarm.r",
+    "worst_at": [
+     -0.369,
+     0.056,
+     1.144
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "spine",
+       0.45
+      ],
+      [
+       "hips",
+       0.29
+      ],
+      [
+       "chest",
+       0.15
+      ],
+      [
+       "upperleg.r",
+       0.12
+      ]
+     ],
+     [
+      [
+       "spine",
+       0.45
+      ],
+      [
+       "hips",
+       0.26
+      ],
+      [
+       "chest",
+       0.15
+      ],
+      [
+       "head",
+       0.13
+      ]
+     ]
+    ]
+   },
+   "new_LOD1": {
+    "max": 2.546,
+    "p999": 2.187,
+    "worst_frame": 13,
+    "worst_bone": "upperleg.r",
+    "worst_at": [
+     -0.342,
+     -0.176,
+     0.931
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "spine",
+       0.55
+      ],
+      [
+       "hips",
+       0.38
+      ],
+      [
+       "upperleg.r",
+       0.06
+      ]
+     ],
+     [
+      [
+       "spine",
+       0.46
+      ],
+      [
+       "hips",
+       0.37
+      ],
+      [
+       "upperleg.r",
+       0.16
+      ]
+     ]
+    ]
+   },
+   "current_LOD0": {
+    "max": 7.192,
+    "p999": 4.494,
+    "worst_frame": 73,
+    "worst_bone": "toes.l",
+    "worst_at": [
+     0.75,
+     -1.153,
+     0.176
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "chest",
+       1.0
+      ]
+     ],
+     [
+      [
+       "lowerarm.l",
+       0.5
+      ],
+      [
+       "wrist.l",
+       0.23
+      ],
+      [
+       "chest",
+       0.22
+      ],
+      [
+       "upperarm.l",
+       0.06
+      ]
+     ]
+    ]
+   },
+   "heat_LOD0": {
+    "max": 6.404,
+    "p999": 2.799,
+    "worst_frame": 17,
+    "worst_bone": "lowerleg.l",
+    "worst_at": [
+     0.155,
+     0.323,
+     0.389
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "hips",
+       0.51
+      ],
+      [
+       "upperleg.l",
+       0.48
+      ]
+     ],
+     [
+      [
+       "upperleg.l",
+       0.45
+      ],
+      [
+       "hips",
+       0.21
+      ],
+      [
+       "foot.l",
+       0.2
+      ],
+      [
+       "lowerleg.l",
+       0.14
+      ]
+     ]
+    ]
+   },
+   "transfer_LOD0": {
+    "max": 3.712,
+    "p999": 2.504,
+    "worst_frame": 45,
+    "worst_bone": "upperarm.r",
+    "worst_at": [
+     -0.369,
+     0.056,
+     1.144
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "spine",
+       0.45
+      ],
+      [
+       "hips",
+       0.29
+      ],
+      [
+       "chest",
+       0.15
+      ],
+      [
+       "upperleg.r",
+       0.12
+      ]
+     ],
+     [
+      [
+       "spine",
+       0.45
+      ],
+      [
+       "hips",
+       0.26
+      ],
+      [
+       "chest",
+       0.15
+      ],
+      [
+       "head",
+       0.13
+      ]
+     ]
+    ]
+   },
+   "hybrid_hard_LOD0": {
+    "max": 3.712,
+    "p999": 2.504,
+    "worst_frame": 45,
+    "worst_bone": "upperarm.r",
+    "worst_at": [
+     -0.369,
+     0.056,
+     1.144
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "spine",
+       0.45
+      ],
+      [
+       "hips",
+       0.29
+      ],
+      [
+       "chest",
+       0.15
+      ],
+      [
+       "upperleg.r",
+       0.12
+      ]
+     ],
+     [
+      [
+       "spine",
+       0.45
+      ],
+      [
+       "hips",
+       0.26
+      ],
+      [
+       "chest",
+       0.15
+      ],
+      [
+       "head",
+       0.13
+      ]
+     ]
+    ]
+   }
+  },
+  "PickUp": {
+   "new_LOD0": {
+    "max": 2.59,
+    "p999": 1.789,
+    "worst_frame": 15,
+    "worst_bone": "chest",
+    "worst_at": [
+     -0.017,
+     0.305,
+     1.587
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "chest",
+       0.38
+      ],
+      [
+       "spine",
+       0.29
+      ],
+      [
+       "head",
+       0.2
+      ],
+      [
+       "upperarm.r",
+       0.13
+      ]
+     ],
+     [
+      [
+       "chest",
+       0.39
+      ],
+      [
+       "spine",
+       0.3
+      ],
+      [
+       "head",
+       0.18
+      ],
+      [
+       "hips",
+       0.12
+      ]
+     ]
+    ]
+   },
+   "new_LOD1": {
+    "max": 1.784,
+    "p999": 1.54,
+    "worst_frame": 1,
+    "worst_bone": "lowerarm.r",
+    "worst_at": [
+     -0.584,
+     -0.076,
+     1.208
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "upperarm.r",
+       0.34
+      ],
+      [
+       "hand.r",
+       0.34
+      ],
+      [
+       "lowerarm.r",
+       0.21
+      ],
+      [
+       "wrist.r",
+       0.11
+      ]
+     ],
+     [
+      [
+       "upperarm.r",
+       0.7
+      ],
+      [
+       "lowerarm.r",
+       0.18
+      ],
+      [
+       "chest",
+       0.06
+      ],
+      [
+       "spine",
+       0.05
+      ]
+     ]
+    ]
+   },
+   "current_LOD0": {
+    "max": 4.459,
+    "p999": 3.202,
+    "worst_frame": 23,
+    "worst_bone": "toes.r",
+    "worst_at": [
+     -0.637,
+     -1.077,
+     0.169
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "lowerarm.r",
+       0.5
+      ],
+      [
+       "wrist.r",
+       0.28
+      ],
+      [
+       "chest",
+       0.12
+      ],
+      [
+       "upperarm.r",
+       0.1
+      ]
+     ],
+     [
+      [
+       "chest",
+       0.97
+      ],
+      [
+       "lowerarm.r",
+       0.02
+      ],
+      [
+       "wrist.r",
+       0.01
+      ]
+     ]
+    ]
+   },
+   "heat_LOD0": {
+    "max": 3.988,
+    "p999": 1.754,
+    "worst_frame": 9,
+    "worst_bone": "lowerleg.l",
+    "worst_at": [
+     0.15,
+     0.331,
+     0.381
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "hips",
+       0.31
+      ],
+      [
+       "upperleg.l",
+       0.28
+      ],
+      [
+       "lowerleg.l",
+       0.24
+      ],
+      [
+       "foot.l",
+       0.17
+      ]
+     ],
+     [
+      [
+       "hips",
+       0.61
+      ],
+      [
+       "upperleg.l",
+       0.38
+      ]
+     ]
+    ]
+   },
+   "transfer_LOD0": {
+    "max": 2.59,
+    "p999": 1.789,
+    "worst_frame": 15,
+    "worst_bone": "chest",
+    "worst_at": [
+     -0.017,
+     0.305,
+     1.587
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "chest",
+       0.38
+      ],
+      [
+       "spine",
+       0.29
+      ],
+      [
+       "head",
+       0.2
+      ],
+      [
+       "upperarm.r",
+       0.13
+      ]
+     ],
+     [
+      [
+       "chest",
+       0.39
+      ],
+      [
+       "spine",
+       0.3
+      ],
+      [
+       "head",
+       0.18
+      ],
+      [
+       "hips",
+       0.12
+      ]
+     ]
+    ]
+   },
+   "hybrid_hard_LOD0": {
+    "max": 2.59,
+    "p999": 1.794,
+    "worst_frame": 15,
+    "worst_bone": "chest",
+    "worst_at": [
+     -0.017,
+     0.305,
+     1.587
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "chest",
+       0.38
+      ],
+      [
+       "spine",
+       0.29
+      ],
+      [
+       "head",
+       0.2
+      ],
+      [
+       "upperarm.r",
+       0.13
+      ]
+     ],
+     [
+      [
+       "chest",
+       0.39
+      ],
+      [
+       "spine",
+       0.3
+      ],
+      [
+       "head",
+       0.18
+      ],
+      [
+       "hips",
+       0.12
+      ]
+     ]
+    ]
+   }
+  },
+  "Run": {
+   "new_LOD0": {
+    "max": 2.881,
+    "p999": 1.974,
+    "worst_frame": 6,
+    "worst_bone": "spine",
+    "worst_at": [
+     -0.296,
+     0.236,
+     0.994
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "upperleg.r",
+       0.42
+      ],
+      [
+       "hips",
+       0.36
+      ],
+      [
+       "spine",
+       0.17
+      ],
+      [
+       "chest",
+       0.04
+      ]
+     ],
+     [
+      [
+       "hips",
+       0.34
+      ],
+      [
+       "spine",
+       0.34
+      ],
+      [
+       "upperleg.r",
+       0.19
+      ],
+      [
+       "chest",
+       0.12
+      ]
+     ]
+    ]
+   },
+   "new_LOD1": {
+    "max": 1.933,
+    "p999": 1.655,
+    "worst_frame": 6,
+    "worst_bone": "upperarm.r",
+    "worst_at": [
+     -0.343,
+     0.149,
+     1.163
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "spine",
+       0.43
+      ],
+      [
+       "hips",
+       0.3
+      ],
+      [
+       "chest",
+       0.14
+      ],
+      [
+       "upperleg.r",
+       0.13
+      ]
+     ],
+     [
+      [
+       "spine",
+       0.44
+      ],
+      [
+       "chest",
+       0.2
+      ],
+      [
+       "hips",
+       0.18
+      ],
+      [
+       "upperarm.r",
+       0.17
+      ]
+     ]
+    ]
+   },
+   "current_LOD0": {
+    "max": 3.831,
+    "p999": 2.638,
+    "worst_frame": 18,
+    "worst_bone": "toes.l",
+    "worst_at": [
+     0.84,
+     -0.768,
+     0.062
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "hand.l",
+       0.95
+      ],
+      [
+       "hips",
+       0.03
+      ],
+      [
+       "wrist.l",
+       0.02
+      ]
+     ],
+     [
+      [
+       "hand.l",
+       0.67
+      ],
+      [
+       "hips",
+       0.32
+      ]
+     ]
+    ]
+   },
+   "heat_LOD0": {
+    "max": 6.925,
+    "p999": 2.181,
+    "worst_frame": 15,
+    "worst_bone": "lowerleg.l",
+    "worst_at": [
+     0.15,
+     0.331,
+     0.381
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "hips",
+       0.31
+      ],
+      [
+       "upperleg.l",
+       0.28
+      ],
+      [
+       "lowerleg.l",
+       0.24
+      ],
+      [
+       "foot.l",
+       0.17
+      ]
+     ],
+     [
+      [
+       "hips",
+       0.61
+      ],
+      [
+       "upperleg.l",
+       0.38
+      ]
+     ]
+    ]
+   },
+   "transfer_LOD0": {
+    "max": 2.881,
+    "p999": 1.974,
+    "worst_frame": 6,
+    "worst_bone": "spine",
+    "worst_at": [
+     -0.296,
+     0.236,
+     0.994
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "upperleg.r",
+       0.42
+      ],
+      [
+       "hips",
+       0.36
+      ],
+      [
+       "spine",
+       0.17
+      ],
+      [
+       "chest",
+       0.04
+      ]
+     ],
+     [
+      [
+       "hips",
+       0.34
+      ],
+      [
+       "spine",
+       0.34
+      ],
+      [
+       "upperleg.r",
+       0.19
+      ],
+      [
+       "chest",
+       0.12
+      ]
+     ]
+    ]
+   },
+   "hybrid_hard_LOD0": {
+    "max": 2.881,
+    "p999": 1.974,
+    "worst_frame": 6,
+    "worst_bone": "spine",
+    "worst_at": [
+     -0.296,
+     0.236,
+     0.994
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "upperleg.r",
+       0.42
+      ],
+      [
+       "hips",
+       0.36
+      ],
+      [
+       "spine",
+       0.17
+      ],
+      [
+       "chest",
+       0.04
+      ]
+     ],
+     [
+      [
+       "hips",
+       0.34
+      ],
+      [
+       "spine",
+       0.34
+      ],
+      [
+       "upperleg.r",
+       0.19
+      ],
+      [
+       "chest",
+       0.12
+      ]
+     ]
+    ]
+   }
+  },
+  "SitDown": {
+   "new_LOD0": {
+    "max": 3.631,
+    "p999": 2.438,
+    "worst_frame": 9,
+    "worst_bone": "upperarm.r",
+    "worst_at": [
+     -0.395,
+     0.084,
+     1.127
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "spine",
+       0.39
+      ],
+      [
+       "hips",
+       0.35
+      ],
+      [
+       "upperleg.r",
+       0.17
+      ],
+      [
+       "chest",
+       0.09
+      ]
+     ],
+     [
+      [
+       "spine",
+       0.44
+      ],
+      [
+       "hips",
+       0.3
+      ],
+      [
+       "chest",
+       0.17
+      ],
+      [
+       "upperarm.r",
+       0.09
+      ]
+     ]
+    ]
+   },
+   "new_LOD1": {
+    "max": 2.457,
+    "p999": 2.24,
+    "worst_frame": 9,
+    "worst_bone": "upperleg.r",
+    "worst_at": [
+     -0.342,
+     -0.176,
+     0.931
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "spine",
+       0.55
+      ],
+      [
+       "hips",
+       0.38
+      ],
+      [
+       "upperleg.r",
+       0.06
+      ]
+     ],
+     [
+      [
+       "spine",
+       0.46
+      ],
+      [
+       "hips",
+       0.37
+      ],
+      [
+       "upperleg.r",
+       0.16
+      ]
+     ]
+    ]
+   },
+   "current_LOD0": {
+    "max": 6.486,
+    "p999": 3.659,
+    "worst_frame": 8,
+    "worst_bone": "toes.r",
+    "worst_at": [
+     -0.325,
+     -0.78,
+     -0.126
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "upperleg.r",
+       0.42
+      ],
+      [
+       "hips",
+       0.27
+      ],
+      [
+       "spine",
+       0.25
+      ],
+      [
+       "chest",
+       0.06
+      ]
+     ],
+     [
+      [
+       "upperleg.r",
+       0.62
+      ],
+      [
+       "hips",
+       0.18
+      ],
+      [
+       "spine",
+       0.17
+      ],
+      [
+       "chest",
+       0.03
+      ]
+     ]
+    ]
+   },
+   "heat_LOD0": {
+    "max": 6.27,
+    "p999": 2.74,
+    "worst_frame": 15,
+    "worst_bone": "lowerleg.l",
+    "worst_at": [
+     0.155,
+     0.323,
+     0.389
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "hips",
+       0.51
+      ],
+      [
+       "upperleg.l",
+       0.48
+      ]
+     ],
+     [
+      [
+       "upperleg.l",
+       0.45
+      ],
+      [
+       "hips",
+       0.21
+      ],
+      [
+       "foot.l",
+       0.2
+      ],
+      [
+       "lowerleg.l",
+       0.14
+      ]
+     ]
+    ]
+   },
+   "transfer_LOD0": {
+    "max": 3.631,
+    "p999": 2.438,
+    "worst_frame": 9,
+    "worst_bone": "upperarm.r",
+    "worst_at": [
+     -0.395,
+     0.084,
+     1.127
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "spine",
+       0.39
+      ],
+      [
+       "hips",
+       0.35
+      ],
+      [
+       "upperleg.r",
+       0.17
+      ],
+      [
+       "chest",
+       0.09
+      ]
+     ],
+     [
+      [
+       "spine",
+       0.44
+      ],
+      [
+       "hips",
+       0.3
+      ],
+      [
+       "chest",
+       0.17
+      ],
+      [
+       "upperarm.r",
+       0.09
+      ]
+     ]
+    ]
+   },
+   "hybrid_hard_LOD0": {
+    "max": 3.631,
+    "p999": 2.438,
+    "worst_frame": 9,
+    "worst_bone": "upperarm.r",
+    "worst_at": [
+     -0.395,
+     0.084,
+     1.127
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "spine",
+       0.39
+      ],
+      [
+       "hips",
+       0.35
+      ],
+      [
+       "upperleg.r",
+       0.17
+      ],
+      [
+       "chest",
+       0.09
+      ]
+     ],
+     [
+      [
+       "spine",
+       0.44
+      ],
+      [
+       "hips",
+       0.3
+      ],
+      [
+       "chest",
+       0.17
+      ],
+      [
+       "upperarm.r",
+       0.09
+      ]
+     ]
+    ]
+   }
+  },
+  "SitIdle": {
+   "new_LOD0": {
+    "max": 3.15,
+    "p999": 2.319,
+    "worst_frame": 29,
+    "worst_bone": "upperarm.l",
+    "worst_at": [
+     0.388,
+     0.087,
+     1.126
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "spine",
+       0.43
+      ],
+      [
+       "hips",
+       0.35
+      ],
+      [
+       "upperleg.l",
+       0.14
+      ],
+      [
+       "chest",
+       0.09
+      ]
+     ],
+     [
+      [
+       "spine",
+       0.45
+      ],
+      [
+       "hips",
+       0.32
+      ],
+      [
+       "chest",
+       0.15
+      ],
+      [
+       "upperarm.l",
+       0.08
+      ]
+     ]
+    ]
+   },
+   "new_LOD1": {
+    "max": 2.218,
+    "p999": 1.983,
+    "worst_frame": 51,
+    "worst_bone": "hand.r",
+    "worst_at": [
+     -0.403,
+     -0.164,
+     0.931
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "spine",
+       0.51
+      ],
+      [
+       "hips",
+       0.37
+      ],
+      [
+       "upperleg.r",
+       0.12
+      ]
+     ],
+     [
+      [
+       "hips",
+       0.39
+      ],
+      [
+       "spine",
+       0.32
+      ],
+      [
+       "upperleg.r",
+       0.3
+      ]
+     ]
+    ]
+   },
+   "current_LOD0": {
+    "max": 5.703,
+    "p999": 3.663,
+    "worst_frame": 69,
+    "worst_bone": "toes.r",
+    "worst_at": [
+     -0.325,
+     -0.78,
+     -0.126
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "upperleg.r",
+       0.42
+      ],
+      [
+       "hips",
+       0.27
+      ],
+      [
+       "spine",
+       0.25
+      ],
+      [
+       "chest",
+       0.06
+      ]
+     ],
+     [
+      [
+       "upperleg.r",
+       0.62
+      ],
+      [
+       "hips",
+       0.18
+      ],
+      [
+       "spine",
+       0.17
+      ],
+      [
+       "chest",
+       0.03
+      ]
+     ]
+    ]
+   },
+   "heat_LOD0": {
+    "max": 6.306,
+    "p999": 2.752,
+    "worst_frame": 43,
+    "worst_bone": "lowerleg.l",
+    "worst_at": [
+     0.155,
+     0.323,
+     0.389
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "hips",
+       0.51
+      ],
+      [
+       "upperleg.l",
+       0.48
+      ]
+     ],
+     [
+      [
+       "upperleg.l",
+       0.45
+      ],
+      [
+       "hips",
+       0.21
+      ],
+      [
+       "foot.l",
+       0.2
+      ],
+      [
+       "lowerleg.l",
+       0.14
+      ]
+     ]
+    ]
+   },
+   "transfer_LOD0": {
+    "max": 3.15,
+    "p999": 2.307,
+    "worst_frame": 29,
+    "worst_bone": "upperarm.l",
+    "worst_at": [
+     0.388,
+     0.087,
+     1.126
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "spine",
+       0.43
+      ],
+      [
+       "hips",
+       0.35
+      ],
+      [
+       "upperleg.l",
+       0.14
+      ],
+      [
+       "chest",
+       0.09
+      ]
+     ],
+     [
+      [
+       "spine",
+       0.45
+      ],
+      [
+       "hips",
+       0.32
+      ],
+      [
+       "chest",
+       0.15
+      ],
+      [
+       "upperarm.l",
+       0.08
+      ]
+     ]
+    ]
+   },
+   "hybrid_hard_LOD0": {
+    "max": 3.15,
+    "p999": 2.342,
+    "worst_frame": 29,
+    "worst_bone": "upperarm.l",
+    "worst_at": [
+     0.388,
+     0.087,
+     1.126
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "spine",
+       0.43
+      ],
+      [
+       "hips",
+       0.35
+      ],
+      [
+       "upperleg.l",
+       0.14
+      ],
+      [
+       "chest",
+       0.09
+      ]
+     ],
+     [
+      [
+       "spine",
+       0.45
+      ],
+      [
+       "hips",
+       0.32
+      ],
+      [
+       "chest",
+       0.15
+      ],
+      [
+       "upperarm.l",
+       0.08
+      ]
+     ]
+    ]
+   }
+  },
+  "StrafeL": {
+   "new_LOD0": {
+    "max": 3.272,
+    "p999": 2.001,
+    "worst_frame": 6,
+    "worst_bone": "spine",
+    "worst_at": [
+     -0.296,
+     0.236,
+     0.994
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "upperleg.r",
+       0.42
+      ],
+      [
+       "hips",
+       0.36
+      ],
+      [
+       "spine",
+       0.17
+      ],
+      [
+       "chest",
+       0.04
+      ]
+     ],
+     [
+      [
+       "hips",
+       0.34
+      ],
+      [
+       "spine",
+       0.34
+      ],
+      [
+       "upperleg.r",
+       0.19
+      ],
+      [
+       "chest",
+       0.12
+      ]
+     ]
+    ]
+   },
+   "new_LOD1": {
+    "max": 1.917,
+    "p999": 1.753,
+    "worst_frame": 6,
+    "worst_bone": "upperarm.r",
+    "worst_at": [
+     -0.343,
+     0.149,
+     1.163
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "spine",
+       0.43
+      ],
+      [
+       "hips",
+       0.3
+      ],
+      [
+       "chest",
+       0.14
+      ],
+      [
+       "upperleg.r",
+       0.13
+      ]
+     ],
+     [
+      [
+       "spine",
+       0.44
+      ],
+      [
+       "chest",
+       0.2
+      ],
+      [
+       "hips",
+       0.18
+      ],
+      [
+       "upperarm.r",
+       0.17
+      ]
+     ]
+    ]
+   },
+   "current_LOD0": {
+    "max": 4.525,
+    "p999": 2.769,
+    "worst_frame": 10,
+    "worst_bone": "toes.l",
+    "worst_at": [
+     0.75,
+     -1.153,
+     0.176
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "chest",
+       1.0
+      ]
+     ],
+     [
+      [
+       "lowerarm.l",
+       0.5
+      ],
+      [
+       "wrist.l",
+       0.23
+      ],
+      [
+       "chest",
+       0.22
+      ],
+      [
+       "upperarm.l",
+       0.06
+      ]
+     ]
+    ]
+   },
+   "heat_LOD0": {
+    "max": 8.192,
+    "p999": 2.495,
+    "worst_frame": 15,
+    "worst_bone": "lowerleg.l",
+    "worst_at": [
+     0.15,
+     0.331,
+     0.381
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "hips",
+       0.31
+      ],
+      [
+       "upperleg.l",
+       0.28
+      ],
+      [
+       "lowerleg.l",
+       0.24
+      ],
+      [
+       "foot.l",
+       0.17
+      ]
+     ],
+     [
+      [
+       "hips",
+       0.61
+      ],
+      [
+       "upperleg.l",
+       0.38
+      ]
+     ]
+    ]
+   },
+   "transfer_LOD0": {
+    "max": 3.272,
+    "p999": 2.001,
+    "worst_frame": 6,
+    "worst_bone": "spine",
+    "worst_at": [
+     -0.296,
+     0.236,
+     0.994
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "upperleg.r",
+       0.42
+      ],
+      [
+       "hips",
+       0.36
+      ],
+      [
+       "spine",
+       0.17
+      ],
+      [
+       "chest",
+       0.04
+      ]
+     ],
+     [
+      [
+       "hips",
+       0.34
+      ],
+      [
+       "spine",
+       0.34
+      ],
+      [
+       "upperleg.r",
+       0.19
+      ],
+      [
+       "chest",
+       0.12
+      ]
+     ]
+    ]
+   },
+   "hybrid_hard_LOD0": {
+    "max": 3.272,
+    "p999": 2.001,
+    "worst_frame": 6,
+    "worst_bone": "spine",
+    "worst_at": [
+     -0.296,
+     0.236,
+     0.994
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "upperleg.r",
+       0.42
+      ],
+      [
+       "hips",
+       0.36
+      ],
+      [
+       "spine",
+       0.17
+      ],
+      [
+       "chest",
+       0.04
+      ]
+     ],
+     [
+      [
+       "hips",
+       0.34
+      ],
+      [
+       "spine",
+       0.34
+      ],
+      [
+       "upperleg.r",
+       0.19
+      ],
+      [
+       "chest",
+       0.12
+      ]
+     ]
+    ]
+   }
+  },
+  "StrafeR": {
+   "new_LOD0": {
+    "max": 2.849,
+    "p999": 2.031,
+    "worst_frame": 10,
+    "worst_bone": "chest",
+    "worst_at": [
+     -0.017,
+     0.305,
+     1.587
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "chest",
+       0.38
+      ],
+      [
+       "spine",
+       0.29
+      ],
+      [
+       "head",
+       0.2
+      ],
+      [
+       "upperarm.r",
+       0.13
+      ]
+     ],
+     [
+      [
+       "chest",
+       0.39
+      ],
+      [
+       "spine",
+       0.3
+      ],
+      [
+       "head",
+       0.18
+      ],
+      [
+       "hips",
+       0.12
+      ]
+     ]
+    ]
+   },
+   "new_LOD1": {
+    "max": 1.975,
+    "p999": 1.742,
+    "worst_frame": 15,
+    "worst_bone": "spine",
+    "worst_at": [
+     0.155,
+     -0.284,
+     0.909
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "spine",
+       0.43
+      ],
+      [
+       "hips",
+       0.41
+      ],
+      [
+       "chest",
+       0.12
+      ],
+      [
+       "upperleg.l",
+       0.04
+      ]
+     ],
+     [
+      [
+       "spine",
+       0.38
+      ],
+      [
+       "hips",
+       0.37
+      ],
+      [
+       "upperleg.l",
+       0.18
+      ],
+      [
+       "chest",
+       0.07
+      ]
+     ]
+    ]
+   },
+   "current_LOD0": {
+    "max": 5.932,
+    "p999": 3.909,
+    "worst_frame": 11,
+    "worst_bone": "toes.l",
+    "worst_at": [
+     0.75,
+     -1.153,
+     0.176
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "chest",
+       1.0
+      ]
+     ],
+     [
+      [
+       "lowerarm.l",
+       0.5
+      ],
+      [
+       "wrist.l",
+       0.23
+      ],
+      [
+       "chest",
+       0.22
+      ],
+      [
+       "upperarm.l",
+       0.06
+      ]
+     ]
+    ]
+   },
+   "heat_LOD0": {
+    "max": 5.656,
+    "p999": 2.017,
+    "worst_frame": 15,
+    "worst_bone": "lowerleg.l",
+    "worst_at": [
+     0.155,
+     0.323,
+     0.389
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "hips",
+       0.51
+      ],
+      [
+       "upperleg.l",
+       0.48
+      ]
+     ],
+     [
+      [
+       "upperleg.l",
+       0.45
+      ],
+      [
+       "hips",
+       0.21
+      ],
+      [
+       "foot.l",
+       0.2
+      ],
+      [
+       "lowerleg.l",
+       0.14
+      ]
+     ]
+    ]
+   },
+   "transfer_LOD0": {
+    "max": 2.849,
+    "p999": 1.953,
+    "worst_frame": 10,
+    "worst_bone": "chest",
+    "worst_at": [
+     -0.017,
+     0.305,
+     1.587
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "chest",
+       0.38
+      ],
+      [
+       "spine",
+       0.29
+      ],
+      [
+       "head",
+       0.2
+      ],
+      [
+       "upperarm.r",
+       0.13
+      ]
+     ],
+     [
+      [
+       "chest",
+       0.39
+      ],
+      [
+       "spine",
+       0.3
+      ],
+      [
+       "head",
+       0.18
+      ],
+      [
+       "hips",
+       0.12
+      ]
+     ]
+    ]
+   },
+   "hybrid_hard_LOD0": {
+    "max": 2.849,
+    "p999": 2.033,
+    "worst_frame": 10,
+    "worst_bone": "chest",
+    "worst_at": [
+     -0.017,
+     0.305,
+     1.587
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "chest",
+       0.38
+      ],
+      [
+       "spine",
+       0.29
+      ],
+      [
+       "head",
+       0.2
+      ],
+      [
+       "upperarm.r",
+       0.13
+      ]
+     ],
+     [
+      [
+       "chest",
+       0.39
+      ],
+      [
+       "spine",
+       0.3
+      ],
+      [
+       "head",
+       0.18
+      ],
+      [
+       "hips",
+       0.12
+      ]
+     ]
+    ]
+   }
+  },
+  "Throw": {
+   "new_LOD0": {
+    "max": 2.765,
+    "p999": 1.941,
+    "worst_frame": 18,
+    "worst_bone": "upperarm.r",
+    "worst_at": [
+     -0.369,
+     0.056,
+     1.144
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "spine",
+       0.45
+      ],
+      [
+       "hips",
+       0.29
+      ],
+      [
+       "chest",
+       0.15
+      ],
+      [
+       "upperleg.r",
+       0.12
+      ]
+     ],
+     [
+      [
+       "spine",
+       0.45
+      ],
+      [
+       "hips",
+       0.26
+      ],
+      [
+       "chest",
+       0.15
+      ],
+      [
+       "head",
+       0.13
+      ]
+     ]
+    ]
+   },
+   "new_LOD1": {
+    "max": 2.728,
+    "p999": 1.793,
+    "worst_frame": 11,
+    "worst_bone": "upperarm.r",
+    "worst_at": [
+     -0.406,
+     0.099,
+     1.194
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "spine",
+       0.41
+      ],
+      [
+       "hips",
+       0.2
+      ],
+      [
+       "upperarm.r",
+       0.2
+      ],
+      [
+       "chest",
+       0.19
+      ]
+     ],
+     [
+      [
+       "upperarm.r",
+       0.43
+      ],
+      [
+       "spine",
+       0.27
+      ],
+      [
+       "chest",
+       0.27
+      ],
+      [
+       "lowerarm.r",
+       0.03
+      ]
+     ]
+    ]
+   },
+   "current_LOD0": {
+    "max": 7.02,
+    "p999": 4.332,
+    "worst_frame": 12,
+    "worst_bone": "toes.r",
+    "worst_at": [
+     -0.497,
+     -1.167,
+     0.022
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "upperarm.r",
+       0.38
+      ],
+      [
+       "lowerarm.r",
+       0.37
+      ],
+      [
+       "hips",
+       0.16
+      ],
+      [
+       "wrist.r",
+       0.1
+      ]
+     ],
+     [
+      [
+       "hips",
+       0.84
+      ],
+      [
+       "upperarm.r",
+       0.09
+      ],
+      [
+       "lowerarm.r",
+       0.06
+      ]
+     ]
+    ]
+   },
+   "heat_LOD0": {
+    "max": 5.181,
+    "p999": 1.904,
+    "worst_frame": 17,
+    "worst_bone": "lowerleg.l",
+    "worst_at": [
+     0.15,
+     0.331,
+     0.381
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "hips",
+       0.31
+      ],
+      [
+       "upperleg.l",
+       0.28
+      ],
+      [
+       "lowerleg.l",
+       0.24
+      ],
+      [
+       "foot.l",
+       0.17
+      ]
+     ],
+     [
+      [
+       "hips",
+       0.61
+      ],
+      [
+       "upperleg.l",
+       0.38
+      ]
+     ]
+    ]
+   },
+   "transfer_LOD0": {
+    "max": 2.765,
+    "p999": 1.953,
+    "worst_frame": 18,
+    "worst_bone": "upperarm.r",
+    "worst_at": [
+     -0.369,
+     0.056,
+     1.144
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "spine",
+       0.45
+      ],
+      [
+       "hips",
+       0.29
+      ],
+      [
+       "chest",
+       0.15
+      ],
+      [
+       "upperleg.r",
+       0.12
+      ]
+     ],
+     [
+      [
+       "spine",
+       0.45
+      ],
+      [
+       "hips",
+       0.26
+      ],
+      [
+       "chest",
+       0.15
+      ],
+      [
+       "head",
+       0.13
+      ]
+     ]
+    ]
+   },
+   "hybrid_hard_LOD0": {
+    "max": 2.765,
+    "p999": 1.941,
+    "worst_frame": 18,
+    "worst_bone": "upperarm.r",
+    "worst_at": [
+     -0.369,
+     0.056,
+     1.144
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "spine",
+       0.45
+      ],
+      [
+       "hips",
+       0.29
+      ],
+      [
+       "chest",
+       0.15
+      ],
+      [
+       "upperleg.r",
+       0.12
+      ]
+     ],
+     [
+      [
+       "spine",
+       0.45
+      ],
+      [
+       "hips",
+       0.26
+      ],
+      [
+       "chest",
+       0.15
+      ],
+      [
+       "head",
+       0.13
+      ]
+     ]
+    ]
+   }
+  },
+  "UseItem": {
+   "new_LOD0": {
+    "max": 2.737,
+    "p999": 1.708,
+    "worst_frame": 17,
+    "worst_bone": "chest",
+    "worst_at": [
+     -0.249,
+     -0.144,
+     1.508
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "chest",
+       0.56
+      ],
+      [
+       "spine",
+       0.21
+      ],
+      [
+       "upperarm.r",
+       0.12
+      ],
+      [
+       "hips",
+       0.11
+      ]
+     ],
+     [
+      [
+       "chest",
+       0.61
+      ],
+      [
+       "head",
+       0.18
+      ],
+      [
+       "upperarm.r",
+       0.11
+      ],
+      [
+       "spine",
+       0.1
+      ]
+     ]
+    ]
+   },
+   "new_LOD1": {
+    "max": 1.962,
+    "p999": 1.522,
+    "worst_frame": 17,
+    "worst_bone": "upperarm.l",
+    "worst_at": [
+     0.451,
+     0.15,
+     1.159
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "upperarm.l",
+       0.64
+      ],
+      [
+       "lowerarm.l",
+       0.21
+      ],
+      [
+       "wrist.l",
+       0.08
+      ],
+      [
+       "hand.l",
+       0.07
+      ]
+     ],
+     [
+      [
+       "spine",
+       0.33
+      ],
+      [
+       "upperarm.l",
+       0.32
+      ],
+      [
+       "chest",
+       0.22
+      ],
+      [
+       "hips",
+       0.13
+      ]
+     ]
+    ]
+   },
+   "current_LOD0": {
+    "max": 4.637,
+    "p999": 3.167,
+    "worst_frame": 17,
+    "worst_bone": "toes.l",
+    "worst_at": [
+     0.48,
+     -1.163,
+     0.029
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "upperarm.l",
+       0.34
+      ],
+      [
+       "lowerarm.l",
+       0.31
+      ],
+      [
+       "hips",
+       0.26
+      ],
+      [
+       "wrist.l",
+       0.1
+      ]
+     ],
+     [
+      [
+       "hips",
+       0.76
+      ],
+      [
+       "upperarm.l",
+       0.12
+      ],
+      [
+       "lowerarm.l",
+       0.07
+      ],
+      [
+       "chest",
+       0.06
+      ]
+     ]
+    ]
+   },
+   "heat_LOD0": {
+    "max": 2.335,
+    "p999": 1.902,
+    "worst_frame": 13,
+    "worst_bone": "lowerleg.l",
+    "worst_at": [
+     0.15,
+     0.331,
+     0.381
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "hips",
+       0.31
+      ],
+      [
+       "upperleg.l",
+       0.28
+      ],
+      [
+       "lowerleg.l",
+       0.24
+      ],
+      [
+       "foot.l",
+       0.17
+      ]
+     ],
+     [
+      [
+       "hips",
+       0.61
+      ],
+      [
+       "upperleg.l",
+       0.38
+      ]
+     ]
+    ]
+   },
+   "transfer_LOD0": {
+    "max": 2.737,
+    "p999": 1.644,
+    "worst_frame": 17,
+    "worst_bone": "chest",
+    "worst_at": [
+     -0.249,
+     -0.144,
+     1.508
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "chest",
+       0.56
+      ],
+      [
+       "spine",
+       0.21
+      ],
+      [
+       "upperarm.r",
+       0.12
+      ],
+      [
+       "hips",
+       0.11
+      ]
+     ],
+     [
+      [
+       "chest",
+       0.61
+      ],
+      [
+       "head",
+       0.18
+      ],
+      [
+       "upperarm.r",
+       0.11
+      ],
+      [
+       "spine",
+       0.1
+      ]
+     ]
+    ]
+   },
+   "hybrid_hard_LOD0": {
+    "max": 2.737,
+    "p999": 1.708,
+    "worst_frame": 17,
+    "worst_bone": "chest",
+    "worst_at": [
+     -0.249,
+     -0.144,
+     1.508
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "chest",
+       0.56
+      ],
+      [
+       "spine",
+       0.21
+      ],
+      [
+       "upperarm.r",
+       0.12
+      ],
+      [
+       "hips",
+       0.11
+      ]
+     ],
+     [
+      [
+       "chest",
+       0.61
+      ],
+      [
+       "head",
+       0.18
+      ],
+      [
+       "upperarm.r",
+       0.11
+      ],
+      [
+       "spine",
+       0.1
+      ]
+     ]
+    ]
+   }
+  },
+  "Walk": {
+   "new_LOD0": {
+    "max": 2.778,
+    "p999": 1.989,
+    "worst_frame": 10,
+    "worst_bone": "upperarm.r",
+    "worst_at": [
+     -0.369,
+     0.056,
+     1.144
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "spine",
+       0.45
+      ],
+      [
+       "hips",
+       0.29
+      ],
+      [
+       "chest",
+       0.15
+      ],
+      [
+       "upperleg.r",
+       0.12
+      ]
+     ],
+     [
+      [
+       "spine",
+       0.45
+      ],
+      [
+       "hips",
+       0.26
+      ],
+      [
+       "chest",
+       0.15
+      ],
+      [
+       "head",
+       0.13
+      ]
+     ]
+    ]
+   },
+   "new_LOD1": {
+    "max": 2.012,
+    "p999": 1.799,
+    "worst_frame": 23,
+    "worst_bone": "spine",
+    "worst_at": [
+     0.155,
+     -0.284,
+     0.909
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "spine",
+       0.43
+      ],
+      [
+       "hips",
+       0.41
+      ],
+      [
+       "chest",
+       0.12
+      ],
+      [
+       "upperleg.l",
+       0.04
+      ]
+     ],
+     [
+      [
+       "spine",
+       0.38
+      ],
+      [
+       "hips",
+       0.37
+      ],
+      [
+       "upperleg.l",
+       0.18
+      ],
+      [
+       "chest",
+       0.07
+      ]
+     ]
+    ]
+   },
+   "current_LOD0": {
+    "max": 5.418,
+    "p999": 3.087,
+    "worst_frame": 1,
+    "worst_bone": "toes.l",
+    "worst_at": [
+     0.75,
+     -1.153,
+     0.176
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "chest",
+       1.0
+      ]
+     ],
+     [
+      [
+       "lowerarm.l",
+       0.5
+      ],
+      [
+       "wrist.l",
+       0.23
+      ],
+      [
+       "chest",
+       0.22
+      ],
+      [
+       "upperarm.l",
+       0.06
+      ]
+     ]
+    ]
+   },
+   "heat_LOD0": {
+    "max": 5.629,
+    "p999": 1.972,
+    "worst_frame": 22,
+    "worst_bone": "lowerleg.l",
+    "worst_at": [
+     0.155,
+     0.323,
+     0.389
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "hips",
+       0.51
+      ],
+      [
+       "upperleg.l",
+       0.48
+      ]
+     ],
+     [
+      [
+       "upperleg.l",
+       0.45
+      ],
+      [
+       "hips",
+       0.21
+      ],
+      [
+       "foot.l",
+       0.2
+      ],
+      [
+       "lowerleg.l",
+       0.14
+      ]
+     ]
+    ]
+   },
+   "transfer_LOD0": {
+    "max": 2.778,
+    "p999": 1.989,
+    "worst_frame": 10,
+    "worst_bone": "upperarm.r",
+    "worst_at": [
+     -0.369,
+     0.056,
+     1.144
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "spine",
+       0.45
+      ],
+      [
+       "hips",
+       0.29
+      ],
+      [
+       "chest",
+       0.15
+      ],
+      [
+       "upperleg.r",
+       0.12
+      ]
+     ],
+     [
+      [
+       "spine",
+       0.45
+      ],
+      [
+       "hips",
+       0.26
+      ],
+      [
+       "chest",
+       0.15
+      ],
+      [
+       "head",
+       0.13
+      ]
+     ]
+    ]
+   },
+   "hybrid_hard_LOD0": {
+    "max": 2.778,
+    "p999": 1.989,
+    "worst_frame": 10,
+    "worst_bone": "upperarm.r",
+    "worst_at": [
+     -0.369,
+     0.056,
+     1.144
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "spine",
+       0.45
+      ],
+      [
+       "hips",
+       0.29
+      ],
+      [
+       "chest",
+       0.15
+      ],
+      [
+       "upperleg.r",
+       0.12
+      ]
+     ],
+     [
+      [
+       "spine",
+       0.45
+      ],
+      [
+       "hips",
+       0.26
+      ],
+      [
+       "chest",
+       0.15
+      ],
+      [
+       "head",
+       0.13
+      ]
+     ]
+    ]
+   }
+  },
+  "WalkBack": {
+   "new_LOD0": {
+    "max": 2.725,
+    "p999": 2.011,
+    "worst_frame": 17,
+    "worst_bone": "upperarm.r",
+    "worst_at": [
+     -0.345,
+     0.151,
+     1.135
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "spine",
+       0.46
+      ],
+      [
+       "hips",
+       0.27
+      ],
+      [
+       "chest",
+       0.17
+      ],
+      [
+       "head",
+       0.1
+      ]
+     ],
+     [
+      [
+       "spine",
+       0.43
+      ],
+      [
+       "hips",
+       0.29
+      ],
+      [
+       "chest",
+       0.15
+      ],
+      [
+       "upperleg.r",
+       0.12
+      ]
+     ]
+    ]
+   },
+   "new_LOD1": {
+    "max": 1.937,
+    "p999": 1.782,
+    "worst_frame": 5,
+    "worst_bone": "spine",
+    "worst_at": [
+     0.155,
+     -0.284,
+     0.909
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "spine",
+       0.43
+      ],
+      [
+       "hips",
+       0.41
+      ],
+      [
+       "chest",
+       0.12
+      ],
+      [
+       "upperleg.l",
+       0.04
+      ]
+     ],
+     [
+      [
+       "spine",
+       0.38
+      ],
+      [
+       "hips",
+       0.37
+      ],
+      [
+       "upperleg.l",
+       0.18
+      ],
+      [
+       "chest",
+       0.07
+      ]
+     ]
+    ]
+   },
+   "current_LOD0": {
+    "max": 5.151,
+    "p999": 3.137,
+    "worst_frame": 18,
+    "worst_bone": "toes.r",
+    "worst_at": [
+     -0.325,
+     -0.78,
+     -0.126
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "upperleg.r",
+       0.42
+      ],
+      [
+       "hips",
+       0.27
+      ],
+      [
+       "spine",
+       0.25
+      ],
+      [
+       "chest",
+       0.06
+      ]
+     ],
+     [
+      [
+       "upperleg.r",
+       0.62
+      ],
+      [
+       "hips",
+       0.18
+      ],
+      [
+       "spine",
+       0.17
+      ],
+      [
+       "chest",
+       0.03
+      ]
+     ]
+    ]
+   },
+   "heat_LOD0": {
+    "max": 5.675,
+    "p999": 2.016,
+    "worst_frame": 5,
+    "worst_bone": "lowerleg.l",
+    "worst_at": [
+     0.155,
+     0.323,
+     0.389
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "hips",
+       0.51
+      ],
+      [
+       "upperleg.l",
+       0.48
+      ]
+     ],
+     [
+      [
+       "upperleg.l",
+       0.45
+      ],
+      [
+       "hips",
+       0.21
+      ],
+      [
+       "foot.l",
+       0.2
+      ],
+      [
+       "lowerleg.l",
+       0.14
+      ]
+     ]
+    ]
+   },
+   "transfer_LOD0": {
+    "max": 2.725,
+    "p999": 2.011,
+    "worst_frame": 17,
+    "worst_bone": "upperarm.r",
+    "worst_at": [
+     -0.345,
+     0.151,
+     1.135
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "spine",
+       0.46
+      ],
+      [
+       "hips",
+       0.27
+      ],
+      [
+       "chest",
+       0.17
+      ],
+      [
+       "head",
+       0.1
+      ]
+     ],
+     [
+      [
+       "spine",
+       0.43
+      ],
+      [
+       "hips",
+       0.29
+      ],
+      [
+       "chest",
+       0.15
+      ],
+      [
+       "upperleg.r",
+       0.12
+      ]
+     ]
+    ]
+   },
+   "hybrid_hard_LOD0": {
+    "max": 2.725,
+    "p999": 2.011,
+    "worst_frame": 17,
+    "worst_bone": "upperarm.r",
+    "worst_at": [
+     -0.345,
+     0.151,
+     1.135
+    ],
+    "worst_edge_weights": [
+     [
+      [
+       "spine",
+       0.46
+      ],
+      [
+       "hips",
+       0.27
+      ],
+      [
+       "chest",
+       0.17
+      ],
+      [
+       "head",
+       0.1
+      ]
+     ],
+     [
+      [
+       "spine",
+       0.43
+      ],
+      [
+       "hips",
+       0.29
+      ],
+      [
+       "chest",
+       0.15
+      ],
+      [
+       "upperleg.r",
+       0.12
+      ]
+     ]
+    ]
+   }
+  }
+ },
+ "stretch_summary": {
+  "new_LOD0": {
+   "worst_max": 4.07,
+   "worst_clip": "DeathB",
+   "worst_p999": 2.518
+  },
+  "new_LOD1": {
+   "worst_max": 2.948,
+   "worst_clip": "Attack",
+   "worst_p999": 2.487
+  },
+  "current_LOD0": {
+   "worst_max": 13.933,
+   "worst_clip": "Attack",
+   "worst_p999": 7.353
+  },
+  "heat_LOD0": {
+   "worst_max": 10.875,
+   "worst_clip": "DeathB",
+   "worst_p999": 4.192
+  },
+  "transfer_LOD0": {
+   "worst_max": 4.07,
+   "worst_clip": "DeathB",
+   "worst_p999": 2.518
+  },
+  "hybrid_hard_LOD0": {
+   "worst_max": 4.07,
+   "worst_clip": "DeathB",
+   "worst_p999": 2.518
+  }
+ },
+ "render_poses": [
+  [
+   "idle",
+   "Idle",
+   1
+  ],
+  [
+   "walk",
+   "Walk",
+   12
+  ],
+  [
+   "run",
+   "Run",
+   1
+  ],
+  [
+   "attack_raise",
+   "Attack",
+   11
+  ],
+  [
+   "attack_contact",
+   "Attack",
+   18
+  ],
+  [
+   "hit",
+   "Hit",
+   7
+  ]
+ ],
+ "closeups": {
+  "inner_thigh_above_knee": {
+   "file": "/Users/wilsonguenther/cm-art-trial/builder/game-ready-v3/closeup_inner_thigh_above_knee.png",
+   "rows_top_to_bottom": [
+    "run",
+    "attack_raise",
+    "attack_contact"
+   ],
+   "cols": "heat | transfer | hybrid_hard | final_hybrid"
+  },
+  "shin_front": {
+   "file": "/Users/wilsonguenther/cm-art-trial/builder/game-ready-v3/closeup_shin_front.png",
+   "rows_top_to_bottom": [
+    "run",
+    "attack_raise",
+    "attack_contact"
+   ],
+   "cols": "heat | transfer | hybrid_hard | final_hybrid"
+  },
+  "right_armpit": {
+   "file": "/Users/wilsonguenther/cm-art-trial/builder/game-ready-v3/closeup_right_armpit.png",
+   "rows_top_to_bottom": [
+    "run",
+    "attack_raise",
+    "attack_contact"
+   ],
+   "cols": "heat | transfer | hybrid_hard | final_hybrid"
+  },
+  "right_forearm": {
+   "file": "/Users/wilsonguenther/cm-art-trial/builder/game-ready-v3/closeup_right_forearm.png",
+   "rows_top_to_bottom": [
+    "run",
+    "attack_raise",
+    "attack_contact"
+   ],
+   "cols": "heat | transfer | hybrid_hard | final_hybrid"
+  }
+ },
+ "renders": {
+  "grid_cols": "game55 azure, game55 crimson, front10 azure, front10 crimson, side10 azure, side10 crimson",
+  "grid_rows": [
+   "idle",
+   "walk",
+   "run",
+   "attack_raise",
+   "attack_contact",
+   "hit"
+  ],
+  "files": [
+   "BuilderTex_Base.png",
+   "BuilderTex_bake_raw.png",
+   "BuilderTex_mask.png",
+   "BuilderTex_preview_azure.png",
+   "BuilderTex_preview_crimson.png",
+   "closeup_inner_thigh_above_knee.png",
+   "closeup_right_armpit.png",
+   "closeup_right_forearm.png",
+   "closeup_shin_front.png",
+   "face_new.png",
+   "face_old.png",
+   "grid_new.png",
+   "grid_old.png",
+   "parts_back.png",
+   "parts_front.png",
+   "parts_raw.png",
+   "parts_side.png",
+   "side_by_side_front_side10.png",
+   "side_by_side_game55.png",
+   "template_fit.png",
+   "template_fit_front.png",
+   "template_fit_side.png"
+  ]
+ },
+ "export": {
+  "path": "/Users/wilsonguenther/cm-art-trial/builder/game-ready-v3/BuilderTex.fbx",
+  "result": [
+   "FINISHED"
+  ],
+  "bytes": 660140
+ },
+ "round_trip": {
+  "armature": "Rig",
+  "bones": 41,
+  "bones_missing": [],
+  "max_bind_matrix_diff": 1.5e-05,
+  "meshes": {
+   "BuilderTex_LOD0": {
+    "tris": 6780,
+    "uv": 1,
+    "colours": [
+     "Col"
+    ],
+    "groups": 20,
+    "parent": "Rig"
+   },
+   "BuilderTex_LOD1": {
+    "tris": 1738,
+    "uv": 1,
+    "colours": [
+     "Col"
+    ],
+    "groups": 20,
+    "parent": "Rig"
+   },
+   "BuilderTex_Shadow": {
+    "tris": 698,
+    "uv": 1,
+    "colours": [
+     "Col"
+    ],
+    "groups": 20,
+    "parent": "Rig"
+   }
+  }
+ },
+ "stretch_gameplay": {
+  "new_LOD0": {
+   "worst_max": 3.338,
+   "worst_p999": 2.386,
+   "clips_under_2_5": 2
+  },
+  "new_LOD1": {
+   "worst_max": 2.948,
+   "worst_p999": 2.487,
+   "clips_under_2_5": 6
+  },
+  "current_LOD0": {
+   "worst_max": 13.933,
+   "worst_p999": 7.353,
+   "clips_under_2_5": 0
+  },
+  "heat_LOD0": {
+   "worst_max": 6.925,
+   "worst_p999": 2.345,
+   "clips_under_2_5": 1
+  },
+  "transfer_LOD0": {
+   "worst_max": 2.881,
+   "worst_p999": 2.106,
+   "clips_under_2_5": 2
+  },
+  "hybrid_hard_LOD0": {
+   "worst_max": 3.338,
+   "worst_p999": 2.386,
+   "clips_under_2_5": 2
+  }
+ }
+}

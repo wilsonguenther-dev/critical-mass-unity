@@ -819,6 +819,7 @@ def deformed(o):
 
 MEAS = {"new_LOD0": low, "new_LOD1": lod1, "current_LOD0": old0}
 if globals().get("LOW_OLD") is not None: MEAS["heat_LOD0"] = LOW_OLD          # method 2 transfer run: the heat weights
+for c_ in globals().get("EXTRAS", []): MEAS[c_.name.split("_LOD0_")[1] + "_LOD0"] = c_
 for o in MEAS.values():
     for m in o.modifiers:
         if m.type != "ARMATURE": m.show_viewport = False
@@ -954,6 +955,7 @@ def shot(path, az, el, dist, tz=1.05):
 RD = os.path.join(OUT, "tiles"); os.makedirs(RD, exist_ok=True)
 lod1.hide_render = shd.hide_render = True
 if globals().get("LOW_OLD") is not None: LOW_OLD.hide_render = True
+for c_ in globals().get("EXTRAS", []): c_.hide_render = True
 for which, o in MODELS.items():
     for x in MODELS.values(): x.hide_render = x is not o
     grid_rows = []
@@ -984,9 +986,11 @@ write_png(os.path.join(OUT, "side_by_side_game55.png"), np.concatenate([gn[:, :2
 write_png(os.path.join(OUT, "side_by_side_front_side10.png"), np.concatenate([gn[:, 2 * tile:], go[:, 2 * tile:]], 1))
 if globals().get("LOW_OLD") is not None and C.get("closeups"):
     # close views of named spots, heat weights (left) vs transferred weights (right), same mesh, same texture, mallet on
-    LOW_OLD.data.materials.clear(); LOW_OLD.data.materials.append(MATS[("new", "azure")]); LOW_OLD.data.materials.append(ink)
-    for p_ in LOW_OLD.data.polygons: p_.material_index = 0
-    sm = LOW_OLD.modifiers.new("hull", "SOLIDIFY"); sm.thickness = 0.014; sm.offset = 1.0; sm.use_flip_normals = True; sm.use_rim = False; sm.material_offset = 1
+    CCOLS = [("heat", LOW_OLD)] + [(c_.name.split("_LOD0_")[1], c_) for c_ in globals().get("EXTRAS", [])] + [("final_" + str(C.get("weights_transfer", {}).get("arm_mode", "transfer")), low)]
+    for _, ob_ in CCOLS[:-1]:
+        ob_.data.materials.clear(); ob_.data.materials.append(MATS[("new", "azure")]); ob_.data.materials.append(ink)
+        for p_ in ob_.data.polygons: p_.material_index = 0
+        sm = ob_.modifiers.new("hull", "SOLIDIFY"); sm.thickness = 0.014; sm.offset = 1.0; sm.use_flip_normals = True; sm.use_rim = False; sm.material_offset = 1
     low.data.materials[0] = MATS[("new", "azure")]
     for x in MODELS.values(): x.hide_render = True
     mal_ = bpy.data.objects.get("Mallet")
@@ -1007,13 +1011,13 @@ if globals().get("LOW_OLD") is not None and C.get("closeups"):
             cam.location = tv + Vector((math.cos(e_) * math.sin(a), -math.cos(e_) * math.cos(a), math.sin(e_))) * sp["dist"]
             cam.rotation_euler = (tv - cam.location).to_track_quat("-Z", "Y").to_euler()
             row = []
-            for which, o in (("heat", LOW_OLD), ("transfer", low)):
+            for which, o in CCOLS:
                 o.hide_render = False
                 pth = os.path.join(RD, "close_%s_%s_%s.png" % (nm_, pname, which)); scene.render.filepath = pth; bpy.ops.render.render(write_still=True)
                 o.hide_render = True; row.append(load_px(pth)[:, :, :3])
             rows.append(np.concatenate(row, 1))
         fn_ = os.path.join(OUT, "closeup_%s.png" % nm_); write_png(fn_, np.concatenate(rows[::-1], 0))
-        REP["closeups"][nm_] = dict(file=fn_, rows_top_to_bottom=[p_[0] for p_ in POSES if p_[0] in cu["poses"]], cols="heat weights | transferred weights")
+        REP["closeups"][nm_] = dict(file=fn_, rows_top_to_bottom=[p_[0] for p_ in POSES if p_[0] in cu["poses"]], cols=" | ".join(c_[0] for c_ in CCOLS))
     scene.render.resolution_x = scene.render.resolution_y = C["render_px"]
     for x in MODELS.values(): x.hide_render = False
     if mal_ is not None: mal_.hide_render = False

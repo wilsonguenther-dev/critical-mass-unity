@@ -169,6 +169,22 @@ def smooth_all(F, W, iters, alpha=0.2, frozen=None):
     return W
 
 
+def crossfade(W_in, W_out, member, V, E, band):
+    """Per-vertex blend: W_in deep inside `member`, W_out deep outside, a smoothstep across `band` metres of edge-path
+    distance centred on the membership border. Returns (W, f)."""
+    import scipy.sparse as sp
+    from scipy.sparse.csgraph import dijkstra
+    n = len(V); ln = np.linalg.norm(V[E[:, 0]] - V[E[:, 1]], axis=1)
+    G = sp.coo_matrix((np.r_[ln, ln], (np.r_[E[:, 0], E[:, 1]], np.r_[E[:, 1], E[:, 0]])), shape=(n, n)).tocsr()
+    def dist_to(src):
+        if not src.any(): return np.full(n, np.inf)
+        return dijkstra(G, indices=np.nonzero(src)[0], min_only=True, limit=band)
+    s = np.where(member, dist_to(~member), -dist_to(member))
+    s = np.where(np.isfinite(s), s, np.where(member, band, -band))
+    x = np.clip((s + band / 2) / band, 0, 1); f = x * x * (3 - 2 * x)
+    return f[:, None] * W_in + (1 - f[:, None]) * W_out, f
+
+
 def limit(W, k=4, eps=1e-3):
     W = W.copy(); o = np.argsort(-W, 1)[:, k:]; np.put_along_axis(W, o, 0, 1)
     W[W < eps] = 0
@@ -185,7 +201,7 @@ def smooth_normals(N, F, iters):
     return N
 
 
-def transfer(Vs, Fs, Ws, Vt, Ft, cfg, frozen=None, mask=None):
+def transfer(Vs, Fs, Ws, Vt, Ft, cfg, frozen=None, mask=None, seed=None):
     """match -> inpaint -> smooth -> (mask) -> limit on one target mesh. cfg: dist_frac, angle_deg, allow_flip,
     normal_smooth_iters (0 = the paper), smooth_iters, smooth_alpha, max_influences. mask (nt, bones) bool, optional:
     bones a vertex may carry at all (region limits); applied to the matched weights before the inpaint (a matched
@@ -201,6 +217,9 @@ def transfer(Vs, Fs, Ws, Vt, Ft, cfg, frozen=None, mask=None):
         Wm = W0 * mask; sm = Wm.sum(1); bad = ok & (sm < 0.5)
         masked_out = int(bad.sum()); ok = ok & ~bad
         W0 = np.where(sm[:, None] > 1e-9, Wm / np.maximum(sm, 1e-12)[:, None], W0)
+    seeded = 0
+    if seed is not None:          # (bool mask, weights): unmatched vertices in the mask become known with these weights
+        sm_, Wsd = seed; add = sm_ & ~ok; W0 = W0.copy(); W0[add] = Wsd[add]; ok = ok | add; seeded = int(add.sum())
     Wi, ist = inpaint(Vt, Ft, W0, ok)
     Wsm, ssel = smooth(Vt, Ft, Wi, ok, dthr, cfg.get("smooth_iters", 10), cfg.get("smooth_alpha", 0.2), frozen)
     if mask is not None and cfg.get("mask_result", False):        # off: a hard mask on the result leaves weight cliffs
@@ -212,7 +231,7 @@ def transfer(Vs, Fs, Ws, Vt, Ft, cfg, frozen=None, mask=None):
               rejected_by_distance=int((d > dthr).sum()), rejected_by_angle_only=int(((d <= dthr) & ~ok).sum()),
               dist_m=dict(median=round(float(np.median(d)), 4), p90=round(float(np.percentile(d, 90)), 4), max=round(float(d.max()), 4)),
               inpaint=ist, smoothed_verts=int(ssel.sum()), matched_share_at_angle=share_at, matched_rejected_by_mask=masked_out,
-              normal_smooth_iters=ns, masked=mask is not None)
+              normal_smooth_iters=ns, masked=mask is not None, seeded_unmatched=seeded)
     return Wf, st, ok
 
 

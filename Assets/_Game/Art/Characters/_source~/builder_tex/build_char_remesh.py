@@ -849,7 +849,25 @@ def load_template():
     return Vs, Fs, Ws, Js, rep
 
 
-def transfer_lod0(o):
+ARM_BONES = [BI[b + s_] for s_ in (".l", ".r") for b in ("upperarm", "lowerarm", "wrist", "hand")]
+FORE_BONES = [BI[b + s_] for s_ in (".l", ".r") for b in ("lowerarm", "wrist", "hand")]
+ALT = {}
+EXTRAS = []
+
+
+def arm_variants(Wt, Wheat, Vx, Ex, rigid, tag, band=None):
+    """The transferred weights with the arms taken from the heat weights: membership = the heat weights' dominant
+    bone is an arm-chain bone; cross-fade over weights_transfer.arm_band_m of edge-path distance at the border."""
+    import robust_weight_transfer as rwt
+    arm = ~rigid & np.isin(Wheat.argmax(1), ARM_BONES) & (Wheat.sum(1) > 0)
+    amin = WT.get("arm_member_min_weight")            # also claim shoulder vertices where heat gives the arm this much
+    if amin is not None: arm |= ~rigid & (Wheat[:, ARM_BONES].sum(1) >= amin)
+    Wh_, f = rwt.crossfade(Wheat, Wt, arm, Vx, Ex, WT.get("arm_band_m", 0.06) if band is None else band)
+    Wh_[rigid] = Wt[rigid]
+    return rwt.limit(Wh_, WT.get("max_influences", 4)), dict(arm_verts=int(arm.sum()), band_verts=int(((f > 0.01) & (f < 0.99)).sum()))
+
+
+def transfer_lod0(o, Wheat=None):
     """Pass 1: template -> the main body piece. Pass 2: the main body (pass-1 weights) -> every other non-rigid piece
     (clothing shells), so cloth follows what is underneath. Rigid parts stay rigid (simple_finalize)."""
     import robust_weight_transfer as rwt
@@ -882,6 +900,24 @@ def transfer_lod0(o):
         MK = al_s
     W1, st1, ok1 = rwt.transfer(Vp, Fs, Ws, Vm, Fm, WT, mask=None if MK is None else MK[ib[im]])
     W[ib[im]] = W1
+    mode = WT.get("arm_mode", "none"); diag = None; W1s = None
+    if Wheat is not None:
+        # why the forearm stuck: heat forearm/hand vertices -> their match test and their transferred arm weight
+        armv = ~rigid & np.isin(Wheat.argmax(1), ARM_BONES); fore = ~rigid & np.isin(Wheat.argmax(1), FORE_BONES)
+        dthr_ = WT.get("dist_frac", 0.05) * float(np.linalg.norm(Vm.max(0) - Vm.min(0)))
+        _, okd, dd, aa = rwt.match(Vp, Fs, Ws, Vm, Fm, dthr_, WT.get("angle_deg", 30.0))
+        fm = fore[ib[im]]; am_ = W1[:, ARM_BONES].sum(1); fw_ = W1[:, FORE_BONES].sum(1); hf_ = Wheat[ib[im]][:, FORE_BONES].sum(1)
+        diag = dict(fore_hand_verts=int(fm.sum()), matched_share=round(float(okd[fm].mean()), 3), rejected_by_distance=int((fm & (dd > dthr_)).sum()),
+                    rejected_by_angle_only=int((fm & (dd <= dthr_) & ~okd).sum()), dist_median_m=round(float(np.median(dd[fm])), 4),
+                    angle_median_deg=round(float(np.median(aa[fm])), 1), transfer_arm_weight_mean=round(float(am_[fm].mean()), 3),
+                    transfer_arm_weight_below_half=int((am_[fm] < 0.5).sum()),
+                    forearm_hand_weight_transfer_mean=round(float(fw_[fm].mean()), 3), forearm_hand_weight_heat_mean=round(float(hf_[fm].mean()), 3),
+                    forearm_verts_mostly_upperarm_in_transfer=int((fm & (fw_ < 0.5)).sum()),
+                    transfer_top_bone_of_those={DEFORM[k]: int(v) for k, v in zip(*np.unique(W1[fm & (am_ < 0.5)].argmax(1), return_counts=True))},
+                    arm_verts=int(armv.sum()), arm_matched_share=round(float(okd[armv[ib[im]]].mean()), 3))
+        log("v3 forearm diagnosis", json.dumps(diag))
+        W1s, st1s, _ = rwt.transfer(Vp, Fs, Ws, Vm, Fm, WT, mask=None if MK is None else MK[ib[im]], seed=(armv[ib[im]], Wheat[ib[im]]))
+        diag["seed_pass1"] = dict(seeded_unmatched=st1s["seeded_unmatched"])
     # remaining surface distance between the posed template and the body, both ways
     _, _, d_tb = rwt.closest_on_mesh(Vm, Fm, Vp)
     _, _, d_bt = rwt.closest_on_mesh(Vp, Fs, Vm)
@@ -907,15 +943,26 @@ def transfer_lod0(o):
         st2 = dict(st2, pieces=int(len(u_) - 1), unmatched_pieces_rigid_verts=int(z_.sum()),
                    piece_list=[dict(verts=int((pl == u).sum()), centroid=np.round(Vx[gi][pl == u].mean(0), 3).tolist(),
                                     region=REG[int(np.bincount(Lx[gi][pl == u]).argmax())], bone=DEFORM[int(W2[pl == u].sum(0).argmax())]) for u in np.unique(pl)])
+    W_pure = W.copy(); W_pure[rigid] = al[rigid].astype(float)
+    if Wheat is not None:
+        Ws_ = W_pure.copy(); Ws_[ib[im]] = W1s
+        Whyb, hst = arm_variants(W_pure, Wheat, Vx, Ex, rigid, "hybrid"); diag["hybrid"] = hst
+        var = {"transfer": W_pure, "seed": Ws_, "hybrid": Whyb, "hybrid_hard": arm_variants(W_pure, Wheat, Vx, Ex, rigid, "hard", band=1e-4)[0]}
+        W = var[mode] if mode in var else W_pure
+        for k_ in WT.get("arm_extra_measure", []):
+            if k_ != mode: ALT[k_] = var[k_]
     # LOD1 source: the same transfer with its own smoothing (LOD1's longer edges span more of a weight gradient:
     # v3 runs 5 vs D, LOD0 better at 30 iterations, LOD1 better from the 10-iteration weights)
     l1s = WT.get("lod1_source_smooth_iters")
     if l1s is not None and l1s != WT.get("smooth_iters", 10):
         cfg1 = dict(WT, smooth_iters=l1s); Wl = np.zeros_like(W)
-        Wl[ib[im]], _, _ = rwt.transfer(Vp, Fs, Ws, Vm, Fm, cfg1, mask=None if MK is None else MK[ib[im]])
+        sd_ = (np.isin(Wheat.argmax(1), ARM_BONES)[ib[im]] & ~rigid[ib[im]], Wheat[ib[im]]) if (Wheat is not None and mode == "seed") else None
+        Wl[ib[im]], _, _ = rwt.transfer(Vp, Fs, Ws, Vm, Fm, cfg1, mask=None if MK is None else MK[ib[im]], seed=sd_)
         if (~main).any():
             Wl[ib[ish]] = W[ib[ish]]                # the shells as above (region-limited)
-        Wl[rigid] = al[rigid].astype(float); LOD1_SRC[0] = rwt.limit(Wl, WT.get("max_influences", 4))
+        Wl[rigid] = al[rigid].astype(float)
+        if Wheat is not None and mode == "hybrid": Wl, _ = arm_variants(Wl, Wheat, Vx, Ex, rigid, "hybrid LOD1 src")
+        LOD1_SRC[0] = rwt.limit(Wl, WT.get("max_influences", 4))
     # evidence: the posed template (red) over the body (grey), x-ray, front and side, A-pose
     TPL[0] = (Vp, Fs)
     try:
@@ -937,7 +984,7 @@ def transfer_lod0(o):
         for x in scene.objects: x.hide_render = hid.get(x.name, False)
     except Exception as ex_:
         log("template fit render failed", repr(ex_))
-    return simple_finalize(o, W, o.name, dict(template=trep, fit=fit, pass1_body=st1, pass2_shells=st2, surface_distance=dist, matched_by_region=by_region,
+    return simple_finalize(o, W, o.name, dict(arm_mode=mode, arm_diagnosis=diag, template=trep, fit=fit, pass1_body=st1, pass2_shells=st2, surface_distance=dist, matched_by_region=by_region,
                                               thresholds=dict(dist_frac=WT.get("dist_frac"), angle_deg=WT.get("angle_deg"), allow_flip=WT.get("allow_flip", False))))
 
 
@@ -960,7 +1007,10 @@ if WT.get("enabled"):
     LOW_OLD = low.copy(); LOW_OLD.data = low.data.copy(); scene.collection.objects.link(LOW_OLD); LOW_OLD.name = LOW_OLD.data.name = KEY + "_LOD0_heat"
     REP["weights"] = {"bone_heat_result": list(rh), "LOD0_heat": finalize(LOW_OLD, Wh, "LOD0_heat")}
     REP["weights"]["LOD0_heat"]["leaks"] = leak_check(LOW_OLD)
-    REP["weights"]["LOD0"] = transfer_lod0(low)
+    REP["weights"]["LOD0"] = transfer_lod0(low, read_groups(LOW_OLD))
+    for k_, Wv in ALT.items():                # other arm variants, LOD0 only, measured and drawn for comparison
+        c_ = low.copy(); c_.data = low.data.copy(); scene.collection.objects.link(c_); c_.name = c_.data.name = KEY + "_LOD0_" + k_
+        REP["weights"]["LOD0_" + k_] = simple_finalize(c_, Wv, c_.name); EXTRAS.append(c_)
 else:
     REP["weights"] = {"bone_heat_result": list(rh), "LOD0": finalize(low, Wh, "LOD0")}
     REP["weights"]["LOD0"]["leaks"] = leak_check(low)
@@ -1008,7 +1058,7 @@ REP["v2_lod_surfaces"] = {o.name: surface_check(o) for o in LODS}
 REP["v2_gaps_apose"] = {o.name: gaps(*arrays(o)[:1], labels_of(o), arrays(o)[1]) for o in LODS}
 REP["lod0_head_tris"] = REP["v2_lod0_head_tris"]
 log("v2 tris", REP["tris"], json.dumps(REP["v2_gaps_apose"]))
-LODS_X = LODS + ([LOW_OLD] if LOW_OLD is not None else [])        # LOW_OLD: the heat weights, for comparison only
+LODS_X = LODS + ([LOW_OLD] if LOW_OLD is not None else []) + EXTRAS        # LOW_OLD: the heat weights, for comparison only
 LAB_REST = {o.name: labels_of(o) for o in LODS_X}
 bpy.data.objects.remove(rigA, do_unlink=True)
 
@@ -1092,11 +1142,13 @@ mallet.parent = rig; mallet.parent_type = "BONE"; mallet.parent_bone = "handslot
 Ptail = rig.matrix_world @ pbh.matrix @ Matrix.Translation((0, pbh.bone.length, 0))
 mallet.matrix_parent_inverse = Ptail.inverted() @ Mw; mallet.matrix_basis = Matrix.Identity(4)
 
+EXTRA_KEYS = [c_.name.split("_LOD0_")[1] for c_ in EXTRAS]          # names survive the factory reset at the end
 exec(compile(_src[_src.index(_m_proof):], P1, "exec"), globals())         # proof, renders, export, round trip
 
 # ================================================================================================ stretch table (csv)
 GP = set(C.get("gameplay_clips", []))
 cols = [("new_LOD0", "lod0"), ("new_LOD1", "lod1"), ("current_LOD0", "current"), ("heat_LOD0", "heat_lod0")]
+cols += [(k_ + "_LOD0", k_ + "_lod0") for k_ in EXTRA_KEYS]
 cols = [c_ for c_ in cols if any(c_[0] in r_ for r_ in REP["clip_stretch"].values())]
 lines = ["clip,gameplay," + ",".join("%s_max,%s_p999" % (b_, b_) for _, b_ in cols) + ",lod0_worst_at"]
 for clip in sorted(REP["clip_stretch"]):
