@@ -216,13 +216,26 @@ namespace CriticalMass.Sim.Core
             return true;
         }
 
+        /// <summary>True when (nx, nz) overlaps the hatched solid Kaiju's body and is closer to its centre than the actor is now.</summary>
+        private static bool IntoKaiju(World w, int id, double nx, double nz)
+        {
+            Kaiju k = w.Kaiju;
+            if (k == null || k.State == KaijuState.Egg || !Phys.On(w, w.Config.Physics.SolidKaiju)) return false;
+            double rr = w.Config.Physics.KaijuBodyRadius + Collide.ActorRadius(w, id);
+            double ex = nx - k.X, ez = nz - k.Z, cx = w.X[id] - k.X, cz = w.Z[id] - k.Z;
+            double e2 = ex * ex + ez * ez;
+            return e2 < rr * rr && e2 < cx * cx + cz * cz;
+        }
+
         private static void DashTick(World w, DodgeState s, int id, int k, double dt)
         {
             Actor a = w.Actors[id];
             int b = id * s.Stride;
             double nx = s.PathX[b + k + 1], nz = s.PathZ[b + k + 1];
-            // the grid may change mid-dash: never step onto ground that is no longer clear (stop where it stands)
-            if (!Collide.FootprintClear(w, id, nx, nz))
+            // the grid may change mid-dash: never step onto ground that is no longer clear (stop where it stands); the Kaiju
+            // moves mid-dash too: never dash into its body (b13 r3 integrator: Hard seed 101 16v16 tick 14061 dashed a Warrior
+            // into a Kaiju wedged between walls, where the body push-out could not clear it)
+            if (!Collide.FootprintClear(w, id, nx, nz) || IntoKaiju(w, id, nx, nz))
             {
                 s.Len[id] = k;
                 w.Vx[id] = JsMath.F32(0);

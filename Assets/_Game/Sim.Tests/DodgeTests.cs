@@ -299,7 +299,9 @@ namespace CriticalMass.Sim.Tests
             var all = new[] { new Arm(), new Arm() };
             foreach (int size in new[] { 5, 16 })
             {
-                int[] seeds = size == 16 ? new[] { 1337, 4242, 7, 99, 2024, 31337 } : new[] { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20 };
+                // b13 r3 integrator: 16v16 on 24 seeds (was 6: hill lead changes swung 18/14 to 9/22 with dodge-unrelated rules; the
+                // walls owner ruling, 24 seeds at 16v16, applies the same way)
+                int[] seeds = size == 16 ? new[] { 1337, 4242, 7, 99, 2024, 31337, 1, 2, 3, 4, 5, 6, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19 } : new[] { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20 };
                 var arms = new[] { new Arm(), new Arm() };
                 foreach (int seed in seeds) for (int a = 0; a < 2; a++) PlayMatch(seed, size, a == 0, arms[a]);
                 for (int a = 0; a < 2; a++) { all[a].Matches += arms[a].Matches; for (int t = 0; t < 3; t++) all[a].Wins[t] += arms[a].Wins[t]; }
@@ -332,7 +334,7 @@ namespace CriticalMass.Sim.Tests
                 {
                     double on = (double)arms[0].Wins[t] / seeds.Length, off = (double)arms[1].Wins[t] / seeds.Length;
                     if (size == 5) Limit(failures, "5v5 " + (t == 0 ? "Azure" : "Crimson") + " win share", on, off, Math.Abs(on - off) <= 0.15 + 1e-9, "within 0.15");
-                    else Console.WriteLine("{\"item\":\"b13-jd limit\",\"line\":\"16v16 " + (t == 0 ? "Azure" : "Crimson") + " win share (printed only, 6 matches): on " + on.ToString("F3") + ", control " + off.ToString("F3") + "\"}");
+                    else Console.WriteLine("{\"item\":\"b13-jd limit\",\"line\":\"16v16 " + (t == 0 ? "Azure" : "Crimson") + " win share (printed only, 24 matches): on " + on.ToString("F3") + ", control " + off.ToString("F3") + "\"}");
                 }
             }
             for (int t = 0; t < 2; t++)
