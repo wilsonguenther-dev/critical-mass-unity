@@ -169,10 +169,10 @@ namespace CriticalMass.Runtime.Hud
                         int tier = Math.Min(2, Math.Max(0, BuilderWalls.Tier(w, a.Team)));
                         bool blocks = tool == BuilderTool.Dig || tool == BuilderTool.Place;
                         int n = Math.Min(15, blocks ? w.Terraform.Carried[me] : BuilderToolbelt.Cost(w, tool));
-                        int max = blocks ? Math.Min(7, Terraform.CarryMax(w.Config)) : 0;
+                        int bcap = blocks ? Math.Min(7, Terraform.CarryMax(w.Config)) : 0;
                         BuilderToolbelt.Rules(w, me, out bool walls, out bool terrain, out bool tall);
                         int next = (int)BuilderToolbelt.Next(tool, 1, walls, terrain, tall);
-                        return (3 << 16) | next | ((int)tool << 19) | (tier << 22) | (n << 24) | (max << 28) | (dev << 15);
+                        return (3 << 16) | next | ((int)tool << 19) | (tier << 22) | (n << 24) | (bcap << 28) | (dev << 15);
                     }
                     case ClassId.Farmer:
                         return (1 << 17) | (Math.Min(63, a.CarryAmount + a.CarryMeat) << 19) | (Math.Min(63, (int)w.Config.Class(a.Cls).CarryCapacity) << 25) | (dev << 15);
