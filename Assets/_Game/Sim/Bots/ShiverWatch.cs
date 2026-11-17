@@ -166,7 +166,7 @@ namespace CriticalMass.Sim.Bots
         private bool InContact(World w, BotsState st, int i)
         {
             int t = st.Target[i];
-            double reach = w.Config.Class(w.Actors[i].Cls).AttackRange + ContactSlack;
+            double reach = Combat.BotReachOf(w, w.Actors[i].Cls) + ContactSlack; // b11-c: the bots' own reach
             double tx, tz;
             if (t == BotsState.TargetKaiju)
             {

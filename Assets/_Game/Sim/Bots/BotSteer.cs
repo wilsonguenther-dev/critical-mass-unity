@@ -285,7 +285,14 @@ namespace CriticalMass.Sim.Bots
             double band = st.InReach[id] != 0 ? reach + pc.BotReachSlack : reach;
             bool inBand = d2 <= band * band && (st.InReach[id] != 0 || hitLine);
             st.InReach[id] = inBand ? (byte)1 : (byte)0;
-            if (inBand)
+            double tRadius = t == BotsState.TargetKaiju ? cfg.Kaiju.Radius : cfg.Class(w.Actors[t].Cls).Radius;
+            if (inBand && !PressLands(w, id, tx, tz, tRadius))
+            {
+                // b12-c: inside the hysteresis band but the swing would land short (the band is reach + BotReachSlack and
+                // the strafe circles at 0.7 x reach): no press, walk straight at the predicted point until it lands.
+                Toward(w, id, tx, tz, 0);
+            }
+            else if (inBand)
             {
                 output.Attack = hitLine && InArc(w, id, tx, tz);
                 double d = Math.Sqrt(d2);
@@ -322,6 +329,45 @@ namespace CriticalMass.Sim.Bots
             Mv.X = dx * inv;
             Mv.Z = dz * inv;
             return true;
+        }
+
+        /// <summary>b12-c: how far inside the hit reach a bot's predicted contact must be before it presses (u).</summary>
+        public const double BotLandMargin = 0.05;
+
+        /// <summary>b12-c: the wind-up of cls's swing in seconds (the light weapon's own when it has one; 0: instant).</summary>
+        public static double SwingLeadSeconds(World w, ClassId cls)
+        {
+            int c = (int)cls;
+            int windup = LightWeapons.Of(w, cls) != null ? w.Dur.LightWindup[c] : w.Dur.AttackWindup[c];
+            return windup > 0 ? windup / w.Config.SimHz : 0;
+        }
+
+        /// <summary>
+        /// b12-c (weapon-reach rule on, Full only): would a press now LAND? The swing resolves on its contact tick from where
+        /// the attacker stands then, against the target's body (Combat.ResolveSwing: ReachOf + target radius). So: the
+        /// attacker's own position after the wind-up (its velocity times the lead) to the target's predicted point (tx, tz,
+        /// the caller's wind-up lead already in it) within ReachOf + targetRadius - BotLandMargin. Round 2 of b11-c measured
+        /// bots pressing from the old distances: whiffs per swing Farmer 427/700, Builder 81/156 (seed 1337). Rule off: always
+        /// true (the game before). The Healer is exempt: her press is a mend first (LightWeapons.BotKeepsPress filters it).
+        /// </summary>
+        public static bool PressLands(World w, int id, double tx, double tz, double targetRadius)
+        {
+            if (!Combat.WeaponReachOn(w.Config)) return true;
+            Actor a = w.Actors[id];
+            // b13-reach (C2 point a): the Healer's MEND is not a weapon swing. Her press lands when Healer.MendTarget finds a
+            // hurt ally within HealerConfig.MendRange of her (never the reach table), and she keeps her 4.5 u stand-off
+            // (Combat.BotReachOf), so she is never walked in to swing. Her LANTERN press (no ally to mend) is decided by
+            // LightWeapons.BotKeepsPress at WeaponReach.HealerBotPressDistance (1.6 u), inside her measured 1.34 u row plus
+            // any body radius; only that swing reads her reach row.
+            if (a.Cls == ClassId.Healer) return true;
+            if (!double.IsFinite(tx) || !double.IsFinite(tz)) return false;
+            double lead = SwingLeadSeconds(w, a.Cls);
+            double ax = w.X[id] + w.Vx[id] * lead;
+            double az = w.Z[id] + w.Vz[id] * lead;
+            double dx = tx - ax;
+            double dz = tz - az;
+            double r = Combat.ReachOf(w, a.Cls) + targetRadius - BotLandMargin;
+            return dx * dx + dz * dz <= r * r;
         }
 
         private static bool InArc(World w, int id, double tx, double tz)
@@ -397,6 +443,7 @@ namespace CriticalMass.Sim.Bots
             double aimZ = double.NaN;
             bool separate = true;
             bool minerField = false;
+            bool trapped = false; // b13-reach: a retreat whose pad field has no step (see AiState.Retreat)
             int capacity = World.ActorCapacity(cfg);
             if (Mates.Length < capacity) Mates = new int[capacity];
             int[] mates = Mates;
@@ -431,14 +478,14 @@ namespace CriticalMass.Sim.Bots
                         valid = k.State != KaijuState.Egg && k.KoIn <= 0;
                         tx = k.X;
                         tz = k.Z;
-                        reach = cc.AttackRange + cfg.Kaiju.Radius + AttackSlack;
+                        reach = Combat.BotReachOf(w, a.Cls) + cfg.Kaiju.Radius + AttackSlack; // b11-c
                     }
                     else if (t >= 0 && t < w.ActorCount && w.Actors[t].Alive && !BotFsm.PassiveTarget(w, t))
                     {
                         valid = true;
                         tx = w.X[t];
                         tz = w.Z[t];
-                        reach = cc.AttackRange + AttackSlack;
+                        reach = Combat.BotReachOf(w, a.Cls) + AttackSlack; // b11-c: the weapon-reach table
                         // DG-69: with a wind-up the bot swings at where the target will be on the contact tick.
                         int windup = w.Dur.AttackWindup[(int)a.Cls];
                         if (windup > 0)
@@ -468,7 +515,12 @@ namespace CriticalMass.Sim.Bots
                         FightCalm(w, st, id, t, tx, tz, reach, output);
                         break;
                     }
-                    if (d2 <= reach * reach && seen)
+                    double tRadius = t == BotsState.TargetKaiju ? cfg.Kaiju.Radius : cfg.Class(w.Actors[t].Cls).Radius;
+                    if (d2 <= reach * reach && seen && !PressLands(w, id, tx, tz, tRadius))
+                    {
+                        Toward(w, id, tx, tz, 0); // b12-c: in the chase band but the swing would whiff: close in first
+                    }
+                    else if (d2 <= reach * reach && seen)
                     {
                         output.Attack = InArc(w, id, tx, tz);
                         // Inside reach: circle-strafe (side by id parity) with a small pull to keep the distance.
@@ -554,7 +606,17 @@ namespace CriticalMass.Sim.Bots
                     break;
                 }
                 case AiState.Retreat:
-                    Follow(w, st, id, TeamPadField(w, id));
+                    // b13-reach (C2 point c): seed 101 Easy, tick 14010, the Healer (11/126 HP) stood in Retreat 6 u from her pad
+                    // with no actor within 2.5 u and none of her four neighbour cells walkable (StuckContext): the pad field has no
+                    // step from a pocket closed by built cells, so Follow left her move at zero. Rule on: walk straight at the pad
+                    // instead, so the barricade probe below sidesteps or chips the cell that closes the pocket (her own team's
+                    // too, see Trapped). Rule off: unchanged.
+                    if (!Follow(w, st, id, TeamPadField(w, id)) && Combat.WeaponReachOn(cfg))
+                    {
+                        PadDef home = map.Pads[(int)a.Team];
+                        Toward(w, id, home.X, home.Z, 0);
+                        trapped = true;
+                    }
                     break;
                 case AiState.Order:
                 {
@@ -681,7 +743,7 @@ namespace CriticalMass.Sim.Bots
             // hold, walk or gather; the FSM only decides whether to CHASE).
             if (!output.Attack && a.AiState != AiState.Fight)
             {
-                double reach = cc.AttackRange + AttackSlack;
+                double reach = Combat.BotReachOf(w, a.Cls) + AttackSlack; // b11-c: the weapon-reach table
                 int cnt = SpatialHash.QueryCircle(w.Hash, x, z, reach, mates);
                 int best = -1;
                 double bestD2 = double.PositiveInfinity;
@@ -705,7 +767,14 @@ namespace CriticalMass.Sim.Bots
                 {
                     aimX = w.X[best];
                     aimZ = w.Z[best];
-                    output.Attack = InArc(w, id, aimX, aimZ);
+                    if (Combat.WeaponReachOn(cfg))
+                    {
+                        // b12-c: aim where the target will be on the contact tick, and press only when it lands
+                        double lead = SwingLeadSeconds(w, a.Cls);
+                        aimX += w.Vx[best] * lead;
+                        aimZ += w.Vz[best] * lead;
+                    }
+                    output.Attack = InArc(w, id, aimX, aimZ) && PressLands(w, id, aimX, aimZ, cfg.Class(w.Actors[best].Cls).Radius);
                 }
                 else
                 {
@@ -715,14 +784,14 @@ namespace CriticalMass.Sim.Bots
                         || (k.State != KaijuState.Neutral && k.State != KaijuState.Egg && k.State != SimEnumMap.ToKaijuState(a.Team));
                     if (hostile && k.KoIn <= 0)
                     {
-                        double kr = cc.AttackRange + cfg.Kaiju.Radius + AttackSlack;
+                        double kr = Combat.BotReachOf(w, a.Cls) + cfg.Kaiju.Radius + AttackSlack; // b11-c
                         double dx = k.X - x;
                         double dz = k.Z - z;
                         if (dx * dx + dz * dz <= kr * kr)
                         {
                             aimX = k.X;
                             aimZ = k.Z;
-                            output.Attack = InArc(w, id, aimX, aimZ);
+                            output.Attack = InArc(w, id, aimX, aimZ) && PressLands(w, id, aimX, aimZ, cfg.Kaiju.Radius); // b12-c
                         }
                     }
                 }
@@ -740,14 +809,14 @@ namespace CriticalMass.Sim.Bots
                     double bz = JsMath.FloorToInt((double)hit / W) + 0.5;
                     double bdx = bx - x;
                     double bdz = bz - z;
-                    double reach = cc.AttackRange + 0.5;
+                    double reach = Combat.BotReachOf(w, a.Cls) + 0.5; // b11-c
                     if (bdx * bdx + bdz * bdz <= reach * reach && !output.Attack)
                     {
                         Barricade[] list = w.Barricades;
                         for (int s = 0; s < list.Length; s++)
                         {
                             Barricade b = list[s];
-                            if (b.Active && b.Cx + 0.5 == bx && b.Cz + 0.5 == bz && b.Team != a.Team)
+                            if (b.Active && b.Cx + 0.5 == bx && b.Cz + 0.5 == bz && (b.Team != a.Team || trapped))   // b13-reach: a trapped retreat chips its own team's cell too
                             {
                                 aimX = bx;
                                 aimZ = bz;

@@ -34,7 +34,7 @@ namespace CriticalMass.Editor.Art
         public const string ArtMaterialPath = "Assets/_Game/Resources/Toon/CMToonArt.mat";
 
         /// <summary>Bump when the contract changes: Unity re-imports every model this postprocessor touches.</summary>
-        public override uint GetVersion() => 19;   // 19: fix/hit-feel-7 keeps both weapon ends (WeaponTip.OtherEnd); 18: integration batch 10 merged both 17s: fix/hit-feel-5 weapon tip (WeaponTip) + perf/app-size-1 face decals DXT5 on desktop; 16: batch 8 reverted the HY Warrior rig (#86), importer back to the pre-#86 rules; 10: wall-damage-1, the Miner barricade imports readable
+        public override uint GetVersion() => 20;   // 20: b11-c measures the left hand too (WeaponTip.Left*, the Healer's lantern); 19: fix/hit-feel-7 keeps both weapon ends (WeaponTip.OtherEnd); 18: integration batch 10 merged both 17s: fix/hit-feel-5 weapon tip (WeaponTip) + perf/app-size-1 face decals DXT5 on desktop; 16: batch 8 reverted the HY Warrior rig (#86), importer back to the pre-#86 rules; 10: wall-damage-1, the Miner barricade imports readable
 
         public static bool IsArt(string path) =>
             path.StartsWith(ArtRoot, StringComparison.Ordinal) && path.EndsWith(".fbx", StringComparison.OrdinalIgnoreCase);
@@ -300,17 +300,59 @@ namespace CriticalMass.Editor.Art
         /// </summary>
         private static void MeasureWeaponTip(GameObject root)
         {
+            if (!MeasureHand(root, "handslot.r", "hand.r", out string bone, out Vector3 best, out float bestD, out Vector3 other, out float otherD, out int count)) return;
+            var tip = root.GetComponent<WeaponTip>();
+            if (tip == null) tip = root.AddComponent<WeaponTip>();
+            tip.Bone = bone;
+            // a bare hand's own vertices reach about 0.15 u from the slot: no weapon below that
+            tip.Distance = bestD > 0.2f ? bestD : 0f;
+            tip.Local = bestD > 0.2f ? best : Vector3.zero;
+            tip.Vertices = count;
+            // fix/hit-feel-7: the far point on the other side of the hand (a two-hand tool held mid-shaft has two ends)
+            tip.OtherDistance = otherD > 0.2f ? otherD : 0f;
+            tip.OtherEnd = otherD > 0.2f ? other : Vector3.zero;
+            // b11-c: the left hand too (the Healer's lantern hangs there; HitPose.StrikeEnds reads it for her reach)
+            if (MeasureHand(root, "handslot.l", "hand.l", out bone, out best, out bestD, out other, out otherD, out count))
+            {
+                tip.LeftBone = bone;
+                tip.LeftDistance = bestD > 0.2f ? bestD : 0f;
+                tip.LeftLocal = bestD > 0.2f ? best : Vector3.zero;
+                tip.LeftVertices = count;
+                tip.LeftOtherDistance = otherD > 0.2f ? otherD : 0f;
+                tip.LeftOtherEnd = otherD > 0.2f ? other : Vector3.zero;
+            }
+            else
+            {
+                tip.LeftDistance = 0f;
+                tip.LeftLocal = Vector3.zero;
+                tip.LeftVertices = 0;
+                tip.LeftOtherDistance = 0f;
+                tip.LeftOtherEnd = Vector3.zero;
+            }
+        }
+
+        /// <summary>
+        /// fix/hit-feel-5/7, b11-c (one hand): of the skinned vertices bound at least 90% to slotName or handName, the one
+        /// farthest from the slot (else the hand) in that bone's local space at the bind pose, and the farthest on the other
+        /// side of the hand (only past a 0.2 u weapon). False when the model has neither bone.
+        /// </summary>
+        private static bool MeasureHand(GameObject root, string slotName, string handName, out string bone, out Vector3 best,
+            out float bestD, out Vector3 other, out float otherD, out int count)
+        {
             Transform slot = null, hand = null;
             foreach (Transform t in root.GetComponentsInChildren<Transform>(true))
             {
-                if (t.name == "handslot.r") slot = t;
-                else if (t.name == "hand.r") hand = t;
+                if (t.name == slotName) slot = t;
+                else if (t.name == handName) hand = t;
             }
             Transform at = slot != null ? slot : hand;
-            if (at == null) return;
-            Vector3 best = Vector3.zero;
-            float bestD = 0f;
-            int count = 0;
+            best = Vector3.zero;
+            bestD = 0f;
+            other = Vector3.zero;
+            otherD = 0f;
+            count = 0;
+            bone = at != null ? at.name : null;
+            if (at == null) return false;
             var pts = new List<Vector3>();
             foreach (SkinnedMeshRenderer smr in root.GetComponentsInChildren<SkinnedMeshRenderer>(true))
             {
@@ -335,24 +377,13 @@ namespace CriticalMass.Editor.Art
                     if (d > bestD) { bestD = d; best = p; }
                 }
             }
-            var tip = root.GetComponent<WeaponTip>();
-            if (tip == null) tip = root.AddComponent<WeaponTip>();
-            tip.Bone = at.name;
-            // a bare hand's own vertices reach about 0.15 u from the slot: no weapon below that
-            tip.Distance = bestD > 0.2f ? bestD : 0f;
-            tip.Local = bestD > 0.2f ? best : Vector3.zero;
-            tip.Vertices = count;
-            // fix/hit-feel-7: the far point on the other side of the hand (a two-hand tool held mid-shaft has two ends)
-            Vector3 other = Vector3.zero;
-            float otherD = 0f;
             if (bestD > 0.2f)
             {
                 Vector3 axis = best / bestD;
                 foreach (Vector3 p in pts)
                     if (Vector3.Dot(p, axis) < 0f && p.magnitude > otherD) { otherD = p.magnitude; other = p; }
             }
-            tip.OtherDistance = otherD > 0.2f ? otherD : 0f;
-            tip.OtherEnd = otherD > 0.2f ? other : Vector3.zero;
+            return true;
         }
 
         private void OnPostprocessModel(GameObject root)
