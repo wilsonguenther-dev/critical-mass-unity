@@ -425,8 +425,8 @@ namespace CriticalMass.Runtime.Menus
         public const string MinerBank = "Bank ore at the hut.";
         public const string BuilderRole = "Builds walls and stairs.";
         public const string BuilderBio = "Builds walls and blocks for cover and traps, stairs over walls and bridges over gaps.";
-        public const string BuilderBuild = "BUILD the selected piece where the outline shows.";
-        public const string BuilderSwitch = "Short wall, tall wall (hut level 2), block. A block dropped in a hole fills it.";
+        public const string BuilderBuild = "BUILD the selected piece where the outline shows; on the dig tool F digs and places.";
+        public const string BuilderSwitch = "Dig, place, short wall, tall wall (hut level 2), block. A block dropped in a hole fills it.";
         public const string BuilderStairs = "STAIRS over a wall, BRIDGE over a gap.";
         /// <summary>b13 r2 (owner decision: terrain belongs to the Builder and the Demolitionist): the Builder's F while the hut rule is on.</summary>
         public const string BuilderDig = "DIG a block of ground with F, then F at an edge or a hole places it back.";
@@ -455,7 +455,7 @@ namespace CriticalMass.Runtime.Menus
                 };
                 w.Early = false;
             }
-            // b13 integrator: the Builder's wall words only while the wall rule is on (item B is cut this batch: pack words stay)
+            // b13 r3 integrator: walls are back (#204, Depth.Build.On true): the Builder's wall words (pack words only with the rule off)
             if (b < all.Length && all[b] != null && CriticalMass.Sim.Config.GameConfig.CreateDefault().Depth.Build.On)
             {
                 ClassWords w = all[b];

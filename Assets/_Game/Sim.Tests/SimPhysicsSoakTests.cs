@@ -88,9 +88,13 @@ namespace CriticalMass.Sim.Tests
                     if (!Terraform.WalkableAt(w.Map, x, z))
                     {
                         int cx = (int)Math.Floor(x), cz = (int)Math.Floor(z);
-                        bool overVoid = MapGrid.InBounds(w.Map, cx, cz) && w.Map.Cells[cz * w.Map.Width + cx] == Cell.Void;
+                        byte cell = MapGrid.InBounds(w.Map, cx, cz) ? w.Map.Cells[cz * w.Map.Width + cx] : (byte)255;
+                        bool overVoid = cell == Cell.Void;
                         bool carried = a.AirLen > 0 || Collide.DeckSpanAt(w, x, z, Collide.ActorRadius(w, id)) != null;
-                        if (!(overVoid && carried)) failures.Add($"{tag} tick {tick}: actor {id} at ({x:F2}, {z:F2}) inside solid ground");
+                        // b13 r3 integrator: an AIRBORNE actor passes over a short wall (Cell.LowWall, S0's Collide rule: a jump
+                        // clears short walls), so mid-jump over one is not "inside solid ground"
+                        bool jumpingLowWall = cell == Cell.LowWall && a.AirLen > 0;
+                        if (!(overVoid && carried) && !jumpingLowWall) failures.Add($"{tag} tick {tick}: actor {id} at ({x:F2}, {z:F2}) inside solid ground (cell {cell}, airborne {a.AirLen > 0})");
                     }
                     if (!classic && k.State != KaijuState.Egg && a.AirLen == 0)
                     {

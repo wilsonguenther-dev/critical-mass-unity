@@ -133,7 +133,7 @@ namespace CriticalMass.Runtime.Tests
             foreach (ShowcaseClass k in CharacterShowcaseData.All)
             {
                 ShowcaseControl[] rows = CharacterShowcaseData.ControlsFor(k.Id);
-                Assert.AreEqual(7, rows.Length, k.Name);   // b13 r3 integrator: Dodge row back; walls (Switch piece) still cut
+                Assert.AreEqual(k.Id == ClassId.Builder ? 8 : 7, rows.Length, k.Name);   // b13 r3 integrator: Dodge row and the Builder's Switch piece row back
                 foreach (ShowcaseControl c in rows)
                 {
                     string kb = CharacterShowcaseData.KeyWords(c.Action, ControlDevice.KeyboardMouse);

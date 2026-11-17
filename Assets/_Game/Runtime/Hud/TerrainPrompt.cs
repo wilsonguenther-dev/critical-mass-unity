@@ -142,6 +142,7 @@ namespace CriticalMass.Runtime.Hud
             if (!a.Alive) return -1;
             int pillar = PillarModeHere(w, me);
             bool miner = a.Cls == Terraform.OwnerClass(w);   // b13 r2: the dig / place strip follows the class that owns terrain (the Builder with the hut rule)
+            if (miner && a.Cls == ClassId.Builder && BuilderWalls.On(w) && !BuilderWalls.TerrainTool(w, me)) miner = false;   // b13 r3: a piece is selected: the walls strip
             // feat/terrain-affordances (e): the other terrain classes keep their resource in the same strip.
             if (pillar == 0 && !miner)
             {
@@ -149,6 +150,15 @@ namespace CriticalMass.Runtime.Hud
                 switch (a.Cls)
                 {
                     case ClassId.Builder:
+                        // CM b13 B: with the walls rule on, the strip names the selected piece, the ghost's verdict and the wood.
+                        if (BuilderWalls.On(w))
+                        {
+                            int sel = BuilderWalls.Piece(w, me) == BuildPiece.Block ? 2 : BuilderWalls.TallSelected(w, me) ? 1 : 0;
+                            int why = Math.Min(15, Math.Max(0, -BuilderWalls.GhostWhy(w, me)));
+                            int fill = BuilderWalls.GhostFill(w, me) ? 1 : 0;
+                            int wood = Math.Min(31, Math.Max(0, BuilderWalls.Wood(w, a.Team)));
+                            return (3 << 16) | ((sel | (why << 2) | (fill << 6) | (wood << 7)) << 19) | (dev << 15);
+                        }
                         return (1 << 16) | (Math.Min(4095, (int)Math.Floor(Math.Max(0, BuiltPieces.Bank(w, a.Team)))) << 19) | (dev << 15);
                     case ClassId.Farmer:
                         return (1 << 17) | (Math.Min(63, a.CarryAmount + a.CarryMeat) << 19) | (Math.Min(63, (int)w.Config.Class(a.Cls).CarryCapacity) << 25) | (dev << 15);
@@ -214,6 +224,18 @@ namespace CriticalMass.Runtime.Hud
         static string Compose(World w, int key)
         {
             ControlDevice device = ControlBindings.ActiveDevice;
+            if ((key & (7 << 16)) == (3 << 16))
+            {
+                // CM b13 B: "F  BUILD SHORT WALL   ·   WHEEL: SWITCH   ·   WOOD 4" (+ the refusal word while the ghost is red).
+                int v = (key >> 19) & 4095;
+                int sel = v & 3, why = (v >> 2) & 15, wood = (v >> 7) & 31;
+                bool fill = ((v >> 6) & 1) == 1;
+                string piece = fill ? "FILL HOLE" : sel == 2 ? "BLOCK" : sel == 1 ? "TALL WALL" : "SHORT WALL";
+                string line = TrialText.Fill("{DigPlace}", device) + "  BUILD " + piece + "   ·   " + TrialText.Fill("{Switch}", device) + ": SWITCH   ·   "
+                    + CriticalMass.Runtime.View.Mechanics.BuilderBank.WoodWord + " " + wood;
+                if (why != 0) line += "   ·   " + BuilderWalls.Word(-why);
+                return line;
+            }
             if ((key & (7 << 16)) != 0)
             {
                 int v = (key >> 19) & 63, v12 = (key >> 19) & 4095;

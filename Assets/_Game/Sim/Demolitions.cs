@@ -499,7 +499,9 @@ namespace CriticalMass.Sim.Core
                 double kr = cfg.BlastRadius + w.Config.Kaiju.Radius;
                 if ((k.X - bx) * (k.X - bx) + (k.Z - bz) * (k.Z - bz) <= kr * kr) Kaiju.DamageKaiju(w, b.Owner, cfg.Damage, DamageCause.Explosion);   // b13-k: BARKSKIN reads the cause
             }
-            Barricades.DamageBarricadesInArc(w, b.Owner, bx, bz, 1, 0, cfg.BlastRadius, -1, cfg.Damage);
+            bool walls = BuilderWalls.On(w);
+            Barricades.DamageBarricadesInArc(w, b.Owner, bx, bz, 1, 0, cfg.BlastRadius, -1, cfg.Damage, walls);
+            if (walls) BuilderWalls.BlastWalls(w, b.Team, bx, bz, cfg.BlastRadius); // CM b13 B: 60 per wall cell in the radius
 
             // Breakable walls in the radius: destroyed outright (they only ever ADD walkable ground, so no route check).
             double R = cfg.BlastRadius;
@@ -717,6 +719,8 @@ namespace CriticalMass.Sim.Core
         /// <summary>Bots: take bot id's queued throw into output (aim + Terraform press); false when none is queued or it died.</summary>
         public static bool TakeBotTnt(World w, int id, InputFrame output)
         {
+            // CM b13 B: a Builder bot's queued build (BotBuild.DecideBuilder) is its one F press this frame, aimed at the ghost.
+            if (BuilderWalls.TakeBotPress(w, id, output)) return true;
             DemolitionsState s = w.Demolitions;
             if (s.BotTnt[id] != 1) return false;
             s.BotTnt[id] = 0;
