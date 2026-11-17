@@ -866,6 +866,8 @@ namespace CriticalMass.Sim.Bots
             // Sim-physics lane (DG-84 / DG-85): a Hard bot steps out of a telegraphed claw cone or slam ring, and jumps a slam.
             BotSkillConfig dsk = BotSkill.Profile(w, id);
             if (dsk != null && dsk.DodgeKaiju && Phys.On(w, true) && DodgeKaiju(w, id, output)) st.WantMove[id] = 1;
+            // b13 r3 [K]: a bot the SHROUD would blind leaves the cloud and skirts it, unless it is contesting the hill.
+            if (BotKaijuFeed.AvoidCloud(w, id, output)) st.WantMove[id] = 1;
 
             // Ability press decided at think time.
             if (st.AbilityReq[id] == 1)
