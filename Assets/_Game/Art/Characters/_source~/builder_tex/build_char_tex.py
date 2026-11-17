@@ -818,6 +818,8 @@ def deformed(o):
 
 
 MEAS = {"new_LOD0": low, "new_LOD1": lod1, "current_LOD0": old0}
+if globals().get("LOW_OLD") is not None: MEAS["heat_LOD0"] = LOW_OLD          # method 2 transfer run: the heat weights
+for c_ in globals().get("EXTRAS", []): MEAS[c_.name.split("_LOD0_")[1] + "_LOD0"] = c_
 for o in MEAS.values():
     for m in o.modifiers:
         if m.type != "ARMATURE": m.show_viewport = False
@@ -880,6 +882,11 @@ f_run = max(sep, key=sep.get)
 hit = act_by(cc["hit"])
 POSES = [("idle", act_by(cc["idle"]), int(act_by(cc["idle"]).frame_range[0])), ("run", run, f_run), ("attack_raise", atk, f_raise),
          ("attack_contact", atk, f_contact), ("hit", hit, int(hit.frame_range[0] + 0.4 * (hit.frame_range[1] - hit.frame_range[0])))]
+if cc.get("walk"):                                     # walk mid-stride: largest foot separation, like the run
+    wlk = act_by(cc["walk"]); sepw = {}
+    for f in range(int(wlk.frame_range[0]), int(wlk.frame_range[1]) + 1):
+        pose_clip(wlk, f); sepw[f] = abs(float((rig.pose.bones["foot.l"].head - rig.pose.bones["foot.r"].head).y))
+    POSES.insert(1, ("walk", wlk, max(sepw, key=sepw.get)))
 REP["render_poses"] = [(n, a.name.split("|")[-1], f) for n, a, f in POSES]
 log("render poses", REP["render_poses"])
 
@@ -947,6 +954,8 @@ def shot(path, az, el, dist, tz=1.05):
 
 RD = os.path.join(OUT, "tiles"); os.makedirs(RD, exist_ok=True)
 lod1.hide_render = shd.hide_render = True
+if globals().get("LOW_OLD") is not None: LOW_OLD.hide_render = True
+for c_ in globals().get("EXTRAS", []): c_.hide_render = True
 for which, o in MODELS.items():
     for x in MODELS.values(): x.hide_render = x is not o
     grid_rows = []
@@ -975,6 +984,44 @@ gn, go = load_px(os.path.join(OUT, "grid_new.png"))[:, :, :3], load_px(os.path.j
 tile = C["render_px"]
 write_png(os.path.join(OUT, "side_by_side_game55.png"), np.concatenate([gn[:, :2 * tile], go[:, :2 * tile]], 1))
 write_png(os.path.join(OUT, "side_by_side_front_side10.png"), np.concatenate([gn[:, 2 * tile:], go[:, 2 * tile:]], 1))
+if globals().get("LOW_OLD") is not None and C.get("closeups"):
+    # close views of named spots, heat weights (left) vs transferred weights (right), same mesh, same texture, mallet on
+    CCOLS = [("heat", LOW_OLD)] + [(c_.name.split("_LOD0_")[1], c_) for c_ in globals().get("EXTRAS", [])] + [("final_" + str(C.get("weights_transfer", {}).get("arm_mode", "transfer")), low)]
+    for _, ob_ in CCOLS[:-1]:
+        ob_.data.materials.clear(); ob_.data.materials.append(MATS[("new", "azure")]); ob_.data.materials.append(ink)
+        for p_ in ob_.data.polygons: p_.material_index = 0
+        sm = ob_.modifiers.new("hull", "SOLIDIFY"); sm.thickness = 0.014; sm.offset = 1.0; sm.use_flip_normals = True; sm.use_rim = False; sm.material_offset = 1
+    low.data.materials[0] = MATS[("new", "azure")]
+    for x in MODELS.values(): x.hide_render = True
+    mal_ = bpy.data.objects.get("Mallet")
+    if mal_ is not None: mal_.hide_render = not C["closeups"].get("show_mallet", False)    # it covers the spots
+    cu = C["closeups"]; scene.render.resolution_x = scene.render.resolution_y = cu.get("px", 380)
+    rest_pose(); Rw = {}
+    for nm_, sp in cu["spots"].items():
+        h_, t_ = joints(rig)[sp["bone"]]; Rw[nm_] = h_ + sp["t"] * (t_ - h_) + np.array(sp.get("offset_m", [0, 0, 0]))
+    REP["closeups"] = {}
+    for nm_, sp in cu["spots"].items():
+        rows = []
+        for pname, act, f in POSES:
+            if pname not in cu["poses"]: continue
+            pose_clip(act, f); pb = rig.pose.bones[sp["bone"]]
+            Mp = np.array(rig.matrix_world @ pb.matrix @ pb.bone.matrix_local.inverted() @ rig.matrix_world.inverted())
+            tg = Mp[:3, :3] @ Rw[nm_] + Mp[:3, 3]
+            a, e_ = math.radians(sp["az"]), math.radians(sp["el"]); tv = Vector(tuple(tg))
+            cam.location = tv + Vector((math.cos(e_) * math.sin(a), -math.cos(e_) * math.cos(a), math.sin(e_))) * sp["dist"]
+            cam.rotation_euler = (tv - cam.location).to_track_quat("-Z", "Y").to_euler()
+            row = []
+            for which, o in CCOLS:
+                o.hide_render = False
+                pth = os.path.join(RD, "close_%s_%s_%s.png" % (nm_, pname, which)); scene.render.filepath = pth; bpy.ops.render.render(write_still=True)
+                o.hide_render = True; row.append(load_px(pth)[:, :, :3])
+            rows.append(np.concatenate(row, 1))
+        fn_ = os.path.join(OUT, "closeup_%s.png" % nm_); write_png(fn_, np.concatenate(rows[::-1], 0))
+        REP["closeups"][nm_] = dict(file=fn_, rows_top_to_bottom=[p_[0] for p_ in POSES if p_[0] in cu["poses"]], cols=" | ".join(c_[0] for c_ in CCOLS))
+    scene.render.resolution_x = scene.render.resolution_y = C["render_px"]
+    for x in MODELS.values(): x.hide_render = False
+    if mal_ is not None: mal_.hide_render = False
+    rest_pose()
 REP["renders"] = dict(grid_cols="game55 azure, game55 crimson, front10 azure, front10 crimson, side10 azure, side10 crimson",
                       grid_rows=[p[0] for p in POSES], files=sorted(f for f in os.listdir(OUT) if f.endswith(".png")))
 save()

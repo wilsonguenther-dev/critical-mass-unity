@@ -51,7 +51,8 @@
   "idle": "Idle",
   "run": "Run",
   "attack": "Attack",
-  "hit": "Hit"
+  "hit": "Hit",
+  "walk": "Walk"
  },
  "render_px": 300,
  "remesh": {
@@ -104,7 +105,7 @@
   "head_bone_reach_m": 99.0,
   "_note_run8": "zone_leg_below_m 0.22 relabelled 3,070 hip-zone verts as leg: the crotch shells then sat 'between legs', the voxel fell to its minimum and decimation stalled (LOD0 10k). Both run-8 rules are disabled (99) = run-7 behaviour."
  },
- "out_dir_remesh": "~/cm-art-trial/builder/game-ready-v2",
+ "out_dir_remesh": "~/cm-art-trial/builder/game-ready-v3",
  "weights_rules": {
   "hip_margin_frac": 0.15,
   "joint_band_frac": 0.25,
@@ -127,5 +128,126 @@
   "grow_up_m": 0.12,
   "grow_min_w": 0.02,
   "enabled": false
+ },
+ "gameplay_clips": [
+  "Idle",
+  "Walk",
+  "Run",
+  "Attack",
+  "AttackSlice",
+  "Hit",
+  "Block"
+ ],
+ "weights_transfer": {
+  "enabled": false,
+  "_doc": "robust_weight_transfer.py (Abdrashitov et al. 2023). template = a well-skinned character on the same skeleton; thresholds = the paper's defaults (dist_frac x bbox diagonal, angle_deg). shell_pass overrides for pass 2 (body -> clothing shells). pydeps: scipy + robust-laplacian installed with Blender's Python (README).",
+  "pydeps": [
+   "~/cm-art-trial/tools/pydeps"
+  ],
+  "template": {
+   "fbx": "Assets/_Game/Art/Characters/Warrior.fbx",
+   "mesh_prefix": "Warrior_LOD0",
+   "exclude_dominant_bone_substrings": [
+    "slot"
+   ]
+  },
+  "terminal_bones": [
+   "head",
+   "hand.l",
+   "hand.r",
+   "toes.l",
+   "toes.r"
+  ],
+  "fit_cross_scale": true,
+  "fit_scale_clamp": [
+   0.6,
+   2.5
+  ],
+  "fit_extent_pct": 90.0,
+  "dist_frac": 0.05,
+  "angle_deg": 30.0,
+  "allow_flip": false,
+  "smooth_iters": 30,
+  "smooth_alpha": 0.2,
+  "max_influences": 4,
+  "shell_pass": {
+   "allow_flip": true
+  },
+  "region_mask": true,
+  "lod1_from": "decimate",
+  "normal_smooth_iters": 0,
+  "known_mask_head_below_neck_m": 0.1,
+  "_doc_mask": "region_mask: the run-9 region limits (allowed_for, grown by remesh.allowed_rings) applied to the MATCHED values only, before the inpaint; mask_result false (a hard mask on the result left weight cliffs, run v3-3: LOD0 Walk 10.1x).",
+  "lod1_source_smooth_iters": 10,
+  "lod1_smooth_iters": 0,
+  "_note_tuning": "v3 runs (LOD0 gameplay worst edge): paper defaults + smooth 10 = 3.18x; smooth 30 = 2.88x; smooth 60 = 4.06x (arm weight smoothed onto the torso side); normal smoothing 6 (30% matched instead of 21%) = 5.38x; result-masking = 10.2x. LOD1 is best from the 10-iteration weights (worst 2.37x vs 3.24x from the 30-iteration ones).",
+  "_note_v3_final": "v3 final (BuilderTex_report_v3_transfer.json): gameplay worst edge LOD0 2.88x (run 9: 6.92x), LOD1 2.37x (run 9: 2.80x), but the right-arm close-up (Run, Attack raise/contact) shows the forearm skin and cuff left at the armpit while the arm moves: a visible defect the heat weights do not have. Off until fixed; the committed FBX stays on run-9 weights.",
+  "arm_mode": "hybrid",
+  "arm_band_m": 0.16,
+  "arm_extra_measure": [
+   "transfer",
+   "hybrid_hard"
+  ],
+  "_note_arm": "arm_mode: 'hybrid' = transferred weights on legs/hips/torso, run-9 heat weights where heat's dominant bone is an arm-chain bone, smoothstep cross-fade over arm_band_m of edge-path distance at the border (LOD0 edges are ~3-4 cm, so 6 cm left no vertex inside the band). 'seed' (unmatched arm vertices fixed to heat before the inpaint) measured worse: gameplay LOD0 worst 3.91x.",
+  "_note_hybrid": "Hybrid (BuilderTex_report_v3_hybrid.json) passes the stretch rule: gameplay LOD0 worst at or below run 9 in all 7 clips, with Attack equal at 3.338. It still fails the visual check: a small red/blue patch pokes through the right shoulder sleeve at the arm/torso border in the Run and Attack close-ups. Claiming more of the shoulder for heat (arm_member_min_weight 0.3) shrank the patch but made Idle 2.38x and AttackSlice 3.10x. Off; the FBX stays on run 9."
+ },
+ "closeups": {
+  "px": 300,
+  "poses": [
+   "run",
+   "attack_raise",
+   "attack_contact"
+  ],
+  "spots": {
+   "inner_thigh_above_knee": {
+    "bone": "upperleg.l",
+    "t": 0.8,
+    "offset_m": [
+     -0.08,
+     0.0,
+     0.0
+    ],
+    "az": -25,
+    "el": 12,
+    "dist": 1.7
+   },
+   "shin_front": {
+    "bone": "lowerleg.l",
+    "t": 0.35,
+    "offset_m": [
+     0.0,
+     -0.05,
+     0.0
+    ],
+    "az": 50,
+    "el": 5,
+    "dist": 1.7
+   },
+   "right_armpit": {
+    "bone": "upperarm.r",
+    "t": 0.1,
+    "offset_m": [
+     0.06,
+     0.0,
+     -0.1
+    ],
+    "az": -55,
+    "el": 0,
+    "dist": 1.7
+   },
+   "right_forearm": {
+    "bone": "lowerarm.r",
+    "t": 0.5,
+    "offset_m": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "az": -70,
+    "el": 5,
+    "dist": 1.7
+   }
+  },
+  "show_mallet": false
  }
 }
