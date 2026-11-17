@@ -13,25 +13,18 @@ namespace CriticalMass.Sim.Core
     /// fell back to its own cell, and it stood with no target for the whole 240 s it was owned. Seed 19: craters round the
     /// hill split it from the hill for 23 s. The guard now also refuses a change that would newly split the Kaiju's clearance
     /// region (crush rule: barricades and short walls pass) from the hill's. Full profile only; a pure function of the grid
-    /// (its own shadow copy, never the Kaiju's nav state, so a view calling the route proof cannot move the Sim); allocation-free
-    /// after the first call; it runs only when a change makes a cell impassable for the body (a hole), so walls cost nothing.
+    /// (the Kaiju's own clearance grid, refreshed first: RefreshClearance is byte-identical whenever it runs); allocation-free
+    /// (static scratch sized for the map at type load); it runs only when a change makes a cell impassable for the body (a hole), so walls cost nothing.
     /// </summary>
     public sealed partial class Kaiju
     {
-        private sealed class RouteShadow
-        {
-            public byte[] Built, Cells, Sq, Tent, TentSq;
-            public int[] Visit, Queue;
-            public int Stamp;
-            public bool Valid;
-            public MapDef Map;
-            public double R, Sr;
-            public int Halo;
-            public bool Squeeze;
-        }
-
-        private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<World, RouteShadow> RouteShadows =
-            new System.Runtime.CompilerServices.ConditionalWeakTable<World, RouteShadow>();
+        // Scratch for the tentative clearance grid and the breadth-first search. Static, sized for the shipped map at type load
+        // (grown only for a bigger map), so no call allocates; the contents never outlive a call (a pure function of the grid).
+        private static byte[] Tent = new byte[CriticalMass.Sim.Maps.SkybreakBasinMap.MapWidth * CriticalMass.Sim.Maps.SkybreakBasinMap.MapHeight];
+        private static byte[] TentSq = new byte[Tent.Length];
+        private static int[] Visit = new int[Tent.Length];
+        private static int[] Queue = new int[Tent.Length];
+        private static int Stamp;
 
         /// <summary>The Kaiju route guard applies: Full profile, the nav guard and the hill-siege crush rule on.</summary>
         internal static bool RouteGuardOn(World w) =>
@@ -39,43 +32,10 @@ namespace CriticalMass.Sim.Core
 
         private static bool PassableType(byte t) => MapGrid.IsWalkableType(t) || t == Cell.Barricade || t == Cell.LowWall;
 
-        private static RouteShadow ShadowFor(World w)
+        private static void Fit(int n)
         {
-            int n = w.Map.Width * w.Map.Height;
-            if (!RouteShadows.TryGetValue(w, out RouteShadow s) || s.Built.Length != n)
-            {
-                if (s != null) RouteShadows.Remove(w);
-                s = new RouteShadow { Built = new byte[n], Cells = new byte[n], Sq = new byte[n], Tent = new byte[n], TentSq = new byte[n], Visit = new int[n], Queue = new int[n] };
-                RouteShadows.Add(w, s);
-            }
-            return s;
-        }
-
-        /// <summary>Brings the guard's own shadow clearance grid (s.Cells) up to the real grid (the RefreshClearance rule, own arrays).</summary>
-        private static void SyncShadow(World w, RouteShadow s, double r, double sr, int halo, bool squeeze)
-        {
-            MapDef map = w.Map;
-            byte[] real = map.Cells;
-            int W = map.Width, H = map.Height, n = W * H;
-            if (!s.Valid || !ReferenceEquals(s.Map, map) || s.R != r || s.Sr != sr || s.Halo != halo || s.Squeeze != squeeze)
-            {
-                for (int cz = 0; cz < H; cz++)
-                    for (int cx = 0; cx < W; cx++)
-                        ClearCellAt(w, map, cx, cz, r, true, squeeze, sr, halo, s.Cells, s.Sq);
-                Array.Copy(real, s.Built, n);
-                s.Map = map; s.R = r; s.Sr = sr; s.Halo = halo; s.Squeeze = squeeze; s.Valid = true;
-                return;
-            }
-            int reach = ClearReach(r, sr, halo);
-            for (int i = 0; i < n; i++)
-            {
-                if (s.Built[i] == real[i]) continue;
-                int ccx = i % W, ccz = i / W;
-                for (int cz = Math.Max(0, ccz - reach); cz <= Math.Min(H - 1, ccz + reach); cz++)
-                    for (int cx = Math.Max(0, ccx - reach); cx <= Math.Min(W - 1, ccx + reach); cx++)
-                        ClearCellAt(w, map, cx, cz, r, true, squeeze, sr, halo, s.Cells, s.Sq);
-                s.Built[i] = real[i];
-            }
+            if (Tent.Length >= n) return;
+            Tent = new byte[n]; TentSq = new byte[n]; Visit = new int[n]; Queue = new int[n]; Stamp = 0;
         }
 
         /// <summary>Nearest walkable cell of `cells` to (x, z) within GoalSnapRings (first minimum wins); -1 none.</summary>
@@ -104,27 +64,27 @@ namespace CriticalMass.Sim.Core
             cx >= 0 && cz >= 0 && cx < map.Width && cz < map.Height && MapGrid.IsWalkableType(cells[cz * map.Width + cx]);
 
         /// <summary>Breadth-first over `cells` (8-connected, no corner cutting: BuildRegions' rule) from cell a; true when it reaches b.</summary>
-        private static bool Connected(MapDef map, RouteShadow s, byte[] cells, int a, int b)
+        private static bool Connected(MapDef map, byte[] cells, int a, int b)
         {
             if (a < 0 || b < 0) return false;
             if (a == b) return true;
-            if (s.Stamp == int.MaxValue) { Array.Fill(s.Visit, 0); s.Stamp = 0; }
-            int stamp = ++s.Stamp, W = map.Width, head = 0, tail = 0;
-            s.Queue[tail++] = a;
-            s.Visit[a] = stamp;
+            if (Stamp == int.MaxValue) { Array.Fill(Visit, 0); Stamp = 0; }
+            int stamp = ++Stamp, W = map.Width, head = 0, tail = 0;
+            Queue[tail++] = a;
+            Visit[a] = stamp;
             while (head < tail)
             {
-                int c = s.Queue[head++], cx = c % W, cz = c / W;
+                int c = Queue[head++], cx = c % W, cz = c / W;
                 for (int i = 0; i < 8; i++)
                 {
                     int nx = cx + Ndx[i], nz = cz + Ndz[i];
                     if (!Clear(map, cells, nx, nz)) continue;
                     int ni = nz * W + nx;
-                    if (s.Visit[ni] == stamp) continue;
+                    if (Visit[ni] == stamp) continue;
                     if (i >= 4 && (!Clear(map, cells, nx, cz) || !Clear(map, cells, cx, nz))) continue;
                     if (ni == b) return true;
-                    s.Visit[ni] = stamp;
-                    s.Queue[tail++] = ni;
+                    Visit[ni] = stamp;
+                    Queue[tail++] = ni;
                 }
             }
             return false;
@@ -143,44 +103,47 @@ namespace CriticalMass.Sim.Core
             if (!narrows) return true;
             MapDef map = w.Map;
             byte[] cells = map.Cells;
-            RouteShadow s = ShadowFor(w);
-            double r = GridR(w), sr = w.Config.Physics.KaijuSqueezeRadius;
-            int halo = w.Config.Physics.KaijuSqueezeHalo;
-            bool squeeze = SqueezeOn(w);
-            // The shadow BEFORE the change: sync it with the tentative cells put back.
+            // The clearance BEFORE the change: the Kaiju's own shadow grid, brought up to date with the tentative cells put back
+            // (RefreshClearance is a pure function of the grid, byte-identical whenever it runs; the Kaiju step would run it next).
             for (int k = 0; k < n; k++) cells[idx[k]] = old[k];
-            SyncShadow(w, s, r, sr, halo, squeeze);
+            RefreshClearance(w);
             for (int k = 0; k < n; k++) cells[idx[k]] = next[k];
+            KaijuNav nav = w.KaijuNav;
+            byte[] before = nav.Clear.Cells;
             Kaiju kj = w.Kaiju;
             bool out_ = w.Match.Hatched && kj.State != KaijuState.Egg;
             double sx = out_ ? kj.X : map.Shrine.X, sz = out_ ? kj.Z : map.Shrine.Z + HatchOffsetZ;
             HillDef hill = map.Hill;
-            if (!Connected(map, s, s.Cells, Snap(map, s.Cells, sx, sz), Snap(map, s.Cells, hill.X, hill.Z))) return true;
-            // The shadow AFTER: a copy patched around the changed cells from the tentative grid.
-            int N = s.Cells.Length, W = map.Width, H = map.Height;
-            Array.Copy(s.Cells, s.Tent, N);
-            Array.Copy(s.Sq, s.TentSq, N);
+            if (!Connected(map, before, Snap(map, before, sx, sz), Snap(map, before, hill.X, hill.Z))) return true;
+            // The clearance AFTER: a scratch copy patched around the changed cells from the tentative grid.
+            int N = before.Length, W = map.Width, H = map.Height;
+            Fit(N);
+            Array.Copy(before, Tent, N);
+            Array.Copy(nav.Squeeze, TentSq, N);
+            double r = GridR(w), sr = w.Config.Physics.KaijuSqueezeRadius;
+            int halo = w.Config.Physics.KaijuSqueezeHalo;
+            bool squeeze = SqueezeOn(w);
             int reach = ClearReach(r, sr, halo);
             for (int k = 0; k < n; k++)
             {
                 int ccx = idx[k] % W, ccz = idx[k] / W;
                 for (int cz = Math.Max(0, ccz - reach); cz <= Math.Min(H - 1, ccz + reach); cz++)
                     for (int cx = Math.Max(0, ccx - reach); cx <= Math.Min(W - 1, ccx + reach); cx++)
-                        ClearCellAt(w, map, cx, cz, r, true, squeeze, sr, halo, s.Tent, s.TentSq);
+                        ClearCellAt(w, map, cx, cz, r, true, squeeze, sr, halo, Tent, TentSq);
             }
-            return Connected(map, s, s.Tent, Snap(map, s.Tent, sx, sz), Snap(map, s.Tent, hill.X, hill.Z));
+            return Connected(map, Tent, Snap(map, Tent, sx, sz), Snap(map, Tent, hill.X, hill.Z));
         }
 
         /// <summary>
-        /// b14-c (tests and the scan): the Kaiju's body can walk from (x, z) to the hill on the current grid (the guard's own
-        /// shadow, crush rule). Pure: touches no Sim state.
+        /// b14-c (tests and the scan): the Kaiju's body can walk from (x, z) to the hill on the current grid (its own clearance
+        /// grid, crush rule; brought up to date first, a pure function of the grid).
         /// </summary>
         public static bool BodyReachesHillFrom(World w, double x, double z)
         {
-            RouteShadow s = ShadowFor(w);
-            SyncShadow(w, s, GridR(w), w.Config.Physics.KaijuSqueezeRadius, w.Config.Physics.KaijuSqueezeHalo, SqueezeOn(w));
+            RefreshClearance(w);
             MapDef map = w.Map;
-            return Connected(map, s, s.Cells, Snap(map, s.Cells, x, z), Snap(map, s.Cells, map.Hill.X, map.Hill.Z));
+            byte[] c = w.KaijuNav.Clear.Cells;
+            return Connected(map, c, Snap(map, c, x, z), Snap(map, c, map.Hill.X, map.Hill.Z));
         }
     }
 }
