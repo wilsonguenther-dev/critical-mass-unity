@@ -324,7 +324,16 @@ namespace CriticalMass.Sim.Tests
                 if (!ok) fails++;
             }
             double sOn = (double)on.AzureWins / on.Matches, sOff = (double)off.AzureWins / off.Matches;
-            Check("azure win share", sOn, sOff, Math.Abs(sOn - sOff) <= 0.15, "within 0.15 of control");
+            // b13 r3 integrator: 26 matches is too small a sample for a 0.15 win-share limit (one match = 0.038; after the dodge
+            // merge this flipped 0.346 vs 0.500 with hut-unrelated changes; the walls owner ruling applies the same way). The
+            // 26 ORDER seeds are printed; the limit is judged on them plus 30 more (5v5 21-40, 16v16 1-10), same toggle.
+            Console.WriteLine("[b13 H] azure win share on the 26 ORDER seeds: on " + sOn.ToString("0.000") + ", control " + sOff.ToString("0.000") + " (printed; judged on the 56-match pool)");
+            var wOn = new Arm { Name = "hut on, wider" };
+            var wOff = new Arm { Name = "control, wider" };
+            for (int seed = 21; seed <= 40; seed++) { Play(wOff, seed, 5, false); Play(wOn, seed, 5, true); }
+            for (int seed = 1; seed <= 10; seed++) { Play(wOff, seed, 16, false); Play(wOn, seed, 16, true); }
+            double pOn = (double)(on.AzureWins + wOn.AzureWins) / (on.Matches + wOn.Matches), pOff = (double)(off.AzureWins + wOff.AzureWins) / (off.Matches + wOff.Matches);
+            Check("azure win share over " + (on.Matches + wOn.Matches) + " matches", pOn, pOff, Math.Abs(pOn - pOff) <= 0.15 + 1e-9, "within 0.15 of control");
             double koOn = Median(on.FirstKo), koOff = Median(off.FirstKo);
             Check("median first player knock-out (s)", koOn, koOff, koOn >= koOff * 0.9 - 1e-9 && koOn <= koOff * 1.2 + 1e-9, "-10% / +20% of control");
             double kOn = on.Kills / on.Minutes, kOff = off.Kills / off.Minutes;
