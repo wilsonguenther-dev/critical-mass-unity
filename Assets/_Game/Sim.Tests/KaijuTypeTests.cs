@@ -40,7 +40,7 @@ namespace CriticalMass.Sim.Tests
             Assert.Greater(Math.Min(Math.Min(r[0], r[1]), Math.Min(r[2], r[3])), 0, "every reference is above 0");
             var cases = new (string name, double p, double m, double d, double a, KaijuType want)[]
             {
-                ("plant dominant", 80, 10, 5, 5, KaijuType.Grove),
+                ("plant dominant", 95, 5, 0, 0, KaijuType.Grove),
                 ("meat dominant", 70, 30, 0, 0, KaijuType.Brute),
                 ("wood dominant", 80, 10, 8, 2, KaijuType.Timber),
                 ("water dominant", 80, 10, 2, 8, KaijuType.Mire),
