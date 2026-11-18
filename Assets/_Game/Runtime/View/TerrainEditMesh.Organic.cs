@@ -156,13 +156,14 @@ namespace CriticalMass.Runtime.View
                 CornerPoint(vax, vaz, cx, cz, out double rax, out double raz, out double bax, out double baz, out _);
                 _fx[nf] = bax; _fz[nf] = baz; nf++;
                 if (!rim) continue;
-                // Rim polyline: start corner, two points along the side, end corner.
+                // Rim polyline: start corner, the side's middle (jittered in), end corner (b15 r3: one middle point, not two:
+                // a quarter fewer triangles, the rebuild stays under the square pits' cost).
                 CornerPoint(vbx, vbz, cx, cz, out double rbx, out double rbz, out double bbx, out double bbz, out _);
                 _ex[0] = vax; _ez[0] = vaz; _rx[0] = rax; _rz[0] = raz; _bx[0] = bax; _bz[0] = baz;
-                _ex[3] = vbx; _ez[3] = vbz; _rx[3] = rbx; _rz[3] = rbz; _bx[3] = bbx; _bz[3] = bbz;
-                for (int k = 1; k <= 2; k++)
+                _ex[2] = vbx; _ez[2] = vbz; _rx[2] = rbx; _rz[2] = rbz; _bx[2] = bbx; _bz[2] = bbz;
+                for (int k = 1; k <= 1; k++)
                 {
-                    double u = k == 1 ? 0.35 : 0.65;
+                    double u = 0.42 + 0.16 * VJit(vax + vbx, vaz + vbz, 3);
                     double px = vax + (vbx - vax) * u, pz = vaz + (vbz - vaz) * u;
                     double j = RimJitter * VJit(px, pz, 1);
                     double ins = Inset(h - FloorIn(px + inx * 0.3, pz + inz * 0.3));
@@ -170,8 +171,8 @@ namespace CriticalMass.Runtime.View
                     _rx[k] = px + inx * j; _rz[k] = pz + inz * j;
                     _bx[k] = px + inx * (j + ins); _bz[k] = pz + inz * (j + ins);
                 }
-                for (int k = 0; k < 4; k++) _by[k] = FloorIn(_bx[k], _bz[k]);
-                for (int k = 1; k <= 2; k++) { _fx[nf] = _bx[k]; _fz[nf] = _bz[k]; nf++; }
+                for (int k = 0; k < 3; k++) _by[k] = FloorIn(_bx[k], _bz[k]);
+                _fx[nf] = _bx[1]; _fz[nf] = _bz[1]; nf++;
                 RimSide(cx, cz, s, h, inx, inz);
                 double sh = Hash01(cx, cz, 900 + s);
                 if (sh > bestHash) { bestHash = sh; bestSide = s; }
@@ -236,7 +237,7 @@ namespace CriticalMass.Runtime.View
         {
             PitWallFaces++;
             Color32 grass = Jit(Grass, cx, cz, 701), grassDark = Jit(GrassDark, cx, cz, 702);
-            for (int k = 0; k < 3; k++)
+            for (int k = 0; k < 2; k++)
             {
                 int k1 = k + 1;
                 // Lip top: the strip between the cell edge and the rim (covers the cut corners), at ground height.
@@ -258,8 +259,9 @@ namespace CriticalMass.Runtime.View
             // Now and then a root crossing the topsoil band of the middle segment.
             if (Hash01(cx, cz, 760 + side) < 0.35)
             {
-                WallRow(1, 0, h, out double ax, out double ay, out double az);
-                WallRow(2, 1, h, out double bx, out double by, out double bz);
+                int r0 = Hash01(cx, cz, 780 + side) < 0.5f ? 0 : 1;   // the root crosses the first or second segment
+                WallRow(r0, 0, h, out double ax, out double ay, out double az);
+                WallRow(r0 + 1, 1, h, out double bx, out double by, out double bz);
                 double ox = inx * 0.012, oz = inz * 0.012;
                 QuadSim(ax + ox, ay - 0.02, az + oz, bx + ox, by + 0.03, bz + oz, bx + ox, by - 0.0, bz + oz, ax + ox, ay - 0.05, az + oz,
                     inx * (1 - PitNormalUp), PitNormalUp, inz * (1 - PitNormalUp), Jit(Root, cx, cz, 770 + side), 0f, default);

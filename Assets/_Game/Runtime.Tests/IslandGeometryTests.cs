@@ -195,8 +195,8 @@ namespace CriticalMass.Runtime.Tests
                 Assert.Greater(Vector3.Dot(new Vector3(n.x, 0, n.z), to), 0f, "pit wall triangle " + t / 3 + " faces into the pit");
             }
             walls /= 2;   // quads
-            Print("lone dug cell: sloped wall faces", walls, ">= 48");
-            Assert.GreaterOrEqual(walls, 48, "four sides of three segments of four bands");
+            Print("lone dug cell: sloped wall faces", walls, ">= 32");
+            Assert.GreaterOrEqual(walls, 32, "four sides of two segments of four bands");
         }
 
         [Test]
@@ -306,9 +306,10 @@ namespace CriticalMass.Runtime.Tests
                     Print($"{tag}: all-dug chunk (256 pits) rebuild ms", msFull, "< 5.0");
                     Print($"{tag}: all-dug chunk triangles", trisFull, "<= 256 x " + TerrainEditMesh.MaxTrisPerPitCell);
                     Assert.AreEqual(0, alloc, tag + ": rebuild allocates");
+                    Assert.LessOrEqual(trisFull, 256 * TerrainEditMesh.MaxTrisPerPitCell, tag + ": triangle cap");
+                    if (!organic) continue;   // the square pits are the measured "before" only (their cost is the old code's)
                     Assert.Less(ms, 5.0, tag + ": worst-case rebuild cost");
                     Assert.Less(msFull, 5.0, tag + ": all-dug chunk rebuild cost");
-                    Assert.LessOrEqual(trisFull, 256 * TerrainEditMesh.MaxTrisPerPitCell, tag + ": triangle cap");
                 }
             }
             finally { TerrainEditMesh.OrganicPits = was; }
