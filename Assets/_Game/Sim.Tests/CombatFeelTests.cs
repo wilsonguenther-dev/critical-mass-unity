@@ -476,8 +476,8 @@ namespace CriticalMass.Sim.Tests
             });
             Console.WriteLine("{\"item\":\"b15 class mods\",\"minerOnWarrior\":" + minerOnWarrior + ",\"minerOnFarmer\":" + minerOnFarmer + ",\"farmerFar\":" + farmerFar +
                               ",\"farmerClose\":" + farmerClose + ",\"builderOpen\":" + builderOpen + ",\"builderHome\":" + builderHome + "}");
-            Assert.AreEqual(12 * f.MinerHeavyPierce, minerOnWarrior, 1e-6, "Miner pierces the Warrior");
-            Assert.AreEqual(12, minerOnFarmer, 1e-6);
+            Assert.AreEqual(f.Classes[(int)ClassId.Miner].AttackDamage * f.MinerHeavyPierce, minerOnWarrior, 1e-6, "Miner pierces the Warrior");
+            Assert.AreEqual(f.Classes[(int)ClassId.Miner].AttackDamage, minerOnFarmer, 1e-6);
             Assert.AreEqual(20, farmerFar, 1e-6);
             Assert.AreEqual(20 * f.FarmerCloseShare, farmerClose, 1e-6, "Farmer weak up close");
             Assert.AreEqual(f.Classes[(int)ClassId.Builder].AttackDamage, builderOpen, 1e-6);
@@ -505,7 +505,7 @@ namespace CriticalMass.Sim.Tests
                 }
             }
             Console.WriteLine("{\"item\":\"b15 sunder\",\"first\":" + hits[0] + ",\"second\":" + (hits.Count > 1 ? hits[1] : -1) + "}");
-            Assert.AreEqual(12 * f.MinerHeavyPierce * (1 + f.SunderDamageTaken), hits[1], 1e-6, "sundered");
+            Assert.AreEqual(f.Classes[(int)ClassId.Miner].AttackDamage * f.MinerHeavyPierce * (1 + f.SunderDamageTaken), hits[1], 1e-6, "sundered");
         }
 
         [Test]

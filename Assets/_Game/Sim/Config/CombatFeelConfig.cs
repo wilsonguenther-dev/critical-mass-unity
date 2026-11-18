@@ -34,11 +34,11 @@ namespace CriticalMass.Sim.Config
         /// <summary>One full row per class, indexed by (int)ClassId; GameConfig.Class returns these while the rule is on.</summary>
         public ClassConfig[] Classes =
         {
-            // WARRIOR: frontline. Slow heavy cleave (0.40 s wind-up, armoured), shield block (ability, unchanged). 27 every 1.05 s
-            // (was 22 every 0.70 s: 26 DPS instead of 31) so he no longer wins every duel; heaviest body (mass 1.6).
+            // WARRIOR: frontline. Slow heavy cleave (0.40 s wind-up, armoured), shield block (ability, unchanged). The numbers of
+            // every row below come from CombatFeelTuneTests' coordinate search (run printed in the PR), not hand-guessing.
             new ClassConfig
             {
-                MaxHp = 160, MoveSpeed = 3.8, Radius = 0.45, AttackDamage = 27, AttackRange = 1.8, AttackArcDeg = 110,
+                MaxHp = 160, MoveSpeed = 3.8, Radius = 0.45, AttackDamage = 21, AttackRange = 1.8, AttackArcDeg = 110,
                 AttackCooldown = 1.05, AbilityCooldown = 10, GatherSeconds = 2, CarryCapacity = 1,
                 AttackWindupSeconds = 0.40, RecoverySeconds = 0.30, Mass = 1.6, Poise = 30,
             },
@@ -50,12 +50,12 @@ namespace CriticalMass.Sim.Config
                 AttackCooldown = 0.65, AbilityCooldown = 9, GatherSeconds = 1, CarryCapacity = 3,
                 AttackWindupSeconds = 0.27, RecoverySeconds = 0.22, Mass = 0.8, Poise = 20,
             },
-            // MINER: fast pick (0.20 s wind-up, 0.55 s cycle). Armour break: his hits leave SUNDER (+25% melee damage taken for
+            // MINER: fast pick (0.20 s wind-up, 0.65 s cycle), light body (95 HP). Armour break: his hits leave SUNDER (+15% for
             // 3 s) and pierce heavy bodies (x1.4 on Mass >= 1.3: the Warrior, the Builder); x2 on structures and walls.
             new ClassConfig
             {
-                MaxHp = 120, MoveSpeed = 4.0, Radius = 0.45, AttackDamage = 12, AttackRange = 1.5, AttackArcDeg = 90,
-                AttackCooldown = 0.55, AbilityCooldown = 12, GatherSeconds = 2, CarryCapacity = 1,
+                MaxHp = 95, MoveSpeed = 4.0, Radius = 0.45, AttackDamage = 14, AttackRange = 1.5, AttackArcDeg = 90,
+                AttackCooldown = 0.65, AbilityCooldown = 12, GatherSeconds = 2, CarryCapacity = 1,
                 AttackWindupSeconds = 0.20, RecoverySeconds = 0.18, Mass = 1.1, Poise = 24,
             },
             // DEMOLITIONS: weak pry bar (12 every 0.8 s; 10 measured 6.3 s on every class, over the 3-6 s band); her damage is the thrown TNT (telegraphed fuse, area), every
@@ -76,10 +76,10 @@ namespace CriticalMass.Sim.Config
             },
             // HEALER: her row now says what her strike does (the audit: config 4.5 u / 0 damage, real strike 1.6 u / 8). Her
             // attack press MENDS the hurt ally in MendRange first (a visible beam, MendHeal, on her AttackCooldown); with nobody
-            // to mend it swings her lantern: 15 at 1.5 u. Bots keep HealerBotStandOff from the enemy.
+            // to mend it swings her lantern: 18 at 1.5 u. Bots keep HealerBotStandOff from the enemy.
             new ClassConfig
             {
-                MaxHp = 110, MoveSpeed = 4.1, Radius = 0.42, AttackDamage = 15, AttackRange = 1.5, AttackArcDeg = 90,
+                MaxHp = 110, MoveSpeed = 4.1, Radius = 0.42, AttackDamage = 18, AttackRange = 1.5, AttackArcDeg = 90,
                 AttackCooldown = 0.80, AbilityCooldown = 9, GatherSeconds = 1.5, CarryCapacity = 2,
                 AttackWindupSeconds = 0.23, RecoverySeconds = 0.22, Mass = 0.9, Poise = 20,
             },
@@ -129,7 +129,7 @@ namespace CriticalMass.Sim.Config
         public double FarmerCloseRange = 1.2;
         public double FarmerCloseShare = 0.6;
         public double SunderSeconds = 3;
-        public double SunderDamageTaken = 0.25;
+        public double SunderDamageTaken = 0.15;
         public double MinerHeavyPierce = 1.4;
         public double MinerHeavyMass = 1.3;
         public double MinerStructureMultiplier = 2;

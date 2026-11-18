@@ -447,7 +447,10 @@ namespace CriticalMass.Sim.Bots
             }
             double mx = output.MoveX, mz = output.MoveZ;
             double m2 = mx * mx + mz * mz;
-            if (m2 < 0.25 || a.HitStunTicks > 0 || a.AirLen > 0 || a.StandUp > 0 || a.KVx != 0 || a.KVz != 0)
+            // A fighter at reach (circle-strafing, its strafe pressed into the scrum) is fighting, not stuck: no side-step there
+            // (it read as Reversals in the shiver gate).
+            if (m2 < 0.25 || a.HitStunTicks > 0 || a.AirLen > 0 || a.StandUp > 0 || a.KVx != 0 || a.KVz != 0 ||
+                (a.AiState == AiState.Fight && st.InReach[id] != 0))
             {
                 st.JamX[id] = x;
                 st.JamZ[id] = z;
@@ -473,6 +476,8 @@ namespace CriticalMass.Sim.Bots
                 double score = (id + s) & 1;   // the parity tie-break, under every real difference
                 // Sliding along a wall: keep the slide's side (a side-step against it would read as a reversal).
                 if (px * w.Vx[id] + pz * w.Vz[id] > 0.05) score += 5;
+                // Jammed again soon after a side-step: the same side as that one (the other way is a reversal).
+                if (w.Tick - st.SideUntil[id] <= 2 * JamWindowTicks && px * st.SideX[id] + pz * st.SideZ[id] > 0) score += 20;
                 if (FirstBlockedCell(w.Map, x, z, x + px * 1.2, z + pz * 1.2) >= 0) score -= 100;
                 int cnt = SpatialHash.QueryCircle(w.Hash, x + px * 0.9, z + pz * 0.9, 0.8, Mates);
                 for (int k = 0; k < cnt; k++)
