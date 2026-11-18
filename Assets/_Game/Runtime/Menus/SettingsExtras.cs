@@ -10,8 +10,9 @@ using UnityEngine.SceneManagement;
 namespace CriticalMass.Runtime.Menu
 {
     /// <summary>
-    /// DG-30 streamer and accessibility options: hide names, clean HUD (H), subtitles, UI scale 80 to 130 %, reduce
-    /// flashing (at most 3 flashes per second) and camera shake 0 to 100 (default 0). Stored in PlayerPrefs like
+    /// DG-30 streamer and accessibility options: hide names, clean HUD (H), subtitles, UI scale 80 to 130 %, intense
+    /// flashing (b15: OFF by default, so at most 3 flashes per second and no full-screen invert unless a player opts in) and
+    /// camera shake 0 to 100 (default 0). Stored in PlayerPrefs like
     /// GameSettings, shown as the ACCESS tab of the settings page (PauseMenu.AddTab, registered before the menu builds).
     /// GORE intensity lives on the Game tab and is repeated here (GameSettings.Gore, the same key). View side only: nothing here reaches the sim.
     /// <para>Readers: the HUD scale and the clean HUD are applied here (AccessibilityApplier); names (scoreboard, kill
@@ -24,19 +25,22 @@ namespace CriticalMass.Runtime.Menu
         public const string CleanHudKey = "cm.access.cleanHud";
         public const string SubtitlesKey = "cm.access.subtitles";
         public const string UiScaleKey = "cm.access.uiScale";
-        public const string ReduceFlashingKey = "cm.access.reduceFlashing";
+        /// <summary>Legacy key of the old opt-in "reduce flashing" switch (no longer read; see IntenseFlashingKey).</summary>
+        public const string ReduceFlashingKey = GameSettings.ReduceFlashingKey;
+        /// <summary>b15 safe defaults: INTENSE FLASHING, the opt-in (1 on, default 0).</summary>
+        public const string IntenseFlashingKey = GameSettings.IntenseFlashingKey;
         public const string ShakeAmountKey = GameSettings.ShakeScaleKey;
         /// <summary>Reduce motion: one key for every reader (StoryIntro, AttractMode, FeelGate, big moments, world reactions).</summary>
         public const string ReduceMotionKey = GameSettings.ReduceMotionKey;
         /// <summary>Batch 12 item P (Travis): fog of war on / off (default on; drawn only in the Full profile, never Classic).</summary>
         public const string FogOfWarKey = "cm.access.fogOfWar";
 
-        public static readonly string[] AllKeys = { HideNamesKey, CleanHudKey, SubtitlesKey, UiScaleKey, ReduceFlashingKey, ShakeAmountKey, ReduceMotionKey, View.Moments.BigMomentsSettings.ModeKey, FogOfWarKey };
+        public static readonly string[] AllKeys = { HideNamesKey, CleanHudKey, SubtitlesKey, UiScaleKey, IntenseFlashingKey, ShakeAmountKey, ReduceMotionKey, View.Moments.BigMomentsSettings.ModeKey, FogOfWarKey };
 
         /// <summary>UI scale choices in percent, screen order.</summary>
         public static readonly int[] UiScaleOptions = { 80, 90, 100, 110, 120, 130 };
         public const int DefaultUiScale = 100;
-        /// <summary>The flash ceiling while Reduce flashing is on.</summary>
+        /// <summary>The flash ceiling while intense flashing is off (the default).</summary>
         public const int ReducedFlashesPerSecond = 3;
         public const string TabName = "ACCESS";
 
@@ -49,8 +53,11 @@ namespace CriticalMass.Runtime.Menu
         public static bool CleanHud { get => GetB(CleanHudKey, false); set => SetB(CleanHudKey, value); }
         /// <summary>Show subtitles for spoken lines (default on).</summary>
         public static bool Subtitles { get => GetB(SubtitlesKey, true); set => SetB(SubtitlesKey, value); }
-        /// <summary>Limit full-screen and HUD flashes to ReducedFlashesPerSecond (default off).</summary>
+        /// <summary>Full-screen and HUD flashes limited to ReducedFlashesPerSecond, no invert frame (b15: the default; false
+        /// only after the player turns INTENSE FLASHING on).</summary>
         public static bool ReduceFlashing { get => GameSettings.ReduceFlashing; set { GameSettings.ReduceFlashing = value; Changed?.Invoke(); } }
+        /// <summary>INTENSE FLASHING opted into (default off): flashes above 3 a second and the full-screen invert frame.</summary>
+        public static bool IntenseFlashing { get => GameSettings.IntenseFlashing; set { GameSettings.IntenseFlashing = value; Changed?.Invoke(); } }
         /// <summary>Reduce motion (default off): fades instead of slides, a quarter of the world sway, no shake.</summary>
         public static bool ReduceMotion { get => GameSettings.ReduceMotion; set { GameSettings.ReduceMotion = value; Changed?.Invoke(); } }
 
@@ -58,7 +65,8 @@ namespace CriticalMass.Runtime.Menu
         /// the maps grey out. View only (Runtime/View/Fog); the Classic profile, spectators and the results never show it.</summary>
         public static bool FogOfWar { get => GetB(FogOfWarKey, true); set => SetB(FogOfWarKey, value); }
 
-        /// <summary>Flashes allowed per second: 3 with Reduce flashing on, otherwise no limit.</summary>
+        /// <summary>Flashes allowed per second: 3 by default (WCAG 2.3.1, see View.Moments.FlashSafety); no limit only with
+        /// INTENSE FLASHING on.</summary>
         public static int MaxFlashesPerSecond => ReduceFlashing ? ReducedFlashesPerSecond : int.MaxValue;
 
         /// <summary>HUD scale in percent, one of UiScaleOptions (default 100).</summary>
@@ -129,13 +137,14 @@ namespace CriticalMass.Runtime.Menu
                 menu.Stepper(tab, 1, "CLEAN HUD   (" + CleanHudKeyWords + ")", () => OnOff(CleanHud), d => CleanHud = !CleanHud),
                 menu.Stepper(tab, 2, "SUBTITLES", () => OnOff(Subtitles), d => Subtitles = !Subtitles),
                 menu.Stepper(tab, 3, "UI SCALE", UiScaleText, StepUiScale),
-                menu.Stepper(tab, 4, "REDUCE FLASHING", () => OnOff(ReduceFlashing), d => ReduceFlashing = !ReduceFlashing),
+                // b15 safe defaults: the row names what ON does (more and brighter flashes); OFF is the safe default.
+                menu.Stepper(tab, 4, "INTENSE FLASHING", () => OnOff(IntenseFlashing), d => IntenseFlashing = !IntenseFlashing),
                 menu.Stepper(tab, 5, "REDUCE MOTION", () => OnOff(ReduceMotion), d => ReduceMotion = !ReduceMotion),
                 menu.Slider(tab, 6, "CAMERA SHAKE", () => Shake01, v => ShakeAmount = Mathf.RoundToInt(v * 100f)),
                 // Big moments (screen takeovers): full, reduced (corner callouts only), off.
                 menu.Stepper(tab, 7, "BIG MOMENTS", () => View.Moments.BigMomentsSettings.Label(View.Moments.BigMomentsSettings.Mode),
                     d => View.Moments.BigMomentsSettings.Mode = View.Moments.BigMomentsSettings.Step(View.Moments.BigMomentsSettings.Mode, d)),
-                // Owner, 2026-11-14: GORE intensity (the Game tab's row, same setting): FULL default, REDUCED, OFF.
+                // Owner, 2026-11-14: GORE intensity (the Game tab's row, same setting): FULL, REDUCED, OFF (b15: OFF default).
                 menu.Stepper(tab, 8, "GORE", () => global::CriticalMass.Runtime.View.Effects.GoreGate.Label(GameSettings.Gore), d => GameSettings.Gore = global::CriticalMass.Runtime.View.Effects.GoreGate.Step(GameSettings.Gore, d)),
                 // Batch 12 item P (Travis): fog of war, ON default (Full profile only; Classic never shows it).
                 menu.Stepper(tab, 9, "FOG OF WAR", () => OnOff(FogOfWar), d => FogOfWar = !FogOfWar),
@@ -150,7 +159,7 @@ namespace CriticalMass.Runtime.Menu
                 menu.SetStatus("Streamer and accessibility options are back to their defaults.", false);
             };
             items.Add(reset);
-            menu.Note(tab, items.Count, "Press " + CleanHudKeyWords + " in a match to hide or show the HUD. GORE is also on the Game tab.");
+            menu.Note(tab, items.Count, "Press " + CleanHudKeyWords + " in a match to hide or show the HUD. Intense flashing can affect people with photosensitive epilepsy. GORE is also on the Game tab.");
             return items;
         }
 

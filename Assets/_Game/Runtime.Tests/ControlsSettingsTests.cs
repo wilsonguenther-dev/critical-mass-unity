@@ -254,7 +254,7 @@ namespace CriticalMass.Runtime.Tests
         public void SettingsPersistInPlayerPrefsWithDefaults()
         {
             foreach (string k in GameSettings.AllKeys) PlayerPrefs.DeleteKey(k);
-            Assert.IsTrue(GameSettings.Blood, "blood defaults on");
+            Assert.IsFalse(GameSettings.Blood, "b15 safe defaults: gore (blood) defaults off");
             Assert.AreEqual(0, PlayerPrefs.GetInt(GameSettings.BloodKey, 0), "a default is not written until changed");
             Assert.AreEqual(1f, GameSettings.MasterVolume);
 
@@ -283,7 +283,7 @@ namespace CriticalMass.Runtime.Tests
             Assert.AreEqual(new Vector2Int(1280, 720), GameSettings.Resolution);
 
             GameSettings.ResetAll();
-            Assert.IsTrue(GameSettings.Blood);
+            Assert.IsFalse(GameSettings.Blood, "b15: back to the default, GORE off");
             Assert.AreEqual(-1, GameSettings.Quality);
         }
 

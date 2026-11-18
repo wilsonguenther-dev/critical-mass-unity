@@ -680,8 +680,9 @@ namespace CriticalMass.Runtime.View.Effects
 
         private void BuildVignette()
         {
-            // Two 128 px textures made once (64 KB each): red for GORE Full and Reduced, Void Navy for Off.
-            _vignetteRed = VignetteTexture(FxScene.BloodDark, FxScene.BloodMid, "Fx Vignette");
+            // Two 128 px textures made once (64 KB each): GORE Full and Reduced, Void Navy for Off (the default).
+            // b15 safe defaults: the gore tone is ImpactPalette's violet-brown, never a team-like red (was FxScene.Blood*).
+            _vignetteRed = VignetteTexture(ImpactPalette.GoreDark, ImpactPalette.GoreMid, "Fx Vignette");
             _vignetteNavy = VignetteTexture(FxScene.Navy, FxScene.GroundInkDark, "Fx Vignette Navy");
             Texture2D tex = GoreGate.Allows(GorePiece.RedDamageVignette, _scene.Gore) ? _vignetteRed : _vignetteNavy;
             BuildVignetteCanvas(tex);

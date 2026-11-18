@@ -347,6 +347,8 @@ namespace CriticalMass.Runtime.PlayTests
         IEnumerator WithLaunchProfile(bool introSetting, Func<TitleScreen, IEnumerator> body)
         {
             int oldSeen = PlayerPrefs.GetInt(OldStorySeenKey, 0), seenV2 = PlayerPrefs.GetInt(StoryIntro.SeenKey, 0);
+            int noticeSeen = PlayerPrefs.GetInt(PhotosensitivityNotice.SeenKey, 0);
+            PlayerPrefs.SetInt(PhotosensitivityNotice.SeenKey, 1);   // b15: the one-time notice was dismissed on this profile
             bool atLaunch = GameSettings.IntroAtLaunch;
             PlayerPrefs.SetInt(OldStorySeenKey, 1);
             PlayerPrefs.SetInt(StoryIntro.SeenKey, 1);
@@ -365,6 +367,7 @@ namespace CriticalMass.Runtime.PlayTests
                 StoryIntro.ResetLaunchForTests();
                 PlayerPrefs.SetInt(OldStorySeenKey, oldSeen);
                 PlayerPrefs.SetInt(StoryIntro.SeenKey, seenV2);
+                PlayerPrefs.SetInt(PhotosensitivityNotice.SeenKey, noticeSeen);
                 GameSettings.IntroAtLaunch = atLaunch;
                 PlayerPrefs.Save();
             }
@@ -395,23 +398,23 @@ namespace CriticalMass.Runtime.PlayTests
             yield return Until(() => StoryIntro.IsPlaying, 5f, "the intro did not play at launch with the old story-seen flags set");
             Assert.IsFalse(StoryIntro.IsAttract, "the launch plays the intro, not the attract loop");
             Assert.IsFalse(title.enabled, "the title reads no keys under the film");
-            yield return Until(() => StoryIntro.Instance.FilmTime >= 0.3, 10f, "the film clock runs");
+            yield return Until(() => StoryIntro.Instance.FilmTime >= 0.05, 10f, "the film clock runs");
 
-            // Inside the 1.5 s lock: fresh taps of Space, Enter and Escape do nothing.
+            // Inside the 1 s lock (b15): fresh taps of Space, Enter and Escape do nothing.
             yield return Tap(Key.Space);
-            Assert.IsTrue(StoryIntro.IsPlaying, "Space inside the first 1.5 s skipped the intro");
+            Assert.IsTrue(StoryIntro.IsPlaying, "Space inside the first second skipped the intro");
             yield return Tap(Key.Enter);
-            Assert.IsTrue(StoryIntro.IsPlaying, "Enter inside the first 1.5 s skipped the intro");
+            Assert.IsTrue(StoryIntro.IsPlaying, "Enter inside the first second skipped the intro");
             yield return Tap(Key.Escape);
-            Assert.IsTrue(StoryIntro.IsPlaying, "Escape inside the first 1.5 s skipped the intro");
+            Assert.IsTrue(StoryIntro.IsPlaying, "Escape inside the first second skipped the intro");
             Assert.Less(StoryIntro.Instance.FilmTime, (double)SkipGate.LockSeconds, "the three taps landed inside the lock");
 
             // Past the lock with no new press, the film keeps playing; then one fresh Space press skips.
             yield return Until(() => !StoryIntro.IsPlaying || StoryIntro.Instance.FilmTime > SkipGate.LockSeconds + 0.25, 15f,
                 "the film never ran past the lock");
             Assert.IsTrue(StoryIntro.IsPlaying, "the film stopped by itself right after the lock");
-            yield return Tap(Key.Space);
-            yield return Until(() => !StoryIntro.IsPlaying, 3f, "a fresh Space press after 1.5 s did not skip");
+            yield return Tap(Key.K);   // b15: ANY key skips once the lock is over (K is not a skip key of the old rule)
+            yield return Until(() => !StoryIntro.IsPlaying, 3f, "a fresh press of K (any key) after 1 s did not skip");
             yield return AssertTitleTakesKeys(title, "after skipping the launch intro");
         }
 
@@ -427,7 +430,7 @@ namespace CriticalMass.Runtime.PlayTests
             Assert.IsNotNull(title);
             yield return null;
             yield return null;
-            Assert.IsFalse(StoryIntro.IsPlaying, "PLAY INTRO AT LAUNCH off: the intro played anyway");
+            Assert.IsFalse(StoryIntro.IsPlaying, "seen, and PLAY INTRO AT EVERY LAUNCH off: the intro played anyway");
             yield return AssertTitleTakesKeys(title, "intro setting off");
         }
 

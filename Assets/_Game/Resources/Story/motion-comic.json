@@ -3,7 +3,7 @@
  "stageW": 1920,
  "stageH": 1080,
  "letterbox": 0.11,
- "skipPromptAfter": 1.5,
+ "skipPromptAfter": 1.0,
  "outroSeconds": 0.5,
  "cues": [
   {
