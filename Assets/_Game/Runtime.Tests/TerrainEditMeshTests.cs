@@ -53,7 +53,7 @@ namespace CriticalMass.Runtime.Tests
             Print("pit rim walls", m.PitWallFaces, "== 4 (every side faces unbroken ground)");
             Print("pit floor faces", m.PitFloorFaces, "== 1");
             Print("pit floor height below ground", G - m.MinFloorY, "== " + TerrainEditMesh.PitDepth1);
-            Print("spoil lumps at the rim", m.SpoilLumps, "== 4");
+            Print("spoil heaps at the rim", m.SpoilLumps, "1..4 (about two rims in three get a heap, by cell hash)");
             float maxY = m.Verts.Max(v => v.y), minY = m.Verts.Min(v => v.y);
             Print("highest vertex above ground (spoil lumps)", maxY - G, "<= 0.14");
             Print("lowest vertex below ground", G - minY, "<= " + TerrainEditMesh.PitDepth1);
@@ -61,7 +61,7 @@ namespace CriticalMass.Runtime.Tests
             Assert.AreEqual(4, m.PitWallFaces, "one rim wall per side");
             Assert.AreEqual(1, m.PitFloorFaces, "a floor closes the pit: never a hole to the sky");
             Assert.AreEqual(G - TerrainEditMesh.PitDepth1, m.MinFloorY, Eps, "floor at the dug depth");
-            Assert.AreEqual(4, m.SpoilLumps);
+            Assert.That(m.SpoilLumps, Is.InRange(1, 4), "spoil heaps on the untouched ground at the rim");
             Assert.LessOrEqual(maxY - G, 0.14f + Eps);
             Assert.GreaterOrEqual(minY, (float)(G - TerrainEditMesh.PitDepth1) - Eps);
             foreach (var (x, z) in new[] { (5, 5), (6, 5), (6, 6), (5, 6) })
@@ -193,7 +193,7 @@ namespace CriticalMass.Runtime.Tests
             Assert.AreEqual(1, m.BlockCells);
             Assert.AreEqual(3, m.BlockSideFaces);
             Assert.AreEqual(1, m.BlockBottomFaces);
-            AssertInsideCell(m, 6, 5, G - TerrainEditMesh.PlacedDepth, G, "placed block");
+            AssertInsideCell(m, 6, 5, G - TerrainEditMesh.PlacedDepth - TerrainEditMesh.UnderDepth, G, "placed block (body and its tapered rock keel)");
             Assert.AreEqual((float)G, m.Verts.Max(v => v.y), Eps, "top exactly at the cell's ground height (where the sim stands actors)");
 
             // Two placed side by side: no face between them, a bevel seam on both.

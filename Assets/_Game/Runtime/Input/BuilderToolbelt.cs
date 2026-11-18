@@ -38,6 +38,10 @@ namespace CriticalMass.Runtime.Input
         public const int HoldTicks = 20;
         /// <summary>World units along the axis for the climb aim point (well clear of input-delay drift).</summary>
         public const double AimLead = 3.0;
+        /// <summary>b14 review: seconds a LADDER / BRIDGE press waits for a short block to clear before it goes anyway. In a
+        /// 16v16 the world-change gap (BuiltPieces RefusedRate: any dig, place or wall anywhere restarts it) was refusing
+        /// about half of all presses, and a press inside the 0.5 s refusal lock or a get-up was dropped without a word.</summary>
+        public const double ClimbHoldSeconds = 1.5;
 
         public static readonly string[] Words = { "DIG", "PLACE", "LADDER", "BRIDGE", "SHORT WALL", "TALL WALL", "BLOCK" };
 
@@ -261,6 +265,17 @@ namespace CriticalMass.Runtime.Input
             _axisSet = true;
         }
 
+        /// <summary>
+        /// b14 review: true while a ladder / bridge press along the belt's axis would only be refused or ignored for a moment:
+        /// the ability cooling (the 0.5 s refusal lock, or the build cooldown), getting up, staggered, dodging, or the world
+        /// gap since the last terrain change (RefusedRate). Read-only (BuildRefusal leaves only Plan's scratch).
+        /// </summary>
+        bool ClimbWaits(World w, int id, Actor a)
+        {
+            if (a.AbilityCd > 0 || a.StandUp > 0 || a.HitStunTicks > 0 || Dodge.Active(w, id)) return true;
+            return BuiltPieces.BuildRefusal(w, id, _dx, _dz) == BuiltPieces.RefusedRate;
+        }
+
         void Select(BuilderTool t)
         {
             if (t == _target) return;
@@ -356,14 +371,22 @@ namespace CriticalMass.Runtime.Input
                 _heldSince = w.Tick;
             }
             if (!_heldUse) return;
-            if (!a.Alive || w.Tick - _heldSince > HoldTicks)
+            bool climb = IsClimb(_target);
+            bool terra = _target == BuilderTool.Dig || _target == BuilderTool.Place;
+            int hold = climb || terra ? Math.Max(HoldTicks, (int)Math.Ceiling(ClimbHoldSeconds * w.Config.SimHz)) : HoldTicks;
+            if (!a.Alive || w.Tick - _heldSince > hold)
             {
                 _heldUse = false;
                 return;
             }
             if (switched || Settling) return;   // the press waits for the last switch (never the same frame)
+            // b14 review: a climb press waits out a short block (the sim would refuse it or ignore it) until the hold runs out
+            if (climb && w.Tick - _heldSince < hold && ClimbWaits(w, id, a)) return;
+            // b14 review: so does a DIG / PLACE press while the team's terrain cooldown or the world gap runs (the team shares
+            // one change per second with its 15 bots, so a single-tick press landing inside it was refused as RefusedRate)
+            if (terra && w.Tick - _heldSince < hold && Terraform.WaitTicks(w, a.Team) > 0) return;
             _heldUse = false;
-            if (IsClimb(_target))
+            if (climb)
             {
                 o.Ability = true;
                 o.AimX = w.X[id] + _dx * AimLead;

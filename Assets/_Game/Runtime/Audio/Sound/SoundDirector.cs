@@ -623,7 +623,8 @@ namespace CriticalMass.Runtime.Audio.Sound
                 }
             }
             if (!_fallsFound && w != null && (Time.frameCount % 30) == 0 && _fallTries < 40) FindFalls(w);
-            _captions.Update(now, _paused || _title);
+            // b14 review: no sound caption over the Characters screen, Controls page or another menu that covers the match
+            _captions.Update(now, _paused || _title || CriticalMass.Runtime.View.Affordance.TerrainAffordanceView.MenuCovers);
         }
 
         private void UpdateListener(World w)

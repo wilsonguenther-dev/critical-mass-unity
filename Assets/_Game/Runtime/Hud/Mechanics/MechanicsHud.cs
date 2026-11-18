@@ -463,7 +463,9 @@ namespace CriticalMass.Runtime.Hud.Mechanics
                     if (pipOn) pip.SetFill(p < row.Charges ? CMTokens.ToolBrass.Color : CMTokens.MeterEmpty.Color);
                 }
             }
-            bool bankOn = teamBank || a.Cls == ClassId.Builder;
+            // b14 review (wood shown once): with the sources rule the stock strip at the top already shows the team wood
+            // (BuilderBank.Whole, the same number), so the Builder's kit drops its TEAM WOOD footer there.
+            bool bankOn = teamBank || (a.Cls == ClassId.Builder && !DepthRead.SourcesOn(w));
             if (_bank.gameObject.activeSelf != bankOn) _bank.gameObject.SetActive(bankOn);
             LayoutKit(Mathf.Min(rows, 2), bankOn);
             if (bankOn)

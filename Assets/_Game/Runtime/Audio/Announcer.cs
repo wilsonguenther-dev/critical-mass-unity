@@ -625,7 +625,8 @@ namespace CriticalMass.Runtime.Audio
                 if (gate == Gate.Drop && w != null) _decoder.Reset(null);
                 _queue.Clear();
             }
-            UpdateSubtitle(now, paused || title);
+            // b14 review: no subtitle over the Characters screen, Controls page or another menu that covers the match
+            UpdateSubtitle(now, paused || title || CriticalMass.Runtime.View.Affordance.TerrainAffordanceView.MenuCovers);
         }
 
         void Begin(AnnouncerLine line)

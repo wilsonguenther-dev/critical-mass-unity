@@ -110,7 +110,9 @@ namespace CriticalMass.Runtime.View.Affordance
             Occupied = "occupied", Hill = "hill ground", Water = "no ground", NoRoom = "hands full", Busy = "busy here",
             NotFeeder = "cannot feed";
         /// <summary>b14: the Builder's ladder / bridge tools facing nothing they can span.</summary>
-        public const string NoCliff = "face a cliff", NoGap = "face a gap";
+        public const string NoCliff = "face a rock wall", NoGap = "face a gap";
+        /// <summary>b14 review: nothing a ladder / bridge could span anywhere near (ladders only cross the hill's rock walls).</summary>
+        public const string NoRockNear = "rock walls: on the hill", NoGapNear = "no gap near";
         /// <summary>b12 r3: the Demolitionist's detail line while her TNT reloads (her attack is the pry bar meanwhile).</summary>
         public const string TntIn = GrenadeTuning.Name + " in";
         /// <summary>b12 r3: her prompt verbs on the attack binding: TNT ready, and the pry bar while it reloads.</summary>
@@ -629,13 +631,19 @@ namespace CriticalMass.Runtime.View.Affordance
                     p.X = w.X[id] + dx;
                     p.Z = w.Z[id] + dz;
                 }
+                // b14 review: with nothing to span along the axis, mark what this tool CAN span close by (rock wall cells for a
+                // ladder, gap cells at the ground's edge for a bridge), so "face a rock wall" points somewhere real.
+                int near = plan == 0 ? 1 : MarkSpannable(w, id, kind, r);
                 int why = plan;
                 if (why == 0 && BuiltPieces.OwnedCount(w, id) >= c.Abilities.BuilderPieces.MaxActivePerBuilder) why = BuiltPieces.RefusedLimit;
                 if (why == 0 && !(BuiltPieces.Bank(w, a.Team) >= BuiltPieces.Cost(c, kind))) why = BuiltPieces.RefusedBiomass;
                 if (why == 0 && w.Tick - w.WallChangeTick < Durations.T30(c, c.Abilities.MinerTerraform.MinGapTicks)) why = BuiltPieces.RefusedRate;
                 p.Count = -1;
                 if (a.StandUp > 0) Refuse(p, AffWords.GettingUp);
-                else if (plan != 0 && plan != BuiltPieces.RefusedLength && plan != BuiltPieces.RefusedOccupied) Refuse(p, t == BuilderTool.Ladder ? AffWords.NoCliff : AffWords.NoGap);
+                // b14 review: the build cooldown first (right after a build the span is gone, and "face a gap" read as broken)
+                else if (a.AbilityCd > c.Abilities.BuilderPieces.RefuseLockSeconds + 1e-9) { Refuse(p, AffWords.Wait); p.WaitSeconds = a.AbilityCd; }
+                else if (plan != 0 && plan != BuiltPieces.RefusedLength && plan != BuiltPieces.RefusedOccupied)
+                    Refuse(p, t == BuilderTool.Ladder ? (near > 0 ? AffWords.NoCliff : AffWords.NoRockNear) : (near > 0 ? AffWords.NoGap : AffWords.NoGapNear));
                 else if (why != 0) Refuse(p, BuilderWhy(why));
                 else if (a.AbilityCd > 0) { Refuse(p, AffWords.Wait); p.WaitSeconds = a.AbilityCd; }
                 else p.Valid = true;
@@ -676,6 +684,35 @@ namespace CriticalMass.Runtime.View.Affordance
                 s.Valid = a.StandUp <= 0;
                 if (!s.Valid) s.Why = AffWords.GettingUp;
             }
+        }
+
+        /// <summary>
+        /// b14 review: the cells within r a piece of kind could span: Wall cells for a ladder (marked, out of reach), and for a
+        /// bridge the Void / Water cells that touch walkable ground (counted only: no tile over open sky). Grid reads only.
+        /// Returns how many cells qualified.
+        /// </summary>
+        int MarkSpannable(World w, int id, int kind, double r)
+        {
+            MapDef m = w.Map;
+            double ox = w.X[id], oz = w.Z[id];
+            Box(w, id, r, out int x0, out int x1, out int z0, out int z1);
+            int n = 0;
+            for (int cz = Math.Max(1, z0); cz <= Math.Min(m.Height - 2, z1); cz++)
+            {
+                for (int cx = Math.Max(1, x0); cx <= Math.Min(m.Width - 2, x1); cx++)
+                {
+                    if (D2(cx + 0.5, cz + 0.5, ox, oz) > r * r) continue;
+                    byte t = m.Cells[cz * m.Width + cx];
+                    bool ok;
+                    if (kind == BuiltPieces.Ladder) ok = t == Cell.Wall;
+                    else ok = (t == Cell.Void || t == Cell.Water)
+                              && (MapGrid.IsWalkable(m, cx + 1, cz) || MapGrid.IsWalkable(m, cx - 1, cz) || MapGrid.IsWalkable(m, cx, cz + 1) || MapGrid.IsWalkable(m, cx, cz - 1));
+                    if (!ok) continue;
+                    n++;
+                    if (kind == BuiltPieces.Ladder) Add(AffAction.Build, cx, cz, cx + 0.5, cz + 0.5, false);   // never a tile over open sky
+                }
+            }
+            return n;
         }
 
         static void Ghost(World w, int id, AffTarget p, bool planned, int dx, int dz)
