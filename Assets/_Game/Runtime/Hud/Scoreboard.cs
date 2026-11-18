@@ -245,7 +245,7 @@ namespace CriticalMass.Runtime.Hud
                     if (o != null && o.OutlineColor != outline) { o.OutlineColor = outline; row.Cells[c].SetVerticesDirty(); }
                 }
             }
-            row.Badge.Set(UiIcons.ClassBadge[cls, (int)s.Team], _tier);
+            row.Badge.Set(UiIcons.Portrait[cls, (int)s.Team], _tier);   // b14 final look: the rebuilt portraits, as the HUD and class cards (was the class glyph)
             // Mechanics depth (U-067): named bots with their play style ("THORN  BRAWLER"); the class word without names.
             HudText.SetOneLine(row.Cells[0], View.Mechanics.DepthNames.RowLabel(s.Id, own, KillWords.You, KillWords.ClassUpper[cls]), 21, 13);
             World w = _world;
