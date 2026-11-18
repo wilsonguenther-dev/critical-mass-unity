@@ -1,7 +1,8 @@
 # b15 tools: the balance report on a GitHub runner (ubuntu-latest, free standard runner, no secrets, no Unity). Bot matches or a
 # compare are re-simulated headless by tools/balance/balance-report.sh; the report (Markdown + JSON + CSV) is the artifact.
 # Manual: Actions > balance-report > Run workflow (the workflow must be on the default branch for the button; until then the
-# push trigger below runs it: push any commit to a ci/balance/** branch and it measures that commit at 24 and 72 seeds).
+# push trigger below runs it: push any commit to a ci/balance/** branch and it compares integration/batch-13-cand1 with that
+# commit at 24 seeds and reports it at 72).
 #   gh workflow run balance-report.yml -f ref=origin/integration/batch-13-cand1 -f seeds=24
 #   gh workflow run balance-report.yml -f mode=compare -f base=origin/integration/batch-13-cand1 -f head=feat/b15-comeback-hut
 #   gh workflow run balance-report.yml -f mode=compare -f base= -f head="Depth.Hut.On=false"
@@ -61,11 +62,12 @@ jobs:
       - name: Balance report
         shell: bash
         env:
-          MODE: ${{ inputs.mode || 'report' }}
+          # push (self-check): 24 seeds = compare integration/batch-13-cand1 (measured in a worktree) with this commit; 72 = report
+          MODE: ${{ inputs.mode || (matrix.seeds == '24' && 'compare' || 'report') }}
           REF: ${{ inputs.ref }}
           SEEDS: ${{ matrix.seeds }}
           SWITCHES: ${{ inputs.switches }}
-          BASE: ${{ inputs.base }}
+          BASE: ${{ github.event_name == 'push' && 'origin/integration/batch-13-cand1' || inputs.base }}
           HEAD: ${{ inputs.head }}
         run: |
           set -o pipefail
@@ -98,7 +100,7 @@ jobs:
           {
             echo "### balance-report (${{ matrix.seeds }} seeds), step time about ${BALANCE_MINUTES:-?} min"
             for f in Temp/balance/report-${{ matrix.seeds }}/balance-report.md Temp/balance/report-${{ matrix.seeds }}/balance-compare.md; do
-              [[ -f "$f" ]] && sed -n '1,/^## Time per class/p' "$f" | head -80
+              if [[ -f "$f" ]]; then sed -n '1,/^## Time per class/p' "$f" | head -80; fi
             done
           } >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v4
@@ -107,6 +109,8 @@ jobs:
           name: balance-report-${{ matrix.seeds }}
           path: |
             Temp/balance/report-${{ matrix.seeds }}/
+            Temp/balance/base-report/
+            Temp/balance/head-report/
             Temp/balance/build.log
           if-no-files-found: warn
           retention-days: 30

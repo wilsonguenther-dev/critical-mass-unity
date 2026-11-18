@@ -477,7 +477,7 @@ namespace CriticalMass.Sim.Tests.Harness
             return v.ToString(f, CultureInfo.InvariantCulture);
         }
 
-        public static string Value(BalanceRow r) => Num(r.Value) + (r.Unit.Length > 0 && !double.IsNaN(r.Value) ? " " + r.Unit : "");
+        public static string Value(BalanceRow r) => (r.Kind == "count" && !double.IsNaN(r.Value) ? r.Value.ToString("0", CultureInfo.InvariantCulture) : Num(r.Value)) + (r.Unit.Length > 0 && !double.IsNaN(r.Value) ? " " + r.Unit : "");
         public static string Ci(BalanceRow r) => double.IsNaN(r.Lo) ? "" : Num(r.Lo) + " to " + Num(r.Hi);
         public static string Spread(BalanceRow r) => double.IsNaN(r.P25) ? "" : Num(r.P25) + " to " + Num(r.P75);
         public static string Cell(string s) => (s ?? "").Replace("|", "/").Replace("\n", " ");
@@ -542,7 +542,8 @@ namespace CriticalMass.Sim.Tests.Harness
             if (r.Ttk != null || r.Duels != null)
             {
                 sb.Append("## Duels (1v1, no bots)\n\nPlayed on an empty map at the hill, every other body removed; primary attack only (held, aimed, walking in to 0.8 x range); ")
-                  .Append("no abilities, dodge or hut levels; ").Append(r.Ttk != null && r.Ttk[0, 0] != null ? r.Ttk[0, 0].Reps : 0).Append(" start angles per cell; 30 s cap.\n\n");
+                  .Append("no abilities, dodge or hut levels; ").Append(r.Ttk != null && r.Ttk[0, 0] != null ? r.Ttk[0, 0].Reps : 0)
+                  .Append(" start angles per cell; 30 s cap. The sim is deterministic, so the angles are the only spread: n counts tries, not independent samples.\n\n");
                 foreach (BalanceRow row in r.Rows)
                     if (row.Key == "ttk.median" || row.Key == "ttk.inband" || row.Key == "duel.unbeaten")
                         sb.Append("- ").Append(row.Label).Append(": ").Append(BalanceFormat.Value(row)).Append(row.Kind == "count" ? " of " + row.N : " (95% CI " + BalanceFormat.Ci(row) + ", n " + row.N + ")")
@@ -571,7 +572,7 @@ namespace CriticalMass.Sim.Tests.Harness
             }
             if (r.Duels != null)
             {
-                sb.Append("### Duel win share: row beats column (wins / tries; draws are timeouts or trades)\n\n| row \\ column |");
+                sb.Append("### Duel win share: row beats column (wins / tries; draws are timeouts or trades; mirror matches not shown)\n\n| row \\ column |");
                 foreach (string c in cn) sb.Append(' ').Append(c).Append(" |");
                 sb.Append("\n|---|---|---|---|---|---|---|\n");
                 for (int a = 0; a < 6; a++)
@@ -580,6 +581,11 @@ namespace CriticalMass.Sim.Tests.Harness
                     for (int b = 0; b < 6; b++)
                     {
                         DuelRunner.Cell c = r.Duels[a, b];
+                        if (a == b)
+                        {
+                            sb.Append(" - |");
+                            continue;
+                        }
                         sb.Append(' ').Append(c.Reps > 0 ? BalanceFormat.Num((double)c.Wins / c.Reps) : "n/a").Append(" (").Append(c.Wins).Append('/').Append(c.Reps).Append(") |");
                     }
                     sb.Append('\n');
