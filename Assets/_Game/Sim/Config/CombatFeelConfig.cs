@@ -89,7 +89,7 @@ namespace CriticalMass.Sim.Config
         public CombatFeelStrike[] Strikes =
         {
             new CombatFeelStrike { Knock = 0.9, ArmouredWindup = true },  // Warrior
-            new CombatFeelStrike { Knock = 0.7 },                          // Farmer
+            new CombatFeelStrike { Knock = 0.9 },                          // Farmer (pushes a Miner back out of her close range)
             new CombatFeelStrike { Knock = 0.3 },                          // Miner
             new CombatFeelStrike { Knock = 0.4 },                          // Demolitions
             new CombatFeelStrike { Knock = 1.3 },                          // Builder
@@ -124,7 +124,7 @@ namespace CriticalMass.Sim.Config
 
         // ---- C. class extras
         public double FarmerCloseRange = 1.2;
-        public double FarmerCloseShare = 0.6;
+        public double FarmerCloseShare = 0.7;
         public double SunderSeconds = 3;
         public double SunderDamageTaken = 0.25;
         public double MinerHeavyPierce = 1.4;
@@ -133,7 +133,7 @@ namespace CriticalMass.Sim.Config
         public double BuilderHomeRadius = 3.5;
         public double BuilderHomeMultiplier = 1.5;
         /// <summary>TNT cooldown (ticks at 30 Hz) while the rule is on (DemolitionsTntConfig.CooldownTicks is 150).</summary>
-        public double TntCooldownTicks = 120;
+        public double TntCooldownTicks = 150; // the shipped cooldown: at 120 her kill share went to 0.29 (DemolitionsAttackThrowTests limit 0.25)
         /// <summary>Share of her own TNT's blast damage the thrower takes when she stands inside its radius.</summary>
         public double TntSelfShare = 0.35;
         /// <summary>The Healer's mend while the rule is on (HealerConfig MendHeal 6 / MendRange 5.5).</summary>
