@@ -94,6 +94,51 @@ namespace CriticalMass.Sim.Tests
         }
 
         [Test]
+        public void GridReachAnswersExactlyWhatTheFlowFieldAnswers()
+        {
+            // the shipped map with random holes punched (seeded LCG, no shared RNG): every pad / goal pairing, 400 grids
+            World w = Make(4242, 16);
+            MapDef map = w.Map;
+            byte[] keep = (byte[])map.Cells.Clone();
+            var hill = new[] { new PointXZ(map.Hill.X, map.Hill.Z) };
+            var shrine = new[] { new PointXZ(map.Shrine.X, map.Shrine.Z), new PointXZ(map.Shrine.X + 2.5, map.Shrine.Z), new PointXZ(-3, 4) };
+            uint s = 12345;
+            int cases = 0, mismatches = 0, reachedA = 0, cutA = 0;
+            try
+            {
+                for (int g = 0; g < 400; g++)
+                {
+                    Array.Copy(keep, map.Cells, keep.Length);
+                    int holes = g % 40 * 25;
+                    for (int h = 0; h < holes; h++)
+                    {
+                        s = s * 1664525u + 1013904223u;
+                        int i = (int)(s % (uint)map.Cells.Length);
+                        if (MapGrid.IsWalkableType(map.Cells[i])) map.Cells[i] = Cell.Void;
+                    }
+                    PointXZ[] goals = g % 2 == 0 ? hill : shrine;
+                    PadDef a = map.Pads[0], c = map.Pads[1];
+                    s = s * 1664525u + 1013904223u;
+                    double qx = s % (uint)map.Width + 0.5, qz = (s >> 8) % (uint)map.Height + 0.5;
+                    FlowField f = FlowField.ComputeFlowField(map, goals);
+                    bool fa = double.IsFinite(f.Dist[JsMath.FloorToInt(a.Z) * map.Width + JsMath.FloorToInt(a.X)]);
+                    bool fq = double.IsFinite(f.Dist[JsMath.FloorToInt(qz) * map.Width + JsMath.FloorToInt(qx)]);
+                    int r = GridReach.Reached(map, goals, a.X, a.Z, qx, qz);
+                    cases++;
+                    if (fa != ((r & 1) != 0) || fq != ((r & 2) != 0)) mismatches++;
+                    if (fa) reachedA++; else cutA++;
+                }
+            }
+            finally
+            {
+                Array.Copy(keep, map.Cells, keep.Length);
+            }
+            Console.WriteLine($"[sim tick cost] GridReach vs ComputeFlowField: {cases} grids, {mismatches} answers differ (limit 0); pad reached in {reachedA}, cut off in {cutA}");
+            Assert.AreEqual(0, mismatches);
+            Assert.Greater(cutA, 0, "some grids cut the pad off (the test covers both answers)");
+        }
+
+        [Test]
         public void HeavyTicksStayWithinTheirBudgetInFlowFieldUnits()
         {
             double unit = FieldUnitUs();
