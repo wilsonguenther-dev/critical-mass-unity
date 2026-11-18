@@ -156,7 +156,9 @@ namespace CriticalMass.Runtime.Hud
             int pillar = PillarModeHere(w, me);
             bool miner = a.Cls == Terraform.OwnerClass(w) && a.Cls != ClassId.Builder;   // b13 r2: the dig / place strip follows the class that owns terrain; b14: the Builder always has his tool strip
             // feat/terrain-affordances (e): the other terrain classes keep their resource in the same strip.
-            if (pillar == 0 && !miner)
+            // b15 (owner walk 2026-11-17): the Builder's left click uses his selected tool, never knocks a pillar, so next to a
+            // pillar his strip still names the tool (it said "LEFT CLICK KNOCK IT DOWN · FROM HERE: RAMP" with BRIDGE selected).
+            if ((pillar == 0 || a.Cls == ClassId.Builder) && !miner)
             {
                 int dev = (int)ControlBindings.ActiveDevice;
                 switch (a.Cls)
