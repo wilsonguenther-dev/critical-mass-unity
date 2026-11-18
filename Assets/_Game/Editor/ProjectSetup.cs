@@ -445,8 +445,8 @@ namespace CriticalMass.Editor
             d |= SetF(m, "_RimStrength", 0f);
             d |= SetF(m, "_FogAmount", 1f);
             d |= SetC(m, "_FogColor", "#B4DAEE");
-            d |= SetF(m, "_FogTop", -3.5f);
-            d |= SetF(m, "_FogBottom", -11f);
+            d |= SetF(m, "_FogTop", -2f);    // b15 world look: height fog from y -2 (art direction 2.2: below island tops)
+            d |= SetF(m, "_FogBottom", -9f);
             d |= SetF(m, "_ExtrudePx", look == WorldLook.Water ? 11f : 0f);
             bool foliage = look == WorldLook.Foliage, crystal = look == WorldLook.Crystal;
             // Foliage (kit README v3): bands exactly #86BD4E / #5E9A45 / #3F6E36 on the leaf colour, N.L only, cuts 0.30 / 0.02.

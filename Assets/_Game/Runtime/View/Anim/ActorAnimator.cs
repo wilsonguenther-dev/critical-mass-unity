@@ -22,8 +22,11 @@ namespace CriticalMass.Runtime.View.Anim
     /// </summary>
     public sealed class ActorAnimator
     {
-        // Facing spring (DG-89): critically damped, capped at 45 degrees per frame at the default pace (60 fps, pace 2).
-        public const double YawOmega = 40.0, MaxYawRate = 1350.0, BankMaxDeg = 8.0, BankGain = 0.011, PitchMaxDeg = 5.0, PitchGain = 0.2;
+        // Facing spring (DG-89): critically damped, capped at 45 degrees per frame at 60 fps, pace 2 (TurningIsSmoothButFast:
+        // no one-frame snap). b15 world look (WORLD-AUDIT "turns snap"): omega 40 -> 50 inside the same cap, so every turn
+        // settles within 2 degrees in 0.10 s at Fast pace and a 30 degree re-aim in 0.10 s at Standard; a 180 at Standard
+        // is held to 0.2 s by the cap itself (180 / 1350 = 0.133 s minimum). WorldLookMotionTests prints every case.
+        public const double YawOmega = 50.0, MaxYawRate = 1350.0, BankMaxDeg = 8.0, BankGain = 0.011, PitchMaxDeg = 5.0, PitchGain = 0.2;
         public const double VelocityTau = 0.06, TeleportSpeed = 30.0;
         public const double IdleBreakMin = 4.0, IdleBreakSpread = 4.0, BreakFade = 0.2, GatherFade = 0.1, CarryFade = 0.15;
         public const double LandSeconds = 0.3, TakeoffTicks = 2.0;
@@ -200,6 +203,13 @@ namespace CriticalMass.Runtime.View.Anim
             {
                 _wasCorpse = false;
                 StepYaw(target, dMotion);
+                // b15: the swing's direction is exact on its contact frame (the spring may still be settling there).
+                if (turnable && _actClip != null && _kind == 1)
+                {
+                    double age = AttackTiming.SwingAge(actor, w.Tick, alpha, hz), windup = AttackTiming.SwingWindupSeconds(actor, hz);
+                    // never more than one capped frame of turn (no one-frame snap)
+                    if (Math.Abs(Wrap(_yaw - target)) <= MaxYawRate * dMotion && ContactSnap(age, windup, dMotion, ref _snappedAt, _actStart)) { _yaw = target; _yawVel = 0; }
+                }
             }
 
             // ---- actions: AnimAction resets to 0 on the press tick of an attack or an ability
@@ -397,15 +407,19 @@ namespace CriticalMass.Runtime.View.Anim
                 if (run > 0f) AddEntry(m, Locomotion.RunBand[k], _w6[k] * run, k, true);
             }
             double stride = 0, len = 0, wsum = 0;
+            // b15 world look: a class on its own measured clips uses their real ground speed (ClassStrides); the Knight
+            // facts times StrideScale stay the fallback for any model without a measured row.
+            string own = ClassStrides.SourceOf(m.Spec != null ? m.Spec.ClipSource : null);
+            bool measured = ClassStrides.UseInAnimator && ClassStrides.Covers(own);
             for (int e = 0; e < _eCount; e++)
             {
                 double l = m.ClipLength(_eClip[e]);
-                stride += _eW[e] * ClipFacts.GroundSpeed(_eClip[e], IsRunClip(_eClip[e]) ? 4.57f : 0.86f) * l;
+                stride += _eW[e] * StrideSpeed(own, measured, _eClip[e]) * l;
                 len += _eW[e] * l;
                 wsum += _eW[e];
             }
             if (wsum > 0) { stride /= wsum; len /= wsum; }
-            if (m.Spec != null && m.Spec.StrideScale > 0f) stride *= m.Spec.StrideScale;   // per-class legs (HY swaps)
+            if (!measured && m.Spec != null && m.Spec.StrideScale > 0f) stride *= m.Spec.StrideScale;   // per-class legs (HY swaps)
             _warp = warp * move;
             double legs = 0;
             for (int e = 0; e < _eCount && wsum > 0; e++)
@@ -482,11 +496,11 @@ namespace CriticalMass.Runtime.View.Anim
             float rest = (1f - heavy) * (1f - _gather) * (1f - land);
             float idleW = (1f - move) * (1f - brk) * rest;
             m.Pose(ArtMapping.Idle, simTime + _id * 0.37, idleW, true);
-            float refPlant = ClipFacts.LeftPlant(ArtMapping.Run, 0.203f);
+            float refPlant = Plant(own, ArtMapping.Run);
             for (int e = 0; e < _eCount; e++)
             {
                 string c = _eClip[e];
-                double t = Locomotion.SampleTime(_phase, m.ClipLength(c), ClipFacts.LeftPlant(c, IsRunClip(c) ? 0.203f : 0.281f), refPlant, _eRev[e]);
+                double t = Locomotion.SampleTime(_phase, m.ClipLength(c), Plant(own, c), refPlant, _eRev[e]);
                 m.Pose(c, t, _eW[e] / (float)Math.Max(1e-6, wsum) * move * rest, true);
             }
             if (_gather > 0f) m.Pose(gatherClip, _gatherT, _gather * (1f - heavy) * (1f - land), true);
@@ -497,6 +511,16 @@ namespace CriticalMass.Runtime.View.Anim
 
         double _prevPhase;
         double _hitAgeForPose;
+
+        /// <summary>b15: planted-toe ground speed of a clip for this class (u/s): its measured row, else the Knight's.</summary>
+        public static double StrideSpeed(string source, bool measured, string clip) =>
+            measured && ClassStrides.TryGet(source, clip, out ClassStrides.Row r) ? r.GroundSpeed : ClipFacts.GroundSpeed(clip, IsRunClip(clip) ? 4.57f : 0.86f);
+
+        /// <summary>Left mid-stance phase of a clip (the sync marker blends line up on). b15: the Knight's markers stay in
+        /// force for every class: the class clips are baked from the Knight's timing, and their stance-centre measure
+        /// (ClassStrides.LeftPlant, 0.19 to 0.21 on the runs) is noisier than one shared marker (first CI run: per-class
+        /// markers made the backward-diagonal blend slide 0.39 u/u). Only the ground speed comes from the class.</summary>
+        public static float Plant(string source, string clip) => ClipFacts.LeftPlant(clip, IsRunClip(clip) ? 0.203f : 0.281f);
 
         static bool IsRunClip(string c) => c == ArtMapping.Run || c == ArtMapping.StrafeL || c == ArtMapping.StrafeR;
 
@@ -818,6 +842,17 @@ namespace CriticalMass.Runtime.View.Anim
             }
             _actClip = _prevClip = null;
             _hasReact = false;
+        }
+
+        double _snappedAt = double.NaN;
+
+        /// <summary>b15: true once per swing, on the first frame at or past the contact (age reaches the wind-up). Pure.</summary>
+        public static bool ContactSnap(double age, double windup, double dt, ref double snappedFor, double swingStart)
+        {
+            if (snappedFor == swingStart) return false;
+            if (age + 1e-9 < windup || age > windup + Math.Max(dt, 1.0 / 30.0)) return false;
+            snappedFor = swingStart;
+            return true;
         }
 
         void StepYaw(double target, double dt)
