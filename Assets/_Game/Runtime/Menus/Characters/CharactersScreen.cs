@@ -376,8 +376,8 @@ namespace CriticalMass.Runtime.Menus.Characters
         {
             CharacterShowcaseData.Flipbook(_flipT, out int a, out int b, out float blend);
             int c = _nav.Class;
-            if (a != _shownFlipA) { _shownFlipA = a; _flipA.texture = StillOrPortrait(c, a); }
-            if (b != _shownFlipB) { _shownFlipB = b; _flipB.texture = StillOrPortrait(c, b); }
+            if (a != _shownFlipA) { _shownFlipA = a; _flipA.texture = StillOrPortrait(c, a); KeepAspect(_flipA); }
+            if (b != _shownFlipB) { _shownFlipB = b; _flipB.texture = StillOrPortrait(c, b); KeepAspect(_flipB); }
             Color ca = _flipA.color, cb = _flipB.color;
             ca.a = 1f;
             cb.a = blend;
@@ -389,7 +389,49 @@ namespace CriticalMass.Runtime.Menus.Characters
         {
             Texture2D t = _stills[c, slide];
             if (t != null) return t;
-            return UiIcons.Get(UiIcons.Portrait[c, 0], 4);
+            // b14 polish: no footage or still yet -> the class's four poses rendered from its new model (idle, attack, class
+            // action, carry; Resources/UI/Characters/pose-<class>-<n>.png), a turntable-style flip-through; portrait last.
+            Texture2D p = Pose(c, slide);
+            return p != null ? p : UiIcons.Get(UiIcons.Portrait[c, 0], 4);
+        }
+
+        /// <summary>b14 polish: a square pose in the wide video rect keeps its shape (the pose's transparent border clamps
+        /// into the side bars); stills and clips fill the rect as before.</summary>
+        static void KeepAspect(RawImage ri)
+        {
+            Texture t = ri.texture;
+            Rect r = ri.rectTransform.rect;
+            if (t == null || r.height <= 0f || t.height <= 0 || !(t is Texture2D t2) || !IsPose(t2)) { ri.uvRect = new Rect(0f, 0f, 1f, 1f); return; }
+            float ra = r.width / r.height, ta = t.width / (float)t.height;
+            if (ra >= ta) { float k = ra / ta; ri.uvRect = new Rect(-(k - 1f) * 0.5f, 0f, k, 1f); }
+            else { float k = ta / ra; ri.uvRect = new Rect(0f, -(k - 1f) * 0.5f, 1f, k); }
+        }
+
+        static bool IsPose(Texture2D t)
+        {
+            for (int c = 0; c < 6; c++)
+                for (int n = 0; n < CharacterShowcaseData.SlideCount; n++)
+                    if (ReferenceEquals(PoseCache[c, n], t)) return true;
+            return false;
+        }
+
+        /// <summary>b14 polish: Resources path of class c's pose n (0 idle, 1 attack, 2 class action, 3 carry).</summary>
+        public static string PosePath(int c, int n) => "UI/Characters/pose-" + UiIcons.Classes[c] + "-" + n;
+
+        static readonly Texture2D[,] PoseCache = new Texture2D[6, CharacterShowcaseData.SlideCount];
+        static readonly bool[,] PoseTried = new bool[6, CharacterShowcaseData.SlideCount];
+
+        /// <summary>b14 polish: the pose texture (loaded once, cached; only called when the flipbook frame changes).</summary>
+        public static Texture2D Pose(int c, int n)
+        {
+            if (c < 0 || c >= 6 || n < 0 || n >= CharacterShowcaseData.SlideCount) return null;
+            if (!PoseTried[c, n])
+            {
+                PoseTried[c, n] = true;
+                PoseCache[c, n] = Resources.Load<Texture2D>(PosePath(c, n));
+                if (PoseCache[c, n] != null) PoseCache[c, n].wrapMode = TextureWrapMode.Clamp;
+            }
+            return PoseCache[c, n];
         }
 
         /// <summary>b14 review: class c has a clip or a still on disk (else the Watch tab shows the portrait).</summary>
@@ -508,7 +550,7 @@ namespace CriticalMass.Runtime.Menus.Characters
             _captions = new string[CharacterShowcaseData.All.Length];
             for (int i = 0; i < _captions.Length; i++) _captions[i] = "THE " + CharacterShowcaseData.All[i].Name + " IN A REAL MATCH";
             _plainCaptions = new string[_captions.Length];
-            for (int i = 0; i < _plainCaptions.Length; i++) _plainCaptions[i] = "THE " + CharacterShowcaseData.All[i].Name;
+            for (int i = 0; i < _plainCaptions.Length; i++) _plainCaptions[i] = "THE " + CharacterShowcaseData.All[i].Name + ": IDLE, ATTACK, ACTION, CARRY";   // b14 polish: the pose flip-through
 
             _how = MenuUi.Rt(space, "How It Works");
             MenuUi.Stretch(_how);
