@@ -491,8 +491,9 @@ namespace CriticalMass.Sim.Core
             double bz = b.Z;
             bool gapOk = w.Tick - w.WallChangeTick >= Durations.T30(w.Config, w.Config.Abilities.MinerTerraform.MinGapTicks); // before this blast's own breaks
             s.Stats.TntBlasts++;
-            int hit = BlastActors(w, b.Owner, b.Team, bx, bz, cfg.BlastRadius, cfg.Damage);
-            if (CombatFeel.On(w)) CombatFeel.TntSelfBlast(w, b.Owner, bx, bz, cfg.BlastRadius, cfg.Damage); // b15: self-risk
+            double tntDamage = CombatFeel.On(w) ? w.Config.Depth.CombatFeel.TntDamage : cfg.Damage; // b15: CombatFeelConfig.TntDamage
+            int hit = BlastActors(w, b.Owner, b.Team, bx, bz, cfg.BlastRadius, tntDamage);
+            if (CombatFeel.On(w)) CombatFeel.TntSelfBlast(w, b.Owner, bx, bz, cfg.BlastRadius, tntDamage); // b15: self-risk
             Chain(w, bx, bz, cfg.BlastRadius);
             Kaiju k = w.Kaiju;
             if (k.State != KaijuState.Egg)

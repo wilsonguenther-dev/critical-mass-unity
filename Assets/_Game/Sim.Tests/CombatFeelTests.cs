@@ -144,9 +144,9 @@ namespace CriticalMass.Sim.Tests
         }
 
         /// <summary>A duel: actor 0 (cls) against the enemy (foeCls); fightBack = the enemy swings too, else it stands still.</summary>
-        internal static DuelResult RunDuel(ClassId cls, ClassId foeCls, bool feel, bool fightBack, double limitSeconds = 30)
+        internal static DuelResult RunDuel(ClassId cls, ClassId foeCls, bool feel, bool fightBack, double limitSeconds = 30, GameConfig cfg = null)
         {
-            World w = Arena(cls, foeCls, feel);
+            World w = Arena(cls, foeCls, feel, cfg);
             int e = Foe(w);
             InputFrame fa = SimInput.EmptyInput(), fb = SimInput.EmptyInput();
             int head = w.EventHead, hits0 = 0, hits1 = 0;

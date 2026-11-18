@@ -25,6 +25,10 @@ namespace CriticalMass.Sim.Core
         /// <summary>The tick of the last landed melee strike on this actor and who struck it (-1 none). Read by the view only
         /// (GroundView keeps the victim of your own hit out of the see-through dither); never read by the sim.</summary>
         public int[] StruckTick, StruckBy;
+        /// <summary>First tick of the actor's current run of melee staggers (StaggerMaxLockSeconds caps the run).</summary>
+        public int[] LockStart;
+        /// <summary>Last tick the actor's current run of melee staggers holds it (a new stagger by the tick after continues the run).</summary>
+        public int[] LockUntil;
         /// <summary>Ticks in a row this actor has been staggered (HitStunTicks above 0) and the longest such run this match.</summary>
         public int[] LockRun;
         public int MaxLockRun;
@@ -52,6 +56,8 @@ namespace CriticalMass.Sim.Core
                 SunderUntil = new int[cap],
                 StruckTick = new int[cap],
                 StruckBy = new int[cap],
+                LockStart = new int[cap],
+                LockUntil = new int[cap],
                 LockRun = new int[cap],
                 Ladder = new byte[cells],
                 LadderCells = new int[cells],
@@ -73,6 +79,8 @@ namespace CriticalMass.Sim.Core
                 SunderUntil[i] = CombatFeel.NoTick;
                 StruckTick[i] = CombatFeel.NoTick;
                 StruckBy[i] = -1;
+                LockStart[i] = CombatFeel.NoTick;
+                LockUntil[i] = CombatFeel.NoTick;
                 LockRun[i] = 0;
             }
             for (int k = 0; k < LadderCount; k++) Ladder[LadderCells[k]] = 0;
@@ -212,8 +220,19 @@ namespace CriticalMass.Sim.Core
             double k = 1;
             for (int c = 0; c < count; c++) k *= f.StaggerDecay;
             int ticks = (int)Math.Floor(baseTicks * k + 0.5);
-            return ticks < 1 ? 1 : ticks;
+            if (ticks < 1) ticks = 1;
+            // No stun-lock: inside a running stagger the run may not pass StaggerMaxLockSeconds from its first tick.
+            if (InLock(s, target, w.Tick))
+            {
+                int cap = s.LockStart[target] + Ticks(w, f.StaggerMaxLockSeconds) - w.Tick;
+                if (ticks > cap) ticks = cap < 0 ? 0 : cap;
+            }
+            return ticks;
         }
+
+        /// <summary>True while target's run of melee staggers is still going at tick (stunned now, or its last stunned tick was the one before).</summary>
+        private static bool InLock(CombatFeelState s, int target, int tick) =>
+            s.LockStart[target] != NoTick && tick <= s.LockUntil[target] + 1;
 
         /// <summary>
         /// A landed melee hit of amount (already multiplied by DamageMul) by source standing at (srcX, srcZ): damage through the
@@ -231,11 +250,24 @@ namespace CriticalMass.Sim.Core
             s.StruckBy[target] = source;
             Knock.Dir(w, target, srcX, srcZ, JsMath.Cos(src.SwingFacing), JsMath.Sin(src.SwingFacing), out double dx, out double dz);
             int stun = StaggerFor(w, target, amount, out bool armoured, out bool immune);
+            bool locked = InLock(s, target, w.Tick);
+            bool clipped = locked && !immune && w.Tick + stun >= s.LockStart[target] + Ticks(w, f.StaggerMaxLockSeconds);
+            if (stun > 0)
+            {
+                if (!locked) s.LockStart[target] = w.Tick;
+                if (w.Tick + stun - 1 > s.LockUntil[target] || !locked) s.LockUntil[target] = w.Tick + stun - 1;
+            }
             bool onLadder = OnLadder(w, target);
             double dealt = Damage.ApplyHit(w, target, amount, source, srcX, srcZ, DamageCause.Melee, dx, dz, f.Strikes[(int)src.Cls].Knock, stun);
             if (!(dealt > 0) || !t.Alive) return dealt;
             if (armoured) s.StaggerArmoured++;
             if (immune) s.StaggerImmune++;
+            if (clipped)
+            {
+                s.ImmuneUntil[target] = w.Tick + stun + Ticks(w, f.StaggerImmuneSeconds);
+                s.StaggerCount[target] = 0;
+                s.StaggerWindowEnd[target] = NoTick;
+            }
             if (stun > 0)
             {
                 if (w.Tick > s.StaggerWindowEnd[target])
@@ -246,7 +278,7 @@ namespace CriticalMass.Sim.Core
                 if (s.StaggerCount[target] > 0) s.StaggerDiminished++;
                 s.StaggerCount[target]++;
                 s.Staggers++;
-                if (s.StaggerCount[target] >= f.StaggerMaxInWindow)
+                if (s.StaggerCount[target] >= f.StaggerMaxInWindow || clipped)
                 {
                     s.ImmuneUntil[target] = w.Tick + stun + Ticks(w, f.StaggerImmuneSeconds);
                     s.StaggerCount[target] = 0;

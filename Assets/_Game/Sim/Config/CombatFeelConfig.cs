@@ -118,6 +118,9 @@ namespace CriticalMass.Sim.Config
         /// <summary>After this many staggers inside one window the victim is immune to stagger for StaggerImmuneSeconds.</summary>
         public int StaggerMaxInWindow = 3;
         public double StaggerImmuneSeconds = 0.8;
+        /// <summary>No stun-lock: a run of melee staggers (each new one landing before the last ends) never lasts longer than
+        /// this (real seconds); a hit that would extend it past the cap is clipped and gives StaggerImmuneSeconds at once.</summary>
+        public double StaggerMaxLockSeconds = 0.4;
         /// <summary>After a stagger the victim moves at StaggerSlowMultiplier for StaggerSlowSeconds.</summary>
         public double StaggerSlowSeconds = 0.30;
         public double StaggerSlowMultiplier = 1.0; // OWNER FEEL-TEST: 0.6 slows after a stagger (see WindupMoveMultiplier)
@@ -136,6 +139,8 @@ namespace CriticalMass.Sim.Config
         public double TntCooldownTicks = 120; // OWNER FEEL-TEST: her kill share is 0.29 at 120 (DemolitionsAttackThrowTests limit 0.25); 150 is the shipped value
         /// <summary>Share of her own TNT's blast damage the thrower takes when she stands inside its radius.</summary>
         public double TntSelfShare = 0.35;
+        /// <summary>Thrown TNT blast damage while the rule is on (DemolitionsTntConfig.Damage is 55).</summary>
+        public double TntDamage = 55;
         /// <summary>The Healer's mend while the rule is on (HealerConfig MendHeal 6 / MendRange 5.5).</summary>
         public double MendHeal = 10;
         public double MendRange = 6;
