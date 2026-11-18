@@ -22,6 +22,8 @@ namespace CriticalMass.Net.Replay
     {
         public const int MaxActors = 64;
         public const int OpNoHuman = 1, OpMask = 2, OpHandToBot = 4, OpRepeat = 8;
+        /// <summary>b15-rejoin: bot-to-human ids follow (u8 count, u8 id each), after any hand-to-bot ids: a rejoined player took the fighter back.</summary>
+        public const int OpBotToHuman = 16;
         public const int CMoveX = 1, CMoveZ = 2, CAimX = 4, CAimZ = 8, CButtons = 16, CPicks = 32, CPingX = 64, CPingZ = 128;
         public const double MoveQuantum = 127.0, PointQuantum = 100.0;
         /// <summary>Beyond this magnitude a double is always stored raw (no quantum index overflow, no NaN casts).</summary>

@@ -38,6 +38,13 @@ namespace CriticalMass.Net
         public int MaxLeadMs = 700;   // online-rooms-9: the adaptive lead's ceiling (LeadPolicy: floor 100 ms)
         /// <summary>Ticks of wall-clock backlog the stepping clock keeps after a stall (catch-up burst cap).</summary>
         public int BacklogTicks = 6;
+        /// <summary>b15-rejoin, host: packets per second of match log fed to rejoining players (all of them together). The relay
+        /// allows 90 messages a second per sender; the bundles take 33, so the feed stays well under the limit.</summary>
+        public int RejoinFeedPerSec = 40;
+        /// <summary>b15-rejoin, host on a lossy link: resend the log from the rejoiner's acknowledgement after this long without progress.</summary>
+        public int RejoinFeedRetryMs = 400;
+        /// <summary>b15-rejoin, rejoiner: at most this many log ticks stepped per Update while catching up (one frame's budget).</summary>
+        public int CatchUpTicksPerUpdate = 1500;
     }
 
     /// <summary>Receives a transport event the lockstep layer does not own (room and chat messages, type 20 and up).</summary>
@@ -60,9 +67,11 @@ namespace CriticalMass.Net
     public sealed class LockstepSession
     {
         public const int Window = 512;
-        private const int MsgInputs = 1, MsgBundles = 2;
+        private const int MsgInputs = 1, MsgBundles = 2, MsgLog = 3;
         private const int HashKeep = 64;
-        private const byte FlagInput = 1, FlagToBot = 2;
+        private const byte FlagInput = 1, FlagToBot = 2, FlagToHuman = 4;
+        /// <summary>b15-rejoin: a rejoiner keeps at most this many ticks beyond what it holds (a hostile host cannot make it allocate more).</summary>
+        private const int FlatAhead = 1 << 15;
 
         public readonly World World;
         public readonly MatchSetup Setup;
@@ -113,6 +122,33 @@ namespace CriticalMass.Net
         public Action<int, ulong> HashRecorded;
         /// <summary>Raised when a human becomes a bot: (slot, actor, world tick of the hand-over).</summary>
         public Action<int, int, int> HumanToBot;
+        /// <summary>b15-rejoin: raised when a rejoined human takes their fighter back from the bot: (slot, actor, world tick).</summary>
+        public Action<int, int, int> BotToHuman;
+
+        // ---------------------------------------------------------------- b15-rejoin: state a screen or a log reads
+        /// <summary>This session joined a match already running and is replaying the host's log (not playing yet).</summary>
+        public bool IsRejoin => _flat;
+        /// <summary>Rejoiner: still replaying the log; the fighter is the bot's until the hand-back.</summary>
+        public bool CatchingUp => _catchingUp;
+        /// <summary>Rejoiner: the newest host tick heard of (the catch-up target), -1 before any.</summary>
+        public int CatchUpTarget => _hostSteppedSeen;
+        /// <summary>Rejoiner: wall time the session started (ms) and the time it went live (ms, -1 while catching up).</summary>
+        public long RejoinStartMs { get; private set; } = -1;
+        public long RejoinLiveMs { get; private set; } = -1;
+        /// <summary>Rejoiner: the tick it went live at, and the wall milliseconds spent stepping the log.</summary>
+        public int RejoinLiveTick { get; private set; } = -1;
+        public double CatchUpStepMs { get; private set; }
+        /// <summary>Rejoiner: log fingerprints from the host checked during the catch-up (each one a whole second of match).</summary>
+        public int RejoinVerified { get; private set; }
+        /// <summary>Rejoiner: received log bytes (compressed, on the wire) and the raw bundle bytes they held.</summary>
+        public long LogBytes { get; private set; }
+        public long LogRawBytes { get; private set; }
+        /// <summary>Host: rejoins accepted, log packets and bytes fed.</summary>
+        public int RejoinsAccepted { get; private set; }
+        public int FeedPackets { get; private set; }
+        public long FeedBytes { get; private set; }
+        /// <summary>Test seam (host): may edit a log packet's raw bundles before they are encoded (proves a bad log is caught).</summary>
+        public Action<int, byte[], int, int> TestFeedTamper;
         /// <summary>Raised after every step with the world (the view reads it).</summary>
         public Action<World> Ticked;
         /// <summary>Test seam: may edit the decoded frames of a tick before it is applied (proves desync detection).</summary>
@@ -136,8 +172,15 @@ namespace CriticalMass.Net
         private readonly byte[] _enc = new byte[InputCodec.Size];
 
         // Bundles (host: produced; client: received), ring by tick.
-        private readonly byte[] _bundles;
-        private readonly int[] _bundleTick;
+        private byte[] _bundles;
+        private int[] _bundleTick;
+        /// <summary>b15-rejoin: a rejoiner keeps its bundles by tick for the whole match (it replays from tick 0), not in the ring.</summary>
+        private readonly bool _flat;
+        private bool _catchingUp;
+        private int _hostSteppedSeen = -1;
+        /// <summary>Rejoiner: the host's fingerprints for the log, by tick / HashEvery (1 = held in _logHashHave).</summary>
+        private ulong[] _logHash = new ulong[0];
+        private byte[] _logHashHave = new byte[0];
         /// <summary>Highest tick t such that every bundle 0..t is held (-1: none).</summary>
         private int _bundlesThrough = -1;
         /// <summary>Per slot: became a bot at the stepping side (applied).</summary>
@@ -163,6 +206,18 @@ namespace CriticalMass.Net
         private readonly long[] _lastStartSend;
         private readonly byte[][] _lastInput;
         private int _producedThrough = -1;
+        // b15-rejoin, host: every produced bundle by tick (the log a rejoiner replays), every fingerprint by tick / HashEvery,
+        // and the rejoin feed per slot.
+        private byte[] _hist = new byte[0];
+        private ulong[] _hashHist = new ulong[0];
+        private int _hashHistThrough = -1;
+        private bool[] _rejoining, _rejoinLive, _feeding;
+        private int[] _feedSent, _feedAckSeen;
+        private long[] _feedAckAt;
+        private double _feedTokens;
+        private long _feedLast = -1;
+        private int _feedNext;
+        private byte[] _feedRaw = new byte[0];
         private long _waitSince = -1;
 
         // Client side.
@@ -190,7 +245,22 @@ namespace CriticalMass.Net
         /// <summary>How often this machine sends new inputs or bundles, in ms.</summary>
         public int SendEveryMs => _sendEveryMs;
 
-        public LockstepSession(ITransport transport, MatchSetup setup, GameConfig cfg, LockstepOptions options = null)
+        /// <summary>
+        /// b15-rejoin: a session for a seat whose player dropped and came back (RoomClient after REJOINED). It builds the
+        /// world from the setup like everyone did at the start, then replays the host's log of every input bundle from tick 0
+        /// as fast as it arrives, checking the host's fingerprint every HashEvery ticks of it, with no input of its own; once
+        /// it holds everything the host has stepped it starts sending inputs, and the host hands the fighter back from the bot
+        /// at the next tick it sequences (the same tick on every machine, carried in the bundle).
+        /// </summary>
+        public static LockstepSession Rejoining(ITransport transport, MatchSetup setup, GameConfig cfg, LockstepOptions options = null) =>
+            new LockstepSession(transport, setup, cfg, options, true);
+
+        /// <summary>Ticks of log a session keeps room for at the start: the match plus a quarter (more only for a long overtime).</summary>
+        private static int LogTicks(GameConfig cfg) => Math.Max(Window, (int)(cfg.MatchSeconds * cfg.SimHz * 1.25) + Window);
+
+        public LockstepSession(ITransport transport, MatchSetup setup, GameConfig cfg, LockstepOptions options = null) : this(transport, setup, cfg, options, false) { }
+
+        private LockstepSession(ITransport transport, MatchSetup setup, GameConfig cfg, LockstepOptions options, bool rejoin)
         {
             _t = transport ?? throw new ArgumentNullException(nameof(transport));
             Setup = setup ?? throw new ArgumentNullException(nameof(setup));
@@ -223,9 +293,14 @@ namespace CriticalMass.Net
             _sendEveryMs = setup.Humans.Length > BigRoomHumans ? Math.Max(_o.SendEveryMs, 2 * _o.SendEveryMs) : _o.SendEveryMs;
             _h = setup.Humans.Length;
             _bundleSize = _h * (1 + InputCodec.Size);
-            _bundles = new byte[Window * _bundleSize];
-            _bundleTick = new int[Window];
-            for (int i = 0; i < Window; i++) { _bundleTick[i] = -1; _mineTick[i] = -1; }
+            _flat = rejoin && !IsHost;
+            _catchingUp = _flat;
+            int ring = _flat ? LogTicks(cfg) : Window;
+            _bundles = new byte[ring * _bundleSize];
+            _bundleTick = new int[ring];
+            for (int i = 0; i < ring; i++) _bundleTick[i] = -1;
+            for (int i = 0; i < Window; i++) _mineTick[i] = -1;
+            if (_flat) { _logHash = new ulong[ring / Math.Max(1, setup.HashEvery) + 1]; _logHashHave = new byte[_logHash.Length]; }
             _frames = new InputFrame[World.ActorCount];
             _slotFrames = new InputFrame[_h];
             for (int i = 0; i < _h; i++) _slotFrames[i] = SimInput.EmptyInput();
@@ -254,6 +329,14 @@ namespace CriticalMass.Net
                 _lastSendTo = new long[_h];
                 _lastStartSend = new long[_h];
                 _lastInput = new byte[_h][];
+                _hist = new byte[LogTicks(cfg) * _bundleSize];
+                _hashHist = new ulong[LogTicks(cfg) / Math.Max(1, setup.HashEvery) + 1];
+                _rejoining = new bool[_h];
+                _rejoinLive = new bool[_h];
+                _feeding = new bool[_h];
+                _feedSent = new int[_h];
+                _feedAckSeen = new int[_h];
+                _feedAckAt = new long[_h];
                 for (int k = 0; k < _h; k++)
                 {
                     _in[k] = new byte[Window * InputCodec.Size];
@@ -292,7 +375,7 @@ namespace CriticalMass.Net
         /// <summary>One frame of work: read the network, sequence (host), step what is due, send what is new.</summary>
         public void Update(long nowMs)
         {
-            if (_lastNow < 0) { _lastNow = nowMs; _startMs = nowMs; _lastFromHost = nowMs; if (IsHost) for (int k = 0; k < _h; k++) _lastHeard[k] = nowMs; }
+            if (_lastNow < 0) { _lastNow = nowMs; _startMs = nowMs; _lastFromHost = nowMs; if (IsHost) for (int k = 0; k < _h; k++) _lastHeard[k] = nowMs; if (_flat) RejoinStartMs = nowMs; }
             long dt = Math.Max(0, nowMs - _lastNow);
             _nowMs = nowMs;
             _lastNow = nowMs;
@@ -304,7 +387,7 @@ namespace CriticalMass.Net
                     _acc += dt;
                     double cap = _o.BacklogTicks * _tickMs;
                     if (_acc > cap) _acc = cap;
-                    if (Stepped == 0 && _mineThrough < 0) GenerateLocal(Lead - 1, true);
+                    if (Stepped == 0 && _mineThrough < 0 && !_catchingUp) GenerateLocal(Lead - 1, true);
                     if (IsHost) { DetectDrops(nowMs); Produce(nowMs); }
                     StepDue(nowMs);
                 }
@@ -319,7 +402,12 @@ namespace CriticalMass.Net
             switch (ev.Kind)
             {
                 case TransportEventKind.PeerLeft:
-                    if (IsHost) { int k = Setup.SlotOfPeer(ev.From); if (k > 0 && !_gone[k]) _dropPending[k] = true; }
+                    if (IsHost)
+                    {
+                        int k = Setup.SlotOfPeer(ev.From);
+                        if (k > 0 && !_gone[k]) _dropPending[k] = true;
+                        if (k > 0 && _rejoining[k]) { _rejoining[k] = false; _rejoinLive[k] = false; _feeding[k] = false; }   // b15-rejoin: gave up
+                    }
                     else if (ev.From == Peers.Host && Status == LockstepStatus.Running) Status = LockstepStatus.HostLeft;
                     return;
                 case TransportEventKind.Closed:
@@ -335,6 +423,7 @@ namespace CriticalMass.Net
             int type = ev.Data[0];
             if (IsHost && type == MsgInputs) ReadInputs(ev.From, ev.Data, ev.Length, nowMs);
             else if (!IsHost && type == MsgBundles && ev.From == Peers.Host) ReadBundles(ev.Data, ev.Length, nowMs);
+            else if (!IsHost && type == MsgLog && ev.From == Peers.Host && _flat) ReadLog(ev.Data, ev.Length, nowMs);
             else if (type >= 20) Other?.Invoke(ref ev, nowMs);
         }
 
@@ -419,6 +508,22 @@ namespace CriticalMass.Net
                 for (int k = 0; k < _h; k++)
                 {
                     int o = off + k * (1 + InputCodec.Size);
+                    if (_gone[k] && _rejoining[k] && _rejoinLive[k])
+                    {
+                        // b15-rejoin: the rejoined player is live (its inputs arrive): it takes the fighter back at this tick, on
+                        // every machine. Its input for the tick if it is here, else its newest (one-shots cleared), as for a
+                        // lagging human; the lead then adapts as usual.
+                        _gone[k] = false;
+                        _rejoining[k] = false;
+                        _rejoinLive[k] = false;
+                        _bundles[o] = FlagToHuman | FlagInput;
+                        if (_inTick[k][idx] == s) Buffer.BlockCopy(_in[k], idx * InputCodec.Size, _lastInput[k], 0, InputCodec.Size);
+                        else { ClearOneShots(_lastInput[k], 0); _lagging[k] = true; _lagUntil[k] = now + _o.LagHoldMs; LateInputs++; }
+                        Buffer.BlockCopy(_lastInput[k], 0, _bundles, o + 1, InputCodec.Size);
+                        _heardInput[k] = true;
+                        _lastHeard[k] = now;
+                        continue;
+                    }
                     if (_gone[k]) { _bundles[o] = 0; continue; }
                     if (_dropPending[k])
                     {
@@ -446,22 +551,35 @@ namespace CriticalMass.Net
                 _bundleTick[idx] = s;
                 _producedThrough = s;
                 _bundlesThrough = s;
+                // b15-rejoin: the log a rejoiner replays (allocated for the match up front; grows only in a long overtime).
+                if ((s + 1) * _bundleSize > _hist.Length) Array.Resize(ref _hist, Math.Max((s + 1) * _bundleSize, _hist.Length * 2));
+                Buffer.BlockCopy(_bundles, off, _hist, s * _bundleSize, _bundleSize);
             }
         }
 
         private void ReadInputs(int from, byte[] d, int len, long now)
         {
             int k = Setup.SlotOfPeer(from);
-            if (k <= 0 || _gone[k]) return;
+            if (k <= 0 || (_gone[k] && !_rejoining[k])) return;
+            bool rejoining = _gone[k] && _rejoining[k];
             var r = new WireReader(d, 1, len);
             int theirDesync = r.I32();
             int ack = r.I32();
             if (!ReadHashes(ref r, k)) return;
+            // b15-rejoin: a rejoiner's fingerprints are of ticks long gone here and its desync report is its own matter (it
+            // stops itself); neither may stop the match for everyone before it has its fighter back.
+            if (rejoining) { _theirTick[k * 2] = -1; _theirTick[k * 2 + 1] = -1; theirDesync = -1; }
             int first = r.I32();
             int count = r.U8();
             if (r.Bad || count > 64 || r.Left < count * InputCodec.Size) return;
             _lastHeard[k] = now;
             if (ack > _ackedBundle[k] && ack <= _producedThrough) _ackedBundle[k] = ack;
+            if (rejoining && count > 0)
+            {
+                // Live: it holds everything we stepped and plays now. Its newest input is what the hand-back starts from.
+                _rejoinLive[k] = true;
+                Buffer.BlockCopy(d, r.Pos + (count - 1) * InputCodec.Size, _lastInput[k], 0, InputCodec.Size);
+            }
             for (int j = 0; j < count; j++)
             {
                 int t = first + j;
@@ -502,16 +620,9 @@ namespace CriticalMass.Net
             if (r.Bad || r.Left < count * _bundleSize) return;
             _lastFromHost = now;
             if (ack > _hostAckedInput && ack <= _mineThrough) _hostAckedInput = ack;
-            for (int j = 0; j < count; j++)
-            {
-                int t = first + j;
-                if (t < Stepped || t >= Stepped + Window || t <= _bundlesThrough) continue;
-                int idx = t & (Window - 1);
-                if (_bundleTick[idx] == t) continue;
-                Buffer.BlockCopy(d, r.Pos + j * _bundleSize, _bundles, idx * _bundleSize, _bundleSize);
-                _bundleTick[idx] = t;
-            }
-            while (_bundleTick[(_bundlesThrough + 1) & (Window - 1)] == _bundlesThrough + 1) _bundlesThrough++;
+            if (hostStepped > _hostSteppedSeen) _hostSteppedSeen = hostStepped;
+            for (int j = 0; j < count; j++) PutBundle(first + j, d, r.Pos + j * _bundleSize);
+            AdvanceHeld();
             // Adaptive lead (LeadPolicy): how many ticks ahead of the host's stepping our inputs were when it sent this.
             if (myMargin != int.MinValue && _lead != null && hostStepped >= 0)
             {
@@ -523,10 +634,204 @@ namespace CriticalMass.Net
             _ = ended;
         }
 
+        // ---------------------------------------------------------------- b15-rejoin: the bundle store
+
+        /// <summary>Where bundle t lives: by tick for a rejoiner (the whole match), in the ring otherwise.</summary>
+        private int BIdx(int t) => _flat ? t : t & (Window - 1);
+
+        private bool HaveBundle(int t) { int i = BIdx(t); return t >= 0 && i < _bundleTick.Length && _bundleTick[i] == t; }
+
+        private void AdvanceHeld() { while (HaveBundle(_bundlesThrough + 1)) _bundlesThrough++; }
+
+        /// <summary>Stores bundle t (copied from src at off) if it is new and fits the window (a rejoiner's: anything ahead).</summary>
+        private void PutBundle(int t, byte[] src, int off)
+        {
+            if (t < Stepped || t <= _bundlesThrough) return;
+            if (_flat)
+            {
+                if (t > _bundlesThrough + FlatAhead) return;
+                if (t >= _bundleTick.Length)
+                {
+                    int n = Math.Max(t + 1, _bundleTick.Length * 2), was = _bundleTick.Length;
+                    Array.Resize(ref _bundleTick, n);
+                    Array.Resize(ref _bundles, n * _bundleSize);
+                    for (int i = was; i < n; i++) _bundleTick[i] = -1;
+                }
+            }
+            else if (t >= Stepped + Window) return;
+            int idx = BIdx(t);
+            if (_bundleTick[idx] == t) return;
+            Buffer.BlockCopy(src, off, _bundles, idx * _bundleSize, _bundleSize);
+            _bundleTick[idx] = t;
+        }
+
+        /// <summary>
+        /// Rejoiner: a packet of the host's log (MsgLog): the host's fingerprints for those ticks, then `count` bundles from
+        /// `first`, XOR-delta and zero-run encoded (LogCodec). Stored like bundles; the fingerprints are checked as it steps.
+        /// </summary>
+        private void ReadLog(byte[] d, int len, long now)
+        {
+            var r = new WireReader(d, 1, len);
+            int hostStepped = r.I32();
+            int nh = r.U8();
+            if (r.Bad || nh > 8) return;
+            for (int j = 0; j < nh; j++)
+            {
+                int tick = r.I32();
+                ulong h = r.U64();
+                int he = Math.Max(1, Setup.HashEvery);
+                if (r.Bad || tick <= 0 || tick % he != 0) continue;
+                int i = tick / he;
+                if (i >= _logHash.Length) { Array.Resize(ref _logHash, i * 2); Array.Resize(ref _logHashHave, i * 2); }
+                if (i < _logHash.Length && Stepped < tick) { _logHash[i] = h; _logHashHave[i] = 1; }
+            }
+            int first = r.I32();
+            int count = r.I16();
+            int enc = r.I16();
+            if (r.Bad || first < 0 || count <= 0 || count > 4096 || enc < 0 || r.Left < enc) return;
+            _lastFromHost = now;
+            if (hostStepped > _hostSteppedSeen) _hostSteppedSeen = hostStepped;
+            int raw = count * _bundleSize;
+            if (_feedRaw.Length < raw) _feedRaw = new byte[raw];
+            if (!LogCodec.Decode(d, r.Pos, enc, _feedRaw, raw, _bundleSize)) return;
+            LogBytes += len;
+            LogRawBytes += raw;
+            for (int j = 0; j < count; j++) PutBundle(first + j, _feedRaw, j * _bundleSize);
+            AdvanceHeld();
+        }
+
+        /// <summary>
+        /// Host: takes `slot` back for a player who dropped and reconnected as `peer`. The seat goes to the bot now if it has
+        /// not yet; from here the host feeds the new peer the log of every bundle from tick 0 (MsgLog, at most
+        /// RejoinFeedPerSec packets a second for all rejoiners together, so the relay's limit and the match are never at
+        /// risk), and the first input it then sends hands the fighter back at the next tick sequenced. Nobody waits for it.
+        /// Null on success, else why not (plain words).
+        /// </summary>
+        public string AcceptRejoin(int slot, int peer, long now)
+        {
+            if (!IsHost) return "Only the host can take a player back.";
+            if (Status != LockstepStatus.Running) return "The match is over.";
+            if (slot <= 0 || slot >= _h) return "That seat is not in this match.";
+            if (peer == Peers.Host || peer == Peers.Broadcast) return "That seat is not in this match.";
+            for (int k = 0; k < _h; k++) if (k != slot && Setup.Humans[k].Peer == peer) return "That player is already in the match.";
+            if (!_gone[slot]) _dropPending[slot] = true;   // still seated (its old link has not timed out): to the bot first
+            Setup.Humans[slot].Peer = peer;
+            _rejoining[slot] = true;
+            _rejoinLive[slot] = false;
+            _feeding[slot] = true;
+            _ackedBundle[slot] = -1;
+            _feedSent[slot] = -1;
+            _feedAckSeen[slot] = -1;
+            _feedAckAt[slot] = now;
+            _inThrough[slot] = _producedThrough;
+            _heardInput[slot] = false;
+            _lagging[slot] = false;
+            _lastHeard[slot] = now;
+            _lastStartSend[slot] = long.MaxValue / 2;   // it has its setup (REJOINED); never resend START to it
+            _theirTick[slot * 2] = -1;
+            _theirTick[slot * 2 + 1] = -1;
+            RejoinsAccepted++;
+            return null;
+        }
+
+        /// <summary>Host: feeds the log to rejoining players (round robin), token-bucketed at RejoinFeedPerSec.</summary>
+        private void FeedRejoiners(long now)
+        {
+            if (_feedLast < 0) _feedLast = now;
+            _feedTokens = Math.Min(4, _feedTokens + (now - _feedLast) * _o.RejoinFeedPerSec / 1000.0);
+            _feedLast = now;
+            for (int n = 0; n < _h && _feedTokens >= 1; n++)
+            {
+                int k = (_feedNext + n) % _h;
+                if (k == 0 || !_feeding[k]) continue;
+                if (!_gone[k] && !_rejoining[k]) { _feeding[k] = false; continue; }   // handed back: the normal stream has it
+                if (_ackedBundle[k] > _feedAckSeen[k]) { _feedAckSeen[k] = _ackedBundle[k]; _feedAckAt[k] = now; }
+                if (!_t.Reliable && now - _feedAckAt[k] > _o.RejoinFeedRetryMs) { _feedSent[k] = _ackedBundle[k]; _feedAckAt[k] = now; }
+                int from = Math.Max(_feedSent[k], _ackedBundle[k]) + 1;
+                if (_t.Reliable && from > _sentBundle[0])
+                {
+                    // Everything broadcast so far is fed; every later bundle reaches it by the broadcast.
+                    _feeding[k] = false;
+                    continue;
+                }
+                if (from > _producedThrough) continue;
+                int len = BuildLog(from, _producedThrough, out int count);
+                if (len <= 0) continue;
+                _t.Send(Setup.Humans[k].Peer, _pkt, len);
+                BytesSent += len;
+                FeedBytes += len;
+                FeedPackets++;
+                _feedSent[k] = from + count - 1;
+                _feedTokens -= 1;
+                _feedNext = k + 1;
+            }
+        }
+
+        /// <summary>One MsgLog packet of bundles from..at most upTo from the history, as many as fit; count = how many.</summary>
+        private int BuildLog(int from, int upTo, out int count)
+        {
+            var w = new WireWriter(_pkt);
+            w.U8(MsgLog);
+            w.I32(Stepped);
+            int he = Math.Max(1, Setup.HashEvery);
+            // Up to 8 of the host's fingerprints at ticks this packet will reach (every HashEvery-th); the first tick after
+            // bundle t is t + 1.
+            int hashes = 0;
+            int at = w.Pos;
+            w.U8(0);
+            int maxTicks = Math.Min(upTo - from + 1, 600);   // a tick encodes to 2 bytes at the very least, so 600 never all fit
+            for (int t = ((from + 1 + he - 1) / he) * he; t <= from + maxTicks && t <= _hashHistThrough && hashes < 8; t += he)
+            {
+                w.I32(t);
+                w.U64(_hashHist[t / he]);
+                hashes++;
+            }
+            _pkt[at] = (byte)hashes;
+            w.I32(from);
+            int countAt = w.Pos;
+            w.I16(0);
+            w.I16(0);
+            if (w.Overflow) { count = 0; return -1; }
+            int room = Peers.MaxPacket - w.Pos;
+            if (_feedRaw.Length < maxTicks * _bundleSize) _feedRaw = new byte[maxTicks * _bundleSize];
+            Buffer.BlockCopy(_hist, from * _bundleSize, _feedRaw, 0, maxTicks * _bundleSize);
+            TestFeedTamper?.Invoke(from, _feedRaw, maxTicks, _bundleSize);
+            int enc = LogCodec.Encode(_feedRaw, maxTicks, _bundleSize, _pkt, w.Pos, room, out count);
+            if (count <= 0) return -1;
+            // The hashes written may reach past the ticks that fit; the rejoiner only checks ticks it steps to, so that is fine.
+            _pkt[countAt] = (byte)count; _pkt[countAt + 1] = (byte)(count >> 8);
+            _pkt[countAt + 2] = (byte)enc; _pkt[countAt + 3] = (byte)(enc >> 8);
+            return w.Pos + enc;
+        }
+
+        /// <summary>Rejoiner: everything the host has stepped is held and stepped: start playing (inputs from here on).</summary>
+        private void GoLive(long now)
+        {
+            _catchingUp = false;
+            _acc = 0;
+            _mineThrough = Stepped - 1;
+            _sentInput = Stepped - 1;
+            _hostAckedInput = Stepped - 1;
+            RejoinLiveMs = now;
+            RejoinLiveTick = Stepped;
+            GenerateLocal(Stepped + Lead - 1, true);
+        }
+
         // ---------------------------------------------------------------- stepping
 
         private void StepDue(long now)
         {
+            if (_catchingUp)
+            {
+                // b15-rejoin: replay the log as fast as it is held (a frame's budget per Update), with no input of our own;
+                // live once every bundle the host has stepped is here and stepped.
+                long t0 = System.Diagnostics.Stopwatch.GetTimestamp();
+                int n = 0;
+                while (Status == LockstepStatus.Running && Stepped <= _bundlesThrough && n < _o.CatchUpTicksPerUpdate) { StepOne(); n++; }
+                if (n > 0) CatchUpStepMs += (System.Diagnostics.Stopwatch.GetTimestamp() - t0) * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
+                if (Status == LockstepStatus.Running && _hostSteppedSeen > 0 && Stepped > _bundlesThrough && _bundlesThrough >= _hostSteppedSeen - 1) GoLive(now);
+                return;
+            }
             int extra = 0;
             bool waited = false;
             while (Status == LockstepStatus.Running)
@@ -561,7 +866,7 @@ namespace CriticalMass.Net
         {
             int s = Stepped;
             int idx = s & (Window - 1);
-            int off = idx * _bundleSize;
+            int off = BIdx(s) * _bundleSize;
             for (int a = 0; a < _frames.Length; a++) _frames[a] = null;
             for (int k = 0; k < _h; k++)
             {
@@ -573,6 +878,13 @@ namespace CriticalMass.Net
                     _slotIsBot[k] = true;
                     MatchTick.HandToBot(World, actor);
                     HumanToBot?.Invoke(k, actor, World.Tick);
+                }
+                if ((flags & FlagToHuman) != 0 && _slotIsBot[k])
+                {
+                    // b15-rejoin: the player who dropped is back: the fighter is theirs again from this tick, on every machine.
+                    _slotIsBot[k] = false;
+                    MatchTick.BotToHuman(World, actor);
+                    BotToHuman?.Invoke(k, actor, World.Tick);
                 }
                 if ((flags & FlagInput) != 0 && !_slotIsBot[k] && actor < _frames.Length)
                 {
@@ -588,8 +900,8 @@ namespace CriticalMass.Net
                 }
             }
             TestTamper?.Invoke(s, _frames);
-            // This machine's next input goes Lead ticks ahead of the tick being stepped.
-            GenerateLocal(s + Lead, false);
+            // This machine's next input goes Lead ticks ahead of the tick being stepped (a rejoiner replaying the log has none).
+            if (!_catchingUp) GenerateLocal(s + Lead, false);
             using (SimThreadGuard.Enter()) MatchTick.AdvanceHumans(World, _frames, _scratch);
             Stepped = s + 1;
             // Tick 1 too: a mismatch there means the first inputs or the first step differ, not a slow drift.
@@ -611,6 +923,27 @@ namespace CriticalMass.Net
 
         private void RecordHash(int tick, ulong h)
         {
+            int he = Math.Max(1, Setup.HashEvery);
+            if (IsHost && tick % he == 0)
+            {
+                // b15-rejoin: every fingerprint of the match, for the rejoin log.
+                int hi = tick / he;
+                if (hi >= _hashHist.Length) Array.Resize(ref _hashHist, Math.Max(hi + 1, _hashHist.Length * 2));
+                _hashHist[hi] = h;
+                if (tick > _hashHistThrough) _hashHistThrough = tick;
+            }
+            if (_flat && tick % he == 0 && tick / he < _logHashHave.Length && _logHashHave[tick / he] != 0)
+            {
+                // b15-rejoin: the host's fingerprint for this second of the log: a wrong or garbage log stops here.
+                _logHashHave[tick / he] = 0;
+                if (_logHash[tick / he] != h)
+                {
+                    SetupMismatch = "Could not rejoin: the match the host sent did not check out. Try again.";
+                    SetupMismatchDetail = $"rejoin log fingerprint at tick {tick}: mine 0x{h:X16}, host 0x{_logHash[tick / he]:X16}";
+                    Desync(tick);
+                }
+                else RejoinVerified++;
+            }
             int i = _hashCount % HashKeep;
             _hashTick[i] = tick;
             _hash[i] = h;
@@ -688,7 +1021,7 @@ namespace CriticalMass.Net
         private void SendClient(long now)
         {
             int from = _t.Reliable ? _sentInput + 1 : _hostAckedInput + 1;
-            bool news = _mineThrough >= from || Status == LockstepStatus.Desynced;
+            bool news = _mineThrough >= from || Status == LockstepStatus.Desynced || _catchingUp;   // a rejoiner acks the log at the send rate
             if (now - _lastSendHost < (news ? _sendEveryMs : _o.KeepAliveMs)) return;
             int count = Math.Max(0, Math.Min(_mineThrough - from + 1, 64));
             var w = new WireWriter(_pkt);
@@ -712,6 +1045,7 @@ namespace CriticalMass.Net
 
         private void SendHost(long now)
         {
+            FeedRejoiners(now);
             if (StartPacket != null)
                 for (int k = 1; k < _h; k++)
                     if (!_heardInput[k] && !_gone[k] && now - _lastStartSend[k] >= 250)
@@ -772,7 +1106,7 @@ namespace CriticalMass.Net
             w.U8(_h);
             for (int k = 0; k < _h; k++)
             {
-                int d = _gone[k] || _inThrough[k] < 0 ? -128 : _inThrough[k] - Stepped;
+                int d = (_gone[k] && !_rejoining[k]) || _inThrough[k] < 0 ? -128 : _inThrough[k] - Stepped;
                 w.U8(unchecked((byte)(sbyte)Math.Max(-128, Math.Min(127, d))));
             }
             WriteHashes(ref w);

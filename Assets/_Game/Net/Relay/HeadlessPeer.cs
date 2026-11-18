@@ -52,6 +52,10 @@ namespace CriticalMass.Net.Relay
         public bool ChatTeam;
         /// <summary>Drop off the network with no goodbye at this tick (-1 = never), to test the bot handover.</summary>
         public int DropAt = -1;
+        /// <summary>b15-rejoin (-rejoin-after MS): after DropAt, wait this long, connect again with the same seat secret, replay
+        /// the match from the host's log and take the fighter back (-1 = stay dropped). Its fingerprints after the rejoin
+        /// (tick 0 to the end, the replayed ticks included) go to HashLogPath + ".rejoin".</summary>
+        public int RejoinAfterMs = -1;
         public string Build = "headless";
         public Action<string> Log = Console.WriteLine;
         /// <summary>Tests: use this in-process relay instead of the network (same rules as server/relay).</summary>
@@ -69,6 +73,14 @@ namespace CriticalMass.Net.Relay
         private readonly List<KeyValuePair<int, ulong>> _hashes = new List<KeyValuePair<int, ulong>>();
         private AutoplayPilot _pilot;
         private bool _picked, _readyLogged, _chatSent, _dropped;
+        private bool _dropDone, _liveLogged;
+        private long _rejoinAt = -1, _droppedAtMs = -1;
+        private ulong _secret;
+        private readonly List<KeyValuePair<int, ulong>> _rejoinHashes = new List<KeyValuePair<int, ulong>>();
+        /// <summary>b15-rejoin: the fingerprints of the rejoined session, for tests.</summary>
+        public IReadOnlyList<KeyValuePair<int, ulong>> RejoinHashes => _rejoinHashes;
+        /// <summary>b15-rejoin: the session (the rejoined one after a rejoin), for tests.</summary>
+        public LockstepSession Session => _session;
         // b12 (X2 follow-up): one "ONLINE LEAD" line per second of match (30 ticks at the shipped 30 Hz) so a log shows how the
         // adaptive lead moved, not only the SUMMARY's range. LeadPolicy/LockstepSession already expose these; no wire change.
         private const int LeadLineEveryTicks = 30;
@@ -123,6 +135,7 @@ namespace CriticalMass.Net.Relay
                 _room = new RoomHost(_t, _cfg, Name, Build) { TeamSize = TeamSize, Pace = Pace };
                 return;
             }
+            if (_secret != 0) { _client = new RoomClient(_t, _cfg, Name, Build, _secret); return; }   // b15-rejoin: ask for the seat back
             _client = new RoomClient(_t, _cfg, Name, Build);
             _client.SetPick(Team, Class);
             _client.SetReady(true);
@@ -151,6 +164,16 @@ namespace CriticalMass.Net.Relay
                 if (now < _retryAt) return null;
                 _retryAt = -1;
                 Connect();
+            }
+            if (_rejoinAt >= 0)
+            {
+                // b15-rejoin: back after the drop: a new connection, the same seat secret.
+                if (now < _rejoinAt) return null;
+                _rejoinAt = -1;
+                _tries = 0;
+                Connect();
+                _dropped = false;
+                Log($"ONLINE REJOINING after {now - _droppedAtMs} ms");
             }
             if (Host)
             {
@@ -211,11 +234,28 @@ namespace CriticalMass.Net.Relay
                 _nextLeadLine = _session.Stepped + LeadLineEveryTicks;
                 Log($"ONLINE LEAD tick {_session.Stepped} lead {_session.Lead} leadmin {_session.LeadMin} leadmax {_session.LeadMax} late {_session.LateInputs}");
             }
-            if (DropAt >= 0 && _session.Stepped >= DropAt)
+            if (_session.IsRejoin && !_liveLogged && _session.RejoinLiveTick >= 0)
+            {
+                _liveLogged = true;
+                Log($"ONLINE REJOINED live at tick {_session.RejoinLiveTick} after {_session.RejoinLiveMs - _session.RejoinStartMs} ms in the match " +
+                    $"({now - _droppedAtMs} ms after the drop): log {_session.LogBytes} B on the wire for {_session.LogRawBytes} B of bundles, " +
+                    $"{_session.RejoinVerified} log fingerprints checked, catch-up stepping {_session.CatchUpStepMs:F0} ms");
+            }
+            if (DropAt >= 0 && !_dropDone && _session.Stepped >= DropAt)
             {
                 _dropped = true;
+                _dropDone = true;
                 Log("ONLINE DROPPED on purpose at tick " + _session.Stepped);
                 (_t as RelayTransport)?.Abort();   // the local relay: simply never heard from again
+                if (RejoinAfterMs >= 0 && _client != null)
+                {
+                    _secret = _client.Secret;
+                    _session = null;
+                    _client = null;
+                    _droppedAtMs = now;
+                    _rejoinAt = now + RejoinAfterMs;
+                    return null;
+                }
                 ExitCode = 0;
                 return Finish();
             }
@@ -251,6 +291,13 @@ namespace CriticalMass.Net.Relay
             _hashes.Add(new KeyValuePair<int, ulong>(0, s.MyWorldHash0));
             s.HashRecorded = (tick, h) => _hashes.Add(new KeyValuePair<int, ulong>(tick, h));
             s.HumanToBot += (slot, actor, tick) => Log($"ONLINE TOBOT slot {slot} actor {actor} at tick {tick}");   // += : the room posts its notice too
+            s.BotToHuman += (slot, actor, tick) => Log($"ONLINE TOHUMAN slot {slot} actor {actor} at tick {tick}");   // b15-rejoin
+            if (s.IsRejoin)
+            {
+                // b15-rejoin: the rejoined session's own log (tick 0 to the end); the first session's stays in _hashes.
+                _rejoinHashes.Add(new KeyValuePair<int, ulong>(0, s.MyWorldHash0));
+                s.HashRecorded = (tick, h) => { _hashes.Add(new KeyValuePair<int, ulong>(tick, h)); _rejoinHashes.Add(new KeyValuePair<int, ulong>(tick, h)); };
+            }
             Log($"ONLINE SETUP peer {_t.LocalPeer} actor {s.LocalActor} humans {s.Setup.Humans.Length} seed {s.Setup.Seed} " +
                 $"config 0x{s.MyConfigHash:X16} world0 0x{s.MyWorldHash0:X16} host config 0x{s.Setup.ConfigHash:X16} host world0 0x{s.Setup.WorldHash0:X16}");
         }
@@ -283,6 +330,12 @@ namespace CriticalMass.Net.Relay
                 var sb = new StringBuilder();
                 foreach (KeyValuePair<int, ulong> kv in _hashes) sb.Append(kv.Key).Append(' ').Append(kv.Value.ToString("X16")).Append('\n');
                 File.WriteAllText(HashLogPath, sb.ToString());
+                if (_rejoinHashes.Count > 0)
+                {
+                    sb.Clear();
+                    foreach (KeyValuePair<int, ulong> kv in _rejoinHashes) sb.Append(kv.Key).Append(' ').Append(kv.Value.ToString("X16")).Append('\n');
+                    File.WriteAllText(HashLogPath + ".rejoin", sb.ToString());
+                }
             }
             if (_t != null && !_dropped) { _t.Close(); (_t as RelayTransport)?.WaitClosed(1500); }
             Log("ONLINE EXIT " + ExitCode);
@@ -335,6 +388,7 @@ namespace CriticalMass.Net.Relay
                     case "onlinechattext": case "chat-text": p.ChatText = next; i++; break;
                     case "onlinechatteam": case "chat-team": p.ChatTeam = true; break;
                     case "onlinedropat": case "drop-at": int.TryParse(next, System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out p.DropAt); i++; break;
+                    case "onlinerejoinafter": case "rejoin-after": int.TryParse(next, System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out p.RejoinAfterMs); i++; break;
                     case "onlinebuild": case "build": p.Build = next; i++; break;
                 }
             }
