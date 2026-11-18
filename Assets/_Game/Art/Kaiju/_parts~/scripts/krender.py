@@ -38,7 +38,7 @@ def toon_material():
     dif = N.new("ShaderNodeBsdfDiffuse"); dif.inputs[0].default_value = (1, 1, 1, 1)
     s2r = N.new("ShaderNodeShaderToRGB"); L.new(dif.outputs[0], s2r.inputs[0])
     bw = N.new("ShaderNodeRGBToBW"); L.new(s2r.outputs[0], bw.inputs[0])
-    ramp = N.new("ShaderNodeValToRGB"); cr = ramp.color_ramp; cr.interpolation = 'CONSTANT'
+    ramp = N.new("ShaderNodeValToRGB"); cr = ramp.color_ramp; cr.interpolation = 'CONSTANT'; ramp.name = "Color Ramp"
     cr.elements[0].position = 0.0; cr.elements[0].color = (0.50, 0.50, 0.56, 1)
     cr.elements[1].position = 0.30; cr.elements[1].color = (0.78, 0.78, 0.80, 1)
     e = cr.elements.new(0.62); e.color = (1, 1, 1, 1)
@@ -57,6 +57,13 @@ def toon_material():
     L.new(mul2.outputs[2], sel.inputs[6]); L.new(vc.outputs[0], sel.inputs[7])
     em = N.new("ShaderNodeEmission"); L.new(sel.outputs[2], em.inputs[0]); L.new(em.outputs[0], out.inputs[0])
     return m
+
+BASE_RAMP = ((0.50, 0.50, 0.56), (0.78, 0.78, 0.80), (1.0, 1.0, 1.0))
+def set_lift(lit=1.0, mid=1.0, shadow=1.0):
+    """The game's band lifts (KaijuAnimator.ApplyTypeLook: _LitMultiplier, _MidRatio, _ShadowRatio) on the preview ramp."""
+    cr = toon_material().node_tree.nodes["Color Ramp"].color_ramp
+    for e, base, k in zip(cr.elements, BASE_RAMP, (shadow, mid, lit)): e.color = (*[min(1.0, c * k) if k == lit else c * k for c in base], 1)
+PARTS_LIFT = (1.10, 1.19, 1.27); OLD_LIFT = (1.22, 1.38, 1.55)
 
 def ink_material():
     m = bpy.data.materials.get("KInk")

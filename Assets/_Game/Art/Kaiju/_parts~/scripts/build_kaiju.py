@@ -124,7 +124,16 @@ def dirz(az_deg, el_deg):
 
 # ------------------------------------------------------------------ BODY (shared, coloured per type)
 SMOOTH = TYPE == "Mire"
-seg_body = 22
+seg_body = 32 if TYPE == "Brute" else 22
+# round 2: the types differ in MASS, not only crests (gameplay-camera silhouette IoU). w = torso width, hz = top-line height
+# (hump), arm / fist / sh = forearm, fist and shoulder bulk, tr = tail thickness, tn = last tail bone that carries geometry
+# (the bones still animate; BRUTE's short thick tail simply ends at Tail4).
+BX = {"Elder": dict(w=1.06, hz=1.0, arm=0.95, fist=0.95, sh=1.0, tr=1.25, tn=7),
+      "Grove": dict(w=0.84, hz=0.85, arm=0.86, fist=0.88, sh=0.86, tr=0.72, tn=7),
+      "Brute": dict(w=1.32, hz=1.0, arm=1.60, fist=1.40, sh=1.60, tr=1.60, tn=4),
+      "Timber": dict(w=0.86, hz=0.50, arm=0.86, fist=0.90, sh=0.85, tr=1.0, tn=7),
+      "Mire": dict(w=1.26, hz=0.9, arm=1.0, fist=0.95, sh=1.10, tr=1.05, tn=7)}[TYPE]
+ARMN = 20 if TYPE == "Brute" else 14
 MASS = {   # bone: (centre, radii, rot)   torso boulders overlapping ~40% so the spine can bend without gaps
     "Hips":   (V(0, 0.86, 1.62), V(0.98, 0.86, 0.74)),
     "Spine":  (V(0, 0.42, 2.14), V(1.12, 0.92, 0.82)),
@@ -132,11 +141,13 @@ MASS = {   # bone: (centre, radii, rot)   torso boulders overlapping ~40% so the
     "Spine3": (V(0, -0.30, 2.94), V(1.28, 0.90, 0.86)),
     "Chest":  (V(0, -0.64, 2.80), V(1.18, 0.74, 0.80)),
 }
+MASS = {b: (c, V(r.x * BX["w"], r.y, r.z)) for b, (c, r) in MASS.items()}
 for b, (c, r) in MASS.items():
     E(b, ellipsoid(c, r, seg_body, 12), "hide")
-# back hump that lifts the top line (the crest grows out of it)
-E("Spine3", ellipsoid(V(0, -0.18, 3.28), V(0.98, 0.82, 0.56), 18, 9), "hide")
-E("Spine2", ellipsoid(V(0, 0.30, 3.02), V(0.92, 0.72, 0.50), 18, 9), "hide")
+# back hump that lifts the top line (the crest grows out of it); TIMBER's is low (a long low log-stacked back)
+HUMP = (("Spine3", V(0, -0.18, 3.28), V(0.98, 0.82, 0.56)), ("Spine2", V(0, 0.30, 3.02), V(0.92, 0.72, 0.50)))
+HUMP = tuple((b, V(c.x, c.y, 2.75 + (c.z - 2.75) * BX["hz"]), V(r.x * BX["w"], r.y, r.z * (0.6 + 0.4 * BX["hz"]))) for b, c, r in HUMP)
+for b, c, r in HUMP: E(b, ellipsoid(c, r, 18, 9), "hide")
 # belly: tan rounded plates down the front (chest / spine2 / spine / hips), banded
 for b, c, s in (("Chest", V(0, -1.18, 2.55), (1.30, 0.42, 0.85)), ("Spine2", V(0, -0.72, 2.12), (1.34, 0.46, 0.72)),
                 ("Spine", V(0, -0.32, 1.78), (1.18, 0.44, 0.62)), ("Hips", V(0, 0.12, 1.42), (1.00, 0.42, 0.46))):
@@ -174,15 +185,16 @@ E("Jaw", ellipsoid(V(0, -2.08, 2.52), V(0.30, 0.16, 0.16), 10, 6), "belly_dk")  
 # ---------------- ARMS
 for S, s in SIDES:
     sh, ar, fa, fi = "Shoulder_" + S, "Arm_" + S, "Forearm_" + S, "Fist_" + S
-    E(sh, ellipsoid(mx(V(1.10, -0.62, 2.92), s), V(0.64, 0.64, 0.60), 16, 9), "hide")
+    q = BX["sh"]; A = BX["arm"]; F = BX["fist"]
+    E(sh, ellipsoid(mx(V(1.10 + 0.55 * (q - 1), -0.62, 2.92 + 0.25 * (q - 1)), s), V(0.64 * q, 0.64 * (1 + 0.5 * (q - 1)), 0.60 * q), 16, 9), "hide")
     a0, a1 = bh(ar), bt(ar)
-    E(ar, tube(a0, a1, [(-0.12, 0.47, 0.47), (0.0, 0.48, 0.48), (0.5, 0.45, 0.45), (1.0, 0.40, 0.40), (1.08, 0.36, 0.36)], 14), "hide")
+    E(ar, tube(a0, a1, [(-0.12, 0.47 * A, 0.47 * A), (0.0, 0.48 * A, 0.48 * A), (0.5, 0.45 * A, 0.45 * A), (1.0, 0.40 * A, 0.40 * A), (1.08, 0.36 * A, 0.36 * A)], ARMN), "hide")
     f0, f1 = bh(fa), bt(fa)
-    E(fa, ellipsoid(f0, V(0.43, 0.43, 0.43), 12, 7), "hide")   # elbow collar (child side)
-    E(fa, tube(f0, f1, [(-0.05, 0.40, 0.40), (0.3, 0.48, 0.46), (0.75, 0.58, 0.55), (1.02, 0.56, 0.54), (1.12, 0.46, 0.44)], 14), "hide")
+    E(fa, ellipsoid(f0, V(0.43, 0.43, 0.43) * A, 12, 7), "hide")   # elbow collar (child side)
+    E(fa, tube(f0, f1, [(-0.05, 0.40 * A, 0.40 * A), (0.3, 0.48 * A, 0.46 * A), (0.75, 0.58 * A, 0.55 * A), (1.02, 0.56 * A, 0.54 * A), (1.12, 0.46 * A, 0.44 * A)], ARMN), "hide")
     # fist: big block along the bone, knuckle fingers on their own bones
     k0, k1 = bh(fi), bt(fi); fd = (k1 - k0).normalized()
-    E(fi, rbox((k0 + k1) / 2 + V(0, -0.06, 0), (0.92, 0.80, 0.78), rot_to(fd, V(0, -1, 0)), 2.6, 14, 6), "hide")
+    E(fi, rbox((k0 + k1) / 2 + V(0, -0.06, 0), (0.92 * F, 0.80 * F, 0.78 * F), rot_to(fd, V(0, -1, 0)), 2.6, 14, 6), "hide")
     for i in (1, 2, 3):
         kn = f"Knuckle{i}_{S}"; q0, q1 = bh(kn), bt(kn); d = (q1 - q0).normalized()
         a = q0 + d * 0.22 * (q1 - q0).length
@@ -205,12 +217,14 @@ for S, s in SIDES:
         E(to, cone(p1 + V(0, 0.02, 0.0), p1 + V(0, -0.20, -0.08), 0.08, 5), "claw")
 
 # ---------------- TAIL
-TR = [0.58, 0.50, 0.42, 0.34, 0.27, 0.20, 0.14, 0.06]
-for i in range(1, 8):
+TR = [r * BX["tr"] for r in (0.58, 0.50, 0.42, 0.34, 0.27, 0.20, 0.14, 0.06)]
+TN = BX["tn"]
+if TN < 7: TR[TN] = TR[TN - 1] * 0.82                       # a short tail ends blunt
+for i in range(1, TN + 1):
     n = f"Tail{i}"; p0, p1 = bh(n), bt(n); L = (p1 - p0).length
     E(n, ellipsoid(p0, V(TR[i - 1] * 1.03, TR[i - 1] * 1.03, TR[i - 1] * 1.03), 12, 7), "hide")
     E(n, tube(p0, p1, [(0, TR[i - 1], TR[i - 1] * 0.95), (1.0, TR[i], TR[i] * 0.95), (1.1, TR[i] * 0.92, TR[i] * 0.88)], 12,
-              hint=V(0, 0, 1), round1=(i == 7)), "hide")
+              hint=V(0, 0, 1), round1=(i == TN)), "hide")
 
 # ------------------------------------------------------------------ plate anchors (shared placement, type style)
 ANCH = []   # (bone, point, normal, size)
@@ -219,51 +233,58 @@ for b, (c, r) in MASS.items():
         if b == "Chest" and az == 90: continue
         if b == "Hips" and el < 40: continue
         p, nn = on_ell(c, r, dirz(az, el)); ANCH.append((b, p, nn, sz * (1.15 if b in ("Spine2", "Spine3") else 1.0)))
-for b, (c, r) in (("Spine3", (V(0, -0.18, 3.28), V(0.98, 0.82, 0.56))), ("Spine2", (V(0, 0.30, 3.02), V(0.92, 0.72, 0.50)))):
+for b, c, r in HUMP:
     for az in (25, 155):
         p, nn = on_ell(c, r, dirz(az, 55)); ANCH.append((b, p, nn, 0.55))
 LIMB_ANCH = []   # forearm / thigh / shin outer plates
 for S, s in SIDES:
     f0, f1 = bh("Forearm_" + S), bt("Forearm_" + S)
     for t, sz in ((0.35, .5), (0.72, .58)):
-        c = f0.lerp(f1, t); LIMB_ANCH.append(("Forearm_" + S, c + V(s * 0.46, 0.02, 0.10), V(s, 0.0, 0.45).normalized(), sz))
+        c = f0.lerp(f1, t); LIMB_ANCH.append(("Forearm_" + S, c + V(s * 0.46 * BX["arm"], 0.02, 0.10 * BX["arm"]), V(s, 0.0, 0.45).normalized(), sz * BX["arm"] ** 0.5))
     t0, t1 = bh("Thigh_" + S), bt("Thigh_" + S)
     LIMB_ANCH.append(("Thigh_" + S, t0.lerp(t1, 0.45) + V(s * 0.58, 0.05, 0.12), V(s, 0.15, 0.55).normalized(), 0.56))
     a0, a1 = bh("Arm_" + S), bt("Arm_" + S)
-    LIMB_ANCH.append(("Arm_" + S, a0.lerp(a1, 0.5) + V(s * 0.38, 0.0, 0.18), V(s, 0, 0.7).normalized(), 0.44))
+    LIMB_ANCH.append(("Arm_" + S, a0.lerp(a1, 0.5) + V(s * 0.38 * BX["arm"], 0.0, 0.18 * BX["arm"]), V(s, 0, 0.7).normalized(), 0.44))
 
 def tail_top(i, t=0.5):
     n = f"Tail{i}"; p0, p1 = bh(n), bt(n); c = p0.lerp(p1, t); r = TR[i - 1] + (TR[i] - TR[i - 1]) * t
     return n, c + V(0, 0, r * 0.88), (p1 - p0).normalized(), r
 
 CREST = [f"Crystal{i}" for i in range(2, 9)]
+def top_z(y):
+    z = 0.0
+    for c, r in [v for v in MASS.values()] + [(c, r) for _, c, r in HUMP] + [(V(0, -1.0, 2.98), V(0.64, 0.52, 0.54))]:
+        u = (y - c.y) / r.y
+        if abs(u) < 1: z = max(z, c.z + r.z * math.sqrt(1 - u * u))
+    return z
 def crest_base(cb):
     """Crest element base on the back surface under the crystal bone, and its up direction (bone axis)."""
     h, t = bh(cb), bt(cb); d = (t - h).normalized()
     return h - d * 0.42, d, (t - h).length
 
 # ------------------------------------------------------------------ TYPE PART SETS
-def shoulder_plate(S, s, style):
-    b = "Shoulder_" + S; c = mx(V(1.18, -0.62, 3.36), s); n = mx(V(0.45, 0, 1), s).normalized()
+def shoulder_plate(S, s, style, k=1.0):
+    q = BX["sh"]; b = "Shoulder_" + S; c = mx(V(1.18 + 0.55 * (q - 1), -0.62, 3.36 + 0.45 * (q - 1)), s); n = mx(V(0.45, 0, 1), s).normalized()
     if style == "rock":
         c = c + mx(V(0.30, 0, 0.02), s); n = mx(V(0.55, 0, 1), s).normalized()
         E(b, hullrock(c + n * 0.10, n, 0.62, 0.55, 0.26, 11 + s, top=0.7), "team")
         E(b, hullrock(c - n * 0.02, n, 0.95, 0.80, 0.20, 21 + s, top=0.92, jit=0.08), "team_dk")
         E(b, hullrock(c - n * 0.12, n, 1.05, 0.88, 0.10, 31 + s, top=0.97, jit=0.05), "trim")
     elif style == "wedge":
-        E(b, wedge(c, n, 0.95, 0.80, 0.42, 7 + s, tip=0.5), "team")
+        E(b, wedge(c, n, 0.95 * k, 0.80 * k, 0.42 * k, 7 + s, tip=0.5), "team")
     elif style == "bark":
-        E(b, rbox(c, (0.95, 0.85, 0.24), rot_to(n), 2.2, 12, 4), "team")
+        E(b, rbox(c, (0.95 * k, 0.85 * k, 0.24), rot_to(n), 2.2, 12, 4), "team")
     elif style == "log":
-        for k in (-1, 0, 1):
-            q = c + V(0, k * 0.27, -0.04 * abs(k))
-            E(b, cylinder(q + V(-s * 0.40, 0, 0.0), q + V(s * 0.40, 0, -0.18), 0.15, 10), "team")
+        for j in (-1, 0, 1):
+            q = c + V(0, j * 0.27 * k, -0.04 * abs(j))
+            E(b, cylinder(q + V(-s * 0.40 * k, 0, 0.0), q + V(s * 0.40 * k, 0, -0.18), 0.15 * k, 10), "team")
     elif style == "smooth":
-        E(b, ellipsoid(c - n * 0.04, V(0.60, 0.55, 0.20), 14, 7, rot_to(n)), "team")
+        E(b, ellipsoid(c - n * 0.04, V(0.60 * k, 0.55 * k, 0.20), 14, 7, rot_to(n)), "team")
 
 def elder():
     # ancient plates with gold trim rims: a gold under-slab peeking out around each stone plate
     for i, (b, p, nn, sz) in enumerate(ANCH):
+        if nn.z > 0.6 and b != "Chest": continue          # under the back shield
         E(b, hullrock(p + nn * 0.02, nn, sz, sz * 0.86, 0.26, 100 + i, top=0.62), "plate" if i % 3 else "plate_lt")
         E(b, hullrock(p - nn * 0.05, nn, sz * 1.10, sz * 0.96, 0.12, 300 + i, top=0.95, jit=0.08), "trim")
     for i, (b, p, nn, sz) in enumerate(LIMB_ANCH):
@@ -271,6 +292,15 @@ def elder():
         E(b, hullrock(p - nn * 0.05, nn, sz * 1.1, sz * 0.9, 0.10, 520 + i, top=0.95, jit=0.08), "trim")
         if "Forearm" in b: E(b, octa(p + nn * 0.13, nn, 0.11), "glow")
     for S, s in SIDES: shoulder_plate(S, s, "rock")
+    # round 2 MASS: a broad stone back SHIELD (a carapace wider than the body, gold rim) under the plate row; a team-painted
+    # inlay on both flanks of each section so ownership reads on the broad top
+    for j, (b, y, tilt, rx, ry) in enumerate((("Spine3", -0.30, -0.15, 2.45, 0.76), ("Spine2", 0.25, 0.10, 2.65, 0.76),
+                                             ("Spine", 0.80, 0.45, 2.40, 0.68), ("Hips", 1.28, 0.85, 1.90, 0.60))):
+        n = V(0, tilt, 1).normalized(); c = V(0, y, top_z(y) - 0.02)
+        E(b, hullrock(c, n, rx, ry, 0.34, 1200 + j, top=0.80, sides=12, jit=0.05, up_hint=V(1, 0, 0)), "plate_lt" if j % 2 else "plate")
+        E(b, hullrock(c - n * 0.10, n, rx * 1.06, ry * 1.14, 0.16, 1210 + j, top=0.96, sides=12, jit=0.03, up_hint=V(1, 0, 0)), "trim")
+        for sg in (1, -1):
+            E(b, hullrock(c + n * 0.16 + V(rx * 0.52 * sg, 0, -0.08), n, 0.80, 0.50, 0.10, 1220 + j * 2 + (sg > 0), top=0.9, sides=8, jit=0.05, up_hint=V(1, 0, 0)), "team")
     # crest: a DOUBLE row of big stone dorsal plates splayed outward (stegosaur-like, staggered), broad along the body and
     # thin across it: a jagged crenellated top line from every side, gaps between plates (the opposite of MIRE's one smooth
     # sail); gold rim behind each; a team-glow diamond on each outer face
@@ -290,15 +320,15 @@ def elder():
     for k in range(9):
         a = math.radians(-72 + k * 18); u = Mc @ V(math.sin(a), 0, math.cos(a))
         arc.append(cc + u * 0.85)
-        Ls = 0.85 + 1.05 * math.sin(a) ** 2
-        E("Crystal1", cone(cc + u * 0.70, cc + u * (0.85 + Ls), 0.17 if k % 2 == 0 else 0.13, 6), "trim" if k % 2 == 0 else "accent")
+        Ls = 1.05 + 1.25 * math.sin(a) ** 2
+        E("Crystal1", cone(cc + u * 0.70, cc + u * (0.85 + Ls), 0.24 if k % 2 == 0 else 0.18, 6), "trim" if k % 2 == 0 else "accent")
     E("Crystal1", K.round_path(arc, [0.13] * len(arc), 6, V(0, 1, 0)), "accent_dk")
     E("Crystal1", octa(cc + Mc @ V(0, -0.12, 0.92), (Mc @ V(0, -1, 0.3)).normalized(), 0.13, up_hint=V(0, 0, 1)), "tglow")
     E("Head", octa(V(0, -1.86, 3.48), V(0, -0.6, 1).normalized(), 0.09), "glow")       # forehead diamond
     # tail: stone scutes with gold edge, diamond on tip
     for i in range(1, 8):
         n, c, d, r = tail_top(i)
-        E(n, hullrock(c, V(0, 0, 1), r * 0.85, r * 0.95, max(0.08, r * 0.45), 900 + i, up_hint=d), "plate")
+        E(n, hullrock(c, V(0, 0, 1), r * 0.85, r * 0.95, max(0.08, r * 0.45), 900 + i, up_hint=d), "team" if i in (1, 3, 5) else "plate")
     n, c, d, r = tail_top(7, 0.9)
     E(n, octa(bt("Tail7") + d * 0.1, d, 0.16, up_hint=V(0, 0, 1), flat=0.5), "trim")
 
@@ -318,24 +348,30 @@ def grove():
             a = math.radians(-70 + j * 25)
             ax = mx(V(math.cos(a) * 0.9, math.sin(a) * 0.9, 0.55), s).normalized()
             E("Shoulder_" + S, leaf(c0, ax, V(0, 0, 1).cross(ax).normalized(), 0.95 if j % 2 else 0.8, 0.36, 0.035, 7, bend=-0.18),
-              "accent" if j % 2 else "trim")
+              "team" if j % 2 else "trim")
     # tree crest: a trunk and a round canopy of faceted leaf clumps grows out of the upper back (the GROVE silhouette)
-    t0 = V(0, -0.15, 3.55); t1 = V(0, 0.0, 4.35)
+    t0 = V(0, 0.30, 3.30); t1 = V(0, 0.75, 3.75)
     E("Crystal5", tube(t0, t1, [(0, 0.34, 0.30), (0.6, 0.24, 0.22), (1.0, 0.26, 0.24)], 10, hint=V(1, 0, 0)), "plate")
     for s_ in (1, -1):
-        E("Crystal5", K.round_path([t0.lerp(t1, 0.6), V(0.55 * s_, 0.05, 4.40), V(0.95 * s_, 0.10, 4.40)], [0.13, 0.10, 0.07], 6), "plate")
+        E("Crystal5", K.round_path([t0.lerp(t1, 0.6), V(0.55 * s_, 0.05, 4.00), V(0.95 * s_, 0.10, 4.00)], [0.13, 0.10, 0.07], 6), "plate")
+    # bark collar: a team-painted bark ring round the trunk foot and a team collar plate over the neck (seen from above)
+    E("Crystal5", tube(t0 - V(0, 0, 0.05), t0 + V(0, 0, 0.22), [(0, 0.52, 0.50), (1.0, 0.48, 0.46)], 12, hint=V(1, 0, 0)), "team")
+    E("Neck", hullrock(V(0, -0.98, 3.42), V(0, -0.3, 1).normalized(), 0.62, 0.85, 0.16, 77, top=0.9, sides=10, jit=0.06, up_hint=V(1, 0, 0)), "team")
     CL = [(V(0, 0.0, 4.70), 0.70, "accent"), (V(1.00, -0.05, 4.40), 0.58, "trim"), (V(-1.00, -0.05, 4.40), 0.58, "accent_dk"),
           (V(0.55, 0.75, 4.42), 0.55, "accent_dk"), (V(-0.55, 0.75, 4.42), 0.55, "trim"), (V(0.0, -0.80, 4.40), 0.52, "trim"),
           (V(0.0, 0.18, 4.92), 0.42, "trim"), (V(0.62, -0.62, 4.36), 0.46, "accent"), (V(-0.62, -0.62, 4.36), 0.46, "accent")]
     for k, (c, r, col) in enumerate(CL):
-        bone = "Crystal5" if k in (0, 5, 6) else ("Crystal4" if c.y < 0.2 else "Crystal6")
-        c = V(c.x * 1.55, c.y * 1.25, c.z + 0.18); r = r * 1.30
+        c = V(c.x * 1.30, c.y * 1.10 + 0.75, c.z - 0.50); r = r * 1.10
+        bone = "Crystal6" if c.y < 0.35 else ("Crystal7" if c.y < 0.95 else "Crystal8")
         E(bone, hullrock(c, V(0, 0, 1), r, r * 0.92, r * 1.2, 600 + k, top=0.55, sides=9, jit=0.22), col)
-    E("Crystal5", ellipsoid(V(0.25, -0.40, 4.85), V(0.10, 0.10, 0.10), 8, 5), "tglow")
-    E("Crystal5", ellipsoid(V(-0.35, 0.30, 4.90), V(0.10, 0.10, 0.10), 8, 5), "tglow")
-    E("Crystal4", ellipsoid(V(0.55, -0.35, 4.62), V(0.09, 0.09, 0.09), 8, 5), "glow")
+        # team blossom on top of every clump: a broad flat flower (ownership reads through the canopy), glowing centre
+        if k != 6:
+            q = c + V(0.18 * math.copysign(1, c.x or 1), 0.10, r * 0.56)
+            E(bone, hullrock(q, V(0, 0, 1), 0.34, 0.34, 0.09, 640 + k, top=0.75, sides=5, jit=0.10), "team")
+            E(bone, ellipsoid(q + V(0, 0, 0.06), V(0.09, 0.09, 0.06), 8, 5), "tglow")
+    E("Crystal4", ellipsoid(V(0.55, -0.35, 4.20), V(0.09, 0.09, 0.09), 8, 5), "glow")
     for k, cb in enumerate(CREST):
-        if cb in ("Crystal4", "Crystal5", "Crystal6"): continue
+        if cb not in ("Crystal2", "Crystal3"): continue        # the tree stands on the rear crest bones; leaf fans in front only
         b0, d, L = crest_base(cb); Lf = L + 0.30
         for j, (sx, col) in enumerate(((-0.9, "accent"), (0.0, "trim"), (0.9, "accent_dk"))):
             ax = (d + V(sx, 0, 0) * 0.75).normalized()
@@ -368,30 +404,33 @@ def brute():
         E(b, wedge(p, nn, sz * (1.5 if big else 1.15), sz * 1.2, 0.36 if big else 0.28, 400 + i, tip=0.45), "plate_lt" if big else "plate")
         if big: E(b, box(p - nn * 0.03 + rot_to(nn) @ V(0, sz * 0.72, 0), (sz * 1.0, 0.07, 0.14), 0.0, 1, rot_to(nn)), "glow")
     for S, s in SIDES:
-        shoulder_plate(S, s, "wedge")
-        # big shoulder horns sweeping out and forward: the BRUTE silhouette (team-glow tips)
-        b = "Shoulder_" + S; h0 = mx(V(1.42, -0.55, 3.52), s)
-        E(b, horn(h0, mx(V(0.9, -0.25, 0.55), s), 1.05, 0.20, mx(V(0.25, -0.35, 0.25), s), 8), "accent")
+        shoulder_plate(S, s, "wedge", k=1.45)
+        # big shoulder horns sweeping out and forward: the BRUTE silhouette (team-glow tips); thick enough to survive 1080p
+        b = "Shoulder_" + S; h0 = mx(V(1.42 + 0.55 * (BX["sh"] - 1), -0.55, 3.52 + 0.45 * (BX["sh"] - 1)), s)
+        E(b, horn(h0, mx(V(0.9, -0.25, 0.55), s), 1.05, 0.30, mx(V(0.25, -0.35, 0.25), s), 8), "accent")
         tip = h0 + mx(V(0.9, -0.25, 0.55), s).normalized() * 1.05 + mx(V(0.25, -0.35, 0.25), s)
-        E(b, ellipsoid(tip, V(0.07, 0.07, 0.07), 8, 5), "tglow")
-        # thick forearm armour cuff
-        f0, f1 = bh("Forearm_" + S), bt("Forearm_" + S)
-        E("Forearm_" + S, tube(f0, f1, [(0.55, 0.66, 0.62), (0.95, 0.70, 0.66)], 12, hint=V(0, 0, 1)), "plate_dk")
+        E(b, ellipsoid(tip, V(0.12, 0.12, 0.12), 8, 5), "tglow")
+        # thick forearm armour cuff, team-painted (big top-facing team area on the huge forearms)
+        f0, f1 = bh("Forearm_" + S), bt("Forearm_" + S); A = BX["arm"]
+        E("Forearm_" + S, tube(f0, f1, [(0.50, 0.66 * A, 0.62 * A), (0.92, 0.70 * A, 0.66 * A)], 14, hint=V(0, 0, 1)), "team")
     # crest: tall blunt horn-plates, team-glow tips
     for k, cb in enumerate(CREST):
         b0, d, L = crest_base(cb); hgt = L + 0.38
         E(cb, wedge(b0, d, 0.60, 0.52, hgt, 800 + k, tip=0.28, up_hint=V(1, 0, 0), lean=V(0, 0, 0)), "plate_lt" if k % 2 else "plate")
-        E(cb, ellipsoid(b0 + d * (hgt * 0.98), V(0.07, 0.07, 0.07), 8, 5), "tglow")
+        E(cb, ellipsoid(b0 + d * (hgt * 0.98), V(0.11, 0.11, 0.11), 8, 5), "tglow")
         E(cb, box(b0 + d * 0.30 + V(0, 0.29, 0), (0.42, 0.06, 0.12), 0.0, 1), "glow")
     # head: two big curved bull horns + nose horn
     for s in (1, -1):
-        E("Head", horn(V(0.46 * s, -1.30, 3.38), V(0.95 * s, -0.1, 0.35), 0.95, 0.16, V(0.0, -0.45, 0.35), 8), "accent")
+        E("Head", horn(V(0.46 * s, -1.30, 3.38), V(0.95 * s, -0.1, 0.35), 0.95, 0.24, V(0.0, -0.45, 0.35), 8), "accent")
     E("Crystal1", horn(bh("Crystal1") + V(0, -0.30, -0.12), V(0, -0.5, 1), 0.45, 0.13, V(0, -0.12, 0), 6), "accent")
-    for i in range(1, 8):
+    for i in range(1, TN + 1):
         n, c, d, r = tail_top(i)
         E(n, wedge(c, V(0, 0, 1), r * 1.4, r * 1.2, 0.18 + r * 0.6, 950 + i, tip=0.3, up_hint=d), "plate")
-    n, c, d, r = tail_top(7, 0.7)
-    E(n, horn(bt("Tail7") - d * 0.15, d, 0.45, 0.12, V(0, 0, 0.12), 6), "accent")   # tail club spike
+    # short thick tail: ends at Tail4 in a spiked stone mace
+    n = f"Tail{TN}"; d = (bt(n) - bh(n)).normalized(); e = bt(n); e = V(e.x, e.y, max(e.z, 0.50))
+    E(n, hullrock(e, d, 0.62, 0.62, 0.70, 990, top=0.7, sides=9, jit=0.12, up_hint=V(0, 0, 1)), "plate_lt")
+    for k2, dv in enumerate((V(0, 0, 1), V(1, 0, 0.3), V(-1, 0, 0.3), V(d.x, d.y, 0.25))):
+        E(n, horn(e + dv.normalized() * 0.40, dv, 0.40, 0.14, V(0, 0, 0), 6), "accent")
 
 def timber():
     # pale banded bark: transverse log plates across the back (alternating pale / dark bands), log spines, antler crest
@@ -399,33 +438,47 @@ def timber():
         for k, az in enumerate((-60, -20, 20, 60)):   # bands that run over the top of each boulder, side to side
             dvec = V(0, math.sin(math.radians(az)), math.cos(math.radians(az)))
             p, nn = on_ell(c, r, dvec)
-            ax = V(1, 0, 0); E(b, rbox(p - nn * 0.05, (r.x * 1.85, 0.30, 0.20), rot_to(nn, ax), 2.6, 12, 4), "plate_lt" if k % 2 else "plate_dk")
+            ax = V(1, 0, 0); E(b, rbox(p - nn * 0.05, (r.x * 1.85, 0.30, 0.20), rot_to(nn, ax), 2.6, 12, 4), ("team" if k == 1 else "plate_lt") if k % 2 else "plate_dk")
     for i, (b, p, nn, sz) in enumerate(LIMB_ANCH):
         E(b, rbox(p, (sz * 1.3, sz * 0.9, 0.16), rot_to(nn), 2.6, 10, 4), "plate")
     for S, s in SIDES: shoulder_plate(S, s, "log")
-    # log spines: upright cut logs (pale bark sides, ring-end caps, sap glow cores on three)
-    for k, cb in enumerate(CREST):
-        b0, d, L = crest_base(cb); hgt = L + 0.30; r = 0.24 if k in (2, 3, 4) else 0.20
-        top = b0 + d * hgt + V(0, 0.06 * (k % 2), 0)
-        E(cb, cylinder(b0, top, r, 9, r * 0.92), "plate_lt")
-        E(cb, cylinder(b0 + d * hgt * 0.33, b0 + d * (hgt * 0.33 + 0.07), r * 1.06, 9), "plate_dk")
-        E(cb, cylinder(top - d * 0.02, top + d * 0.04, r * 0.82, 9), "accent")
-        if k in (1, 3, 5): E(cb, cylinder(top + d * 0.03, top + d * 0.06, r * 0.36, 7), "glow")
+    # round 2 MASS: a long LOW LOG STACK along the back (three logs below, two on top) cut into one section per bone so
+    # the spine bends between sections; ring-end caps; a team-painted band round the top logs of every section
+    SEG = [("Neck", -1.45, -1.00), ("Chest", -1.00, -0.55), ("Spine3", -0.55, -0.05), ("Spine2", -0.05, 0.45), ("Spine", 0.45, 0.95), ("Hips", 0.95, 1.45)]
+    RL = 0.25
+    for j, (b, y0, y1) in enumerate(SEG):
+        z0, z1 = top_z(y0) - 0.10, top_z(y1) - 0.10
+        for (x, dz, col) in ((-0.56, 0, "plate_lt"), (0.0, 0.04, "plate"), (0.56, 0, "plate_lt"), (-0.28, 0.44, "plate"), (0.28, 0.44, "plate_lt")):
+            p0 = V(x, y0 + 0.03, z0 + RL + dz); p1 = V(x, y1 - 0.03, z1 + RL + dz)
+            E(b, cylinder(p0, p1, RL, 10), col)
+            for pe in (p0, p1): E(b, cylinder(pe - (p1 - p0).normalized() * 0.02, pe + (p1 - p0).normalized() * 0.02, RL * 0.86, 10), "accent")
+            if dz > 0.3: E(b, cylinder(p0.lerp(p1, 0.38), p0.lerp(p1, 0.62), RL * 1.08, 10), "team")
+        if j in (1, 3): E(b, cylinder(V(0, (y0 + y1) / 2, z0 + RL * 2 + 0.50), V(0, (y0 + y1) / 2, z0 + RL * 2 + 0.56), 0.10, 7), "glow")
+    for i in (1, 2):   # the stack runs on over the tail root
+        n, c, d, r = tail_top(i)
+        for x in (-0.30, 0.30):
+            E(n, cylinder(bh(n) + V(x, 0, r * 0.9), bt(n) + V(x, 0, TR[i] * 0.9), 0.20 - 0.03 * i, 9), "plate_lt")
     # ANTLERS on Crystal1: branching tines, pale, team-glow tips
     c0 = bh("Crystal1") + V(0, 0.05, -0.1)
     for s in (1, -1):
         base = c0 + V(0.22 * s, 0, 0)
         main = [base, base + V(0.50 * s, 0.12, 0.40), base + V(1.10 * s, 0.30, 0.62), base + V(1.62 * s, 0.45, 0.95), base + V(1.95 * s, 0.55, 1.35)]
-        E("Crystal1", K.round_path(main, [0.16, 0.15, 0.13, 0.10, 0.06], 7), "accent")
+        E("Crystal1", K.round_path(main, [0.24, 0.22, 0.19, 0.15, 0.10], 7), "accent")
         for (a, b2) in ((1, V(0.05 * s, -0.35, 0.70)), (2, V(0.05 * s, -0.30, 0.75)), (3, V(0.25 * s, -0.25, 0.55)), (3, V(0.55 * s, 0.05, 0.05))):
-            E("Crystal1", K.round_path([main[a], main[a] + b2 * 0.55, main[a] + b2], [0.10, 0.08, 0.045], 6), "accent")
-        E("Crystal1", ellipsoid(main[-1], V(0.07, 0.07, 0.07), 8, 5), "tglow")
+            E("Crystal1", K.round_path([main[a], main[a] + b2 * 0.55, main[a] + b2], [0.15, 0.12, 0.08], 6), "accent")
+            E("Crystal1", ellipsoid(main[a] + b2, V(0.10, 0.10, 0.10), 8, 5), "team")       # team-painted tine tips
+        E("Crystal1", ellipsoid(main[-1], V(0.15, 0.15, 0.15), 8, 5), "tglow")
     # tail: stacked log rings
     for i in range(1, 8):
         n, c, d, r = tail_top(i)
         p0, p1 = bh(n), bt(n)
         E(n, tube(p0, p1, [(0.40, TR[i - 1] * 1.08, TR[i - 1] * 1.04), (0.55, TR[i - 1] * 1.08, TR[i - 1] * 1.04)], 12, hint=V(0, 0, 1), round0=False, round1=False), "plate_dk")
-        if i <= 5: E(n, cylinder(c - V(0, 0, 0.05), c + V(0, 0, 0.18 + r * 0.5), r * 0.45, 8), "plate_lt")
+    # club tail: a big knotted burl on the tail tip
+    d = (bt("Tail7") - bh("Tail7")).normalized()
+    ce = bt("Tail7") - d * 0.10; ce = V(ce.x, ce.y, max(ce.z, 0.50))
+    E("Tail7", hullrock(ce, d, 0.62, 0.58, 0.85, 995, top=0.72, sides=9, jit=0.15, up_hint=V(0, 0, 1)), "plate_lt")
+    E("Tail7", cylinder(ce - d * 0.22, ce - d * 0.10, 0.62, 10), "team")
+    c6 = bt("Tail6"); E("Tail6", hullrock(V(c6.x, c6.y, max(c6.z, 0.34)), d, 0.36, 0.34, 0.40, 996, top=0.8, sides=8, jit=0.12, up_hint=V(0, 0, 1)), "plate")
 
 def mire():
     # smooth wet hide: no plates; dorsal sail fin with a team-glow rim; head frill; glowing sacs
@@ -435,7 +488,7 @@ def mire():
         if "Forearm" in b:   # arm fins
             d = (bt(b) - bh(b)).normalized()
             E(b, leaf(p - nn * 0.1, (nn + d * 0.3).normalized(), d, 0.75, 0.42, 0.035, 7, bend=0.15), "accent")
-    for S, s in SIDES: shoulder_plate(S, s, "smooth")
+    for S, s in SIDES: shoulder_plate(S, s, "smooth", k=1.45)
     # sail: one membrane panel per crest bone; the top follows ONE arch over the whole back so the panels read as one fin
     def ztop(y): return 3.55 + 1.85 * max(0.0, 1 - ((y + 0.25) / 1.60) ** 2) ** 0.6
     for k, cb in enumerate(CREST):
@@ -445,6 +498,10 @@ def mire():
         outer = [[V(0.04, y, b0.z - 0.25) for y in ys], [V(0.04, y, max(b0.z + 0.1, ztop(y))) for y in ys]]
         inner = [[q - V(0.08, 0, 0) for q in row] for row in outer]
         E(cb, slab(outer, inner), "accent")
+        # team band along the upper sail (wraps the membrane, reads from both sides and above)
+        tb_o = [[V(0.075, y, max(b0.z + 0.1, ztop(y)) - 0.52) for y in ys], [V(0.075, y, max(b0.z + 0.1, ztop(y)) - 0.10) for y in ys]]
+        tb_i = [[q - V(0.15, 0, 0) for q in row] for row in tb_o]
+        if ztop(b0.y) - b0.z > 0.7: E(cb, slab(tb_o, tb_i), "team")
         top = [V(0, y, max(b0.z + 0.1, ztop(y))) for y in ys]
         E(cb, K.round_path(top, [0.055] * len(top), 6, V(1, 0, 0)), "tglow")
         E(cb, K.round_path([V(0, b0.y, b0.z - 0.1), V(0, b0.y, ztop(b0.y) - 0.05)], [0.06, 0.03], 5), "accent_dk")
@@ -465,9 +522,16 @@ def mire():
     for s in (1, -1):
         E("Spine2", ellipsoid(V(1.10 * s, 0.10, 2.60), V(0.16, 0.20, 0.18), 10, 6), "glow")
         E("Spine", ellipsoid(V(1.00 * s, 0.50, 2.20), V(0.14, 0.17, 0.15), 10, 6), "glow")
-    for i in range(2, 8):
+    for i in range(2, 5):
         n, c, d, r = tail_top(i)
         E(n, leaf(c - V(0, 0, r * 0.3), V(0, 0, 1), d, 0.35 + r * 1.2, 0.22 + r * 0.4, 0.03, 6), "accent")
+    # round 2 MASS: a wide FLAT tail fluke (horizontal, whale-like) over Tail4..Tail7, team-painted trailing tips
+    for i, wdt in ((4, 1.50), (5, 2.40), (6, 3.20), (7, 3.70)):
+        n = f"Tail{i}"; p0, p1 = bh(n), bt(n); d = (p1 - p0).normalized(); L = (p1 - p0).length
+        side = V(0, 0, 1).cross(d).normalized(); cm = p0.lerp(p1, 0.5); cm = V(cm.x, cm.y, max(cm.z, 0.12))
+        for sg in (1, -1):
+            E(n, leaf(cm, side * sg, d, wdt * 0.5, L * 1.15, 0.05, 7), "accent" if i % 2 else "accent_dk")
+            if i >= 6: E(n, leaf(cm + side * sg * (wdt * 0.5 - 0.55) + V(0, 0, 0.03), side * sg, d, 0.55, L * 0.8, 0.06, 5), "team")
     E("Tail7", ellipsoid(bt("Tail7"), V(0.14, 0.14, 0.14), 10, 6), "glow")
 
 {"Elder": elder, "Grove": grove, "Brute": brute, "Timber": timber, "Mire": mire}[TYPE]()

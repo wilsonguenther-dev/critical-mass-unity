@@ -149,7 +149,8 @@ for t in TYPES:
     for lod in ("Hero", "LOD0", "LOD1"):
         rep["meshes"][obs[lod].name] = {"built": tris(obs[lod])}
         decimate(obs[lod], TARGET[lod])
-    sh = shadow_from(obs["LOD1"], nm(t, "Shadow")); decimate(sh, TARGET["Shadow"]); obs["Shadow"] = sh
+    # round 2: hulls of the LOD0 parts (fuller: thin fins and sails kept)
+    sh = shadow_from(obs["LOD0"], nm(t, "Shadow")); decimate(sh, TARGET["Shadow"]); obs["Shadow"] = sh
     for lod, ob in obs.items():
         ob.data.materials.clear(); ob.data.materials.append(mat)
         ca = ob.data.color_attributes["Col"]; ob.data.color_attributes.active_color = ca

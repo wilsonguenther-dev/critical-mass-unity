@@ -19,6 +19,7 @@ def imp(p, anim=True):
 rig, M = imp(ROOT + "/out/Kaiju_Adult.fbx")
 ACTS = {a.name.split("|")[-1]: a for a in bpy.data.actions if a.name.startswith(rig.name)}
 for o in M.values(): R.dress(o, 0.03); o.hide_render = True
+R.set_lift(*R.PARTS_LIFT)   # round 2: previews carry the in-game band lift (parts model: half the b14 lift)
 def pose(act=None, frame=1):
     ad = rig.animation_data or rig.animation_data_create()
     if act is None:
@@ -110,8 +111,10 @@ if PART in ("sheet", "tail"):
     old = [o for n, o in OM.items() if "LOD0" in n][0]
     for o in OM.values(): o.hide_render = True
     R.dress(old, 0.03); R.swap_colours(old, R.GLOW["neutral_elder"]); only([old]); gc = R.look(sc, "night"); R.ground(sc, gc)
+    R.set_lift(*R.OLD_LIFT)      # the old model with ITS in-game lift (b14: 1.22 / 1.38 / 1.55), so the comparison is fair
     R.cam_game(cam, Vector((0, 0.4, 1.6)), 420, yaw=45); R.render(f"{T}/old_night_45.png")
     R.cam_game(cam, Vector((0, 0.4, 1.6)), 420, yaw=300); R.render(f"{T}/old_night_300.png")
+    R.set_lift(*R.PARTS_LIFT)
     # size vs a player character (the rebuilt Warrior, team azure), side by side, gameplay camera, night
     wr, WM = imp(os.path.expanduser("~/cm-art-trial/parts-game-ready/out/Warrior/Warrior.fbx"), anim=False)
     war = [o for n, o in WM.items() if "LOD0" in n][0]
@@ -122,7 +125,14 @@ if PART in ("sheet", "tail"):
     war.parent = None; war.matrix_world = Matrix.Translation((3.4, -1.6, 0)) @ Matrix.Rotation(math.radians(180), 4, 'Z') @ mw
     bpy.context.view_layer.update(); print("WARRIOR_DIMS", [round(x, 2) for x in war.dimensions], [round(v[2], 2) for v in war.bound_box][:2])
     R.dress(war, 0.012)
+    # one clear panel per type: low 3/4 front ortho (heights read true), the Warrior standing beside the Kaiju, day
+    dg = bpy.context.evaluated_depsgraph_get()
+    def zrange(o):
+        ev = o.evaluated_get(dg); m = ev.to_mesh(); zs = [(o.matrix_world @ v.co).z for v in m.vertices]; ev.to_mesh_clear(); return min(zs), max(zs)
+    heights = {"Warrior": round(zrange(war)[1] - max(0.0, zrange(war)[0]), 2)}
     for t in ("Elder", "Brute"):
-        k = M[nm(t, "LOD0")]; R.swap_colours(k, R.GLOW["azure"]); only([k, war]); gc = R.look(sc, "night"); R.ground(sc, gc)
-        R.cam_game(cam, Vector((1.2, 0.0, 1.4)), 520, yaw=30); R.render(f"{T}/size_{t}.png")
+        k = M[nm(t, "LOD0")]; R.swap_colours(k, R.GLOW["azure"]); only([k, war]); gc = R.look(sc, "day"); R.ground(sc, gc)
+        heights[t] = round(zrange(k)[1], 2)
+        R.cam_ortho(cam, Vector((1.3, 0.0, 2.6)), 9.0, 8, -22, 520); R.render(f"{T}/size_{t}.png")
+    json.dump(heights, open(f"{T}/heights.json", "w")); print("HEIGHTS", heights)
     print("SHEET_DONE")
