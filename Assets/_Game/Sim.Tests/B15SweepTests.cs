@@ -28,6 +28,7 @@ namespace CriticalMass.Sim.Tests
             k.HoldFatigueOn = false;
             k.MajorityMargin = 1;
             k.ForwardReturnOn = false;
+            k.ForwardWhenHillLost = false;
         }
 
         public static Action<GameConfig> Arm(params Action<ComebackConfig>[] levers) => c =>
@@ -41,6 +42,7 @@ namespace CriticalMass.Sim.Tests
         public static Action<ComebackConfig> Fatigue(double grace, double span, int min) => k => { k.HoldFatigueOn = true; k.HoldGraceSeconds = grace; k.HoldSpanSeconds = span; k.HoldMinPerMille = min; };
         public static Action<ComebackConfig> Majority(int m) => k => k.MajorityMargin = m;
         public static Action<ComebackConfig> Forward(double share) => k => { k.ForwardReturnOn = true; k.ForwardShare = share; };
+        public static readonly Action<ComebackConfig> FwLost = k => k.ForwardWhenHillLost = true;
         public static Action<ComebackConfig> Curve(double a, double b, int p = 1) => k => { k.RespawnCurveOn = true; k.RespawnStartSeconds = a; k.RespawnEndSeconds = b; k.CurvePower = p; };
         public static Action<ComebackConfig> Rally(int perMille, double cap, double threshold) => k => { k.RallyOn = true; k.RallyPerMille = perMille; k.BonusCapSeconds = cap; k.TrailThresholdSeconds = threshold; };
 
@@ -134,6 +136,45 @@ namespace CriticalMass.Sim.Tests
                 A("T+F10/20/0+C2-6+Fw.4", Turncoat, Fatigue(10, 20, 0), Curve(2, 6), Forward(0.4)),
                 A("T+F20/40/.25+C2-6+Fw.4+R1000/90/5", Turncoat, F2, Curve(2, 6), Forward(0.4), Rally(1000, 90, 5)),
             });
+        }
+    
+        [Test, Explicit, Timeout(3500000)]
+        public void B15SweepRoundThree()
+        {
+            var F2 = Fatigue(20, 40, 250);
+            var R = Rally(500, 60, 5);
+            Sweep("r3", new List<KeyValuePair<string, Action<GameConfig>>>
+            {
+                A("B=T+F20/40/.25+Fw.4+R500/60/5 +C2-6", Turncoat, F2, Forward(0.4), R, Curve(2, 6)),
+                A("B+C2-5", Turncoat, F2, Forward(0.4), R, Curve(2, 5)),
+                A("B+C2-6p2", Turncoat, F2, Forward(0.4), R, Curve(2, 6, 2)),
+                A("B+C2-6+FwLost", Turncoat, F2, Forward(0.4), R, Curve(2, 6), FwLost),
+                A("B+C2-5+FwLost", Turncoat, F2, Forward(0.4), R, Curve(2, 5), FwLost),
+                A("B(R500/60/10)+C2-6", Turncoat, F2, Forward(0.4), Rally(500, 60, 10), Curve(2, 6)),
+                A("B(R400/60/5)+C2-6", Turncoat, F2, Forward(0.4), Rally(400, 60, 5), Curve(2, 6)),
+                A("B+C2-6+M2", Turncoat, F2, Forward(0.4), R, Curve(2, 6), Majority(2)),
+                A("B+C2-5+FwLost+M2", Turncoat, F2, Forward(0.4), R, Curve(2, 5), FwLost, Majority(2)),
+                A("B+C1.5-5+FwLost", Turncoat, F2, Forward(0.4), R, Curve(1.5, 5), FwLost),
+            });
+        }
+
+        public static int[] Seeds72()
+        {
+            var seeds = new int[72];
+            for (int i = 0; i < seeds.Length; i++) seeds[i] = i < 24 ? WinShare.Seeds16[i] : 50000 + i * 7919;
+            return seeds;
+        }
+
+        [Test, Explicit, Timeout(3500000)]
+        public void B15SweepConfirmSeventyTwo()
+        {
+            var F2 = Fatigue(20, 40, 250);
+            var R = Rally(500, 60, 5);
+            Sweep("c72", new List<KeyValuePair<string, Action<GameConfig>>>
+            {
+                A("B+C2-6", Turncoat, F2, Forward(0.4), R, Curve(2, 6)),
+                A("B+C2-5+FwLost", Turncoat, F2, Forward(0.4), R, Curve(2, 5), FwLost),
+            }, Seeds72());
         }
     }
 }

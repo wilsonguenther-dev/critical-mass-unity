@@ -66,7 +66,8 @@ namespace CriticalMass.Sim.Core
 
         /// <summary>FORWARD RETURN is on for the team right now (it trails by more than the threshold).</summary>
         public static bool ForwardActive(World w, TeamId team) =>
-            On(w) && w.Config.Depth.Comeback.ForwardReturnOn && Deficit(w, team) > w.Config.Depth.Comeback.TrailThresholdSeconds;
+            On(w) && w.Config.Depth.Comeback.ForwardReturnOn && (Deficit(w, team) > w.Config.Depth.Comeback.TrailThresholdSeconds
+                || (w.Config.Depth.Comeback.ForwardWhenHillLost && w.Match.HillState == (team == TeamId.Azure ? HillState.Crimson : HillState.Azure)));
 
         /// <summary>The team earned RALLY credit on the last tick.</summary>
         public static bool Earning(World w, TeamId team) => On(w) && w.Rally.Earning[(int)team] != 0;
@@ -239,7 +240,7 @@ namespace CriticalMass.Sim.Core
         {
             if (!On(w) || !w.Config.Depth.Comeback.ForwardReturnOn) return;
             TeamId team = w.Actors[id].Team;
-            if (!(Deficit(w, team) > w.Config.Depth.Comeback.TrailThresholdSeconds)) return;
+            if (!ForwardActive(w, team)) return;
             CriticalMass.Sim.Grid.PadDef pad = w.Map.Pads[(int)team];
             CriticalMass.Sim.Grid.MapDef m = w.Map;
             int r = (int)Math.Ceiling(radius) + 1;

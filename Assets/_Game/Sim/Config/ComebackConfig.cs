@@ -62,6 +62,8 @@ namespace CriticalMass.Sim.Config
         /// the way from its pad to the hill (on open floor; the pad when the point is blocked).</summary>
         public bool ForwardReturnOn = false;
         public double ForwardShare = 0.4;
+        /// <summary>FORWARD RETURN also for a team whose hill the other team holds (not only a trailing team).</summary>
+        public bool ForwardWhenHillLost = false;
 
         public ComebackConfig Clone() => (ComebackConfig)MemberwiseClone();
     }
