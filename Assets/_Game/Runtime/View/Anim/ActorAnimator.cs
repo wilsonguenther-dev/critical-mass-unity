@@ -876,7 +876,8 @@ namespace CriticalMass.Runtime.View.Anim
         /// </summary>
         void ApplyClimb(ModelView m, World w, int i, double simTime)
         {
-            float target = OnLadder(w, i) ? 1f : 0f;
+            // b14 ladder fix: the climb pose belongs on the rungs (between the feet and the lip), not on the wall top
+            float target = CriticalMass.Runtime.View.Mechanics.LadderClimb.OnRungs(w, w.X[i], w.Z[i]) ? 1f : 0f;
             _climbW += (target - _climbW) * 0.25f;
             if (_climbW < 0.01f) { _climbW = 0f; return; }
             float ph = (float)(2 * Math.PI * 1.6 * simTime + i * 0.9);

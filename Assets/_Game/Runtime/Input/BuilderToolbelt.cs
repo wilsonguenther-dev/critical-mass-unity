@@ -386,6 +386,10 @@ namespace CriticalMass.Runtime.Input
             // one change per second with its 15 bots, so a single-tick press landing inside it was refused as RefusedRate)
             if (terra && w.Tick - _heldSince < hold && Terraform.WaitTicks(w, a.Team) > 0) return;
             _heldUse = false;
+            // b14 ladder fix: a ladder that only skips a short walk round the wall's end is not sent (the prompt says
+            // "no shortcut here"); the human layer only, so replays and lockstep still see just what was pressed
+            if (_target == BuilderTool.Ladder && BuiltPieces.Plan(w, id, _dx, _dz, BuiltPieces.Ladder) == 0
+                && !CriticalMass.Runtime.View.Mechanics.LadderClimb.LastPlanIsShortcut(w, id, _dx, _dz)) return;
             if (climb)
             {
                 o.Ability = true;
