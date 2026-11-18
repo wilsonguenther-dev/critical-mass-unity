@@ -40,7 +40,7 @@ concurrency:
 jobs:
   sim:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
         with:
@@ -55,11 +55,7 @@ jobs:
       - name: Compile and test (no Unity)
         shell: bash
         run: |
-          case "${{ inputs.suite || 'fast' }}" in
-            slow) tools/ci/sim-tests.sh --slow ;;
-            all)  tools/ci/sim-tests.sh --all ;;
-            *)    tools/ci/sim-tests.sh ;;
-          esac
+          tools/ci/simcost/run.sh   # ci/b14-simcost only (never merged): same-job sim cost, alternating arms
       - name: Summary
         if: always()
         shell: bash
