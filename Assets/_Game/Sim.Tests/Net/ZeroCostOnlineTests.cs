@@ -171,14 +171,17 @@ namespace CriticalMass.Sim.Tests.Net
             $"per player-minute {a.MsgsPerPlayerMin:F0} msg, {a.BytesPerPlayerMin:F0} B; lobby {a.LobbyMsgs:F0} msg; joiners' lead avg {a.AvgLead:F2} max {a.LeadMax} ticks, " +
             $"late inputs {a.Late}, stalls {a.StallMs} ms; {a.Checks} fingerprints MATCH";
 
-        /// <summary>Messages and bytes per player-minute after b15, pinned from the sim gate's print (the cost guard's line).</summary>
+        /// <summary>Messages and bytes per player-minute after b15, pinned from the sim gate's print (the cost guard's line).
+        /// 0 bytes = not pinned (printed, not asserted).</summary>
         private static readonly Dictionary<int, (double msgs, double bytes)> Baseline = new Dictionary<int, (double, double)>
         {
-            // humans: (messages, bytes) per player-minute in a match; 0 bytes = not pinned yet (printed, not asserted).
-            { 2, (900, 0) },
-            { 4, (900, 0) },
-            { 8, (900, 0) },
-            { 32, (900, 0) },
+            // humans: (messages, bytes) per player-minute in a match, pinned from sim-tests run 44245987359 (b15-zero-cost,
+            // deterministic: LocalRelay on a simulated clock). Before b15 the same rooms measured 1,799 to 1,800 messages
+            // (999 at 32 humans) and 119,930 to 125,363 bytes (92,940 at 32). Raise a number only with the reason in the PR.
+            { 2, (902, 59340) },
+            { 4, (902, 64299) },
+            { 8, (902, 66779) },
+            { 32, (907, 68889) },
         };
 
         private static void CompareArms(int humans, int ticks)
