@@ -283,7 +283,7 @@ namespace CriticalMass.Runtime.Tests
             Assert.AreEqual(new Vector2Int(1280, 720), GameSettings.Resolution);
 
             GameSettings.ResetAll();
-            Assert.IsTrue(GameSettings.Blood);
+            Assert.IsFalse(GameSettings.Blood, "b15: back to the default, GORE off");
             Assert.AreEqual(-1, GameSettings.Quality);
         }
 
