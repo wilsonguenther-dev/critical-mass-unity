@@ -1,5 +1,7 @@
 // CM b13 item K: the SHROUD cloud in the world (view only; reads KaijuTypes, writes nothing to the sim).
+// b14 polish: plus the Kaiju's type halo on the ground (a soft contact shadow and a glow ring whose SHAPE names the type).
 using CriticalMass.Runtime.Game;
+using CriticalMass.Runtime.View.Anim;
 using CriticalMass.Sim.Core;
 using UnityEngine;
 using UnityEngine.Rendering;
@@ -21,6 +23,22 @@ namespace CriticalMass.Runtime.View.B13
         /// <summary>Slate teal-grey cloud colour (sRGB).</summary>
         static readonly Color32 CloudCol = new Color32(92, 116, 122, 255), CloudCore = new Color32(70, 90, 98, 255);
         const float BandTop = 1.3f, PuffSize = 0.22f, FadeTicks = 15f;
+
+        // b14 polish: the type halo. One unit-radius polar mesh per type (built once in Start: 5 x 2,400 vertices), one
+        // draw call, same material as the cloud. Shape per type (colour-blind safe): GROVE eight leaf petals, BRUTE ten
+        // spikes, TIMBER three concentric bark rings, MIRE twelve mist dots, ELDER a solid ring with four diamonds. Under it a
+        // dark soft contact shadow so the body lifts off the night ground.
+        public const int HaloRings = 20, HaloSegments = 120;
+        /// <summary>Halo radius in u at type scale 1 (the body's hit radius is 1.64 u; the ring sits just outside the feet).</summary>
+        public const float HaloRadius = 2.9f, HaloGlowAlpha = 0.80f, HaloShadowAlpha = 0.50f;
+        static readonly Color32 HaloShadow = new Color32(24, 35, 59, 255);
+        GameObject _haloGo;
+        MeshFilter _haloFilter;
+        readonly Mesh[] _halo = new Mesh[5];
+        int _haloType = -1;
+        /// <summary>The halo is drawn this frame, and for which type (tests, capture tool).</summary>
+        public bool HaloDrawn { get; private set; }
+        public KaijuType HaloType => (KaijuType)Mathf.Max(0, _haloType);
 
         SimDriverBehaviour _driver;
         Material _mat;
@@ -53,11 +71,16 @@ namespace CriticalMass.Runtime.View.B13
             _bandGo = Layer("Shroud Band", _band);
             _discGo.SetActive(false);
             _bandGo.SetActive(false);
+            for (int t = 0; t < _halo.Length; t++) _halo[t] = BuildHalo((KaijuType)t);
+            _haloGo = Layer("Kaiju Type Halo", _halo[0]);
+            _haloFilter = _haloGo.GetComponent<MeshFilter>();
+            _haloGo.SetActive(false);
         }
 
         void OnDestroy()
         {
-            Release(_discGo); Release(_bandGo); Release(_disc); Release(_band); Release(_mat);
+            Release(_discGo); Release(_bandGo); Release(_haloGo); Release(_disc); Release(_band); Release(_mat);
+            for (int t = 0; t < _halo.Length; t++) Release(_halo[t]);
         }
 
         static void Release(Object o)
@@ -154,10 +177,122 @@ namespace CriticalMass.Runtime.View.B13
             _band.bounds = new Bounds(new Vector3(0, BandTop / 2, 0), new Vector3(2, BandTop, 2));
         }
 
+        static float Band(float r, float a, float b) =>
+            Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(a - 0.04f, a + 0.02f, r)) * (1f - Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(b - 0.02f, b + 0.04f, r)));
+
+        /// <summary>The halo glow share (0..1) at polar point (r 0..1, angle a) for a type: the shape cue.</summary>
+        public static float HaloPattern(KaijuType t, float r, float a)
+        {
+            const float Tau = Mathf.PI * 2f;
+            switch (t)
+            {
+                case KaijuType.Grove:
+                    return Band(r, 0.55f, 0.70f + 0.28f * Mathf.Pow(Mathf.Abs(Mathf.Cos(4f * a)), 0.6f));
+                case KaijuType.Brute:
+                {
+                    float f = Mathf.Repeat(a * 10f / Tau, 1f);
+                    float tri = 1f - 2f * Mathf.Abs(f - 0.5f);
+                    return Band(r, 0.55f, 0.66f + 0.33f * tri * tri);
+                }
+                case KaijuType.Timber:
+                    return Mathf.Max(Band(r, 0.52f, 0.60f), Mathf.Max(Band(r, 0.70f, 0.78f), Band(r, 0.88f, 0.96f)));
+                case KaijuType.Mire:
+                {
+                    float best = 9f;
+                    float x = Mathf.Cos(a) * r, z = Mathf.Sin(a) * r;
+                    for (int i = 0; i < 12; i++)
+                    {
+                        float da = i * Tau / 12f;
+                        float dx = x - Mathf.Cos(da) * 0.80f, dz = z - Mathf.Sin(da) * 0.80f;
+                        best = Mathf.Min(best, dx * dx + dz * dz);
+                    }
+                    return 1f - Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(0.09f, 0.15f, Mathf.Sqrt(best)));
+                }
+                default:
+                {
+                    float ring = Band(r, 0.78f, 0.92f);
+                    float q = Mathf.Repeat(a + Mathf.PI / 4f, Mathf.PI / 2f) - Mathf.PI / 4f;   // angle from the nearest quarter
+                    float dia = Mathf.Abs(q) * r / 0.16f + Mathf.Abs(r - 0.85f) / 0.15f;
+                    return Mathf.Max(ring, dia < 1f ? 1f : 0f);
+                }
+            }
+        }
+
+        Mesh BuildHalo(KaijuType type)
+        {
+            Color32 glow = ColorUtility.TryParseHtmlString(KaijuTypeLook.GlowHex(type), out Color gc) ? (Color32)gc : new Color32(255, 210, 74, 255);
+            int nr = HaloRings, na = HaloSegments;
+            var v = new Vector3[1 + nr * na];
+            var c = new Color32[v.Length];
+            var t = new int[na * 3 + (nr - 1) * na * 6];
+            v[0] = Vector3.zero;
+            c[0] = new Color32(HaloShadow.r, HaloShadow.g, HaloShadow.b, (byte)(HaloShadowAlpha * 255));
+            for (int ri = 0; ri < nr; ri++)
+            {
+                float r = (ri + 1) / (float)nr;
+                for (int ai = 0; ai < na; ai++)
+                {
+                    float a = ai * Mathf.PI * 2f / na;
+                    int idx = 1 + ri * na + ai;
+                    v[idx] = new Vector3(Mathf.Cos(a) * r, 0, Mathf.Sin(a) * r);
+                    float g = Mathf.Clamp01(HaloPattern(type, r, a));
+                    float sh = HaloShadowAlpha * (1f - Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(0.15f, 0.70f, r)));
+                    float alpha = g * HaloGlowAlpha + sh * (1f - g);
+                    float wg = alpha > 1e-4f ? g * HaloGlowAlpha / alpha : 0f;
+                    c[idx] = new Color32((byte)Mathf.Lerp(HaloShadow.r, glow.r, wg), (byte)Mathf.Lerp(HaloShadow.g, glow.g, wg),
+                        (byte)Mathf.Lerp(HaloShadow.b, glow.b, wg), (byte)Mathf.Clamp(Mathf.RoundToInt(alpha * 255f), 0, 255));
+                }
+            }
+            int k = 0;
+            for (int ai = 0; ai < na; ai++)
+            {
+                int aj = (ai + 1) % na;
+                t[k++] = 0; t[k++] = 1 + aj; t[k++] = 1 + ai;
+            }
+            for (int ri = 0; ri < nr - 1; ri++)
+                for (int ai = 0; ai < na; ai++)
+                {
+                    int aj = (ai + 1) % na;
+                    int i0 = 1 + ri * na + ai, i1 = 1 + ri * na + aj, o0 = 1 + (ri + 1) * na + ai, o1 = 1 + (ri + 1) * na + aj;
+                    t[k++] = i0; t[k++] = i1; t[k++] = o1;
+                    t[k++] = i0; t[k++] = o1; t[k++] = o0;
+                }
+            var m = new Mesh { name = "Kaiju Halo " + type };
+            if (v.Length > 65000) m.indexFormat = IndexFormat.UInt32;
+            m.vertices = v;
+            m.colors32 = c;
+            m.triangles = t;
+            m.bounds = new Bounds(Vector3.zero, new Vector3(2, 0.2f, 2));
+            m.UploadMeshData(true);
+            return m;
+        }
+
+        void Halo(World w)
+        {
+            if (_haloGo == null) return;
+            if (!w.Match.Hatched || w.Kaiju.State == KaijuState.Egg)
+            {
+                HaloDrawn = false;
+                if (_haloGo.activeSelf) _haloGo.SetActive(false);
+                return;
+            }
+            KaijuType type = KaijuTypes.Type(w);
+            int ti = Mathf.Clamp((int)type, 0, _halo.Length - 1);
+            if (ti != _haloType) { _haloType = ti; _haloFilter.sharedMesh = _halo[ti]; }
+            float h = (float)GroundHeight.At(w.Map, w.Kaiju.X, w.Kaiju.Z);
+            float rad = HaloRadius * KaijuTypeLook.Scale(type);
+            _haloGo.transform.localPosition = SimSpace.ToWorld(w.Kaiju.X, h + 0.03, w.Kaiju.Z);
+            _haloGo.transform.localScale = new Vector3(rad, 1f, rad);
+            _haloGo.transform.localRotation = Quaternion.Euler(0, Time.time * 9f % 360f, 0);
+            if (!_haloGo.activeSelf) _haloGo.SetActive(true);
+            HaloDrawn = true;
+        }
+
         void LateUpdate()
         {
             World w = _driver != null ? _driver.World : null;
-            if (w == null || w.ActorCount == 0) { Hide(); return; }
+            if (w == null || w.ActorCount == 0) { Hide(); HaloDrawn = false; if (_haloGo != null && _haloGo.activeSelf) _haloGo.SetActive(false); return; }
+            Halo(w);
             KaijuTypeState s = w.KaijuKind;
             double r, x, z;
             float fade;

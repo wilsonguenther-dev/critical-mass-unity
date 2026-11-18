@@ -66,6 +66,9 @@ Shader "CM/Toon"
         _WaterFlow ("Water Flow (stripes and ripple rings; 0 off)", Range(0, 2)) = 0
         [Toggle] _WobbleUV4Y ("Wobble Weight From UV4.y (hair, scarf, tabard)", Float) = 0
         _SmoothNormals ("Smoothed Normals From UV3 (characters, 0 imported)", Range(0, 1)) = 0
+        _KaijuGlow ("Kaiju Type Glow (rgb hue, a strength; 0 off)", Color) = (0, 0, 0, 0)
+        _KaijuPattern ("Kaiju Glow Pattern (0 none, 1 crest, 2 plates, 3 bands, 4 spots, 5 spine)", Range(0, 5)) = 0
+        _TeamTopTint ("Team Tint On Top-Facing Fixed Colours (characters: headgear, shoulders)", Range(0, 1)) = 0
     }
 
     SubShader
@@ -135,6 +138,9 @@ Shader "CM/Toon"
             #if defined(_CMTOON_BASEMAP)
                 CMToonBaseMapColour(input.uv0, albedo, selfLit);
             #endif
+                // b14 polish (team read from above): top-facing fixed colours (helmet / hair tops, shoulders) lean toward the
+                // team cloth so the team reads from the 55-degree camera without repainting. Characters only (ArtMaterials).
+                albedo = CMToonTeamTop(albedo, input.color, normalWS);
                 albedo = CMToonDecal(albedo, input.uv0);
 
                 // Three bands from N.L; a cast shadow drops the pixel to the shadow band; a top-facing surface is one
@@ -152,6 +158,8 @@ Shader "CM/Toon"
                 float rim = 1.0 - saturate(dot(normalWS, normalize(viewDirWS)));
                 half rimMask = rim > (1.0 - _RimWidth) ? 1.0 : 0.0;
                 half3 color = lerp(lit, _TeamColor.rgb, rimMask * _RimStrength);
+                // b14 polish: the Kaiju's type glow (soft fresnel + a per-type pattern; _KaijuGlow.a 0 everywhere else).
+                color = CMToonKaijuGlow(color, normalWS, viewDirWS, input.positionWS);
 
                 // Glows are self-lit: unshaded, no rim.
                 color = selfLit > 0.5h ? albedo : color;

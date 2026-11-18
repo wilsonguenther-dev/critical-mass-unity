@@ -40,6 +40,63 @@ namespace CriticalMass.Runtime.View.Moments
         /// <summary>hud-art-1: entry (back-out ease) and exit (ease-in) of the character, wall seconds.</summary>
         public const float PortraitIn = 0.30f, PortraitOut = 0.26f;
         public const float StingerW = 560f, StingerH = 140f, StingerTop = 380f, StingerRight = 24f;
+        /// <summary>b14 polish: smallest stinger title size (TextFit) and the clearance kept round the hill centre and the player.</summary>
+        public const int StingerTitleMin = 30;
+        public const float StingerClearPx = 48f;
+
+        /// <summary>b14 polish: the side toast's rect in screen pixels, y measured DOWN from the top, docked right (default) or left.</summary>
+        public static Rect StingerScreenRect(float pw, float ph, bool left)
+        {
+            float s = HudLayout.Scale(pw, ph);
+            float w = StingerW * s, h = StingerH * s, top = StingerTop * s, edge = StingerRight * s;
+            return new Rect(left ? edge : pw - edge - w, top, w, h);
+        }
+
+        /// <summary>b14 polish: whether a screen point (y down) lies inside the rect grown by margin.</summary>
+        public static bool StingerCovers(Rect r, Vector2 pointTopDown, float margin) =>
+            pointTopDown.x >= r.xMin - margin && pointTopDown.x <= r.xMax + margin && pointTopDown.y >= r.yMin - margin && pointTopDown.y <= r.yMax + margin;
+
+        /// <summary>
+        /// b14 polish: dock the toast on the left when the right one would sit over the hill centre or the local player and
+        /// the left one would not (points y down; an off-screen point passes NaN and never blocks).
+        /// </summary>
+        public static bool StingerDockLeft(float pw, float ph, Vector2 player, Vector2 hill)
+        {
+            float m = StingerClearPx * HudLayout.Scale(pw, ph);
+            Rect right = StingerScreenRect(pw, ph, false), left = StingerScreenRect(pw, ph, true);
+            bool rightBad = StingerCovers(right, player, m) || StingerCovers(right, hill, m);
+            if (!rightBad) return false;
+            return !(StingerCovers(left, player, m) || StingerCovers(left, hill, m));
+        }
+
+        private bool _stingerLeft;
+
+        private Vector2 ScreenTopDown(UnityEngine.Camera cam, Vector3 world)
+        {
+            Vector3 sp = cam.WorldToScreenPoint(world);
+            if (sp.z <= 0f) return new Vector2(float.NaN, float.NaN);
+            return new Vector2(sp.x, cam.pixelHeight - sp.y);
+        }
+
+        /// <summary>b14 polish: picks the toast side for this moment from where the hill centre and the local player are on screen.</summary>
+        private void DockStinger()
+        {
+            _stingerLeft = false;
+            UnityEngine.Camera cam = UnityEngine.Camera.main;
+            World w = World;
+            if (cam != null && w != null && w.ActorCount > 0 && w.Map != null)
+            {
+                Vector2 hill = ScreenTopDown(cam, SimSpace.ToWorld(w.Map.Hill.X, GroundHeight.At(w.Map, w.Map.Hill.X, w.Map.Hill.Z), w.Map.Hill.Z));
+                int me = LocalSeat.Actor;
+                Vector2 player = me >= 0 && me < w.ActorCount
+                    ? ScreenTopDown(cam, SimSpace.ToWorld(w.X[me], GroundHeight.At(w.Map, w.X[me], w.Z[me]) + 1.0, w.Z[me]))
+                    : new Vector2(float.NaN, float.NaN);
+                _stingerLeft = StingerDockLeft(cam.pixelWidth, cam.pixelHeight, player, hill);
+            }
+            Vector2 a = _stingerLeft ? new Vector2(0f, 1f) : new Vector2(1f, 1f);
+            _stinger.anchorMin = _stinger.anchorMax = a;
+            _stinger.pivot = a;
+        }
         public const int Sparks = 12, Rings = 3;
         public const float SlowMotionFactor = 0.35f, SlowMotionTail = 0.35f;
         public const string AudioTakeover = "Audio/BigMoments/bm-takeover", AudioStinger = "Audio/BigMoments/bm-stinger";
@@ -683,6 +740,7 @@ namespace CriticalMass.Runtime.View.Moments
             _group.alpha = 1f;
             // only the corner shows: every takeover layer off
             SetTakeoverLayers(false);
+            DockStinger();
             _stinger.gameObject.SetActive(true);
             _look = BigMomentsSettings.Look();
             MomentRecipe r = MomentRecipes.Get(m.Request.Id);
@@ -715,7 +773,8 @@ namespace CriticalMass.Runtime.View.Moments
             float t = (float)(now - m.StartedAt), S = m.Seconds;
             float e = Ease(Mathf.Clamp01(t / 0.16f)), x = Mathf.Clamp01(1f - (S - t) / 0.2f);
             bool motion = _look.Motion;
-            _stinger.anchoredPosition = new Vector2(-StingerRight + (motion ? (1f - e) * 300f + x * 300f : 0f), -StingerTop);
+            float slide = motion ? (1f - e) * 300f + x * 300f : 0f;
+            _stinger.anchoredPosition = _stingerLeft ? new Vector2(StingerRight - slide, -StingerTop) : new Vector2(-StingerRight + slide, -StingerTop);
             _stingerGroup.alpha = motion ? 1f - x : e * (1f - x);
         }
 
@@ -1053,7 +1112,8 @@ namespace CriticalMass.Runtime.View.Moments
             _stingerIcon.rectTransform.pivot = new Vector2(0f, 0.5f);
             _stingerIcon.rectTransform.sizeDelta = new Vector2(104f, 104f);
             _stingerIcon.rectTransform.anchoredPosition = new Vector2(24f, 0f);
-            _stingerTitle = CriticalMass.Runtime.Menu.MenuUi.Fit(HudText.Make(_stinger, "Stinger Title", CMTokens.Display, UiScale.TypeDisplay, CMTokens.WarmCream.Color, TextAnchor.MiddleLeft, 4f), 46);
+            // b14 polish: the title may shrink to 30 so "OPENING STRIKE" / "BATTERING RAM" fit whole instead of "OPENING..."
+            _stingerTitle = CriticalMass.Runtime.Menu.MenuUi.Fit(HudText.Make(_stinger, "Stinger Title", CMTokens.Display, UiScale.TypeDisplay, CMTokens.WarmCream.Color, TextAnchor.MiddleLeft, 4f), StingerTitleMin);
             Place(_stingerTitle.rectTransform, new Vector2(140f, 14f), new Vector2(StingerW - 170f, 56f));
             _stingerSub = HudText.Make(_stinger, "Stinger Sub", CMTokens.Ui, UiScale.TypeBody, CMTokens.WarmCream.Color, TextAnchor.MiddleLeft, 2.5f);
             Place(_stingerSub.rectTransform, new Vector2(140f, -34f), new Vector2(StingerW - 170f, 30f));
