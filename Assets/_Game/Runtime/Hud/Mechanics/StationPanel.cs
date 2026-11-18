@@ -271,13 +271,13 @@ namespace CriticalMass.Runtime.Hud.Mechanics
             Actor a = w.Actors[me];
             TeamId t = a.Team;
             int wood = DepthRead.Stock(w, t, DepthRead.StockWood), water = DepthRead.Stock(w, t, DepthRead.StockWater);
-            HudText.Set(_stock, StockLine(wood, water));
+            HudText.Set(_stock, StockLine(wood, DeadSystemViews.BankedWaterShown(w) ? water : -1));   // b15 item 4: -1 = no water shown
             int cd = DepthRead.SwitchCdTicks(w, me);
             double hz = w.Config.SimHz;
             int limitS = StationRules.Seconds((int)w.Config.Respawn.ClassSwitchCooldownTicks, hz);
             HudText.Set(_limit, cd > 0 ? DepthLines.Wait(0, StationRules.Seconds(cd, hz)) : LimitLine(limitS));
             bool hut = Blacksmith.On(w);
-            ShowHut(hut);
+            ShowHut(!DeadSystemViews.StationLadderShown(w));   // b15 item 4: the class ladder rows only where the ladder is live
             if (hut) RefreshHut(w, t);
             bool builder = a.Alive && a.Cls == ClassId.Builder;
             HudText.Set(_who, builder ? string.Empty : DepthWords.OnlyBuilders);
@@ -306,7 +306,12 @@ namespace CriticalMass.Runtime.Hud.Mechanics
         string StockLine(int wood, int water)
         {
             int key = wood * 1000 + water;
-            if (key != _stockKey) { _stockKey = key; _stockLine = DepthWords.Wood + " " + wood.ToString(CultureInfo.InvariantCulture) + "   " + DepthWords.Water + " " + water.ToString(CultureInfo.InvariantCulture); }
+            if (key != _stockKey)
+            {
+                _stockKey = key;
+                _stockLine = DepthWords.Wood + " " + wood.ToString(CultureInfo.InvariantCulture) +
+                             (water < 0 ? string.Empty : "   " + DepthWords.Water + " " + water.ToString(CultureInfo.InvariantCulture));
+            }
             return _stockLine;
         }
 

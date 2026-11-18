@@ -94,6 +94,8 @@ namespace CriticalMass.Runtime.Menu
         // skills page
         LevelBar _bar;
         Text _coins, _record, _next;
+        /// <summary>b15 item 4: the coin icon beside the total (hidden with it while coins have no sink).</summary>
+        VectorShape _coinIcon;
 
         // ---- static API ----
 
@@ -436,7 +438,7 @@ namespace CriticalMass.Runtime.Menu
         {
             Color cream = CMTokens.WarmCream.Color;
             _bar = LevelBar.Build(page, "Level Bar", PX + 40f, CY, PW - 80f);
-            ProgressionUi.Coin(page, "Coin", PX + 40f, CY + 116f, 40f);
+            _coinIcon = ProgressionUi.Coin(page, "Coin", PX + 40f, CY + 116f, 40f);
             _coins = MenuUi.Label(page, "Coins", CMTokens.Display, UiScale.TypeHeading, CMTokens.ToolBrass.Color, TextAnchor.MiddleLeft, PX + 96f, CY + 110f, 600f, 52f, "", 3f);
             _record = MenuUi.Label(page, "Record", CMTokens.Ui, UiScale.TypeBody, cream, TextAnchor.MiddleLeft, PX + 40f, CY + 176f, PW - 80f, 40f, "", 2f);
             MenuUi.Label(page, "Next Head", CMTokens.Display, UiScale.TypeBody, CMTokens.ToolBrass.Color, TextAnchor.MiddleLeft, PX + 40f, CY + 246f, PW - 80f, 40f,
@@ -510,8 +512,8 @@ namespace CriticalMass.Runtime.Menu
             HudText.Set(_className, ProgressionWords.ClassName(c));
             RefreshChips();
             HudText.Set(_role, ProgressionWords.RoleLines[ci]);
-            HudText.Set(_headerInfo, ProgressionWords.Level + " " + p.Level.ToString(CultureInfo.InvariantCulture) + "   " +
-                                     ProgressionUi.Thousands(p.Coins) + " " + ProgressionWords.Coins);
+            HudText.Set(_headerInfo, ProgressionWords.Level + " " + p.Level.ToString(CultureInfo.InvariantCulture) +
+                                     (CriticalMass.Runtime.Hud.DeadSystemViews.CoinsShown() ? "   " + ProgressionUi.Thousands(p.Coins) + " " + ProgressionWords.Coins : string.Empty));
             if (_classStep.Value != null) HudText.Set(_classStep.Value, ProgressionWords.ClassName(c));
 
             // character
@@ -575,6 +577,9 @@ namespace CriticalMass.Runtime.Menu
             // skills
             _bar.Set(p.SkillPoints);
             HudText.Set(_coins, ProgressionUi.Thousands(p.Coins) + " " + ProgressionWords.Coins);
+            bool coinsOn = CriticalMass.Runtime.Hud.DeadSystemViews.CoinsShown();   // b15 item 4: coins have no sink
+            if (_coins.gameObject.activeSelf != coinsOn) _coins.gameObject.SetActive(coinsOn);
+            if (_coinIcon != null && _coinIcon.gameObject.activeSelf != coinsOn) _coinIcon.gameObject.SetActive(coinsOn);
             HudText.Set(_record, p.MatchesPlayed.ToString(CultureInfo.InvariantCulture) + " MATCHES   " +
                                  p.Wins.ToString(CultureInfo.InvariantCulture) + " WINS   " +
                                  p.Draws.ToString(CultureInfo.InvariantCulture) + " DRAWS   " +

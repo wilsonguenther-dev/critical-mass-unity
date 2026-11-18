@@ -190,6 +190,8 @@ namespace CriticalMass.Runtime.Flow
                     else if (a.input == "ability") ability = a.name;
                 }
             }
+            // b15 item 4: with the hut rule on the Miner's Space is HAUL; the pack's "Barricade" would promise a dead system
+            if (c == ClassId.Miner && !CriticalMass.Runtime.Hud.DeadSystemViews.MinerBarricadesShown()) ability = CriticalMass.Runtime.Game.MatchWords.MinerAbility;
             return attack + " · " + ability;   // integration batch 4: title case, one space each side: "PICK-HAMMER · BARRICADE" did not fit a 230 px card at 16 px
         }
 

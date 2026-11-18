@@ -91,6 +91,8 @@ namespace CriticalMass.Runtime.Game
 
         // ---------------------------------------------------------------- honest profile (Barracks, character panel)
 
+        /// <summary>The Miner's ability name on the match setup card while barricades are dead (item 4).</summary>
+        public static string MinerAbility = "Haul";
         public static string MoreComing = "More looks are coming.";
         public static string TopLevelNothingNew = "Levels past {level} unlock nothing yet.";
 
@@ -140,7 +142,7 @@ namespace CriticalMass.Runtime.Game
             {
                 StoryTab, StoryHeading, AwardsHeading, AxisSeconds, LegendAzure, LegendCrimson, LegendHatch, LegendHut, LegendLead,
                 TeamAzure, TeamCrimson, TurnLedAndHeld, TurnRetook, TurnComeback, TurnLate, TurnDraw, TurnNobody, TurnNoMark,
-                AwardNobody, BestPrefix, BestRank, BestOnCard, BestKnockOuts, BestNothing, You, GoalDone, MoreComing, TopLevelNothingNew,
+                AwardNobody, BestPrefix, BestRank, BestOnCard, BestKnockOuts, BestNothing, You, GoalDone, MinerAbility, MoreComing, TopLevelNothingNew,
             }) yield return s;
             foreach (string s in AwardTitles) yield return s;
             foreach (string s in AwardLines) yield return s;
