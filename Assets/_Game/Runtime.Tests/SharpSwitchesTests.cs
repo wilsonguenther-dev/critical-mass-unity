@@ -86,14 +86,15 @@ namespace CriticalMass.Runtime.Tests
             int lod0 = SharpSwitches.MediumLod0BudgetFor(true);
             Line("rim on: material rim for a 0.6 model", rim, "0.3");
             Line("upscale on: Medium render scale", scale, "0.85");
-            Line("msaa on: MSAA samples High / Medium / Low", msaaHigh + " / " + msaaMed + " / " + msaaLow, "2 / 1 / 1");
+            Line("msaa on: MSAA samples High / Medium / Low (b15 world look tiers)", msaaHigh + " / " + msaaMed + " / " + msaaLow, "4 / 2 / 1");
             Line("lod0 on: Medium LOD0 budget", lod0, "16");
             Line("normals on: _SmoothNormals", SharpSwitches.SmoothNormalsFor(true), "1");
             Assert.AreEqual(0.3f, rim, 1e-6f);
             Assert.AreEqual(0.85f, scale, 1e-6f);
-            Assert.AreEqual(2, msaaHigh);
-            Assert.AreEqual(1, msaaMed, "Medium unchanged");
+            Assert.AreEqual(4, msaaHigh, "b15: art direction MSAA 4x at High");
+            Assert.AreEqual(2, msaaMed, "b15: 2x on the Air's Medium (WorldLookBudgets.Medium)");
             Assert.AreEqual(1, msaaLow, "Low unchanged");
+            Assert.AreEqual(1, SharpSwitches.MsaaFor(FramePolicy.LevelVeryLow, true), "Very Low costs nothing");
             Assert.AreEqual(16, lod0);
             Assert.AreEqual(1f, SharpSwitches.SmoothNormalsFor(true));
             Assert.AreEqual(0f, SharpSwitches.RimFor(0f, true), "props and structures keep no rim");

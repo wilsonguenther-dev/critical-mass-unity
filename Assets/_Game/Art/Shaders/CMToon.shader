@@ -148,10 +148,15 @@ Shader "CM/Toon"
                 float ndl = dot(normalWS, mainLight.direction);
                 half band = CMToonBand(ndl) * lerp(1.0h, step(0.5, mainLight.shadowAttenuation), _ReceiveShadows);
                 band = min(2.0h, band + _TopBandLift * smoothstep(0.65, 0.75, normalWS.y));
+                // b15 world look: fighters and the Kaiju (rim above 0) lift their shadow and mid bands (characters are the
+                // brightest layer at every time of day; three tones stay distinct).
+                half charW = step(0.001h, _RimStrength);
+                band = CMTodCharacterBand(band, charW);
                 half3 lit = CMToonBandColor(albedo, band);
                 // Time of day (CMTimeOfDay.hlsl): key and shadow tint by band, sky fill, moon rim on world solids.
                 half todLift = CMToonTodLift();
                 lit = CMTodGrade(lit, band * 0.5h, todLift);
+                lit = CMTodCharacterGain(lit, charW);
                 lit = CMTodRim(lit, normalWS, viewDirWS, mainLight.direction, todLift);
 
                 // Hard rim in the team colour.

@@ -45,7 +45,10 @@ namespace CriticalMass.Runtime.View.Mechanics
         static readonly Color32 Brass = CMTokens.ToolBrass.Color, BrassDark = new Color32(150, 112, 40, 255);
         static readonly Color32 TntRed = new Color32(200, 53, 46, 255), TntDark = new Color32(132, 30, 28, 255), TntLight = new Color32(232, 96, 80, 255);
         static readonly Color32 Danger = CMTokens.MeterOrange.Color, Cream = CMTokens.WarmCream.Color, Spark = new Color32(255, 214, 72, 255);
-        static readonly Color32 Heal = CMTokens.Biomass.Color, Seam = CMTokens.EggSeam.Color, Hurt = CMTokens.Crimson.Color;
+        // b15 world look (WORLD-AUDIT W08, AD reserve hues): the Healer's heal reads in its own mint (hue 133), never the
+        // reserved Biomass lime (hue 80) or the Azure team cyan (hue 181). Biomass drops keep Biomass (BiomassDrop).
+        public static readonly Color32 HealMint = new Color32(95, 224, 122, 255);
+        static readonly Color32 Heal = HealMint, BiomassDrop = CMTokens.Biomass.Color, Seam = CMTokens.EggSeam.Color, Hurt = CMTokens.Crimson.Color;
 
         // perf/start-hitch-1: timed for the scene-start report (LoadTimer).
         void Start() { long t0 = CriticalMass.Runtime.Game.LoadTimer.Now(); StartBody(); CriticalMass.Runtime.Game.LoadTimer.Part("MechanicsWorldView.Start", t0); }
@@ -526,7 +529,7 @@ namespace CriticalMass.Runtime.View.Mechanics
                         break;
                     case MechFeed.BurstDrop:
                         if (age > 0.3f) break;
-                        GroundRing(c, Mathf.Max(0f, R * age / 0.3f - 0.1f), R * age / 0.3f + 0.02f, 0f, Mathf.PI * 2f, 20, A(Heal, 0.8f * (1f - age / 0.3f)));
+                        GroundRing(c, Mathf.Max(0f, R * age / 0.3f - 0.1f), R * age / 0.3f + 0.02f, 0f, Mathf.PI * 2f, 20, A(BiomassDrop, 0.8f * (1f - age / 0.3f)));
                         break;
                     case MechFeed.BurstDodge:
                         if (age > 0.4f) break;

@@ -448,6 +448,7 @@ namespace CriticalMass.Runtime.Game
             var urp = GraphicsSettings.currentRenderPipeline as UniversalRenderPipelineAsset;
             int w = Mathf.Max(64, cam.pixelWidth / 2), h = Mathf.Max(64, cam.pixelHeight / 2);
             RenderTexture rt = RenderTexture.GetTemporary(w, h, 24);
+            CriticalMass.Runtime.View.ActorViews views = null;
             try
             {
                 t.position = centre - t.forward * dist;
@@ -456,11 +457,15 @@ namespace CriticalMass.Runtime.Game
                 QualitySettings.lodBias = WideLodBias;
                 if (urp != null) { shadow = urp.shadowDistance; urp.shadowDistance = Mathf.Max(shadow, WideShadowDistance); }
                 cam.targetTexture = rt;
+                // b15 world look: the Kaiju's later stages (inactive until the hatch) draw in this render too.
+                if (views == null) views = UnityEngine.Object.FindAnyObjectByType<CriticalMass.Runtime.View.ActorViews>();
+                if (views != null) Log("kaiju stages warmed (" + views.PrewarmKaiju(true) + " materials)");
                 cam.Render();
             }
             catch (Exception e) { Log("wide render failed: " + e.Message); }
             finally
             {
+                try { if (views != null) views.PrewarmKaiju(false); } catch (Exception) { }
                 cam.targetTexture = old;
                 t.position = pos;
                 cam.farClipPlane = far;

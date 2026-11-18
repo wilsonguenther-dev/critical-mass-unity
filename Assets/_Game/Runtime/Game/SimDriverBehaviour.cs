@@ -204,7 +204,7 @@ namespace CriticalMass.Runtime.Game
         }
 
         /// <summary>b13-replay: ReplayPlayback's interpolation fraction for this frame.</summary>
-        internal void ReplayAlpha(double alpha) => Alpha = alpha;
+        internal void ReplayAlpha(double alpha) => Alpha = ViewAlpha.Hold(alpha, ViewAlpha.Ended(World));   // b15: still after the end
 
         private void ForwardTicked(World w)
         {
@@ -254,7 +254,7 @@ namespace CriticalMass.Runtime.Game
             {
                 float cd = Time.captureDeltaTime;
                 FrameDt = Math.Min(cd > 0f ? cd : Time.unscaledDeltaTime, MaxFrameDt);
-                Alpha = _online.Alpha;   // the session ticks in OnlineRunner; never paused, never sped up
+                Alpha = ViewAlpha.Hold(_online.Alpha, ViewAlpha.Ended(World));   // the session ticks in OnlineRunner; never paused, never sped up (b15: still after the end)
                 return;
             }
             if (CriticalMass.Runtime.Game.LoadTimer.Armed) CriticalMass.Runtime.Game.LoadTimer.FirstUpdate();   // perf/start-hitch-1: every Start() of the load frame has run
@@ -279,7 +279,7 @@ namespace CriticalMass.Runtime.Game
             for (int i = 0; i < ticks; i++) Tick(input);
             RuntimeCounters.SimDroppedSeconds = _clock.DroppedSimSeconds;
             RuntimeCounters.SimDroppedTicks = _clock.DroppedTicks;
-            Alpha = _clock.Alpha(_dt);
+            Alpha = ViewAlpha.Hold(_clock.Alpha(_dt), ViewAlpha.Ended(World));   // b15 world look: no shiver behind the result screen
         }
 
         /// <summary>

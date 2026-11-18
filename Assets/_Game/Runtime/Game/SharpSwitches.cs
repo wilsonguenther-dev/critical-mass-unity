@@ -16,7 +16,9 @@ namespace CriticalMass.Runtime.Game
     /// first choice but cannot take effect at run time here: URP 17 runs non-bilinear upscaling only in its FinalPost
     /// pass, which needs post-processing on the camera (UniversalRendererRenderGraph.cs, applyFinalPostProcessing), and
     /// the game's camera renders with post-processing off, so URP would keep upscaling bilinear. Off: 0.75.</item>
-    /// <item>msaa: 2x MSAA on the High URP asset (High, Very High, Ultra share it), player only. Off: 1 (as authored).</item>
+    /// <item>msaa: MSAA per quality level from View.WorldLookBudgets (b15 world look, art direction 2.x MSAA 4x): 4x on the
+    /// High URP asset (High, Very High, Ultra share it), 2x on Medium (the 8 GB M1 Air's pick), 1 on Low and Very Low;
+    /// player only. Off: 1 (as authored).</item>
     /// <item>lod0: Medium LOD0 crowd budget 16 instead of 10 (QualityTable.MediumLod0Budget). Off: 10.</item>
     /// </list>
     /// Every number lives here (one config place). View only: nothing here reaches the simulation or a checksum.
@@ -119,8 +121,8 @@ namespace CriticalMass.Runtime.Game
         /// <summary>Medium's first-launch render scale (FramePolicy.MidRenderScale).</summary>
         public static float MidRenderScaleFor(bool on) => on ? MidRenderScaleSharp : MidRenderScaleOld;
 
-        /// <summary>MSAA samples of the URP asset a quality level uses: 2 at High and above when on, else 1.</summary>
-        public static int MsaaFor(int level, bool on) => on && level >= FramePolicy.LevelHigh ? HighMsaaSharp : MsaaOld;
+        /// <summary>MSAA samples of the URP asset a quality level uses (b15: WorldLookBudgets.For(level).Msaa when on, else 1).</summary>
+        public static int MsaaFor(int level, bool on) => on ? Mathf.Max(MsaaOld, CriticalMass.Runtime.View.WorldLookBudgets.For(level).Msaa) : MsaaOld;
 
         /// <summary>Medium's LOD0 crowd budget (QualityTable.MediumLod0Budget).</summary>
         public static int MediumLod0BudgetFor(bool on) => on ? MediumLod0BudgetSharp : MediumLod0BudgetOld;
@@ -154,10 +156,12 @@ namespace CriticalMass.Runtime.Game
                 if (QualitySettings.GetRenderPipelineAssetAt(i) is UnityEngine.Rendering.Universal.UniversalRenderPipelineAsset a)
                 {
                     int want = MsaaFor(i, true);
-                    if (i >= FramePolicy.LevelHigh || a.msaaSampleCount != want) a.msaaSampleCount = Mathf.Max(a.msaaSampleCount, want);
+                    // Levels sharing an asset share a tier (Very Low + Low, High + Very High + Ultra): the larger count wins.
+                    if (a.msaaSampleCount != want) a.msaaSampleCount = Mathf.Max(a.msaaSampleCount, want);
                 }
             }
-            Debug.Log("[CM.Sharp] msaa: High URP asset " + MsaaFor(FramePolicy.LevelHigh, true) + "x, Medium and Low unchanged");
+            Debug.Log("[CM.Sharp] msaa: High URP asset " + MsaaFor(FramePolicy.LevelHigh, true) + "x, Medium " + MsaaFor(FramePolicy.LevelMedium, true) +
+                      "x, Low " + MsaaFor(FramePolicy.LevelLow, true) + "x (b15 world look tiers)");
         }
     }
 }

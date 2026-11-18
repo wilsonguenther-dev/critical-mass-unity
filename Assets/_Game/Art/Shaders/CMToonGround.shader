@@ -153,6 +153,7 @@ Shader "CM/ToonGround"
 
                 half top = step(0.5, normalWS.y);
                 half3 albedo = lerp(_CliffColor.rgb, tone, top);
+                albedo = lerp(albedo, CMTodGroundGrade(albedo), top);   // b15 world look: grass tops take the ground grade
 
                 // One band; cast shadows only.
                 float4 shadowCoord = TransformWorldToShadowCoord(input.positionWS);

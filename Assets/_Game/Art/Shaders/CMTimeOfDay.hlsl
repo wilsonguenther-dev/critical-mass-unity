@@ -14,6 +14,10 @@
 // _CMTodVoid     rgb: the deep void colour at the bottom of the view; a: gradient amount (screen top -> bottom).
 // _CMTodSky      x: stars 0..1, y: moon 0..1, z: glow decal and light pool boost (multiplier minus 1), w: view time (s).
 // _CMTodMoon     xyz: moon direction (world, unit, from the camera), w: cos of the moon's angular radius.
+// _CMTodGround   b15 world look, ground shaders only: x value multiplier minus 1, y luma contrast compression toward w
+//                (0 none .. 1 flat), z saturation multiplier minus 1, w pivot luma (linear). All 0 = no change.
+// _CMTodChar     b15 world look, CM/Toon characters and the Kaiju (rim above 0): x gain minus 1 (hue kept), y band fill
+//                (shadow and mid bands lifted toward lit). All 0 = no change. TimeOfDayGrade.Ground / .Character mirror both.
 #ifndef CM_TIME_OF_DAY_INCLUDED
 #define CM_TIME_OF_DAY_INCLUDED
 
@@ -25,6 +29,8 @@ float4 _CMTodFog;
 float4 _CMTodVoid;
 float4 _CMTodSky;
 float4 _CMTodMoon;
+float4 _CMTodGround;
+float4 _CMTodChar;
 
 // The grade of a banded colour: band01 is 0 (shadow band) .. 1 (lit band); lift 0 (world) .. 1 (skips the grade).
 half3 CMTodGrade(half3 color, half band01, half lift)
@@ -35,6 +41,33 @@ half3 CMTodGrade(half3 color, half band01, half lift)
     half l = saturate(lift * (half)_CMTodKey.a);
     m = lerp(m, 1.0h, l);
     return color * m + (half3)_CMTodAmbient.rgb * (1.0h - l);
+}
+
+// b15 world look: the ground grade (before the ground's shadow and CMTodGrade). Rec. 709 luma in linear.
+half3 CMTodGroundGrade(half3 c)
+{
+    if (_CMTodGround.x == 0.0 && _CMTodGround.y == 0.0 && _CMTodGround.z == 0.0) return c;
+    half l = dot(c, half3(0.2126h, 0.7152h, 0.0722h));
+    if (l <= 1e-5h) return c;
+    half l2 = max(0.0h, (half)_CMTodGround.w + (l - (half)_CMTodGround.w) * (1.0h - saturate((half)_CMTodGround.y)));
+    half3 c1 = c * (l2 / l);
+    half3 c2 = lerp(half3(l2, l2, l2), c1, 1.0h + (half)_CMTodGround.z);
+    return max(0.0h, c2) * (1.0h + (half)_CMTodGround.x);
+}
+
+// b15 world look: a character's band (0 shadow .. 2 lit) lifted toward lit by the fill; w = 1 for characters, 0 else.
+half CMTodCharacterBand(half band, half w)
+{
+    return band + (2.0h - band) * saturate((half)_CMTodChar.y) * w;
+}
+
+// b15 world look: a character's banded colour times the gain, hue kept (no channel clips alone).
+half3 CMTodCharacterGain(half3 c, half w)
+{
+    half g = 1.0h + max(0.0h, (half)_CMTodChar.x) * w;
+    c *= g;
+    half m = max(c.r, max(c.g, c.b));
+    return m > 1.0h ? c / m : c;
 }
 
 // Rim on world solids: a hard edge on silhouettes that face the key light (moonlit edges keep shapes readable at

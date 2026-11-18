@@ -174,7 +174,7 @@ namespace CriticalMass.Runtime.View.Effects
                     Vector3 p = c + new Vector3(Mathf.Cos(a), 0f, Mathf.Sin(a)) * (0.6f * R) + up * 0.2f;
                     AddPuff(t + S(0.02 * (k % 3)), p, seed, (uint)(k + 70), Mathf.Min(0.5f + 0.1f * R, BlastPuffMax), kind == ExplosionKind.Mine ? DirtLight : DustMid, 1);
                 }
-                if (fire && IsGround(x, z)) AddMark(t, c, ScorchSizeK * R, 1, seed, S(0.06), S(ScorchLife));
+                if (fire && IsGround(x, z)) AddMark(t, c, ScorchHalf(R), 1, seed, S(0.06), S(ScorchLife));
             }
             GibRecentDeaths(t, x, z, R * 1.3);
             RustleArea(x, z, 1.6 * R, t, seed);
@@ -351,7 +351,17 @@ namespace CriticalMass.Runtime.View.Effects
 
         /// <summary>polish-5: the TNT scorch: size per blast radius (was 0.95: about 4 m across with its rays), life (was 14 s,
         /// then stamped for good), the share of life it fades over, its peak opacity and its warm grey-brown tones.</summary>
-        public const float ScorchSizeK = 0.63f, ScorchAlpha = 0.6f;
+        // b15 world look (WORLD-AUDIT AD8.19 / W08: a ~3 u scorch at over 30%): residue at 30% and 0.6 to 1.2 u across, rays
+        // included (they reach 1.55 x the blob's radius), whatever the blast radius. Warm colours kept (polish-5, SmokeLookTests).
+        public const float ScorchSizeK = 0.63f, ScorchAlpha = 0.3f;
+        public const float ScorchRayReach = 1.55f, ScorchMinAcross = 0.6f, ScorchMaxAcross = 1.2f;
+
+        /// <summary>The scorch blob's radius for a blast radius R: its whole mark (rays too) is 0.6 to 1.2 u across.</summary>
+        public static float ScorchHalf(float blastR) =>
+            Mathf.Clamp(ScorchSizeK * blastR, ScorchMinAcross * 0.5f / ScorchRayReach, ScorchMaxAcross * 0.5f / ScorchRayReach);
+
+        /// <summary>The whole scorch mark's width across (u) for a blast radius R.</summary>
+        public static float ScorchAcross(float blastR) => 2f * ScorchRayReach * ScorchHalf(blastR);
         public const double ScorchLife = 5.0, ScorchFadeShare = 0.6;
         public static readonly Color32 ScorchWarm = new Color32(92, 76, 64, 255), ScorchWarmDeep = new Color32(70, 56, 46, 255);
 
