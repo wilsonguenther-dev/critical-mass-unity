@@ -13,7 +13,7 @@ extract() {  # name sha
 }
 for a in control b13base cand; do git fetch -q --no-tags --depth=1 origin "${SHA[$a]}" || { echo "simcost: fetch ${SHA[$a]} failed"; exit 2; }; done
 for a in control b13base cand; do extract "$a" "${SHA[$a]}"; done
-for a in control cand; do extract "$a-probe" "${SHA[$a]}"; done
+for a in control b13base cand; do extract "$a-probe" "${SHA[$a]}"; done
 extract head HEAD; extract head-probe HEAD
 build() {  # dir [--patch]
   python3 "$ROOT/tools/ci/simcost/probe.py" "$1" ${2:-} || exit 2
@@ -23,11 +23,11 @@ build() {  # dir [--patch]
     || { grep -E 'error [A-Z]+[0-9]+' "$1/simcost-build.log" | sort -u | head -20; echo "simcost: compile failed in $1"; exit 2; }
 }
 for a in control b13base cand head; do build "$T/$a"; done
-for a in control cand head; do build "$T/$a-probe" --patch; done
+for a in control b13base cand head; do build "$T/$a-probe" --patch; done
 run() { (cd "$T/$1" && CM_COST_TAG="$2" dotnet tools/ci/SimTests/bin/Release/net8.0/CriticalMass.Sim.Tests.dll --noheader --labels=Off --where "class == CriticalMass.Sim.Tests.SimCostBench" --result="$T/r.xml") | grep -E '\[sim(cost|probe)\]' | tee -a "$ROOT/simcost.txt"; }
 echo "simcost: head $(git rev-parse --short HEAD), runner $(nproc) cpus, $(date -u +%H:%M:%SZ)"
 for r in 1 2 3; do for a in control b13base cand head; do run "$a" "$a run $r"; done; done
-for a in control cand head; do run "$a-probe" "$a probed"; done
+for a in control b13base cand head; do run "$a-probe" "$a probed"; done
 python3 - "$ROOT/simcost.txt" <<'PY' | tee -a "${GITHUB_STEP_SUMMARY:-/dev/null}"
 import re,sys,statistics as st
 K=['trimmed','median','p95','p99','p99.9','max']

@@ -3,6 +3,7 @@ using System.Diagnostics;
 using CriticalMass.Sim.Bots;
 using CriticalMass.Sim.Config;
 using CriticalMass.Sim.Core;
+using CriticalMass.Net;
 using NUnit.Framework;
 
 namespace CriticalMass.Sim.Tests
@@ -32,6 +33,7 @@ namespace CriticalMass.Sim.Tests
             var calls = probed ? new short[(long)cap * nn] : null;
             int n = 0;
             long total = 0;
+            string hashes = "";
             for (int k = 0; k <= seeds16.Length; k++)
             {
                 bool five = k == seeds16.Length;
@@ -55,7 +57,9 @@ namespace CriticalMass.Sim.Tests
                     }
                     per[n++] = dt; total += dt;
                 }
+                hashes += $" {StateHash.Of(w):X16}@{w.Tick}";
             }
+            Console.WriteLine($"[simcost] {tag}: end hashes{hashes}");
             double us = 1e6 / Stopwatch.Frequency;
             var s = new long[n]; Array.Copy(per, s, n); Array.Sort(s);
             int keep = n - n / 50; long sum = 0;
@@ -82,6 +86,21 @@ namespace CriticalMass.Sim.Tests
             Array.Sort(order, (a, b) => tsum[b].CompareTo(tsum[a]));
             foreach (int j in order)
                 Console.WriteLine($"[simprobe] {tag}: TOP {SimCostProbe.TopNames[j]}: heavy share {100 * tsum[j] / hs:0.0}%, {tsum[j] * us / heavy:0.0} us per heavy tick, {tall[j] * us / n:0.00} us per tick overall");
+            var idxs = new int[n]; for (int i = 0; i < n; i++) idxs[i] = i;
+            Array.Sort(idxs, (a, b) => per[b].CompareTo(per[a]));
+            for (int r = 0; r < 6 && r < n; r++)
+            {
+                int i = idxs[r];
+                var sb = new System.Text.StringBuilder();
+                var ot = new int[nt]; for (int j = 0; j < nt; j++) ot[j] = j;
+                Array.Sort(ot, (a, b) => top[(long)i * nt + b].CompareTo(top[(long)i * nt + a]));
+                for (int q = 0; q < 3; q++) sb.Append($" {SimCostProbe.TopNames[ot[q]]}={top[(long)i * nt + ot[q]] * us:0}");
+                sb.Append(" |");
+                var on = new int[nn]; for (int j = 0; j < nn; j++) on[j] = j;
+                Array.Sort(on, (a, b) => nest[(long)i * nn + b].CompareTo(nest[(long)i * nn + a]));
+                for (int q = 0; q < 5 && q < nn; q++) sb.Append($" {SimCostProbe.NestNames[on[q]]}={nest[(long)i * nn + on[q]] * us:0}us/{calls[(long)i * nn + on[q]]}");
+                Console.WriteLine($"[simprobe] {tag}: HEAVIEST #{r + 1} tick-index {i} {per[i] * us:0} us grid+{grid[i]}:{sb}");
+            }
             var o2 = new int[nn]; for (int j = 0; j < nn; j++) o2[j] = j;
             Array.Sort(o2, (a, b) => nsum[b].CompareTo(nsum[a]));
             foreach (int j in o2)
