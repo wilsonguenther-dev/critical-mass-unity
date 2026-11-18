@@ -62,7 +62,11 @@ namespace CriticalMass.Sim.Core
 
         /// <summary>The team trails by more than the threshold and still has cap left (RALLY would count if it held the hill).</summary>
         public static bool Trailing(World w, TeamId team) =>
-            On(w) && Deficit(w, team) > w.Config.Depth.Comeback.TrailThresholdSeconds && w.Rally.BonusMilli[(int)team] < CapMilli(w.Config);
+            On(w) && w.Config.Depth.Comeback.RallyOn && Deficit(w, team) > w.Config.Depth.Comeback.TrailThresholdSeconds && w.Rally.BonusMilli[(int)team] < CapMilli(w.Config);
+
+        /// <summary>FORWARD RETURN is on for the team right now (it trails by more than the threshold).</summary>
+        public static bool ForwardActive(World w, TeamId team) =>
+            On(w) && w.Config.Depth.Comeback.ForwardReturnOn && Deficit(w, team) > w.Config.Depth.Comeback.TrailThresholdSeconds;
 
         /// <summary>The team earned RALLY credit on the last tick.</summary>
         public static bool Earning(World w, TeamId team) => On(w) && w.Rally.Earning[(int)team] != 0;
@@ -237,21 +241,33 @@ namespace CriticalMass.Sim.Core
             TeamId team = w.Actors[id].Team;
             if (!(Deficit(w, team) > w.Config.Depth.Comeback.TrailThresholdSeconds)) return;
             CriticalMass.Sim.Grid.PadDef pad = w.Map.Pads[(int)team];
-            double f = Math.Max(0, Math.Min(0.9, w.Config.Depth.Comeback.ForwardShare));
-            double nx = x + (w.Map.Hill.X - pad.X) * f, nz = z + (w.Map.Hill.Z - pad.Z) * f;
             CriticalMass.Sim.Grid.MapDef m = w.Map;
             int r = (int)Math.Ceiling(radius) + 1;
-            int cx = (int)Math.Floor(nx), cz = (int)Math.Floor(nz);
+            // the furthest clear point on the pad-to-hill line at or under ForwardShare, in twentieths (integer steps)
+            int steps = (int)Math.Floor(Math.Max(0, Math.Min(0.9, w.Config.Depth.Comeback.ForwardShare)) * 20 + 1e-9);
+            for (int k = steps; k >= 2; k--)
+            {
+                double f = k / 20.0;
+                double nx = x + (w.Map.Hill.X - pad.X) * f, nz = z + (w.Map.Hill.Z - pad.Z) * f;
+                if (!Clear(m, nx, nz, r)) continue;
+                x = nx;
+                z = nz;
+                return;
+            }
+        }
+
+        static bool Clear(CriticalMass.Sim.Grid.MapDef m, double x, double z, int r)
+        {
+            int cx = (int)Math.Floor(x), cz = (int)Math.Floor(z);
             for (int dz = -r; dz <= r; dz++)
             for (int dx = -r; dx <= r; dx++)
             {
                 int gx = cx + dx, gz = cz + dz;
-                if (gx < 0 || gz < 0 || gx >= m.Width || gz >= m.Height) return;
+                if (gx < 0 || gz < 0 || gx >= m.Width || gz >= m.Height) return false;
                 byte c = m.Cells[gz * m.Width + gx];
-                if (c != Cell.Floor && c != Cell.BreakableDestroyed) return;
+                if (c != Cell.Floor && c != Cell.BreakableDestroyed && c != Cell.Bridge) return false;
             }
-            x = nx;
-            z = nz;
+            return true;
         }
     }
 

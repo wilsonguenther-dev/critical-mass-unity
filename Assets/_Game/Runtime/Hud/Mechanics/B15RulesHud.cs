@@ -34,6 +34,14 @@ namespace CriticalMass.Runtime.Hud.Mechanics
 
         public static string VoteHead(int level, int secondsLeft) => string.Format(CultureInfo.InvariantCulture, HutChoiceNames.Vote, level) + "   " + secondsLeft + " s";
 
+        public const string RallyPointLine = "RALLY POINT: you come back closer to the hill";
+        public const string TurnReason = "Knocked down, the Kaiju gets up for the team that beat it.";
+
+        public static string TurnHeadline(bool ours) => ours ? "THE KAIJU JOINS YOU" : "THE KAIJU TURNS ON YOU";
+
+        public static string TiringLine(bool ours, double share) =>
+            (ours ? "YOUR HILL TIRES x" : "THEIR HILL TIRES x") + share.ToString("0.00", CultureInfo.InvariantCulture);
+
         public static string Votes(int n) => n == 1 ? "1 vote" : n + " votes";
 
         public static string Result(int level, HutOption o) => string.Format(CultureInfo.InvariantCulture, HutChoiceNames.Chosen, level, HutChoiceNames.Name[(int)o]);
@@ -81,7 +89,7 @@ namespace CriticalMass.Runtime.Hud.Mechanics
         // caches: strings rebuilt only when their numbers change
         int _epoch = -1, _rallyKey = int.MinValue, _voteKey = int.MinValue, _cardsLevel = -1, _keysDevice = -1;
         readonly int[] _votesShown = { -1, -1 }, _resultTick = { -1, -1 }, _rallyBanner = { 0, 0 };
-        int _myVoteShown = -1;
+        int _myVoteShown = -1, _turnsShown = -1;
 
         /// <summary>Shown flags (tests and captures).</summary>
         public bool RallyShown => _rally != null && _rally.gameObject.activeSelf;
@@ -168,6 +176,7 @@ namespace CriticalMass.Runtime.Hud.Mechanics
                 _rallyBanner[0] = _rallyBanner[1] = 0;
                 _votesShown[0] = _votesShown[1] = -1;
                 _myVoteShown = -1;
+                _turnsShown = -1;
             }
             TeamId team = w.Actors[me].Team;
             TickRally(w, team);
@@ -180,7 +189,7 @@ namespace CriticalMass.Runtime.Hud.Mechanics
             TeamId enemy = team == TeamId.Azure ? TeamId.Crimson : TeamId.Azure;
             bool ownTrails = Comeback.Trailing(w, team), enemyTrails = Comeback.Trailing(w, enemy);
             bool show = ownTrails || enemyTrails;
-            if (_rally.gameObject.activeSelf != show) _rally.gameObject.SetActive(show);
+            if (show && !_rally.gameObject.activeSelf) _rally.gameObject.SetActive(true);   // hidden by TickLevers
             // a one-time banner per team, the first tick that team earns RALLY credit (the announcer line, both teams see it)
             for (int t = 0; t < 2; t++)
             {
@@ -196,7 +205,7 @@ namespace CriticalMass.Runtime.Hud.Mechanics
                     HoldSeconds = 2.0,
                 });
             }
-            if (!show) { _rallyKey = int.MinValue; return; }
+            if (!show) { TickLevers(w, team, enemy); return; }
             TeamId who = ownTrails ? team : enemy;
             int left = (int)System.Math.Ceiling(Comeback.CapLeftSeconds(w, who));
             bool earning = Comeback.Earning(w, who);
@@ -208,6 +217,52 @@ namespace CriticalMass.Runtime.Hud.Mechanics
             _rallyText.color = earning ? CMTokens.WarmCream.Color : ink;
             _rallyPanel.RimColor = ink;
             _rallyPanel.SetFill(earning ? CMTokens.WithAlpha(CMTokens.Team(who), 0.85f) : CMTokens.WithAlpha(CMTokens.PanelNavy.Color, 0.92f));
+        }
+
+        /// <summary>b15 pass 2: with no RALLY to show, the same tag shows the hill tiring (HOLD FATIGUE) or the trailing team's
+        /// RALLY POINT (FORWARD RETURN); a turned Kaiju gets a banner for both teams.</summary>
+        void TickLevers(World w, TeamId team, TeamId enemy)
+        {
+            KaijuState ks = w.Kaiju.State;
+            if ((ks == KaijuState.Azure || ks == KaijuState.Crimson) && w.Rally.Turns != _turnsShown)
+            {
+                if (_turnsShown >= 0 && w.Rally.Turns > _turnsShown)
+                {
+                    TeamId to = ks == KaijuState.Azure ? TeamId.Azure : TeamId.Crimson;
+                    Banner.Show(new BannerSpec
+                    {
+                        Headline = B15Hud.TurnHeadline(to == team),
+                        Reason = B15Hud.TurnReason,
+                        Style = to == TeamId.Azure ? BannerStyle.Azure : BannerStyle.Crimson,
+                        Priority = 5,
+                        HoldSeconds = 2.0,
+                    });
+                }
+                _turnsShown = w.Rally.Turns;
+            }
+            TeamId owner = w.Match.HillState == HillState.Azure ? TeamId.Azure : TeamId.Crimson;
+            bool owned = w.Match.HillState == HillState.Azure || w.Match.HillState == HillState.Crimson;
+            double share = owned ? Comeback.HoldShare(w, owner) : 1.0;
+            bool forward = Comeback.ForwardActive(w, team);
+            int key;
+            string line;
+            TeamId who;
+            if (share < 0.995) { who = owner; key = 300000 + (owner == team ? 1000 : 0) + (int)System.Math.Round(share * 100); line = B15Hud.TiringLine(owner == team, share); }
+            else if (forward) { who = team; key = 400000; line = B15Hud.RallyPointLine; }
+            else
+            {
+                if (_rally.gameObject.activeSelf) _rally.gameObject.SetActive(false);
+                _rallyKey = int.MinValue;
+                return;
+            }
+            if (!_rally.gameObject.activeSelf) _rally.gameObject.SetActive(true);
+            if (key == _rallyKey) return;
+            _rallyKey = key;
+            HudText.Set(_rallyText, line);
+            Color ink = CMTokens.TeamInk(who);
+            _rallyText.color = ink;
+            _rallyPanel.RimColor = ink;
+            _rallyPanel.SetFill(CMTokens.WithAlpha(CMTokens.PanelNavy.Color, 0.92f));
         }
 
         void TickVote(World w, int me, TeamId team)

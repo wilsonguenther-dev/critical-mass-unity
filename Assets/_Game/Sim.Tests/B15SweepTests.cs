@@ -110,5 +110,30 @@ namespace CriticalMass.Sim.Tests
                 A("turncoat+fatigue 20/40/0.25+waves 8+forward 0.5", Turncoat, Fatigue(20, 40, 250), Waves(8), Forward(0.5)),
             });
         }
+    
+        [Test, Explicit, Timeout(3500000)]
+        public void B15SweepRoundTwo()
+        {
+            var F2 = Fatigue(20, 40, 250);
+            Sweep("r2", new List<KeyValuePair<string, Action<GameConfig>>>
+            {
+                A("T+F20/40/.25", Turncoat, F2),
+                A("T+F15/30/.25", Turncoat, Fatigue(15, 30, 250)),
+                A("T+F20/40/.25+C2-6", Turncoat, F2, Curve(2, 6)),
+                A("T+F20/40/.25+C2-6+Fw.4", Turncoat, F2, Curve(2, 6), Forward(0.4)),
+                A("T+F20/40/.25+C2-6+Fw.6", Turncoat, F2, Curve(2, 6), Forward(0.6)),
+                A("T+F20/40/.25+C2-6+Fw.4+R500/60/5", Turncoat, F2, Curve(2, 6), Forward(0.4), Rally(500, 60, 5)),
+                A("T+F30/60/.5+C2-6+Fw.4", Turncoat, Fatigue(30, 60, 500), Curve(2, 6), Forward(0.4)),
+                A("T+F20/40/.25+C2-5", Turncoat, F2, Curve(2, 5)),
+                A("T+F20/40/.1+C2-6+Fw.4", Turncoat, Fatigue(20, 40, 100), Curve(2, 6), Forward(0.4)),
+                A("T+F10/30/.25+C2-6+Fw.4", Turncoat, Fatigue(10, 30, 250), Curve(2, 6), Forward(0.4)),
+                A("F20/40/.25+C2-6+Fw.4", F2, Curve(2, 6), Forward(0.4)),
+                A("T+F20/40/.25+C2-6+Fw.4+M2", Turncoat, F2, Curve(2, 6), Forward(0.4), Majority(2)),
+                A("T+F20/40/.25+C2-6+Fw.4+R250/45/15", Turncoat, F2, Curve(2, 6), Forward(0.4), Rally(250, 45, 15)),
+                A("T+F15/45/0+C2-6+Fw.4", Turncoat, Fatigue(15, 45, 0), Curve(2, 6), Forward(0.4)),
+                A("T+F10/20/0+C2-6+Fw.4", Turncoat, Fatigue(10, 20, 0), Curve(2, 6), Forward(0.4)),
+                A("T+F20/40/.25+C2-6+Fw.4+R1000/90/5", Turncoat, F2, Curve(2, 6), Forward(0.4), Rally(1000, 90, 5)),
+            });
+        }
     }
 }
