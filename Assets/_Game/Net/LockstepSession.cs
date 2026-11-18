@@ -266,6 +266,9 @@ namespace CriticalMass.Net
         /// <summary>b15-zero-cost: ticks of input in one joiner packet (1 = a packet per tick, the pre-b15 way).</summary>
         public int TicksPerPacket => _clientTicks;
         private readonly int _clientTicks;
+        /// <summary>b15-zero-cost, host: per slot, how many ticks before the host needed it the first new input of that slot's
+        /// last packet arrived (int.MinValue: none yet). With packed inputs this is the margin the bundles report.</summary>
+        private int[] _arrSlack;
         private int _hashesSent;
         private long _unsentSince = -1;
 
@@ -364,6 +367,8 @@ namespace CriticalMass.Net
                 _hashHist = new ulong[LogTicks(cfg) / Math.Max(1, setup.HashEvery) + 1];
                 _rejoining = new bool[_h];
                 _rejoinLive = new bool[_h];
+                _arrSlack = new int[_h];
+                for (int k = 0; k < _h; k++) _arrSlack[k] = int.MinValue;
                 _feeding = new bool[_h];
                 _feedSent = new int[_h];
                 _feedAckSeen = new int[_h];
@@ -611,6 +616,7 @@ namespace CriticalMass.Net
                 _rejoinLive[k] = true;
                 Buffer.BlockCopy(d, r.Pos + (count - 1) * InputCodec.Size, _lastInput[k], 0, InputCodec.Size);
             }
+            int firstNew = -1;
             for (int j = 0; j < count; j++)
             {
                 int t = first + j;
@@ -622,7 +628,12 @@ namespace CriticalMass.Net
                 Buffer.BlockCopy(d, at, _in[k], idx * InputCodec.Size, InputCodec.Size);
                 _inTick[k][idx] = t;
                 _heardInput[k] = true;
+                if (firstNew < 0) firstNew = t;
             }
+            // b15-zero-cost: with packed inputs the margin a bundle reports is measured when the inputs ARRIVE (how many ticks
+            // before the host needs the first new one), not when the bundle is sent: bundles now go out right after a group
+            // completes, when every slot's last group looks "just in time", so a send-time margin would grow every lead.
+            if (firstNew >= 0) _arrSlack[k] = firstNew - Stepped;
             // Everything up to the last sequenced tick is no longer needed (a late input there was replaced), so the
             // acknowledgement never sticks at a hole and the client never resends stale inputs forever.
             if (_inThrough[k] < _producedThrough) _inThrough[k] = _producedThrough;
@@ -657,10 +668,7 @@ namespace CriticalMass.Net
             // Adaptive lead (LeadPolicy): how many ticks ahead of the host's stepping our inputs were when it sent this.
             if (myMargin != int.MinValue && _lead != null && hostStepped >= 0)
             {
-                // b15-zero-cost: with inputs sent _clientTicks at a time the host sequences (and reports) right after a whole
-                // group arrives, so a group that came just in time shows a margin of _clientTicks - 1. Take that off, so the
-                // policy sees the same slack it saw with one tick a packet (and grows the lead instead of letting the host wait).
-                _lead.OnMargin(myMargin - (_clientTicks - 1), now);
+                _lead.OnMargin(myMargin, now);
                 Lead = _lead.Lead;
             }
             if (theirDesync >= 0) Desync(theirDesync);
@@ -764,6 +772,7 @@ namespace CriticalMass.Net
             _lastStartSend[slot] = long.MaxValue / 2;   // it has its setup (REJOINED); never resend START to it
             _theirTick[slot * 2] = -1;
             _theirTick[slot * 2 + 1] = -1;
+            _arrSlack[slot] = int.MinValue;
             RejoinsAccepted++;
             return null;
         }
@@ -1173,7 +1182,8 @@ namespace CriticalMass.Net
             w.U8(_h);
             for (int k = 0; k < _h; k++)
             {
-                int d = (_gone[k] && !_rejoining[k]) || _inThrough[k] < 0 ? -128 : _inThrough[k] - Stepped;
+                int d = (_gone[k] && !_rejoining[k]) || _inThrough[k] < 0 ? -128
+                    : _clientTicks > 1 && _arrSlack[k] != int.MinValue ? _arrSlack[k] : _inThrough[k] - Stepped;
                 w.U8(unchecked((byte)(sbyte)Math.Max(-128, Math.Min(127, d))));
             }
             WriteHashes(ref w);

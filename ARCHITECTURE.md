@@ -398,3 +398,26 @@ of desyncs", https://www.gamedeveloper.com/design/opinion-synchronous-rts-engine
 engine's reconnect replays the match ("their own computer has to replay everything that happened",
 https://eu.forums.blizzard.com/en/heroes/t/why-does-reconnecting-take-so-long/2686); the 2026-11-17 systems audit M6
 (input-log replay over world serialisation).
+
+## 10. Online on zero spend: three paths, one protocol (b15-zero-cost)
+
+Every online path carries the same relay frames (`server/relay/src/protocol.js`) and the same lockstep, room, chat and
+rejoin messages; only the pipe differs:
+
+| Path | Pipe | Cost | Code |
+|---|---|---|---|
+| Room code | WebSocket to the Cloudflare relay (one Durable Object a room) | the free plan's 100,000 requests a day (incoming messages count 20 to 1) | `Net/Relay/RelayTransport.cs` |
+| Same network | TCP to the host's game (port 47800), found by a UDP beacon (port 47801) | free | `Net/Relay/DirectNet.cs` (`DirectHost`, `DirectClient`, `LanBeacon`, `LanListener`) |
+| Typed address | TCP to the host's game, through the host's port forwarding | free | same |
+
+The host's game IS the relay for direct joiners (`DirectHost` stamps senders, forwards broadcasts, enforces the same
+size and rate limits, peer numbers 200 to 254). `HostMux` lets one room take relay and direct players together and
+keeps the room alive if the relay leg dies (relay players become bots at one tick on every machine; direct players
+play on). `FallbackTransport` tries direct first and joins the same room by code if the host cannot be reached.
+
+Traffic rules (they never change what a tick computes; checksum rows unchanged): joiners send inputs two ticks a packet
+(three above 16 humans), aligned on the tick number so the host's bundles go out in the same groups; the lead policy
+reads the group's slack (margin minus ticks-per-packet minus one); fingerprints travel once on reliable links.
+`MeteredTransport` counts every message and byte by kind; `RelayBudget` turns rates into matches a day; the sim gate's
+`ZeroCostOnlineTests` measure both and guard them (+10%). Numbers, hosting how-to and the free tier's walls:
+`docs/online/ZERO-COST-ONLINE.md`.

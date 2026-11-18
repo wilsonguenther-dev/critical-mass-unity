@@ -58,8 +58,9 @@ Matches a day by room size, measured before and after b15's traffic cut: `docs/o
   "Online today: about N of M matches left" (and warns before START when the day is nearly used).
 - `wrangler.toml` turns Workers Logs on at a 1% sample (free plan: 200,000 log events a day, 3 days kept).
 
-Deploying this version adds one Durable Object class (`Usage`, migration `v2`). A deploy restarts the room objects, so
-anyone in a room at that moment is disconnected: deploy when nobody is playing (check `relay-usage.py` for the last hour).
+Deploying this version adds one Durable Object class (`Usage`, migration `v2`). A deploy restarts the room objects (as
+any new Durable Object code does), so anyone in a room at that moment may be disconnected: deploy when nobody is
+playing (check `relay-usage.py` for the last hour).
 
 ## Test locally (no account needed)
 
