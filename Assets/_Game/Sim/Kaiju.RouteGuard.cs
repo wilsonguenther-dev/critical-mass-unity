@@ -26,6 +26,32 @@ namespace CriticalMass.Sim.Core
         private static int[] Queue = new int[Tent.Length];
         private static int Stamp;
 
+        /// <summary>
+        /// b14 sim cost (Terraform's route verdict memo): bumped every time RefreshClearance rebuilds or patches the clearance
+        /// grid of any World, so a remembered start cell is only compared on the very clearance bytes it was taken from.
+        /// Never Sim state.
+        /// </summary>
+        internal static long ClearEpoch;
+
+        /// <summary>b14 sim cost: the start cell the last TentativeKeepsKaijuRoute call used (-1 none; int.MinValue no cell).</summary>
+        internal static int GuardUsedStart = -1;
+
+        /// <summary>
+        /// b14 sim cost: the start cell TentativeKeepsKaijuRoute would use now, read from the clearance grid ONLY when it is
+        /// already current (no refresh here, so nothing the Kaiju step reads is touched); -2 when it is not current (no memo hit).
+        /// </summary>
+        internal static int RouteMemoStart(World w)
+        {
+            KaijuNav nav = w.KaijuNav;
+            if (nav.ClearGridVersion != w.GridVersion) return -2;
+            MapDef map = w.Map;
+            Kaiju kj = w.Kaiju;
+            bool out_ = w.Match.Hatched && kj.State != KaijuState.Egg;
+            double sx = out_ ? kj.X : map.Shrine.X, sz = out_ ? kj.Z : map.Shrine.Z + HatchOffsetZ;
+            int start = Snap(map, nav.Clear.Cells, sx, sz);
+            return start < 0 ? int.MinValue : start;
+        }
+
         /// <summary>The Kaiju route guard applies: Full profile, the nav guard and the hill-siege crush rule on.</summary>
         internal static bool RouteGuardOn(World w) =>
             DepthRules.On(w, true) && Phys.On(w, w.Config.Physics.KaijuNavGuard) && Phys.On(w, w.Config.Physics.KaijuHillSiege);
@@ -117,7 +143,9 @@ namespace CriticalMass.Sim.Core
             bool out_ = w.Match.Hatched && kj.State != KaijuState.Egg;
             double sx = out_ ? kj.X : map.Shrine.X, sz = out_ ? kj.Z : map.Shrine.Z + HatchOffsetZ;
             HillDef hill = map.Hill;
-            if (!Connected(map, before, Snap(map, before, sx, sz), Snap(map, before, hill.X, hill.Z))) return true;
+            int start = Snap(map, before, sx, sz);
+            GuardUsedStart = start < 0 ? int.MinValue : start;   // b14 sim cost: the verdict now depends on this start cell
+            if (!Connected(map, before, start, Snap(map, before, hill.X, hill.Z))) return true;
             // The clearance AFTER: a scratch copy patched around the changed cells from the tentative grid.
             int N = before.Length, W = map.Width, H = map.Height;
             Fit(N);

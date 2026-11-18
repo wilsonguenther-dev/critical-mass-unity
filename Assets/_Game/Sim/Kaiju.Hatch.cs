@@ -278,6 +278,7 @@ namespace CriticalMass.Sim.Core
         {
             KaijuNav nav = w.KaijuNav;
             if (nav.ClearGridVersion == w.GridVersion) return;
+            ClearEpoch++;   // b14 sim cost: the route verdict memo compares start cells only within one clearance build
             SimProfile.Begin?.Invoke(SimProfile.KaijuClearance);
             MapDef map = w.Map;
             byte[] cells = nav.Clear.Cells;

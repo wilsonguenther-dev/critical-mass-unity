@@ -117,6 +117,84 @@ namespace CriticalMass.Sim.Core
         /// </summary>
         public static bool CellsKeepRoutes(World w, int[] idx, byte[] next, int n)
         {
+            // b14 sim cost: the same request on the same grid (and, when the Kaiju route guard looked at the body, the same
+            // Kaiju start cell on the same clearance build) has the same verdict: answer it from the memo (an expired piece
+            // whose lift is refused retries every tick; each retry paid two flow fields and the Kaiju guard's searches).
+            int hit = RouteMemoFind(w, idx, next, n);
+            if (hit >= 0) return Memo[hit].Ok;
+            Kaiju.GuardUsedStart = -1;
+            bool verdict = CellsKeepRoutesUncached(w, idx, next, n);
+            RouteMemoStore(w, idx, next, n, verdict, Kaiju.GuardUsedStart);
+            return verdict;
+        }
+
+        // ------------------------------------------------------------------------------------------ route verdict memo
+        /// <summary>
+        /// b14 sim cost: one remembered route verdict. A pure function of (the grid = World.GridVersion; the request; and,
+        /// only when the Kaiju route guard reached the body test, the guard's start cell on the Kaiju clearance grid, whose
+        /// build is identified by Kaiju.ClearEpoch). Never Sim state: a hit and a miss give the same answer, so no checksum moves.
+        /// </summary>
+        private sealed class RouteMemoEntry
+        {
+            public World W;
+            public int GridVersion;
+            public long Epoch;
+            /// <summary>-1 = the verdict did not depend on the Kaiju (pads cut, nothing narrowed, guard off); else its start cell.</summary>
+            public int Start;
+            public int N;
+            public int[] Idx = new int[RouteMemoMaxCells];
+            public byte[] Next = new byte[RouteMemoMaxCells];
+            public bool Ok;
+        }
+
+        /// <summary>Requests with more cells than this are never memoised (a whole wall line is checked once anyway).</summary>
+        private const int RouteMemoMaxCells = 64;
+        private static readonly RouteMemoEntry[] Memo = NewMemo(8);
+        private static int MemoCursor;
+
+        private static RouteMemoEntry[] NewMemo(int k)
+        {
+            var m = new RouteMemoEntry[k];
+            for (int i = 0; i < k; i++) m[i] = new RouteMemoEntry();
+            return m;
+        }
+
+        private static int RouteMemoFind(World w, int[] idx, byte[] next, int n)
+        {
+            if (n > RouteMemoMaxCells) return -1;
+            int start = -2;
+            for (int e = 0; e < Memo.Length; e++)
+            {
+                RouteMemoEntry m = Memo[e];
+                if (!ReferenceEquals(m.W, w) || m.GridVersion != w.GridVersion || m.Epoch != Kaiju.ClearEpoch || m.N != n) continue;
+                bool same = true;
+                for (int k = 0; k < n && same; k++) same = m.Idx[k] == idx[k] && m.Next[k] == next[k];
+                if (!same) continue;
+                if (m.Start == -1) return e;
+                if (start == -2) start = Kaiju.RouteMemoStart(w);
+                if (start != -2 && start == m.Start) return e;
+            }
+            return -1;
+        }
+
+        private static void RouteMemoStore(World w, int[] idx, byte[] next, int n, bool ok, int start)
+        {
+            if (n > RouteMemoMaxCells) return;
+            RouteMemoEntry m = Memo[MemoCursor];
+            MemoCursor = (MemoCursor + 1) % Memo.Length;
+            m.W = w;
+            m.GridVersion = w.GridVersion;
+            m.Epoch = Kaiju.ClearEpoch;
+            m.Start = start;
+            m.N = n;
+            Array.Copy(idx, m.Idx, n);
+            Array.Copy(next, m.Next, n);
+            m.Ok = ok;
+        }
+
+        /// <summary>The route guard proper (CellsKeepRoutes without the memo).</summary>
+        private static bool CellsKeepRoutesUncached(World w, int[] idx, byte[] next, int n)
+        {
             MapDef map = w.Map;
             byte[] cells = map.Cells;
             if (OldTypes.Length < n) OldTypes = new byte[n];
