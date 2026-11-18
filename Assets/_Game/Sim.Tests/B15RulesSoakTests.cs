@@ -282,6 +282,8 @@ namespace CriticalMass.Sim.Tests
                 if (!Check(a.Name + ": RALLY within its cap", F(a.RallyMax, "0.00") + " s most in one team's match", a.RallyMax <= cap + 1e-6, "<= " + F(cap, "0") + " s")) fails++;
                 if (!Check(a.Name + ": knock-out wait inside the curve", F(a.RespawnMin, "0.00") + " .. " + F(a.RespawnMax, "0.00") + " s", a.RespawnMin >= 2 - 1e-6 && a.RespawnMax <= 8 + 1.0 / 30 + 1e-6, "2 (QUICK RETURN floor) .. 8 s")) fails++;
             }
+            double usOff = off.SimSeconds * 1e6 / Math.Max(1, off.Ticks), usBoth = both.SimSeconds * 1e6 / Math.Max(1, both.Ticks);
+            if (!Check("both on: sim cost per tick against both off (same job, 24 whole matches each)", F(usOff, "0.0") + " / " + F(usBoth, "0.0") + " us = " + F((usBoth / usOff - 1) * 100, "+0.0;-0.0") + " %", usBoth <= usOff * 1.03, "+3 % or less")) fails++;
             Assert.AreEqual(0, fails, "b15 rule invariants (see the [b15 soak] lines)");
         }
 
