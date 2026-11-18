@@ -492,7 +492,10 @@ namespace CriticalMass.Sim.Bots
                         int windup = w.Dur.AttackWindup[(int)a.Cls];
                         if (windup > 0)
                         {
-                            double lead = windup / cfg.SimHz;
+                            // b15 combat feel: the lead is capped at BotLeadSeconds. A 0.40 s wind-up led the whole way swung the
+                            // chase point across a knocked or strafing target, so the bot walked back and forth (shiver gate run
+                            // 44232708547: 18 hard flags, 1 with the shipped wind-ups); a heavy that misses a moving target is fair.
+                            double lead = (CombatFeel.On(w) ? Math.Min(windup, CombatFeel.Ticks(w, cfg.Depth.CombatFeel.BotLeadSeconds)) : windup) / cfg.SimHz;
                             tx += w.Vx[t] * lead;
                             tz += w.Vz[t] * lead;
                         }

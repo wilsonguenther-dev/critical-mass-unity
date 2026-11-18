@@ -149,6 +149,8 @@ namespace CriticalMass.Sim.Config
         // ---- G. bots
         /// <summary>In narrow spots bots follow the raw next-cell step, not the blended flow.</summary>
         public bool BotNarrowRawStep = true;
+        /// <summary>Bots lead a moving target by at most this much of their wind-up (real seconds) when they chase and aim.</summary>
+        public double BotLeadSeconds = 0.13;
 
         public CombatFeelConfig Clone()
         {
