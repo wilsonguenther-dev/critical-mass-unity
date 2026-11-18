@@ -4,8 +4,8 @@ using UnityEngine;
 
 namespace CriticalMass.Runtime.Menus
 {
-    /// <summary>The four pages of the one results layout.</summary>
-    public enum ResultsTab { Summary = 0, Rewards = 1, Achievements = 2, Highlights = 3 }
+    /// <summary>The pages of the one results layout, in tab order (b15: MATCH STORY second, after the summary).</summary>
+    public enum ResultsTab { Summary = 0, Story = 1, Rewards = 2, Achievements = 3, Highlights = 4 }
 
     /// <summary>
     /// The one results layout (2026-11-12, UI rough spots), in 1920x1080 reference px, y down from the top-left. Five
@@ -27,7 +27,7 @@ namespace CriticalMass.Runtime.Menus
         /// <summary>The whole headline zone.</summary>
         public static readonly Rect Header = new Rect(Left, 12f, Width, 224f);
 
-        public const int TabCount = 4;
+        public const int TabCount = 5;
         public const float TabW = 300f, TabH = 52f, TabGap = UiScale.ButtonGap;
         public static readonly Rect Tabs = new Rect(Left, 244f, Width, TabH);
 
@@ -86,6 +86,24 @@ namespace CriticalMass.Runtime.Menus
         public static readonly Rect SaveButton = new Rect(960f - 230f, 704f, 460f, 64f);
         public static readonly Rect SaveStatus = new Rect(Left, 780f, Width, 32f);
 
+        // ---- b15 match story: the lead graph panel (left) and the awards panel (right), side by side, no scrolling ----
+        public static readonly Rect StoryPanel = new Rect(Left, 308f, 1060f, 556f);
+        public static readonly Rect StoryTurn = new Rect(Left + 32f, 318f, 996f, 48f);
+        /// <summary>The y-axis labels' column, left of the graph.</summary>
+        public static readonly Rect StoryAxisY = new Rect(Left + 20f, 372f, 72f, 368f);
+        public static readonly Rect StoryGraph = new Rect(Left + 100f, 380f, 924f, 352f);
+        public static readonly Rect StoryAxisX = new Rect(Left + 72f, 740f, 980f, 30f);
+        public static readonly Rect StoryLegend = new Rect(Left + 32f, 784f, 996f, 56f);
+        public const int LegendItems = 5;
+        public static Rect LegendItem(int i) { float w = StoryLegend.width / LegendItems; return new Rect(StoryLegend.x + i * w, StoryLegend.y, w, StoryLegend.height); }
+
+        public static readonly Rect AwardsPanel = new Rect(1210f, 308f, 590f, 556f);
+        public static readonly Rect AwardsHeading = new Rect(1242f, 318f, 526f, 40f);
+        public static readonly Rect AwardsBest = new Rect(1242f, 364f, 526f, 64f);
+        public const int AwardRows = 6;
+        public const float AwardRowH = 64f, AwardPitch = 68f, AwardTop = 436f;
+        public static Rect AwardRow(int i) => new Rect(1242f, AwardTop + i * AwardPitch, 526f, AwardRowH);
+
         /// <summary>The fixed zones, top to bottom (they must never overlap).</summary>
         public static IEnumerable<KeyValuePair<string, Rect>> Zones()
         {
@@ -107,6 +125,10 @@ namespace CriticalMass.Runtime.Menus
                     list.Add(new KeyValuePair<string, Rect>("you card", Card(1)));
                     list.Add(new KeyValuePair<string, Rect>("mvp card", Card(2)));
                     break;
+                case ResultsTab.Story:
+                    list.Add(new KeyValuePair<string, Rect>("story panel", StoryPanel));
+                    list.Add(new KeyValuePair<string, Rect>("awards panel", AwardsPanel));
+                    break;
                 case ResultsTab.Rewards:
                     list.Add(new KeyValuePair<string, Rect>("rewards", Fitted(rewardsW, rewardsH)));
                     break;
@@ -125,6 +147,31 @@ namespace CriticalMass.Runtime.Menus
                     list.Add(new KeyValuePair<string, Rect>("save status", SaveStatus));
                     break;
             }
+            return list;
+        }
+
+        /// <summary>b15: the story page's inner rects inside one of its two panels (tests: inside, never overlapping).</summary>
+        public static List<KeyValuePair<string, Rect>> StoryParts()
+        {
+            var list = new List<KeyValuePair<string, Rect>>
+            {
+                new KeyValuePair<string, Rect>("turn", StoryTurn),
+                new KeyValuePair<string, Rect>("axis y", StoryAxisY),
+                new KeyValuePair<string, Rect>("graph", StoryGraph),
+                new KeyValuePair<string, Rect>("axis x", StoryAxisX),
+                new KeyValuePair<string, Rect>("legend", StoryLegend),
+            };
+            return list;
+        }
+
+        public static List<KeyValuePair<string, Rect>> AwardParts()
+        {
+            var list = new List<KeyValuePair<string, Rect>>
+            {
+                new KeyValuePair<string, Rect>("heading", AwardsHeading),
+                new KeyValuePair<string, Rect>("best", AwardsBest),
+            };
+            for (int i = 0; i < AwardRows; i++) list.Add(new KeyValuePair<string, Rect>("award " + i, AwardRow(i)));
             return list;
         }
 
