@@ -66,6 +66,10 @@ CBUFFER_START(UnityPerMaterial)
     // Sharpness switch "normals" (batch 12 AB): 0 the imported normals, 1 the by-position smoothed ones in UV3
     // (Editor/Art/SharpNormalsPostprocessor; characters only, ArtMaterials sets it). Default 0: no other mesh reads UV3 here.
     float _SmoothNormals;
+    // b14 polish (Kaiju readability at night): a type hue as a soft fresnel emissive plus a per-type pattern on the body
+    // (KaijuAnimator sets both through its one property block; 0 on every other material, so nothing else changes).
+    half4 _KaijuGlow;
+    float _KaijuPattern;
 CBUFFER_END
 
 // Outside the per-material block (textures are not CBUFFER members; SRP Batcher compatible).
@@ -403,6 +407,61 @@ half3 CMToonFog(half3 color, float3 positionWS)
     float f = _FogAmount * saturate((_FogTop - positionWS.y) / max(1e-3, _FogTop - _FogBottom));
     if (f <= 0.0) return color;
     return lerp(color, CMTodFogColor(_FogColor.rgb, positionWS, (half)f), f);
+}
+
+// b14 polish: the Kaiju type glow. A soft fresnel band (wider and softer than the hard team rim, inside it) and a pattern
+// that differs in SHAPE per type, so the type reads without hue (colour-blind safe): 1 GROVE leafy crest on the top
+// surfaces, 2 BRUTE separate back plates, 3 TIMBER horizontal bark bands, 4 MIRE mist spots, 5 ELDER a spine ridge.
+// Patterns run in object space measured in world units (they ride with the body, no crawl when it walks).
+float CMToonKaijuHash(float3 c)
+{
+    return frac(sin(dot(c, float3(12.9898, 78.233, 37.719))) * 43758.5453);
+}
+
+half3 CMToonKaijuGlow(half3 color, float3 normalWS, float3 viewDirWS, float3 positionWS)
+{
+    if (_KaijuGlow.a <= 0.0h) return color;
+    float fres = 1.0 - saturate(dot(normalWS, normalize(viewDirWS)));
+    float rimGlow = smoothstep(0.30, 0.78, fres);
+    float sc = max(1e-4, length(float3(UNITY_MATRIX_M._m00, UNITY_MATRIX_M._m10, UNITY_MATRIX_M._m20)));
+    float3 p = TransformWorldToObject(positionWS) * sc;
+    float up = normalWS.y;
+    float pat = 0.0;
+    int kind = (int)round(_KaijuPattern);
+    if (kind == 1)
+    {
+        // leafy crest: scalloped leaf patches over every upward face
+        float leaf = sin(p.x * 3.1) * sin(p.z * 3.1 + p.y * 1.7);
+        pat = smoothstep(0.30, 0.55, up) * step(-0.15, leaf);
+    }
+    else if (kind == 2)
+    {
+        // back plates: a grid of separate plates (gaps between them) on the upward faces
+        float2 f = frac(p.xz * 1.35);
+        float edge = min(min(f.x, 1.0 - f.x), min(f.y, 1.0 - f.y));
+        pat = step(0.40, up) * step(0.11, edge);
+    }
+    else if (kind == 3)
+    {
+        // bark bands: pale horizontal bands round the whole body
+        pat = step(frac(p.y * 1.4), 0.30) * step(-0.35, up);
+    }
+    else if (kind == 4)
+    {
+        // mist spots: scattered round spots on the upper body
+        float3 cell = floor(p * 2.2);
+        float3 fr = frac(p * 2.2) - 0.5;
+        pat = step(0.45, CMToonKaijuHash(cell)) * step(length(fr), 0.34) * step(-0.10, up);
+    }
+    else if (kind == 5)
+    {
+        // spine ridge: a band along the back (object x near 0) on the upward faces
+        pat = smoothstep(0.35, 0.60, up) * step(abs(p.x), 0.42);
+    }
+    half k = (half)saturate(_KaijuGlow.a);
+    half3 glow = _KaijuGlow.rgb;
+    color = lerp(color, glow, (half)(pat * 0.80) * k);
+    return saturate(color + glow * (half)(rimGlow * 0.55) * k);
 }
 
 // Time of day: how much of the grade a CM/Toon material skips. Characters and the Kaiju (rim strength above 0: world
