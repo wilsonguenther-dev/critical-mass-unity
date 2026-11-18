@@ -74,15 +74,18 @@ namespace CriticalMass.Runtime.Game
 
         // ---------------------------------------------------------------- first-match class goals (match start, respawn)
 
-        /// <summary>Indexed by ClassId. {key} = the real key or button for that action in the active control scheme.</summary>
+        /// <summary>
+        /// Indexed by ClassId (Warrior, Farmer, Miner, Demolitionist, Builder, Healer). The {Attack} {Interact} {DigPlace}
+        /// {Switch} slots are TrialText tokens: they become the key or button bound in the control scheme in use.
+        /// </summary>
         public static string[] ClassGoals =
         {
-            "Warrior goal: stand on the hill and win a fight there. Attack with {key}",
-            "Farmer goal: carry food to the egg so the Kaiju sides with your team. Gather with {key}",
-            "Miner goal: mine ore and bank it at your hut, which makes your whole team stronger. Mine with {key}",
-            "Demolitionist goal: blow up an enemy wall or catch two enemies in one blast. Throw TNT with {key}",
-            "Builder goal: put a ladder on the hill wall so your team gets in. Build with {key}",
-            "Healer goal: heal a hurt teammate before they go down. Heal with {key}",
+            "Warrior goal: knock out an enemy on the hill. Attack with {Attack}",
+            "Farmer goal: bring food to the egg so the Kaiju sides with your team. Gather with {Interact}",
+            "Miner goal: bank ore at your hut to make your whole team stronger. Mine with {DigPlace}",
+            "Demolitionist goal: hit an enemy with TNT. Throw it with {DigPlace}",
+            "Builder goal: put a ladder on the hill wall so your team gets in. Pick it with {Switch}, build with {DigPlace}",
+            "Healer goal: heal a hurt teammate. Mend with {Attack}",
         };
         public static string GoalDone = "Goal done. Nice work.";
 
