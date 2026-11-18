@@ -1,6 +1,8 @@
 using System;
 using CriticalMass.Runtime.View;
+using CriticalMass.Runtime.Game;
 using CriticalMass.Runtime.View.Anim;
+using CriticalMass.Runtime.View.Art;
 using CriticalMass.Sim.Config;
 using NUnit.Framework;
 using UnityEngine;
