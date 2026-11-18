@@ -47,10 +47,12 @@ namespace CriticalMass.Sim.Core
                 next = anchor == 1 ? HillState.Azure : anchor == 2 ? HillState.Crimson : HillState.Contested;
             }
 
+            next = Comeback.Majority(w, next, azure, crimson);   // b15-hook: MAJORITY (the same state with the lever off)
+            double held = dt * Comeback.HoldRate(w, next);      // b15-hook: HOLD FATIGUE (dt with the lever off)
             // b15 rule A RALLY: the trailing owner's extra credit, read before this tick's seconds are added (0 with the rule off)
             double rally = Comeback.RallyCredit(w, next, dt);   // b15-hook
-            if (next == HillState.Azure) m.HillSeconds.Azure += dt;
-            else if (next == HillState.Crimson) m.HillSeconds.Crimson += dt;
+            if (next == HillState.Azure) m.HillSeconds.Azure += held;
+            else if (next == HillState.Crimson) m.HillSeconds.Crimson += held;
             if (rally > 0)
             {
                 if (next == HillState.Azure) m.HillSeconds.Azure += rally;

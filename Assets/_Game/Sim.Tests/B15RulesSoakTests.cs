@@ -27,7 +27,8 @@ namespace CriticalMass.Sim.Tests
             public bool Comeback, Choices;
             public Action<GameConfig> Tweak;
             public readonly WinShare.Tally T16 = new WinShare.Tally();
-            public readonly List<double> LeadChanges = new List<double>(), Decided = new List<double>();
+            public readonly List<double> LeadChanges = new List<double>(), Decided = new List<double>(), Length = new List<double>();
+            public int Turns;
             public int Matches, Blowouts, LeaderAtHalf, LeaderAtHalfWon, Kills, RespawnN, RallyMatches, RallyWon;
             public double Minutes, DeadTicks, WalkTicks, ActorTicks, RespawnSum, RallySeconds, SimSeconds, RallyMax, RespawnMin = double.MaxValue, RespawnMax;
             public long Ticks;
@@ -38,7 +39,7 @@ namespace CriticalMass.Sim.Tests
 
         static string F(double v, string f = "0.000") => v.ToString(f, CultureInfo.InvariantCulture);
 
-        static double Median(List<double> v)
+        public static double Median(List<double> v)
         {
             if (v.Count == 0) return double.NaN;
             var s = new List<double>(v);
@@ -125,6 +126,8 @@ namespace CriticalMass.Sim.Tests
             arm.Kills += kills;
             arm.Minutes += w.Match.Time / 60.0;
             arm.LeadChanges.Add(changes);
+            arm.Length.Add(w.Match.Time);
+            arm.Turns += w.Rally.Turns;
             MatchResult win = w.Match.Winner;
             arm.T16.Add(win);
             double ha = w.Match.HillSeconds.Azure, hc = w.Match.HillSeconds.Crimson;

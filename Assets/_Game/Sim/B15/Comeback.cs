@@ -13,6 +13,12 @@ namespace CriticalMass.Sim.Core
         public readonly byte[] Earning = new byte[2];
         /// <summary>Per team: the tick the team first earned RALLY credit (-1 never; the announcer's one line).</summary>
         public readonly int[] FirstTick = { -1, -1 };
+        /// <summary>Per team: ticks of unbroken hill ownership (HOLD FATIGUE).</summary>
+        public readonly int[] HoldTicks = new int[2];
+        /// <summary>The team (0 Azure, 1 Crimson) that knocked a sided Kaiju down and gets it at the get-up; -1 none (TURNCOAT).</summary>
+        public int KoTeam = -1;
+        /// <summary>Times the Kaiju turned this match (TURNCOAT; tests and the HUD).</summary>
+        public int Turns;
 
         public void Init(World w) => Clear();
         public void Reset(World w) => Clear();
@@ -23,6 +29,10 @@ namespace CriticalMass.Sim.Core
             Array.Clear(Earning, 0, 2);
             FirstTick[0] = -1;
             FirstTick[1] = -1;
+            HoldTicks[0] = 0;
+            HoldTicks[1] = 0;
+            KoTeam = -1;
+            Turns = 0;
         }
     }
 
@@ -74,7 +84,7 @@ namespace CriticalMass.Sim.Core
             ComebackState s = w.Rally;
             s.Earning[0] = 0;
             s.Earning[1] = 0;
-            if (!On(w)) return 0;
+            if (!On(w) || !w.Config.Depth.Comeback.RallyOn) return 0;
             TeamId team;
             if (next == HillState.Azure) team = TeamId.Azure;
             else if (next == HillState.Crimson) team = TeamId.Crimson;
@@ -101,9 +111,11 @@ namespace CriticalMass.Sim.Core
         public static double RespawnDelay(World w, TeamId team)
         {
             GameConfig c = w.Config;
-            bool curve = On(w);
+            bool on = On(w);
+            bool curve = on && c.Depth.Comeback.RespawnCurveOn;
+            bool wave = on && c.Depth.Comeback.WaveSeconds > 0;
             bool quick = HutChoices.Has(w, team, HutOption.QuickReturn);
-            if (!curve && !quick) return c.Respawn.DelaySeconds;
+            if (!curve && !quick && !wave) return c.Respawn.DelaySeconds;
             double hz = c.SimHz;
             long ticks;
             if (curve)
@@ -126,7 +138,120 @@ namespace CriticalMass.Sim.Core
                 HutChoicesConfig h = c.Depth.HutChoices;
                 ticks = Math.Max(Ticks(h.RespawnFloorSeconds, hz), ticks - Ticks(h.QuickReturnSeconds, hz));
             }
+            if (wave)
+            {
+                // WAVES: come back on the next beat of the team clock at or after the own wait (same beat for both teams)
+                long beat = Math.Max(1L, Ticks(c.Depth.Comeback.WaveSeconds, hz));
+                long now = Math.Max(0L, (long)w.Tick);
+                long at = now + ticks;
+                long up = (at + beat - 1) / beat * beat;
+                ticks = up - now;
+            }
             return ticks / hz;
+        }
+
+        // ------------------------------------------------------------------ b15 pass 2 levers
+
+        /// <summary>
+        /// Hill.HillSystem, the owner by bodies (next) before scoring: MAJORITY turns a narrow lead of bodies into Contested
+        /// (nobody scores) when both teams stand on the hill. A team alone on the hill always owns it.
+        /// </summary>
+        public static HillState Majority(World w, HillState next, int azure, int crimson)
+        {
+            if (!On(w)) return next;
+            int margin = w.Config.Depth.Comeback.MajorityMargin;
+            if (margin <= 1 || azure == 0 || crimson == 0) return next;
+            if (next != HillState.Azure && next != HillState.Crimson) return next;
+            int diff = azure > crimson ? azure - crimson : crimson - azure;
+            return diff >= margin ? next : HillState.Contested;
+        }
+
+        /// <summary>
+        /// Hill.HillSystem, once per tick with this tick's owner: HOLD FATIGUE's share of a second the owner scores (1 = full),
+        /// from the owner's unbroken hold. Integer ticks and per mille; the streak resets for a team that does not own the hill.
+        /// </summary>
+        public static double HoldRate(World w, HillState next)
+        {
+            if (!On(w) || !w.Config.Depth.Comeback.HoldFatigueOn) return 1.0;
+            ComebackState s = w.Rally;
+            int owner = next == HillState.Azure ? 0 : next == HillState.Crimson ? 1 : -1;
+            for (int t = 0; t < 2; t++) s.HoldTicks[t] = t == owner ? s.HoldTicks[t] + 1 : 0;
+            if (owner < 0) return 1.0;
+            ComebackConfig k = w.Config.Depth.Comeback;
+            double hz = w.Config.SimHz;
+            long grace = Ticks(k.HoldGraceSeconds, hz), span = Math.Max(1L, Ticks(k.HoldSpanSeconds, hz));
+            long over = Math.Min(span, Math.Max(0L, s.HoldTicks[owner] - grace));
+            int min = Math.Max(0, Math.Min(1000, k.HoldMinPerMille));
+            long milli = 1000 - (1000 - min) * over / span;
+            return milli / 1000.0;
+        }
+
+        /// <summary>The owner's HOLD FATIGUE share right now (HUD; 1 when off or not tiring).</summary>
+        public static double HoldShare(World w, TeamId team)
+        {
+            if (!On(w) || !w.Config.Depth.Comeback.HoldFatigueOn) return 1.0;
+            ComebackConfig k = w.Config.Depth.Comeback;
+            double hz = w.Config.SimHz;
+            long grace = Ticks(k.HoldGraceSeconds, hz), span = Math.Max(1L, Ticks(k.HoldSpanSeconds, hz));
+            long over = Math.Min(span, Math.Max(0L, w.Rally.HoldTicks[(int)team] - grace));
+            int min = Math.Max(0, Math.Min(1000, k.HoldMinPerMille));
+            return (1000 - (1000 - min) * over / span) / 1000.0;
+        }
+
+        /// <summary>Kaiju KO (Kaiju.Hatch DamageKaiju): TURNCOAT remembers the team that knocked a sided Kaiju down.</summary>
+        public static void OnKaijuKo(World w, int sourceId)
+        {
+            if (!On(w) || !w.Config.Depth.Comeback.KaijuTurncoat) return;
+            KaijuState st = w.Kaiju.State;
+            if (st != KaijuState.Azure && st != KaijuState.Crimson) return;
+            if (sourceId < 0 || sourceId >= w.ActorCount) return;
+            TeamId by = w.Actors[sourceId].Team;
+            if ((by == TeamId.Azure && st == KaijuState.Azure) || (by == TeamId.Crimson && st == KaijuState.Crimson)) return;
+            w.Rally.KoTeam = (int)by;
+        }
+
+        /// <summary>Kaiju get-up (Kaiju.Ai): TURNCOAT turns the Kaiju to the team that knocked it down.</summary>
+        public static void OnKaijuRecover(World w)
+        {
+            ComebackState s = w.Rally;
+            if (s.KoTeam < 0) return;
+            int t = s.KoTeam;
+            s.KoTeam = -1;
+            if (!On(w) || !w.Config.Depth.Comeback.KaijuTurncoat) return;
+            KaijuState st = w.Kaiju.State;
+            if (st != KaijuState.Azure && st != KaijuState.Crimson) return;
+            KaijuState to = t == 0 ? KaijuState.Azure : KaijuState.Crimson;
+            if (to == st) return;
+            w.Kaiju.State = to;
+            w.Kaiju.TargetId = -1;
+            s.Turns++;
+        }
+
+        /// <summary>
+        /// Respawn.RespawnSystem, after the pad slot is chosen: FORWARD RETURN moves a trailing team's respawn ForwardShare of the
+        /// way toward the hill, keeping the slot's offset from the pad so teammates do not stack; only onto open floor.
+        /// </summary>
+        public static void ForwardSpawn(World w, int id, double radius, ref double x, ref double z)
+        {
+            if (!On(w) || !w.Config.Depth.Comeback.ForwardReturnOn) return;
+            TeamId team = w.Actors[id].Team;
+            if (!(Deficit(w, team) > w.Config.Depth.Comeback.TrailThresholdSeconds)) return;
+            CriticalMass.Sim.Grid.PadDef pad = w.Map.Pads[(int)team];
+            double f = Math.Max(0, Math.Min(0.9, w.Config.Depth.Comeback.ForwardShare));
+            double nx = x + (w.Map.Hill.X - pad.X) * f, nz = z + (w.Map.Hill.Z - pad.Z) * f;
+            CriticalMass.Sim.Grid.MapDef m = w.Map;
+            int r = (int)Math.Ceiling(radius) + 1;
+            int cx = (int)Math.Floor(nx), cz = (int)Math.Floor(nz);
+            for (int dz = -r; dz <= r; dz++)
+            for (int dx = -r; dx <= r; dx++)
+            {
+                int gx = cx + dx, gz = cz + dz;
+                if (gx < 0 || gz < 0 || gx >= m.Width || gz >= m.Height) return;
+                byte c = m.Cells[gz * m.Width + gx];
+                if (c != Cell.Floor && c != Cell.BreakableDestroyed) return;
+            }
+            x = nx;
+            z = nz;
         }
     }
 

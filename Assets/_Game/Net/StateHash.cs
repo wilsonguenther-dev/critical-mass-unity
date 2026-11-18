@@ -65,6 +65,10 @@ namespace CriticalMass.Net
             {
                 Mix(ref h, w.Rally.BonusMilli[0]);
                 Mix(ref h, w.Rally.BonusMilli[1]);
+                Mix(ref h, w.Rally.HoldTicks[0]);
+                Mix(ref h, w.Rally.HoldTicks[1]);
+                Mix(ref h, w.Rally.KoTeam);
+                Mix(ref h, w.Rally.Turns);
             }
             if (!HutChoices.On(w) || w.HutVote == null) return;
             HutChoiceState s = w.HutVote;

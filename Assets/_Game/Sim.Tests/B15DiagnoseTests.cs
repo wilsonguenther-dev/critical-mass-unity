@@ -249,6 +249,22 @@ namespace CriticalMass.Sim.Tests
             Console.WriteLine("[b15 diag]   mean |lead| by minute: " + la);
         }
 
+        static string Top(Dictionary<string, int> d)
+        {
+            var l = new List<KeyValuePair<string, int>>(d);
+            l.Sort((a, b) => b.Value != a.Value ? b.Value.CompareTo(a.Value) : string.CompareOrdinal(a.Key, b.Key));
+            string s = "";
+            for (int i = 0; i < Math.Min(6, l.Count); i++) s += (i > 0 ? ", " : "") + l[i].Key + " x" + l[i].Value;
+            return s;
+        }
+
+        static int CountWalls(World w)
+        {
+            int n = 0;
+            foreach (byte c in w.Map.Cells) if (c == Cell.LowWall || c == Cell.Barricade) n++;
+            return n;
+        }
+
         public static Diag Run(string name, Action<GameConfig> tweak, int[] seeds = null)
         {
             var d = new Diag { Name = name };
@@ -279,6 +295,7 @@ namespace CriticalMass.Sim.Tests
                 cfg.Depth.HutChoices.Enabled = (arm & 2) != 0;
                 World w = World.CreateWorld(new WorldOptions { Seed = 1, TeamSize = 16, HumanTeam = TeamId.Azure, HumanClass = ClassId.Warrior, Config = cfg });
                 var watch = new ShiverWatch();
+                watch.MaxFlags = 5000;
                 InputFrame scratch = SimInput.EmptyInput();
                 var byMinute = new int[9];
                 var byClass = new int[7];
@@ -301,8 +318,20 @@ namespace CriticalMass.Sim.Tests
                 Console.WriteLine("[b15 diag shiver] seed 1 hatch 60 guard on, comeback " + ((arm & 1) != 0) + ", hut choices " + ((arm & 2) != 0) + ": flags " + watch.Count
                     + " (dither " + watch.CountByKind[0] + ", reversals " + watch.CountByKind[1] + ", pressed " + watch.CountByKind[2] + "); by minute " + bm + "; by class (first 256 flags) " + bc
                     + "; winner " + w.Match.Winner + " hill " + F(w.Match.HillSeconds.Azure, "0") + "/" + F(w.Match.HillSeconds.Crimson, "0") + ", Kaiju " + w.Kaiju.State);
-                int shown = 0;
-                foreach (ShiverFlag f in watch.Flags) if (shown++ < 6) Console.WriteLine("[b15 diag shiver]   " + ShiverWatch.Format(f));
+                var cells = new Dictionary<string, int>();
+                var states = new Dictionary<string, int>();
+                var actors = new Dictionary<string, int>();
+                foreach (ShiverFlag f in watch.Flags)
+                {
+                    string c = ((int)(f.X / 3) * 3) + ":" + ((int)(f.Z / 3) * 3);
+                    cells[c] = (cells.TryGetValue(c, out int v) ? v : 0) + 1;
+                    string sk = f.State + "/" + f.Kind;
+                    states[sk] = (states.TryGetValue(sk, out int v2) ? v2 : 0) + 1;
+                    string ak = f.Actor + " " + f.Cls + " " + f.Team;
+                    actors[ak] = (actors.TryGetValue(ak, out int v3) ? v3 : 0) + 1;
+                }
+                Console.WriteLine("[b15 diag shiver]   top cells (3 u) " + Top(cells) + "; top state/kind " + Top(states) + "; top actors " + Top(actors)
+                    + "; walls up at the end " + CountWalls(w) + ", hut picks A/C mask " + w.HutVote.Mask[0] + "/" + w.HutVote.Mask[1]);
             }
         }
     }

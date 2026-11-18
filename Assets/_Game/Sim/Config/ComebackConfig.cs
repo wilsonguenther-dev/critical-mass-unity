@@ -21,8 +21,10 @@ namespace CriticalMass.Sim.Config
         /// <summary>The rule's own switch (default on; Full profile only).</summary>
         public bool Enabled = true;
 
-        // ---- RALLY (trailing team's hill time)
-        /// <summary>Behind on hill seconds by more than this (s) = trailing.</summary>
+        // ---- RALLY (trailing team's hill time); the last-resort score lever
+        /// <summary>RALLY on / off (each lever has its own switch; the rule's Enabled turns them all off).</summary>
+        public bool RallyOn = true;
+        /// <summary>Behind on hill seconds by more than this (s) = trailing (RALLY and FORWARD RETURN).</summary>
         public double TrailThresholdSeconds = 15;
         /// <summary>Extra credit per owned tick while trailing, per mille of a tick (250 = the hill counts x1.25).</summary>
         public int RallyPerMille = 250;
@@ -30,10 +32,36 @@ namespace CriticalMass.Sim.Config
         public double BonusCapSeconds = 45;
 
         // ---- RESPAWN CURVE (both teams)
+        public bool RespawnCurveOn = true;
         public double RespawnStartSeconds = 3;
         public double RespawnEndSeconds = 8;
         /// <summary>1 = linear, 2 = quadratic (slow start). Integers only.</summary>
         public int CurvePower = 1;
+
+        // ---- b15 pass 2 levers (each its own switch; all symmetric, read only match state)
+        /// <summary>WAVES: a knocked-out fighter comes back at his team's next wave (every WaveSeconds of match time, both teams
+        /// on the same beat), never sooner than his own wait: the dead regroup and walk back together. 0 = off.</summary>
+        public double WaveSeconds = 0;
+
+        /// <summary>TURNCOAT KAIJU: a sided Kaiju knocked out by the other team gets up on the side of the team that knocked it
+        /// down ("it becomes what beat it"); a neutral or berserk Kaiju never turns.</summary>
+        public bool KaijuTurncoat = false;
+
+        /// <summary>HOLD FATIGUE: after HoldGraceSeconds of unbroken ownership the owner's hill seconds count less and less, down
+        /// to HoldMinPerMille / 1000 after HoldSpanSeconds more; a lost, contested or empty hill resets the streak.</summary>
+        public bool HoldFatigueOn = false;
+        public double HoldGraceSeconds = 30;
+        public double HoldSpanSeconds = 60;
+        public int HoldMinPerMille = 500;
+
+        /// <summary>MAJORITY: the hill is owned only with at least this many more bodies than the other team (1 = today's rule);
+        /// fewer is contested and nobody scores.</summary>
+        public int MajorityMargin = 1;
+
+        /// <summary>FORWARD RETURN: a team trailing by more than TrailThresholdSeconds respawns at a rally point ForwardShare of
+        /// the way from its pad to the hill (on open floor; the pad when the point is blocked).</summary>
+        public bool ForwardReturnOn = false;
+        public double ForwardShare = 0.4;
 
         public ComebackConfig Clone() => (ComebackConfig)MemberwiseClone();
     }
