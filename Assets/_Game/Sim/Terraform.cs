@@ -109,7 +109,7 @@ namespace CriticalMass.Sim.Core
         /// </summary>
         public static bool CellsKeepRoutes(World w, int[] idx, byte[] next, int n)
         {
-            // b14 sim cost: the same request on the same grid (and, when the Kaiju route guard looked at the body, the same
+            // b14 sim cost: the same request on the same grid (compared cell for cell; and, when the Kaiju route guard looked at the body, the same
             // Kaiju start cell on the same clearance build) has the same verdict: answer it from the memo (an expired piece
             // whose lift is refused retries every tick; each retry paid two flow fields and the Kaiju guard's searches).
             int hit = RouteMemoFind(w, idx, next, n);
@@ -127,14 +127,16 @@ namespace CriticalMass.Sim.Core
 
         // ------------------------------------------------------------------------------------------ route verdict memo
         /// <summary>
-        /// b14 sim cost: one remembered route verdict. A pure function of (the grid = World.GridVersion; the request; and,
+        /// b14 sim cost: one remembered route verdict. A pure function of (the grid, compared cell for cell; the request; and,
         /// only when the Kaiju route guard reached the body test, the guard's start cell on the Kaiju clearance grid, whose
         /// build is identified by Kaiju.ClearEpoch). Never Sim state: a hit and a miss give the same answer, so no checksum moves.
         /// </summary>
         private sealed class RouteMemoEntry
         {
             public World W;
-            public int GridVersion;
+            /// <summary>The whole grid the verdict was worked out on (exact compare: a raw cell write without a GridVersion bump, as
+            /// the tests paint, still misses).</summary>
+            public byte[] Grid = new byte[0];
             public long Epoch;
             /// <summary>What the Kaiju route guard read (Used false: the verdict did not depend on the Kaiju: pads cut, nothing narrowed, guard off).</summary>
             public Kaiju.GuardKey Guard;
@@ -162,10 +164,12 @@ namespace CriticalMass.Sim.Core
             for (int e = 0; e < Memo.Length; e++)
             {
                 RouteMemoEntry m = Memo[e];
-                if (!ReferenceEquals(m.W, w) || m.GridVersion != w.GridVersion || m.Epoch != Kaiju.ClearEpoch || m.N != n) continue;
+                if (!ReferenceEquals(m.W, w) || m.Epoch != Kaiju.ClearEpoch || m.N != n) continue;
                 bool same = true;
                 for (int k = 0; k < n && same; k++) same = m.Idx[k] == idx[k] && m.Next[k] == next[k];
                 if (!same) continue;
+                byte[] cells = w.Map.Cells;
+                if (m.Grid.Length != cells.Length || !new ReadOnlySpan<byte>(m.Grid).SequenceEqual(cells)) continue;
                 if (!m.Guard.Used || Kaiju.RouteMemoSameKaiju(w, in m.Guard)) return e;
             }
             return -1;
@@ -177,7 +181,9 @@ namespace CriticalMass.Sim.Core
             RouteMemoEntry m = Memo[MemoCursor];
             MemoCursor = (MemoCursor + 1) % Memo.Length;
             m.W = w;
-            m.GridVersion = w.GridVersion;
+            byte[] cells = w.Map.Cells;
+            if (m.Grid.Length != cells.Length) m.Grid = new byte[cells.Length];   // once per map size
+            Array.Copy(cells, m.Grid, cells.Length);
             m.Epoch = Kaiju.ClearEpoch;
             m.Guard = Kaiju.LastGuard;
             m.N = n;
