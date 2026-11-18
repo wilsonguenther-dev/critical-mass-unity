@@ -207,6 +207,13 @@ namespace CriticalMass.Runtime.View.Moments
         public const string ReducedMotionKey = "cm.reducedMotion";
         public const string ReduceFlashingKey = "cm.access.reduceFlashing";
 
+        /// <summary>
+        /// b14 polish (owner review 2026-11-17: the takeover covered about a quarter of the screen): the default is REDUCED, so
+        /// every moment plays as the compact side toast (560 x 140 at 1080p, 3.8 % of the screen, 1.6 s, queued). FULL
+        /// takeovers stay one settings step away.
+        /// </summary>
+        public const int DefaultMode = (int)BigMomentsMode.Reduced;
+
         public static BigMomentsMode? ModeOverride;
         public static bool? ReducedMotionOverride, ReduceFlashingOverride, SlowMotionOverride;
 
@@ -217,7 +224,7 @@ namespace CriticalMass.Runtime.View.Moments
             get
             {
                 if (ModeOverride.HasValue) return ModeOverride.Value;
-                int v = PlayerPrefs.GetInt(ModeKey, 0);
+                int v = PlayerPrefs.GetInt(ModeKey, DefaultMode);
                 return v == 1 ? BigMomentsMode.Reduced : v == 2 ? BigMomentsMode.Off : BigMomentsMode.Full;
             }
             set
