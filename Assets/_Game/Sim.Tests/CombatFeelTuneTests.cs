@@ -40,7 +40,7 @@ namespace CriticalMass.Sim.Tests
             new Knob { Name = "Warrior.AttackDamage", Set = (f, v) => Row(f, ClassId.Warrior).AttackDamage = v, Values = new[] { 21.0, 22 } },
             new Knob { Name = "Warrior.MaxHp", Set = (f, v) => Row(f, ClassId.Warrior).MaxHp = v, Values = new[] { 140.0, 135, 130 } },
             new Knob { Name = "Warrior.AttackCooldown", Set = (f, v) => Row(f, ClassId.Warrior).AttackCooldown = v, Values = new[] { 0.9, 0.85 } },
-            new Knob { Name = "Healer.AttackDamage", Set = (f, v) => Row(f, ClassId.Healer).AttackDamage = v, Values = new[] { 18.0, 20, 22 } },
+            new Knob { Name = "Healer.AttackDamage", Set = (f, v) => Row(f, ClassId.Healer).AttackDamage = v, Values = new[] { 15.0, 17, 19 } },
             new Knob { Name = "Healer.AttackCooldown", Set = (f, v) => Row(f, ClassId.Healer).AttackCooldown = v, Values = new[] { 0.8, 0.7 } },
             new Knob { Name = "Farmer.AttackDamage", Set = (f, v) => Row(f, ClassId.Farmer).AttackDamage = v, Values = new[] { 20.0, 23 } },
             new Knob { Name = "Miner.AttackDamage", Set = (f, v) => Row(f, ClassId.Miner).AttackDamage = v, Values = new[] { 14.0, 16 } },

@@ -76,10 +76,10 @@ namespace CriticalMass.Sim.Config
             },
             // HEALER: her row now says what her strike does (the audit: config 4.5 u / 0 damage, real strike 1.6 u / 8). Her
             // attack press MENDS the hurt ally in MendRange first (a visible beam, MendHeal, on her AttackCooldown); with nobody
-            // to mend it swings her lantern: 18 at 1.5 u. Bots keep HealerBotStandOff from the enemy.
+            // to mend it swings her lantern: 15 at 1.5 u. Bots keep HealerBotStandOff from the enemy.
             new ClassConfig
             {
-                MaxHp = 110, MoveSpeed = 4.1, Radius = 0.42, AttackDamage = 18, AttackRange = 1.5, AttackArcDeg = 90,
+                MaxHp = 110, MoveSpeed = 4.1, Radius = 0.42, AttackDamage = 15, AttackRange = 1.5, AttackArcDeg = 90,
                 AttackCooldown = 0.80, AbilityCooldown = 9, GatherSeconds = 1.5, CarryCapacity = 2,
                 AttackWindupSeconds = 0.23, RecoverySeconds = 0.22, Mass = 0.9, Poise = 20,
             },

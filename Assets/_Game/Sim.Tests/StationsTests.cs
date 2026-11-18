@@ -34,12 +34,12 @@ namespace CriticalMass.Sim.Tests
         {
             World w = AtBase(ClassId.Warrior);
             Actor a = w.Actors[0];
-            a.Hp = 80; // half of 160
+            a.Hp = a.MaxHp / 2; // half (b15 combat feel: the Warrior row is 140 with the rule on, 160 without)
             int head = w.EventHead;
             Pick(w, ClassId.Builder);
             Assert.AreEqual(ClassId.Builder, a.Cls);
             Assert.AreEqual(w.Config.Class(ClassId.Builder).MaxHp, a.MaxHp);
-            Assert.AreEqual(60, a.Hp, 1.01, "half of 120 (the fountain may add a tick)");
+            Assert.AreEqual(w.Config.Class(ClassId.Builder).MaxHp / 2, a.Hp, 1.01, "half of the Builder's MaxHp (the fountain may add a tick)");
             Assert.IsTrue(a.Alive);
             Assert.AreEqual(1, a.ClassSwitches);
             List<SimEvent> ev = DepthKit.Since(w, head, SimEventType.ClassSwitch);
@@ -139,9 +139,11 @@ namespace CriticalMass.Sim.Tests
             Assert.AreEqual(0, w.Inputs[0].StationBuy, "one-shot");
             Assert.AreEqual(2, Stations.Level(w, TeamId.Azure, ClassId.Warrior));
             Assert.AreEqual(1, Stations.Level(w, TeamId.Crimson, ClassId.Warrior));
-            Assert.AreEqual(184, w.Actors[ally].MaxHp, "160 x 1.15");
-            Assert.AreEqual(124, w.Actors[ally].Hp, "healed by the gain");
-            Assert.AreEqual(160, w.Actors[enemy].MaxHp);
+            // b15 combat feel: read the Warrior row (140 with the rule on, 160 without), not a literal.
+            double wHp = w.Config.Class(ClassId.Warrior).MaxHp;
+            Assert.AreEqual(Math.Round(wHp * 1.15), w.Actors[ally].MaxHp, 1e-6, "Warrior MaxHp x 1.15");
+            Assert.AreEqual(100 + Math.Round(wHp * 1.15) - wHp, w.Actors[ally].Hp, 1e-6, "healed by the gain");
+            Assert.AreEqual(wHp, w.Actors[enemy].MaxHp, 1e-6);
             Assert.AreEqual(6, Sources.Stock(w, TeamId.Azure, Sources.StockWood));
             Assert.AreEqual(2, Sources.Stock(w, TeamId.Azure, Sources.StockWater));
             SimEvent e = DepthKit.Since(w, head, SimEventType.Upgrade)[0];
@@ -153,7 +155,7 @@ namespace CriticalMass.Sim.Tests
             w.Inputs[0].StationBuy = (int)ClassId.Warrior + 1;
             DepthKit.Steps(w, 1);
             Assert.AreEqual(3, Stations.Level(w, TeamId.Azure, ClassId.Warrior));
-            Assert.AreEqual(208, w.Actors[ally].MaxHp, "160 x 1.30");
+            Assert.AreEqual(Math.Round(wHp * 1.30), w.Actors[ally].MaxHp, 1e-6, "Warrior MaxHp x 1.30");
             Assert.AreEqual(1, Sources.Stock(w, TeamId.Azure, Sources.StockWood));
             w.Depth.Stock[Sources.StockWood] = 20;
             w.Depth.Stock[Sources.StockWater] = 20;
