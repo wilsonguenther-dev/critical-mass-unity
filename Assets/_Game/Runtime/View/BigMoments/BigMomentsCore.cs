@@ -173,7 +173,7 @@ namespace CriticalMass.Runtime.View.Moments
     {
         /// <summary>Slides, spins, scrolling lines and rising particles (false: fades only, everything still).</summary>
         public bool Motion;
-        /// <summary>The colour-invert frame (never with reduce flashing).</summary>
+        /// <summary>The colour-invert frame (never with reduce flashing, which is the b15 default).</summary>
         public bool Invert;
         public float FlashAlpha;
         public float FlashSeconds;
@@ -205,6 +205,7 @@ namespace CriticalMass.Runtime.View.Moments
         public const string ModeKey = "cm.bigMoments";
         public const string SlowMotionKey = "cm.bigMoments.slowMotion";
         public const string ReducedMotionKey = "cm.reducedMotion";
+        /// <summary>Legacy key (no longer read): b15 made the safe look the default; the opt-in is GameSettings.IntenseFlashingKey.</summary>
         public const string ReduceFlashingKey = "cm.access.reduceFlashing";
 
         /// <summary>
@@ -236,7 +237,8 @@ namespace CriticalMass.Runtime.View.Moments
         }
 
         public static bool ReducedMotion => ReducedMotionOverride ?? PlayerPrefs.GetInt(ReducedMotionKey, 0) != 0;
-        public static bool ReduceFlashing => ReduceFlashingOverride ?? PlayerPrefs.GetInt(ReduceFlashingKey, 0) != 0;
+        /// <summary>b15 safe defaults: true unless the player opted into INTENSE FLASHING (GameSettings.ReduceFlashing).</summary>
+        public static bool ReduceFlashing => ReduceFlashingOverride ?? CriticalMass.Runtime.Menu.GameSettings.ReduceFlashing;
 
         public static bool SlowMotion
         {

@@ -33,9 +33,18 @@ namespace CriticalMass.Runtime.Menu
         // the same stored values: shake is an int amount 0..100, default 0 (off, owner decision OD-6), reduce flashing an int.
         /// <summary>Camera shake amount 0..100 (int, default 0 = off); same key as PR #28's SettingsExtras.ShakeAmountKey.</summary>
         public const string ShakeScaleKey = "cm.access.shake";
-        /// <summary>Reduce flashing (1 on, default 0): hit flash as a light tint, a steady damage edge, pulses at 2 Hz or less.</summary>
+        /// <summary>Legacy (before b15): the old opt-in "reduce flashing" switch. No longer read: the safe look is now the
+        /// default for everyone, whatever this key holds (see IntenseFlashingKey).</summary>
         public const string ReduceFlashingKey = "cm.access.reduceFlashing";
-        /// <summary>Story intro at every launch, before the title (owner, 2026-11-13: default on; Settings turns it off).</summary>
+        /// <summary>
+        /// b15 safe defaults (blind-spot audit C1): INTENSE FLASHING (1 on, default 0 = off). Off, the game's flashes are
+        /// photosensitivity-safe: at most 3 full-screen or edge flashes in any second (View.Moments.FlashSafety, WCAG 2.3.1),
+        /// no full-screen invert, the hit flash as a light tint, a steady damage edge, pulses at 2 Hz or less. A new key so
+        /// nobody inherits the old uncapped default; players opt in from Settings > Access.
+        /// </summary>
+        public const string IntenseFlashingKey = "cm.access.intenseFlashing";
+        /// <summary>Story intro at EVERY launch (b15 safe defaults, owner-approved 2026-11-17: default off, so the film plays on
+        /// the first launch only (StoryIntro.SeenKey) and from WATCH INTRO; Settings > Game turns every-launch back on).</summary>
         public const string IntroAtLaunchKey = "cm.story.atLaunch";
         /// <summary>Story intro 3: the intro film's subtitles (drawn by the engine under the picture), on by default.</summary>
         public const string IntroSubtitlesKey = "cm.story.subtitles";
@@ -70,7 +79,7 @@ namespace CriticalMass.Runtime.Menu
         {
             MasterKey, MusicKey, EffectsKey, MuteMusicKey, MuteEffectsKey, MuteInBackgroundKey, ColourBlindTeamsKey, WidthKey, HeightKey, FullScreenKey, VSyncKey, QualityKey, ShakeKey,
             DamageNumbersKey, BloodKey, GoreKey, FpsCapKey, BgThrottleKey, MoveAssistKey, KeysFollowMapKey, GroundCameraKey, "cm.camera.heading", CameraViewKey, CameraManualKey, CameraSensKey, CameraFovKey, CameraInvertYKey, PrefsVersionKey,
-            ShakeScaleKey, ReduceFlashingKey, ReduceMotionKey, IntroAtLaunchKey, IntroSubtitlesKey,
+            ShakeScaleKey, ReduceFlashingKey, IntenseFlashingKey, ReduceMotionKey, IntroAtLaunchKey, IntroSubtitlesKey,
         };
 
         public const string MixerResource = "Audio/CMMixer";
@@ -155,7 +164,11 @@ namespace CriticalMass.Runtime.Menu
             }
         }
 
-        public static bool ReduceFlashing { get => GetB(ReduceFlashingKey, false); set => SetB(ReduceFlashingKey, value); }
+        /// <summary>INTENSE FLASHING opted into (default off).</summary>
+        public static bool IntenseFlashing { get => GetB(IntenseFlashingKey, false); set => SetB(IntenseFlashingKey, value); }
+        /// <summary>The safe flash look is in force: true unless the player opted into intense flashing (b15: the default).
+        /// Setting it writes the opt-in key (true = intense off).</summary>
+        public static bool ReduceFlashing { get => !IntenseFlashing; set => IntenseFlashing = !value; }
         public static bool ReduceMotion { get => GetB(ReduceMotionKey, false); set => SetB(ReduceMotionKey, value); }
         public static bool IntroAtLaunch { get => GetB(IntroAtLaunchKey, true); set => SetB(IntroAtLaunchKey, value); }
         public static bool IntroSubtitles { get => GetB(IntroSubtitlesKey, true); set => SetB(IntroSubtitlesKey, value); }
