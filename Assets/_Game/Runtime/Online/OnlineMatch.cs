@@ -70,12 +70,67 @@ namespace CriticalMass.Runtime.Online
         public static long NowMs => Clock.ElapsedMilliseconds;
         static readonly InputFrame Neutral = SimInput.EmptyInput();
 
+        // ---------------------------------------------------------------- b15-zero-cost: direct and local-network play
+        /// <summary>The host's direct listener (local network and typed address), null when it could not open a port.</summary>
+        public static DirectHost Direct { get; private set; }
+        static LanBeacon _beacon;
+        static int _beaconVersion = -1;
+        static LanListener _lan;
+        /// <summary>The relay's count of today's requests (-1 unknown), fetched once per hosted room.</summary>
+        public static double RelayUsedToday { get; private set; } = -1;
+        static System.Threading.Tasks.Task<double> _usage;
+
+        /// <summary>Joiner side: rooms heard on this computer's local network (empty when none, or the port is busy).</summary>
+        public static System.Collections.Generic.List<LanGame> LanGames()
+        {
+            if (_lan == null) _lan = LanListener.TryStart();
+            return _lan != null ? _lan.Games() : new System.Collections.Generic.List<LanGame>();
+        }
+
+        public static void StopLanListening() { _lan?.Dispose(); _lan = null; }
+
+        /// <summary>
+        /// Opens the host's direct listener next to the relay room (relay may be null: a room for local-network and
+        /// address joiners only, for when the relay is unreachable or full for the day). Returns the host's transport.
+        /// </summary>
+        public static ITransport HostTransport(ITransport relay)
+        {
+            DirectHost d = null;
+            try { d = DirectHost.Start(DirectHost.DefaultPort, false); }
+            catch (RoomException) { if (relay == null) throw; }
+            Direct = d;
+            return d != null ? new HostMux(relay, d) : relay;
+        }
+
+        /// <summary>The host's plain line about free ways in: the local address, and the day's relay allowance.</summary>
+        public static string HostWaysLine()
+        {
+            var sb = new System.Text.StringBuilder();
+            if (Direct != null)
+            {
+                System.Collections.Generic.List<string> addrs = DirectAddress.LocalAddresses();
+                if (addrs.Count > 0) sb.Append("On the same network they can also type " + addrs[0] + (Direct.Port != DirectHost.DefaultPort ? ":" + Direct.Port : "") + ". ");
+            }
+            if (Transport is HostMux mux && mux.Relay != null && !mux.RelayUp) sb.Append("The online room service closed; network friends can still join. ");
+            else if (Code != null && RelayUsedToday >= 0) sb.Append(RelayBudget.HostLine(Host != null ? Math.Max(2, Host.Members.Count) : 2, RelayUsedToday));
+            return sb.ToString().Trim();
+        }
+
         public static void HostRoom(ITransport t, string code, string name)
         {
+            DirectHost keep = Direct;
+            Direct = null;
             Leave();
+            Direct = keep;
             Transport = t;
             Code = code;
             Host = new RoomHost(t, GameConfig.CreateDefault(), name, OnlineConfig.Build);
+            if (Direct != null)
+            {
+                try { _beacon = new LanBeacon(Direct.Port, code, name, 1, OnlineConfig.Build); } catch (Exception) { _beacon = null; }
+            }
+            RelayUsedToday = -1;
+            _usage = code != null ? RelayTransport.FetchRequestsTodayAsync(OnlineConfig.RelayUrl, System.Threading.CancellationToken.None) : null;
             OnlineRunner.Ensure();
         }
 
@@ -110,7 +165,8 @@ namespace CriticalMass.Runtime.Online
 
         static void RetryJoin(long now)
         {
-            if (Client == null || Client.Session != null || Client.Phase != RoomPhase.Closed || !(Transport is RelayTransport)) return;
+            bool relay = Transport is RelayTransport || (Transport is FallbackTransport f && f.Current is RelayTransport);
+            if (Client == null || Client.Session != null || Client.Phase != RoomPhase.Closed || !relay || Code == null) return;
             if (_retryAt < 0)
             {
                 if (!RelayTransport.IsRetryable(Client.Error) || _joinTries >= JoinTries) return;
@@ -172,7 +228,16 @@ namespace CriticalMass.Runtime.Online
         public static void Update()
         {
             long now = NowMs;
-            if (Host != null) Host.Update(now);
+            if (Host != null)
+            {
+                Host.Update(now);
+                if (_beacon != null && Host.Version != _beaconVersion && Direct != null)
+                {
+                    _beaconVersion = Host.Version;
+                    _beacon.Update(Direct.Port, Code, Host.Members.Count > 0 ? Host.Members[0].Name : "", Host.Members.Count, OnlineConfig.Build);
+                }
+                if (_usage != null && _usage.IsCompleted) { RelayUsedToday = _usage.Status == System.Threading.Tasks.TaskStatus.RanToCompletion ? _usage.Result : -1; _usage = null; }
+            }
             else if (Client != null) { Client.Update(now); RetryJoin(now); }
         }
 
@@ -181,6 +246,11 @@ namespace CriticalMass.Runtime.Online
         {
             Transport?.Close();
             Transport = null;
+            _beacon?.Dispose();
+            _beacon = null;
+            _beaconVersion = -1;
+            Direct = null;   // closed with the transport (HostMux closes its listener)
+            _usage = null;
             Host = null;
             Client = null;
             Session = null;

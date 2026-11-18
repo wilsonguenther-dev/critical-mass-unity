@@ -6,12 +6,15 @@
 //   GET  /rooms/<CODE>/ws?v=1&key=..  -> WebSocket                                  host joins (with its key)
 //   GET  /rooms/<CODE>/ws?v=1         -> WebSocket                                  anyone else joins
 //   GET  /health                      -> 200 ok
+//   GET  /usage                       -> 200 {"day":..,"messages":..,"requests":..,"free":100000,...}  b15-zero-cost: this
+//                                        relay's own count for today (UTC), so a host's game can say how many matches are left
 // Errors after the WebSocket opened arrive as a CLOSING frame with a reason code (see protocol.js), so the game can show
 // one clear sentence instead of a bare socket error.
 import { DurableObject } from "cloudflare:workers";
 import {
   OP_DATA, OP_LOCK, OP_WELCOME, OP_JOINED, OP_LEFT, OP_CLOSING, BROADCAST, HOST, REASON, PROTOCOL_VERSION,
   MAX_PEERS, MAX_FRAME, IDLE_MS, HOST_CONNECT_MS, MAX_ROOM_MS, Bucket, frame, normaliseCode, randomCode, randomKey,
+  FREE_REQUESTS_PER_DAY, MESSAGES_PER_REQUEST,
 } from "./protocol.js";
 
 export default {
@@ -19,6 +22,11 @@ export default {
     const url = new URL(request.url);
     const parts = url.pathname.split("/").filter(Boolean);
     if (parts.length === 1 && parts[0] === "health") return new Response("ok");
+    if (parts.length === 1 && parts[0] === "usage" && request.method === "GET") {
+      // b15-zero-cost: one Worker request plus one Durable Object request per ask; the game asks once per room it hosts.
+      const usage = await env.USAGE.get(env.USAGE.idFromName("usage")).today();
+      return Response.json(usage, { headers: { "cache-control": "no-store", "access-control-allow-origin": "*" } });
+    }
     if (parts.length === 1 && parts[0] === "rooms" && request.method === "POST") {
       for (let attempt = 0; attempt < 5; attempt++) {
         const code = randomCode();
@@ -53,6 +61,19 @@ export class Room extends DurableObject {
   constructor(ctx, env) {
     super(ctx, env);
     this.buckets = new Map(); // peer -> Bucket (memory only; a hibernation wake starts a fresh bucket)
+    // b15-zero-cost: what this room cost since its last report (memory only: a hibernation wake starts at 0, so the count
+    // can miss a few messages of a quiet room; a room in play never sleeps). Reported to the Usage object every alarm.
+    this.msgs = 0;
+    this.connects = 0;
+    this.creates = 0;
+  }
+
+  // b15-zero-cost: adds this room's cost since the last report to today's total (one Durable Object request).
+  async report(alarms) {
+    const delta = { msgs: this.msgs, connects: this.connects, alarms, rooms: this.creates };
+    this.msgs = 0; this.connects = 0; this.creates = 0;
+    if (!delta.msgs && !delta.connects && !delta.alarms && !delta.rooms) return;
+    try { await this.env.USAGE.get(this.env.USAGE.idFromName("usage")).add(delta); } catch { /* counting must never break a room */ }
   }
 
   // ---- RPC from the Worker ------------------------------------------------------------------------------------------
@@ -63,6 +84,7 @@ export class Room extends DurableObject {
     await this.ctx.storage.deleteAll();
     await this.ctx.storage.put("meta", { key, created: Date.now(), locked: false, nextPeer: 1, lastActive: Date.now(), hostSeen: false });
     await this.ctx.storage.setAlarm(Date.now() + HOST_CONNECT_MS);
+    this.creates += 1;
     return true;
   }
 
@@ -96,6 +118,7 @@ export class Room extends DurableObject {
     } else meta.hostSeen = true;
     meta.lastActive = Date.now();
     await this.ctx.storage.put("meta", meta);
+    this.connects += 1;
     // Hibernation API: the object can sleep between messages; the peer number rides on the socket.
     this.ctx.acceptWebSocket(server);
     server.serializeAttachment({ peer });
@@ -107,6 +130,7 @@ export class Room extends DurableObject {
   }
 
   async webSocketMessage(ws, message) {
+    this.msgs += 1; // b15-zero-cost: every incoming message is billed (20 to 1), whatever happens to it next
     const from = this.peerOf(ws);
     if (from === undefined) return;
     if (typeof message === "string") return this.kick(ws, REASON.BAD_REQUEST);
@@ -151,8 +175,10 @@ export class Room extends DurableObject {
     if (expired || idle || hostNeverCame || (meta.hostSeen && sockets.length === 0)) {
       for (const s of sockets) this.kick(s, expired ? REASON.EXPIRED : REASON.IDLE);
       await this.ctx.storage.deleteAll();
+      await this.report(1);
       return;
     }
+    await this.report(1);
     if (this.touched) { meta.lastActive = this.touched; await this.ctx.storage.put("meta", meta); }
     await this.ctx.storage.setAlarm(now + 60 * 1000);
   }
@@ -183,8 +209,41 @@ export class Room extends DurableObject {
       // The host is the lockstep sequencer: without it nobody can continue (host migration is a later step).
       for (const s of rest) this.kick(s, REASON.HOST_LEFT);
       await this.ctx.storage.deleteAll();
+      await this.report(0);
       return;
     }
     for (const s of rest) this.trySend(s, frame(OP_LEFT, peer));
+  }
+}
+
+// b15-zero-cost: one object for the whole relay that keeps today's cost (UTC day, as Cloudflare's free limits reset at
+// 00:00 UTC). Rooms add to it once a minute (their alarm) and when they close. "requests" is the estimate of what the
+// free plan counts: incoming WebSocket messages / 20, plus one per WebSocket opened, per room made, per alarm and per
+// report (https://developers.cloudflare.com/durable-objects/platform/pricing/). Other Workers on the same account are
+// not in it (the owner's tools/online/relay-usage.py asks Cloudflare for the account's whole count).
+export class Usage extends DurableObject {
+  async add(d) {
+    const day = new Date().toISOString().slice(0, 10);
+    const cur = (await this.ctx.storage.get(day)) || { msgs: 0, connects: 0, alarms: 0, rooms: 0, reports: 0 };
+    cur.msgs += d.msgs || 0;
+    cur.connects += d.connects || 0;
+    cur.alarms += d.alarms || 0;
+    cur.rooms += d.rooms || 0;
+    cur.reports += 1;
+    await this.ctx.storage.put(day, cur);
+    if (cur.reports === 1) {
+      // A new day: forget days older than a week (a handful of rows).
+      const old = new Date(Date.now() - 8 * 86400000).toISOString().slice(0, 10);
+      const keys = [...(await this.ctx.storage.list()).keys()].filter((k) => k < old);
+      if (keys.length) await this.ctx.storage.delete(keys);
+    }
+  }
+
+  async today() {
+    const day = new Date().toISOString().slice(0, 10);
+    const c = (await this.ctx.storage.get(day)) || { msgs: 0, connects: 0, alarms: 0, rooms: 0, reports: 0 };
+    const requests = Math.ceil(c.msgs / MESSAGES_PER_REQUEST) + c.connects + c.alarms + 2 * c.rooms + c.reports;
+    return { day, messages: c.msgs, connects: c.connects, alarms: c.alarms, rooms: c.rooms, requests, free: FREE_REQUESTS_PER_DAY,
+      note: "this relay only, rooms still open count at their next minute; resets 00:00 UTC" };
   }
 }

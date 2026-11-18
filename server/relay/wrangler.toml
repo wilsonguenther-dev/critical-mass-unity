@@ -10,9 +10,23 @@ workers_dev = true
 name = "ROOMS"
 class_name = "Room"
 
+# b15-zero-cost: today's cost counter (GET /usage).
+[[durable_objects.bindings]]
+name = "USAGE"
+class_name = "Usage"
+
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["Room"]
 
+[[migrations]]
+tag = "v2"
+new_sqlite_classes = ["Usage"]
+
+# b15-zero-cost: Workers Logs on, free on the Workers Free plan (200,000 log events a day, 3 days kept:
+# https://developers.cloudflare.com/workers/observability/logs/workers-logs/). Every WebSocket message is an invocation,
+# so only 1 in 100 is logged (errors and kicks still show up over a day). Request counts do not need logs: GET /usage and
+# tools/online/relay-usage.py read them.
 [observability]
-enabled = false
+enabled = true
+head_sampling_rate = 0.01

@@ -8,7 +8,7 @@
 name: online-smoke
 on:
   push:
-    branches: ['feat/online-rooms-*', 'ci/**']
+    branches: ['feat/online-rooms-*', 'ci/**']   # b15 branches: run by hand (workflow_dispatch), each run spends relay allowance only in cross-os
     paths:
       - 'Assets/_Game/Net/**'
       - 'Assets/_Game/Sim/**'
@@ -97,7 +97,44 @@ jobs:
             # b15-rejoin: the rejoined session (replayed from tick 0, then live) against the host, past the drop.
             python3 tools/online/compare-hashes.py out/host.txt out/join.txt.rejoin --min $(( (T - D) / 30 - 4 )) --from $(( D + 60 )) || exit 1
           fi
+          grep -h "ONLINE TRAFFIC" out/host.log out/join.log || true
           [ $HC -eq 0 ] && [ $JC -eq 0 ]
+      - name: b15-zero-cost, direct play (no relay), fallback to the relay, and the relay's usage count
+        run: |
+          set -u
+          P=tools/online/HeadlessPeer/bin/Release/net8.0/cm-online-peer.dll
+          R=http://127.0.0.1:8787
+          T=900
+          # 1. Direct only: the host listens on TCP 47800, the joiner types 127.0.0.1:47800; no relay, no code.
+          dotnet $P -host -no-relay -direct-port 47800 -humans 2 -ticks $T -name Host -hash-log out/dhost.txt -code-out out/dcode.txt -timeout 300 -lobby 90 > out/dhost.log 2>&1 &
+          HP=$!
+          for i in $(seq 1 60); do [ -s out/dcode.txt ] && break; sleep 1; done
+          dotnet $P -direct 127.0.0.1:47800 -ticks $T -name Joiner -team crimson -class Miner -hash-log out/djoin.txt -timeout 300 > out/djoin.log 2>&1
+          JC=$?; wait $HP; HC=$?
+          cat out/dhost.log out/djoin.log
+          echo "direct: host exit $HC, joiner exit $JC"
+          python3 tools/online/compare-hashes.py out/dhost.txt out/djoin.txt --min $(( T / 30 - 2 )) || exit 1
+          grep -q "path direct" out/djoin.log || { echo "the joiner did not play direct"; exit 1; }
+          [ $HC -eq 0 ] && [ $JC -eq 0 ] || exit 1
+          # 2. Fallback: the host takes relay and direct joiners (port 47810); the joiner is given a port where nothing
+          #    listens AND the room code: it must fall back to the relay room and MATCH.
+          rm -f out/fcode.txt
+          dotnet $P -host -relay $R -direct-port 47810 -humans 2 -ticks $T -name Host -hash-log out/fhost.txt -code-out out/fcode.txt -timeout 300 -lobby 90 > out/fhost.log 2>&1 &
+          HP=$!
+          for i in $(seq 1 60); do [ -s out/fcode.txt ] && break; sleep 1; done
+          CODE=$(cat out/fcode.txt)
+          dotnet $P -join "$CODE" -direct 127.0.0.1:47899 -relay $R -ticks $T -name Joiner -team crimson -hash-log out/fjoin.txt -timeout 300 > out/fjoin.log 2>&1
+          JC=$?; wait $HP; HC=$?
+          cat out/fhost.log out/fjoin.log
+          echo "fallback: host exit $HC, joiner exit $JC"
+          python3 tools/online/compare-hashes.py out/fhost.txt out/fjoin.txt --min $(( T / 30 - 2 )) || exit 1
+          grep -q "path relay" out/fjoin.log || { echo "the joiner did not fall back to the relay"; exit 1; }
+          [ $HC -eq 0 ] && [ $JC -eq 0 ] || exit 1
+          # 3. The relay's own count of today's cost (GET /usage), after the rooms above closed.
+          sleep 2
+          U=$(curl -sf $R/usage) || { echo "no /usage"; exit 1; }
+          echo "relay usage: $U"
+          echo "$U" | python3 -c 'import sys,json; d=json.load(sys.stdin); assert d["messages"] > 0 and d["requests"] > 0 and d["free"] == 100000, d; print("USAGE OK", d["messages"], "messages,", d["requests"], "requests counted")'
       - uses: actions/upload-artifact@v4
         if: always()
         with:

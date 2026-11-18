@@ -45,6 +45,23 @@ namespace CriticalMass.Net
         public int RejoinFeedRetryMs = 400;
         /// <summary>b15-rejoin, rejoiner: at most this many log ticks stepped per Update while catching up (one frame's budget).</summary>
         public int CatchUpTicksPerUpdate = 1500;
+        /// <summary>
+        /// b15-zero-cost: a joiner sends its inputs in packets of this many ticks, sent when the packet's last tick is a
+        /// multiple of it (so every joiner's packets cover the same ticks and the host's bundles go out in the same groups),
+        /// or after (this - 1) ticks of waiting at most. 0 = by room size (<see cref="LockstepSession.TicksPerPacketFor"/>:
+        /// 2 up to 16 humans, 3 above); 1 = one packet per tick on SendEveryMs, as before b15. The relay bills every message
+        /// a game sends it, so this is the room's cost; it adds at most one tick to when an input reaches the host.
+        /// </summary>
+        public int ClientTicksPerPacket = 0;
+        /// <summary>b15-zero-cost: on a reliable link each state fingerprint travels once (false: the newest two in every
+        /// packet, as before; a datagram link always repeats them, since a packet may be lost).</summary>
+        public bool HashesOnce = true;
+        /// <summary>b15-zero-cost: the keep-alive interval once this machine's match has ended (nothing is waited for then).</summary>
+        public int EndedKeepAliveMs = 1000;
+
+        /// <summary>b15-zero-cost: the sending as it was before b15 (one packet per tick, fingerprints repeated), for
+        /// before/after measurements and the cost guard's control arm.</summary>
+        public static LockstepOptions PreB15() => new LockstepOptions { ClientTicksPerPacket = 1, HashesOnce = false, EndedKeepAliveMs = 250 };
     }
 
     /// <summary>Receives a transport event the lockstep layer does not own (room and chat messages, type 20 and up).</summary>
@@ -109,6 +126,8 @@ namespace CriticalMass.Net
         public string SetupMismatchDetail { get; private set; }
         private long _stallSeen;
         public long BytesSent { get; private set; }
+        /// <summary>b15-zero-cost: packets this session handed to the transport (each one is one message the relay bills).</summary>
+        public long PacketsSent { get; private set; }
         /// <summary>The transport's reason when our own connection closed (plain words), else null.</summary>
         public string ClosedReason { get; private set; }
         /// <summary>Milliseconds the network has kept this machine waiting right now (0 when ticking): the "waiting for" cue.</summary>
@@ -244,6 +263,15 @@ namespace CriticalMass.Net
         private readonly int _sendEveryMs;
         /// <summary>How often this machine sends new inputs or bundles, in ms.</summary>
         public int SendEveryMs => _sendEveryMs;
+        /// <summary>b15-zero-cost: ticks of input in one joiner packet (1 = a packet per tick, the pre-b15 way).</summary>
+        public int TicksPerPacket => _clientTicks;
+        private readonly int _clientTicks;
+        private int _hashesSent;
+        private long _unsentSince = -1;
+
+        /// <summary>b15-zero-cost: the default inputs-per-packet for a room of this many humans (2, or 3 above 16 humans,
+        /// where the pre-b15 joiners already sent every 2 ticks).</summary>
+        public static int TicksPerPacketFor(int humans) => humans > BigRoomHumans ? 3 : 2;
 
         /// <summary>
         /// b15-rejoin: a session for a seat whose player dropped and came back (RoomClient after REJOINED). It builds the
@@ -288,9 +316,12 @@ namespace CriticalMass.Net
             if (SetupMismatch != null) { Status = LockstepStatus.Desynced; DesyncTick = 0; }
             // Wall milliseconds per tick: the match pace (sim ticks per wall second / SimHz) speeds the clock, never the rules.
             _tickMs = 1000.0 / (cfg.SimHz * WallPace(setup, cfg));
-            // A big room sends half as often (two ticks per packet): the relay's room object sees one message per human per
-            // send, and 32 humans x 33 a second would sit at its 1,000 a second soft limit. 17+ humans: 66 ms, 32 x 15 = 480/s.
+            // A big room's host sends half as often (two ticks per packet): the relay's room object sees one message per human
+            // per send, and 32 humans x 33 a second would sit at its 1,000 a second soft limit.
             _sendEveryMs = setup.Humans.Length > BigRoomHumans ? Math.Max(_o.SendEveryMs, 2 * _o.SendEveryMs) : _o.SendEveryMs;
+            // b15-zero-cost: joiners pack 2 ticks a packet (3 in a big room, which sent every 2 before): the relay bills each
+            // message it receives, and a joiner's inputs are nearly all of them. The host's bundles keep their interval.
+            _clientTicks = _o.ClientTicksPerPacket > 0 ? _o.ClientTicksPerPacket : TicksPerPacketFor(setup.Humans.Length);
             _h = setup.Humans.Length;
             _bundleSize = _h * (1 + InputCodec.Size);
             _flat = rejoin && !IsHost;
@@ -761,6 +792,7 @@ namespace CriticalMass.Net
                 BytesSent += len;
                 FeedBytes += len;
                 FeedPackets++;
+                PacketsSent++;
                 _feedSent[k] = from + count - 1;
                 _feedTokens -= 1;
                 _feedNext = k + 1;
@@ -960,8 +992,17 @@ namespace CriticalMass.Net
             {
                 int tick = r.I32();
                 ulong h = r.U64();
-                int at = slot * 2 + j;
-                if (!r.Bad && tick > 0) { _theirTick[at] = tick; _theirHash[at] = h; }
+                if (r.Bad || tick <= 0) continue;
+                // b15-zero-cost: a fingerprint may now travel once, so it takes the slot's entry for the same tick, else a
+                // free one, else the older one (a pending check is never pushed out by a newer packet's position).
+                int a = slot * 2, b = a + 1, at;
+                if (_theirTick[a] == tick) at = a;
+                else if (_theirTick[b] == tick) at = b;
+                else if (_theirTick[a] <= 0) at = a;
+                else if (_theirTick[b] <= 0) at = b;
+                else at = _theirTick[a] <= _theirTick[b] ? a : b;
+                _theirTick[at] = tick;
+                _theirHash[at] = h;
             }
             return !r.Bad;
         }
@@ -1000,7 +1041,11 @@ namespace CriticalMass.Net
 
         private void WriteHashes(ref WireWriter w)
         {
-            int n = Math.Min(_hashCount, 2);
+            // b15-zero-cost: on a reliable link only the fingerprints not sent yet (at most two); on a datagram link the
+            // newest two in every packet, as before (any packet may be lost).
+            bool once = _o.HashesOnce && _t.Reliable;
+            int n = once ? Math.Max(0, Math.Min(_hashCount - _hashesSent, 2)) : Math.Min(_hashCount, 2);
+            if (once) _hashesSent = _hashCount;
             w.U8(n);
             for (int j = n; j >= 1; j--)
             {
@@ -1018,11 +1063,25 @@ namespace CriticalMass.Net
             else SendClient(now);
         }
 
+        private int KeepAliveNow => Status == LockstepStatus.Ended ? Math.Max(_o.KeepAliveMs, _o.EndedKeepAliveMs) : _o.KeepAliveMs;
+
         private void SendClient(long now)
         {
             int from = _t.Reliable ? _sentInput + 1 : _hostAckedInput + 1;
             bool news = _mineThrough >= from || Status == LockstepStatus.Desynced || _catchingUp;   // a rejoiner acks the log at the send rate
-            if (now - _lastSendHost < (news ? _sendEveryMs : _o.KeepAliveMs)) return;
+            int fresh = _mineThrough - _sentInput;   // ticks generated since the last packet
+            if (_clientTicks > 1 && fresh > 0 && !_catchingUp && Status != LockstepStatus.Desynced)
+            {
+                // b15-zero-cost: one packet per _clientTicks ticks, when its last tick is a multiple of _clientTicks (every
+                // joiner the same, so the host completes and sends its bundles in the same groups), or when the oldest unsent
+                // input has waited (_clientTicks - 1) ticks (a stall: never hold an input longer than that).
+                if (_unsentSince < 0) _unsentSince = now;
+                bool aligned = (_mineThrough + 1) % _clientTicks == 0;
+                bool full = fresh >= _clientTicks;
+                bool waited = now - _unsentSince >= (_clientTicks - 1) * _tickMs - 0.5;
+                if (!aligned && !full && !waited) return;
+            }
+            else if (now - _lastSendHost < (news ? _sendEveryMs : KeepAliveNow)) return;
             int count = Math.Max(0, Math.Min(_mineThrough - from + 1, 64));
             var w = new WireWriter(_pkt);
             w.U8(MsgInputs);
@@ -1039,7 +1098,9 @@ namespace CriticalMass.Net
             if (w.Overflow) return;
             _t.Send(Peers.Host, _pkt, w.Pos);
             BytesSent += w.Pos;
+            PacketsSent++;
             _lastSendHost = now;
+            _unsentSince = -1;
             if (count > 0) _sentInput = from + count - 1;
         }
 
@@ -1051,6 +1112,7 @@ namespace CriticalMass.Net
                     if (!_heardInput[k] && !_gone[k] && now - _lastStartSend[k] >= 250)
                     {
                         _t.Send(Setup.Humans[k].Peer, StartPacket, StartPacketLength);
+                        PacketsSent++;
                         _lastStartSend[k] = now;
                     }
             int maxPer = Math.Max(1, (Peers.MaxPacket - 48 - _h) / _bundleSize);   // online-rooms-9: + the margins
@@ -1063,13 +1125,14 @@ namespace CriticalMass.Net
                 {
                     int from = _sentBundle[0] + 1;
                     bool news = _producedThrough >= from || Status == LockstepStatus.Desynced;
-                    if (pkt == 0 && now - _lastSendTo[0] < (news ? _sendEveryMs : _o.KeepAliveMs)) return;
+                    if (pkt == 0 && now - _lastSendTo[0] < (news ? _sendEveryMs : KeepAliveNow)) return;
                     if (pkt > 0 && _producedThrough < from) return;
                     int count = Math.Max(0, Math.Min(_producedThrough - from + 1, maxPer));
                     int len = BuildBundles(from, count, -1);
                     if (len <= 0) return;
                     _t.Send(Peers.Broadcast, _pkt, len);
                     BytesSent += len;
+                    PacketsSent++;
                     _lastSendTo[0] = now;
                     if (count > 0) _sentBundle[0] = from + count - 1;
                 }
@@ -1080,7 +1143,7 @@ namespace CriticalMass.Net
                 if (_gone[k]) continue;
                 int first = _ackedBundle[k] + 1;
                 bool news = _producedThrough >= first || Status == LockstepStatus.Desynced;
-                if (now - _lastSendTo[k] < (news ? _sendEveryMs : _o.KeepAliveMs)) continue;
+                if (now - _lastSendTo[k] < (news ? _sendEveryMs : KeepAliveNow)) continue;
                 // Everything unacked, in up to three packets (a big room fits only two ticks in one).
                 for (int pkt = 0; pkt < 3; pkt++)
                 {
@@ -1091,6 +1154,7 @@ namespace CriticalMass.Net
                     if (len <= 0) break;
                     _t.Send(Setup.Humans[k].Peer, _pkt, len);
                     BytesSent += len;
+                    PacketsSent++;
                 }
                 _lastSendTo[k] = now;
             }
