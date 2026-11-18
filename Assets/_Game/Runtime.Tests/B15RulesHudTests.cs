@@ -11,6 +11,17 @@ namespace CriticalMass.Runtime.Tests
     public sealed class B15RulesHudTests
     {
         [Test]
+        public void TheComebackLeverWordsReadPlainly()
+        {
+            Assert.AreEqual("YOUR HILL TIRES x0.50", B15Hud.TiringLine(true, 0.5));
+            Assert.AreEqual("THEIR HILL TIRES x0.25", B15Hud.TiringLine(false, 0.25));
+            Assert.AreEqual("THE KAIJU JOINS YOU", B15Hud.TurnHeadline(true));
+            Assert.AreEqual("THE KAIJU TURNS ON YOU", B15Hud.TurnHeadline(false));
+            StringAssert.Contains("closer to the hill", B15Hud.RallyPointLine);
+            Assert.LessOrEqual(B15Hud.TurnReason.Length, 72, "one banner line");
+        }
+
+        [Test]
         public void TheRallyTagAndTheVoteWordsReadPlainly()
         {
             Assert.AreEqual("RALLY x1.25   45 s left", B15Hud.RallyLine(true, 1.25, 45));

@@ -25,18 +25,22 @@ namespace CriticalMass.Sim.Config
         /// <summary>RALLY on / off (each lever has its own switch; the rule's Enabled turns them all off).</summary>
         public bool RallyOn = true;
         /// <summary>Behind on hill seconds by more than this (s) = trailing (RALLY and FORWARD RETURN).</summary>
-        public double TrailThresholdSeconds = 15;
-        /// <summary>Extra credit per owned tick while trailing, per mille of a tick (250 = the hill counts x1.25).</summary>
-        public int RallyPerMille = 250;
+        public double TrailThresholdSeconds = 5;
+        /// <summary>Extra credit per owned tick while trailing, per mille of a tick (500 = the hill counts x1.5).</summary>
+        public int RallyPerMille = 500;
         /// <summary>Extra hill seconds a team can bank from RALLY in one match.</summary>
-        public double BonusCapSeconds = 45;
+        public double BonusCapSeconds = 60;
 
         // ---- RESPAWN CURVE (both teams)
         public bool RespawnCurveOn = true;
-        public double RespawnStartSeconds = 3;
-        public double RespawnEndSeconds = 8;
+        public double RespawnStartSeconds = 2;
+        public double RespawnEndSeconds = 5;
         /// <summary>1 = linear, 2 = quadratic (slow start). Integers only.</summary>
         public int CurvePower = 1;
+
+        // Defaults = the set chosen by the pass-2 sweep (B15SweepTests rounds 1-3, confirmed on 72 seeds): TURNCOAT + HOLD FATIGUE
+        // 20/40/0.25 + FORWARD RETURN 0.4 (also when the hill is lost) + RALLY x1.5 past 5 s, cap 60 s + respawn 2 -> 5 s. WAVES and
+        // MAJORITY stay off (both made matches worse: waves 6-10 s raised blowouts to 0.46-0.67, majority 2-3 did not lower them).
 
         // ---- b15 pass 2 levers (each its own switch; all symmetric, read only match state)
         /// <summary>WAVES: a knocked-out fighter comes back at his team's next wave (every WaveSeconds of match time, both teams
@@ -45,14 +49,14 @@ namespace CriticalMass.Sim.Config
 
         /// <summary>TURNCOAT KAIJU: a sided Kaiju knocked out by the other team gets up on the side of the team that knocked it
         /// down ("it becomes what beat it"); a neutral or berserk Kaiju never turns.</summary>
-        public bool KaijuTurncoat = false;
+        public bool KaijuTurncoat = true;
 
         /// <summary>HOLD FATIGUE: after HoldGraceSeconds of unbroken ownership the owner's hill seconds count less and less, down
         /// to HoldMinPerMille / 1000 after HoldSpanSeconds more; a lost, contested or empty hill resets the streak.</summary>
-        public bool HoldFatigueOn = false;
-        public double HoldGraceSeconds = 30;
-        public double HoldSpanSeconds = 60;
-        public int HoldMinPerMille = 500;
+        public bool HoldFatigueOn = true;
+        public double HoldGraceSeconds = 20;
+        public double HoldSpanSeconds = 40;
+        public int HoldMinPerMille = 250;
 
         /// <summary>MAJORITY: the hill is owned only with at least this many more bodies than the other team (1 = today's rule);
         /// fewer is contested and nobody scores.</summary>
@@ -60,10 +64,10 @@ namespace CriticalMass.Sim.Config
 
         /// <summary>FORWARD RETURN: a team trailing by more than TrailThresholdSeconds respawns at a rally point ForwardShare of
         /// the way from its pad to the hill (on open floor; the pad when the point is blocked).</summary>
-        public bool ForwardReturnOn = false;
+        public bool ForwardReturnOn = true;
         public double ForwardShare = 0.4;
         /// <summary>FORWARD RETURN also for a team whose hill the other team holds (not only a trailing team).</summary>
-        public bool ForwardWhenHillLost = false;
+        public bool ForwardWhenHillLost = true;
 
         public ComebackConfig Clone() => (ComebackConfig)MemberwiseClone();
     }

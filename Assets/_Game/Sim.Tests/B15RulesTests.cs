@@ -25,7 +25,31 @@ namespace CriticalMass.Sim.Tests
             GameConfig c = GameConfig.CreateBrowser5v5().ApplyRules(RulesProfile.Full);
             c.Depth.Comeback.Enabled = comeback;
             c.Depth.HutChoices.Enabled = choices;
+            Pass1(c);
             return c;
+        }
+
+        /// <summary>The pass-1 unit tests pin the pass-1 RALLY / curve numbers and turn the pass-2 levers off, so each test reads
+        /// one mechanism; the shipped defaults (the swept set) are checked in <see cref="DefaultsAreTheSweptSet"/>.</summary>
+        static void Pass1(GameConfig c)
+        {
+            B15SweepTests.Bare(c);
+            ComebackConfig k = c.Depth.Comeback;
+            k.RallyOn = true; k.RallyPerMille = 250; k.BonusCapSeconds = 45; k.TrailThresholdSeconds = 15;
+            k.RespawnCurveOn = true; k.RespawnStartSeconds = 3; k.RespawnEndSeconds = 8; k.CurvePower = 1;
+        }
+
+        [Test]
+        public void DefaultsAreTheSweptSet()
+        {
+            var k = new ComebackConfig();
+            string got = "RALLY " + k.RallyOn + " x" + (1 + k.RallyPerMille / 1000.0) + " past " + k.TrailThresholdSeconds + " s cap " + k.BonusCapSeconds + " s; respawn " + k.RespawnCurveOn + " "
+                + k.RespawnStartSeconds + " -> " + k.RespawnEndSeconds + " s p" + k.CurvePower + "; waves " + k.WaveSeconds + "; turncoat " + k.KaijuTurncoat + "; fatigue " + k.HoldFatigueOn + " "
+                + k.HoldGraceSeconds + "/" + k.HoldSpanSeconds + "/" + k.HoldMinPerMille + "; majority " + k.MajorityMargin + "; forward " + k.ForwardReturnOn + " " + k.ForwardShare + " lost " + k.ForwardWhenHillLost;
+            const string want = "RALLY True x1.5 past 5 s cap 60 s; respawn True 2 -> 5 s p1; waves 0; turncoat True; fatigue True 20/40/250; majority 1; forward True 0.4 lost True";
+            Line("comeback defaults", got, want);
+            Assert.AreEqual(want, got);
+            Assert.IsTrue(k.Enabled);
         }
 
         static World Make(GameConfig cfg, int seed = 63, int teamSize = 5) =>

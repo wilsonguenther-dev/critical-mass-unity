@@ -251,7 +251,13 @@ namespace CriticalMass.Sim.Tests
             Arm hut = Run("hut choices on", false, true);
             Arm both = Run("both on", true, true);
             Arm coin = Run("both on, coin-flip picks", true, true, CoinPicks);
-            Arm cp2 = Run("both on, CurvePower 2", true, true, c => c.Depth.Comeback.CurvePower = 2);
+            Arm cp2 = Run("both on, pass-1 comeback (RALLY x1.25 at 15 s, 3 -> 8 s)", true, true, c =>
+            {
+                B15SweepTests.Bare(c);
+                ComebackConfig k = c.Depth.Comeback;
+                k.RallyOn = true; k.RallyPerMille = 250; k.BonusCapSeconds = 45; k.TrailThresholdSeconds = 15;
+                k.RespawnCurveOn = true; k.RespawnStartSeconds = 3; k.RespawnEndSeconds = 8; k.CurvePower = 1;
+            });
             Arm[] arms = { off, cb, hut, both, coin, cp2 };
             foreach (Arm a in arms) Print(a);
             foreach (Arm a in new[] { cb, hut, both, coin, cp2 }) WinShare.Judge("b15 " + a.Name, "16v16 pool", a.T16, off.T16, true);
@@ -281,9 +287,11 @@ namespace CriticalMass.Sim.Tests
             }
             foreach (Arm a in new[] { cb, both, coin, cp2 })
             {
-                double cap = new ComebackConfig().BonusCapSeconds;
+                double cap = Math.Max(45, new ComebackConfig().BonusCapSeconds);
                 if (!Check(a.Name + ": RALLY within its cap", F(a.RallyMax, "0.00") + " s most in one team's match", a.RallyMax <= cap + 1e-6, "<= " + F(cap, "0") + " s")) fails++;
-                if (!Check(a.Name + ": knock-out wait inside the curve", F(a.RespawnMin, "0.00") + " .. " + F(a.RespawnMax, "0.00") + " s", a.RespawnMin >= 2 - 1e-6 && a.RespawnMax <= 8 + 1.0 / 30 + 1e-6, "2 (QUICK RETURN floor) .. 8 s")) fails++;
+                var kc = new ComebackConfig();
+                double lo = Math.Min(new HutChoicesConfig().RespawnFloorSeconds, kc.RespawnStartSeconds), hi = Math.Max(8, kc.RespawnEndSeconds) + kc.WaveSeconds;
+                if (!Check(a.Name + ": knock-out wait inside the curve", F(a.RespawnMin, "0.00") + " .. " + F(a.RespawnMax, "0.00") + " s", a.RespawnMin >= lo - 1e-6 && a.RespawnMax <= hi + 1.0 / 30 + 1e-6, F(lo, "0.0") + " .. " + F(hi, "0.0") + " s")) fails++;
             }
             double usOff = off.SimSeconds * 1e6 / Math.Max(1, off.Ticks), usBoth = both.SimSeconds * 1e6 / Math.Max(1, both.Ticks);
             if (!Check("both on: sim cost per tick against both off (same job, 24 whole matches each)", F(usOff, "0.0") + " / " + F(usBoth, "0.0") + " us = " + F((usBoth / usOff - 1) * 100, "+0.0;-0.0") + " %", usBoth <= usOff * 1.03, "+3 % or less")) fails++;
