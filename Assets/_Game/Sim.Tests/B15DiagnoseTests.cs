@@ -330,6 +330,11 @@ namespace CriticalMass.Sim.Tests
                     string ak = f.Actor + " " + f.Cls + " " + f.Team;
                     actors[ak] = (actors.TryGetValue(ak, out int v3) ? v3 : 0) + 1;
                 }
+                int nearHill = 0;
+                double hr = w.Config.Hill.Radius + 6;
+                foreach (ShiverFlag f in watch.Flags)
+                    if ((f.X - w.Map.Hill.X) * (f.X - w.Map.Hill.X) + (f.Z - w.Map.Hill.Z) * (f.Z - w.Map.Hill.Z) <= hr * hr) nearHill++;
+                Console.WriteLine("[b15 diag shiver]   hill at " + w.Map.Hill.X.ToString("0") + ":" + w.Map.Hill.Z.ToString("0") + " r " + w.Config.Hill.Radius + "; flags within r + 6: " + nearHill + " of " + watch.Flags.Count);
                 Console.WriteLine("[b15 diag shiver]   top cells (3 u) " + Top(cells) + "; top state/kind " + Top(states) + "; top actors " + Top(actors)
                     + "; walls up at the end " + CountWalls(w) + ", hut picks A/C mask " + w.HutVote.Mask[0] + "/" + w.HutVote.Mask[1]);
             }
