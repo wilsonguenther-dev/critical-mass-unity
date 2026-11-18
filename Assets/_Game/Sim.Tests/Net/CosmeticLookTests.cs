@@ -29,7 +29,8 @@ namespace CriticalMass.Sim.Tests.Net
                 (new CosmeticLook(7, 4, 5, 5, 20), new CosmeticLook(7, 4, 5, 5, 20)),
                 (new CosmeticLook(7, 4, 5, 5, 3), new CosmeticLook(0, 0, 0, 0, 3)),   // above the mastery: cleared, never swapped
                 (new CosmeticLook(1, 1, 1, 1, 0), new CosmeticLook(1, 0, 0, 0, 1)),   // mastery 0 is held to 1
-                (new CosmeticLook(3, 1, 1, 1, 5), new CosmeticLook(3, 1, 1, 1, 5)),
+                (new CosmeticLook(2, 1, 1, 1, 5), new CosmeticLook(2, 1, 1, 1, 5)),   // title 2 at 3, frame 1 at 5, trim 1 at 4, emblem 1 at 2
+                (new CosmeticLook(3, 1, 1, 1, 5), new CosmeticLook(0, 1, 1, 1, 5)),   // title 3 needs mastery 7
                 (new CosmeticLook(-5, -1, 999, 1, 2), new CosmeticLook(0, 0, 0, 1, 2)),
             };
             foreach ((CosmeticLook given, CosmeticLook want) in cases)
