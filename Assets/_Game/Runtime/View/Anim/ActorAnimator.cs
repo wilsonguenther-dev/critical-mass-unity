@@ -410,7 +410,7 @@ namespace CriticalMass.Runtime.View.Anim
             // b15 world look: a class on its own measured clips uses their real ground speed (ClassStrides); the Knight
             // facts times StrideScale stay the fallback for any model without a measured row.
             string own = ClassStrides.SourceOf(m.Spec != null ? m.Spec.ClipSource : null);
-            bool measured = ClassStrides.Covers(own);
+            bool measured = ClassStrides.UseInAnimator && ClassStrides.Covers(own);
             for (int e = 0; e < _eCount; e++)
             {
                 double l = m.ClipLength(_eClip[e]);

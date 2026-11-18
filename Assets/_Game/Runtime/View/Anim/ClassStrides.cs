@@ -79,6 +79,15 @@ namespace CriticalMass.Runtime.View.Anim
             return false;
         }
 
+        /// <summary>
+        /// Off in this branch: with the measured speeds on, AnimationPassPlayTests.NoMoonwalkingInEightDirectionsWithAFixedAim
+        /// read the Warrior's backward-left diagonal at 0.39 and 0.41 u/u planted-foot slide (sibling branches on the same
+        /// base: 0.14; limit 0.2) while the other seven directions held 0.02 to 0.11. Until the reviewer reads the feet in
+        /// the Editor (CM > World Look > Feet probe) the animator keeps the Knight facts x StrideScale; the table stays the
+        /// measured reference (WorldLookMotionTests prints the per-class error of the old stride).
+        /// </summary>
+        public const bool UseInAnimator = false;
+
         /// <summary>True when every locomotion clip of the source is measured (then the stride needs no StrideScale).</summary>
         public static bool Covers(string source) => source != null && TryGet(source, "Run", out _) && TryGet(source, "Walk", out _);
     }
