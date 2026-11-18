@@ -351,8 +351,8 @@ namespace CriticalMass.Sim.Core
 
         // ------------------------------------------------------------------------------------------------ Demolitions
 
-        /// <summary>The TNT cooldown (ticks at 30 Hz) in config c.</summary>
-        public static double TntCooldownTicks(GameConfig c) => On(c) ? c.Depth.CombatFeel.TntCooldownTicks : c.Abilities.DemolitionsTnt.CooldownTicks;
+        /// <summary>The TNT cooldown in sim ticks at this config's SimHz (through Durations.T30, like every *Ticks field).</summary>
+        public static int TntCooldown(GameConfig c) => Durations.T30(c, On(c) ? c.Depth.CombatFeel.TntCooldownTicks : c.Abilities.DemolitionsTnt.CooldownTicks);
 
         /// <summary>
         /// Self-risk: the thrower inside her own TNT's radius takes TntSelfShare of the blast damage at her distance (full at the

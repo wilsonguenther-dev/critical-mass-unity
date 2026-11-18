@@ -129,7 +129,7 @@ namespace CriticalMass.Runtime.Hud
             s.DemoTntOnAttack = a.Cls == ClassId.Demolitions && tnt.ThrowOnAttack && !c.Depth.Classic;
             int tntWait = s.DemoTntOnAttack && w.Demolitions != null ? Demolitions.TntWaitTicks(w, localId) : 0;
             s.DemoTntReady = s.DemoTntOnAttack && tntWait <= 0;
-            double tntCdTicks = CombatFeel.TntCooldownTicks(c); // b15: the combat feel TNT cooldown in Full
+            double tntCdTicks = CombatFeel.TntCooldown(c); // b15: the combat feel TNT cooldown in Full (sim ticks)
             s.DemoTntCd01 = s.DemoTntOnAttack && tntCdTicks > 0 ? Clamp01((float)(tntWait / tntCdTicks)) : 0f;
             s.DemoTntSeconds = s.DemoTntOnAttack ? (float)(tntWait / c.SimHz) : 0f;
             s.AbilityCd01 = cc.AbilityCooldown > 0 ? Clamp01((float)(a.AbilityCd / cc.AbilityCooldown)) : 0f;

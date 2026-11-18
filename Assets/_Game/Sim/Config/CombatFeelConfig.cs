@@ -133,7 +133,7 @@ namespace CriticalMass.Sim.Config
         /// <summary>TNT cooldown (ticks at 30 Hz) while the rule is on (DemolitionsTntConfig.CooldownTicks is 150).</summary>
         public double TntCooldownTicks = 120;
         /// <summary>Share of her own TNT's blast damage the thrower takes when she stands inside its radius.</summary>
-        public double TntSelfShare = 0.5;
+        public double TntSelfShare = 0.35;
         /// <summary>The Healer's mend while the rule is on (HealerConfig MendHeal 6 / MendRange 5.5).</summary>
         public double MendHeal = 10;
         public double MendRange = 6;
