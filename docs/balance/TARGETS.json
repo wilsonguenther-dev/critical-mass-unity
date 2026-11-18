@@ -1,0 +1,13 @@
+{
+  "about": "Balance targets for tools/balance/balance-report.sh. Each target is a band on one report row (row = the key in balance-report.csv). Sources: ~/cm-incidents/systems-audit-2026-11-17/SYSTEMS-AUDIT.md (section 1 numbers and roadmap) and the batch-15 builder orders. min / max are inclusive unless maxExclusive is true.",
+  "targets": [
+    { "id": "ttk", "row": "ttk.median", "label": "Time to kill 3 to 6 s (median 1v1 matchup)", "min": 3, "max": 6, "source": "batch-15 combat feel; game-design skill: TTK long enough to react and be rescued" },
+    { "id": "duels", "row": "duel.unbeaten", "label": "No class wins every duel", "max": 0, "source": "audit section 1: the Warrior is the class that wins (0.58 to 0.69 of kills)" },
+    { "id": "top10", "row": "dmg.top10", "label": "Top-10 share of damage at most 0.50", "max": 0.5, "source": "batch-15 combat feel" },
+    { "id": "blowouts", "row": "blowout", "label": "Blowouts (2:1 on hill time) at most 0.15", "max": 0.15, "source": "audit section 1: 31% of matches were 2:1" },
+    { "id": "leadchanges", "row": "lead.changes", "label": "Lead changes at least 5 a match (median)", "min": 5, "source": "audit section 1: 2.2 to 3.1 a match" },
+    { "id": "leaderhalf", "row": "leader.half.win", "label": "Leader at half wins 0.60 to 0.80", "min": 0.6, "max": 0.8, "source": "batch-15 comeback hut: a lead matters but is not final" },
+    { "id": "deadwalk", "row": "time.deadwalk.all", "label": "Dead or walking at most 0.28 of a match", "max": 0.28, "source": "audit section 1: 37% or more spent dead or walking back" },
+    { "id": "stuck", "row": "stuck", "label": "Stuck episodes under 5 a match (median)", "max": 5, "maxExclusive": true, "source": "batch-15 terrain height / bot pathing" }
+  ]
+}
