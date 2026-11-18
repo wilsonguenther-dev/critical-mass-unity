@@ -91,7 +91,8 @@ namespace CriticalMass.Runtime.View.Atmosphere
             if (cam != _cam && _cam != null) SetCameraPost(_cam, false);
             _cam = cam;
             bool hdr = cam != null && cam.allowHDR && GraphicsSettings.currentRenderPipeline is UniversalRenderPipelineAsset u && u.supportsHDR;
-            PostOn = tier.Post && cam != null;
+            // No graphics device (-nographics): no post (URP logs "Setup PostFX passes: Unable to find surface" there).
+            PostOn = tier.Post && cam != null && !AmbientParticles.NoGpu;
             BloomOn = PostOn && tier.Bloom && hdr;
             if (cam != null) SetCameraPost(cam, PostOn);
             if (_volume == null) return;

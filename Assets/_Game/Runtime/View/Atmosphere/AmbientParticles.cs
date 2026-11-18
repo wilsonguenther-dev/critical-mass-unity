@@ -28,6 +28,10 @@ namespace CriticalMass.Runtime.View.Atmosphere
 
         public static AmbientParticles Current { get; private set; }
 
+        /// <summary>No graphics device (-nographics: CI's PlayMode runs). Nothing is built: the null device's billboard
+        /// path crashed the GitHub PlayMode shard (run 44248605488, ParticleSystemRenderer_RenderMultipleBillboards).</summary>
+        public static bool NoGpu => SystemInfo.graphicsDeviceType == GraphicsDeviceType.Null;
+
         readonly ParticleSystem[] _sys = new ParticleSystem[3];
         readonly float[] _carry = new float[3];
         readonly List<Vector3> _braziers = new List<Vector3>(64);
@@ -73,7 +77,7 @@ namespace CriticalMass.Runtime.View.Atmosphere
             Teardown();
             _builtFor = level;
             WorldLookBudgets.AirTier t = WorldLookBudgets.For(level);
-            if (t.Particles <= 0) return;
+            if (t.Particles <= 0 || NoGpu) return;
             if (_mat == null)
             {
                 Shader sh = Resources.Load<Shader>("CMFxUnlit");
