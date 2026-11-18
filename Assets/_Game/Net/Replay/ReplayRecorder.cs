@@ -38,6 +38,8 @@ namespace CriticalMass.Net.Replay
         readonly InputFrame[] _one = new InputFrame[1];
         readonly int[] _handToBot = new int[ReplayInputStream.MaxActors];
         int _handCount;
+        readonly int[] _botToHuman = new int[ReplayInputStream.MaxActors];   // b15-rejoin
+        int _backCount;
         ulong _lastMask;
         bool _lastNoHuman;
         int _repeat;
@@ -69,6 +71,7 @@ namespace CriticalMass.Net.Replay
             if (_fp.Length < expect) { _fp = new ulong[expect]; _fpTick = new int[expect]; }
             _fpCount = 0;
             _handCount = 0;
+            _backCount = 0;
             _lastMask = 0;
             _lastNoHuman = false;
             _repeat = 0;
@@ -106,6 +109,13 @@ namespace CriticalMass.Net.Replay
             if (_handCount < _handToBot.Length) _handToBot[_handCount++] = id;
         }
 
+        /// <summary>b15-rejoin: a rejoined player takes the fighter back before this tick's inputs.</summary>
+        public void OnBotToHuman(World w, int id)
+        {
+            if (!ReferenceEquals(w, World) || Done) return;
+            if (_backCount < _botToHuman.Length) _botToHuman[_backCount++] = id;
+        }
+
         void Record(World w, InputFrame[] frames, bool noHuman)
         {
             if (w.Tick % Header.HashEvery == 0) AddFingerprint(w.Tick, StateHash.Of(w));
@@ -125,7 +135,7 @@ namespace CriticalMass.Net.Replay
                     if (c != 0) changed = true;
                 }
             }
-            bool same = _any && !changed && mask == _lastMask && noHuman == _lastNoHuman && _handCount == 0;
+            bool same = _any && !changed && mask == _lastMask && noHuman == _lastNoHuman && _handCount == 0 && _backCount == 0;
             Ticks++;
             if (same)
             {
@@ -134,7 +144,7 @@ namespace CriticalMass.Net.Replay
             }
             FlushRepeat();
             int op = (noHuman ? ReplayInputStream.OpNoHuman : 0) | (mask != _lastMask ? ReplayInputStream.OpMask : 0) |
-                     (_handCount > 0 ? ReplayInputStream.OpHandToBot : 0);
+                     (_handCount > 0 ? ReplayInputStream.OpHandToBot : 0) | (_backCount > 0 ? ReplayInputStream.OpBotToHuman : 0);
             _buf.U8(op);
             if ((op & ReplayInputStream.OpMask) != 0) _buf.Var(mask);
             if (_handCount > 0)
@@ -142,6 +152,12 @@ namespace CriticalMass.Net.Replay
                 _buf.U8(_handCount);
                 for (int i = 0; i < _handCount; i++) _buf.U8(_handToBot[i]);
                 _handCount = 0;
+            }
+            if (_backCount > 0)
+            {
+                _buf.U8(_backCount);
+                for (int i = 0; i < _backCount; i++) _buf.U8(_botToHuman[i]);
+                _backCount = 0;
             }
             for (int id = 0; id < n && mask >> id != 0; id++)
                 if ((mask & (1UL << id)) != 0) ReplayInputStream.PutFrame(ref _buf, _lanes[id], frames[id], _changes[id]);

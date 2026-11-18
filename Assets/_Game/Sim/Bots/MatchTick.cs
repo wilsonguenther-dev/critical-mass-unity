@@ -18,6 +18,8 @@ namespace CriticalMass.Sim.Bots
         void OnAdvanceNoHuman(World w);
         /// <summary>HandToBot(w, id) is about to run.</summary>
         void OnHandToBot(World w, int id);
+        /// <summary>b15-rejoin: BotToHuman(w, id) is about to run.</summary>
+        void OnBotToHuman(World w, int id);
     }
 
     /// <summary>The one per-tick order (browser SimDriver.tsx lines 30-60, outcomes.ts tick()), shared by the Runtime driver, the soak harness and the PlayMode smoke test.</summary>
@@ -96,6 +98,19 @@ namespace CriticalMass.Sim.Bots
             if (id <= 0 || id >= w.ActorCount) return;
             Tap?.OnHandToBot(w, id);
             w.Actors[id].IsHuman = false;
+        }
+
+        /// <summary>
+        /// b15-rejoin: a player who left an online room and rejoined takes their fighter back from the bot at this tick. Every
+        /// machine calls it at the same tick (the host announces it in the input bundle, like HandToBot), so the worlds stay
+        /// identical. The fighter keeps everything the bot did with it (position, hp, carry, kills); from this tick on its
+        /// frames come from the player again.
+        /// </summary>
+        public static void BotToHuman(World w, int id)
+        {
+            if (id <= 0 || id >= w.ActorCount) return;
+            Tap?.OnBotToHuman(w, id);
+            w.Actors[id].IsHuman = true;
         }
 
         /// <summary>Steps (2), (3), (4) only: actor 0 receives no input at all (outcomes.ts tick() with human === "passive").</summary>
