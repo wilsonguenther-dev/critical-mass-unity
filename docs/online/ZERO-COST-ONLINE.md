@@ -57,8 +57,10 @@ Every arm: every fingerprint MATCHED, no late inputs, no extra waiting.
 ## 3. What b15 changed (the simulation is untouched)
 
 1. **Joiners pack two ticks of input per packet.** A packet goes when its last tick is odd (ticks 0-1, 2-3, ...), so every
-   joiner's packets cover the same ticks; the host then
-   completes its bundles two at a time and its broadcasts halve too, without any extra wait on the host. An input waits at
+   joiner's packets cover the same ticks, and the host broadcasts its bundles in the same pairs (when a pair's last tick
+   is sequenced, or after one tick of waiting at most). On a simulated clock the pairs lined up by themselves; on the real
+   relay (online-smoke 44246410965) the host still sent one bundle a tick, so the pairing is explicit since online-smoke
+   44247175418, which measured the host's messages halved (1,756 to 909 a minute) with every fingerprint matching. An input waits at
    most one tick (33 ms) longer than before to leave the joiner's computer, and the measured input delay grew by exactly
    one tick. The host reports each joiner's margin from when its newest pair ARRIVED, so the lead policy is not fooled by
    bundles that now go out right after a pair completes. `LockstepOptions.ClientTicksPerPacket`. Three ticks a packet was
@@ -83,6 +85,11 @@ Not changed, on purpose:
 - **Star through the host vs every-to-every.** Already the cheapest shape under this bill: each joiner sends one message
   per packet to the host, and the host one broadcast for everyone (the relay fans it out for free). Every-to-every would
   cost the same from joiners plus nothing saved on the host.
+
+**Watch item (open):** with the host's pairs, a player who REJOINED on a near-zero-latency relay (CI's local relay)
+waited for the host more than before in two runs out of three (11.7 s and 1.7 s over the last 40 s, against 0 before);
+the cross-OS rejoin over the real relay waited 188 ms (273 before). Every fingerprint matched in all of them. Not yet
+explained; `LockstepSession` host pairing is the single place to switch it off (`ClientTicksPerPacket = 1`).
 
 ## 4. How to host friends, three ways
 
