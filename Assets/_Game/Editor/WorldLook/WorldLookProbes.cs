@@ -298,8 +298,8 @@ namespace CriticalMass.Editor.LookProbes
             readonly Dictionary<Transform, (Vector3 fl, Vector3 fr, Vector3 root)> _last = new Dictionary<Transform, (Vector3, Vector3, Vector3)>();
             readonly Dictionary<string, (int walk, int planted)> _byClass = new Dictionary<string, (int, int)>();
 
-            void OnEnable() { _lodWas = AnimLod.Enabled; AnimLod.Enabled = false; }
-            void OnDisable() { AnimLod.Enabled = _lodWas; }
+            void OnEnable() { _lodWas = CriticalMass.Runtime.View.Anim.AnimLod.Enabled; CriticalMass.Runtime.View.Anim.AnimLod.Enabled = false; }
+            void OnDisable() { CriticalMass.Runtime.View.Anim.AnimLod.Enabled = _lodWas; }
 
             void LateUpdate()
             {
