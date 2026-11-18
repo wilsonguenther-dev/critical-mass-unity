@@ -25,7 +25,18 @@ namespace CriticalMass.Runtime
         }
 
         /// <summary>Visual ground height under sim (x, z): the island height (the dais lift joins once the dais is drawn).</summary>
-        public static double At(MapDef map, double x, double z) => IslandHeightAt(map, x, z);
+        /// <summary>b14 bridge fix: the live match (set by StagedBuildView each frame). On the cells of its built rope bridges
+        /// At is the deck height, which runs straight from bank to bank, so fighters, rings and aim all sit on the deck.
+        /// View-only: the sim never reads this.</summary>
+        public static CriticalMass.Sim.Core.World Live;
+
+        public static double At(MapDef map, double x, double z)
+        {
+            double h = IslandHeightAt(map, x, z);
+            CriticalMass.Sim.Core.World w = Live;
+            if (w != null && ReferenceEquals(w.Map, map)) h += View.Mechanics.LadderClimb.BridgeLift(w, x, z);
+            return h;
+        }
 
         /// <summary>
         /// The horizontal Unity plane at height h. Unity's Plane keeps n.p + distance = 0, so the plane y = h is

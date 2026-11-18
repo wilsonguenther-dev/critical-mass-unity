@@ -141,12 +141,22 @@ namespace CriticalMass.Runtime.Tests
         }
 
         [Test]
+        public void BridgeDeckRunsStraightFromBankToBank()
+        {
+            Assert.AreEqual(1.5f, LadderClimb.BridgeDeck(-6, 6, 1.5f, 0.75f), 1e-5);
+            Assert.AreEqual(0.75f, LadderClimb.BridgeDeck(6, 6, 1.5f, 0.75f), 1e-5);
+            Assert.AreEqual(1.125f, LadderClimb.BridgeDeck(0, 6, 1.5f, 0.75f), 1e-5);
+            Assert.AreEqual(1.5f, LadderClimb.BridgeDeck(-9, 6, 1.5f, 0.75f), 1e-5, "clamped past the near bank");
+        }
+
+        [Test]
         public void RopeBridgeOnSkybreakIsWalkedEndToEndWithoutFalling()
         {
             World w = Skybreak();
             MapDef map = w.Map;
             int[] dxs = { 1, -1, 0, 0 }, dzs = { 0, 0, 1, -1 };
             int tried = 0, walked = 0;
+            float maxStep = 0f;
             var bad = new List<string>();
             for (int cz = 1; cz < map.Height - 1 && tried < 6; cz++)
             for (int cx = 1; cx < map.Width - 1 && tried < 6; cx++)
@@ -163,6 +173,8 @@ namespace CriticalMass.Runtime.Tests
                     tried++;
                     double dt = SimStep.Dt(t.Config);
                     bool fell = false;
+                    GroundHeight.Live = t;
+                    float lastH = (float)GroundHeight.At(t.Map, t.X[0], t.Z[0]);
                     for (int k = 0; k < 40 * cells && !fell; k++)
                     {
                         double gx = lx - t.X[0], gz = lz - t.Z[0];
@@ -172,15 +184,20 @@ namespace CriticalMass.Runtime.Tests
                         t.Inputs[0].MoveZ = dzs[d];
                         Movement.MovementSystem(t, dt);
                         if (!MapGrid.IsWalkable(t.Map, (int)Math.Floor(t.X[0]), (int)Math.Floor(t.Z[0]))) fell = true;
+                        float hNow = (float)GroundHeight.At(t.Map, t.X[0], t.Z[0]);
+                        maxStep = Mathf.Max(maxStep, Mathf.Abs(hNow - lastH));
+                        lastH = hNow;
                     }
+                    GroundHeight.Live = null;
                     double ex = lx - t.X[0], ez = lz - t.Z[0];
                     if (!fell && ex * ex + ez * ez < 0.36) walked++;
                     else bad.Add($"({cx},{cz}) dir ({dxs[d]},{dzs[d]}) {cells} cells: ended ({t.X[0]:F2},{t.Z[0]:F2}) fell {fell}");
                 }
             }
-            Debug.Log($"[ladder fix] rope bridges: {walked} of {tried} walked end to end. " + string.Join("; ", bad));
+            Debug.Log($"[ladder fix] rope bridges: {walked} of {tried} walked end to end, biggest per-tick height change on and off the deck {maxStep:F2} u. " + string.Join("; ", bad));
             Assert.GreaterOrEqual(tried, 1, "a rope bridge can be built on Skybreak");
             Assert.IsEmpty(bad, "every bridge walked end to end without leaving walkable ground");
+            Assert.That(maxStep, Is.LessThan(0.3f), "the deck meets both banks: no snap up or down at either end");
         }
     }
 }
