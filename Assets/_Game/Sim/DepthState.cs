@@ -281,7 +281,7 @@ namespace CriticalMass.Sim.Core
             BridgesRepaired = 0;
             // b15: the repaint restored every cell; every level goes back to the island's own. A restart honours the switch
             // (a config turned off or on between matches drops or makes the layer; this allocates only on such a restart).
-            MapDef rm = w.Map;
+            CriticalMass.Sim.Grid.MapDef rm = w.Map;
             if (TerrainHeight.Enabled(w.Config))
             {
                 if (rm.Lift == null || rm.Lift.Length != rm.Width * rm.Height) rm.Lift = new sbyte[rm.Width * rm.Height];
