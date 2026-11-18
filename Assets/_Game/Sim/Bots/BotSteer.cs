@@ -1009,7 +1009,7 @@ namespace CriticalMass.Sim.Bots
             // b13 r3 [K]: a bot the SHROUD would blind leaves the cloud and skirts it, unless it is contesting the hill.
             if (BotKaijuFeed.AvoidCloud(w, id, output)) st.WantMove[id] = 1;
             // b15 combat feel: a bot that has pressed for JamSeconds and covered under a quarter of its walk side-steps.
-            if (CombatFeel.On(w) && Unjam(w, st, id, cc, output)) st.WantMove[id] = 1;
+            if (CombatFeel.On(w) && cfg.Depth.CombatFeel.BotUnjam && Unjam(w, st, id, cc, output)) st.WantMove[id] = 1;
 
             // Ability press decided at think time.
             if (st.AbilityReq[id] == 1)
