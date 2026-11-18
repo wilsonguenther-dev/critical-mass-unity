@@ -1,4 +1,5 @@
 using CriticalMass.Runtime.Game;
+using CriticalMass.Sim.Config;
 using CriticalMass.Sim.Core;
 using UnityEngine;
 
