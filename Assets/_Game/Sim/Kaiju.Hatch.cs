@@ -212,6 +212,21 @@ namespace CriticalMass.Sim.Core
             public double R, Sr;
             public int Halo;
             public bool Squeeze, Crush, Guard, Valid;
+            /// <summary>b14 sim cost: the region labels are older than the shadow cells (a route-guard refresh deferred them).</summary>
+            public bool RegionsDirty;
+        }
+
+        /// <summary>
+        /// b14 sim cost: label the regions now when a route-guard refresh deferred them. The labels are a pure function of the
+        /// shadow cells (BuildRegions), so building them at the first read instead of at the refresh gives the same labels.
+        /// </summary>
+        private static void EnsureRegions(World w)
+        {
+            ClearBuild b = ClearBuildFor(w);
+            if (!b.RegionsDirty) return;
+            b.RegionsDirty = false;
+            SimProfile.ClearanceRegionBuilds++;
+            BuildRegions(w);
         }
 
         private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<World, ClearBuild> ClearBuilds =
@@ -274,10 +289,21 @@ namespace CriticalMass.Sim.Core
         /// grid within that reach, and BuildRegions a pure function of the shadow cells); the flow field is still invalidated on
         /// every grid change exactly as before, so no Sim decision or timer moves. SimProfile.ForceFullClearance = the old path.
         /// </summary>
-        internal static void RefreshClearance(World w)
+        internal static void RefreshClearance(World w) => RefreshClearance(w, false);
+
+        /// <summary>
+        /// deferRegions (b14 sim cost, the route guard only: it reads the shadow cells, never the region labels): leave the
+        /// labels to the next reader (RegionAt, the next plain refresh). A TNT crater proves every carved cell, and each proof
+        /// after the first saw a new hole, so it relabelled the whole map (~1.1 ms) up to four times in one tick.
+        /// </summary>
+        internal static void RefreshClearance(World w, bool deferRegions)
         {
             KaijuNav nav = w.KaijuNav;
-            if (nav.ClearGridVersion == w.GridVersion) return;
+            if (nav.ClearGridVersion == w.GridVersion)
+            {
+                if (!deferRegions) EnsureRegions(w);
+                return;
+            }
             ClearEpoch++;   // b14 sim cost: the route verdict memo compares start cells only within one clearance build
             SimProfile.Begin?.Invoke(SimProfile.KaijuClearance);
             MapDef map = w.Map;
@@ -364,8 +390,10 @@ namespace CriticalMass.Sim.Core
             // The field was built over the old shadow grid: force a rebuild (on every grid change, as before b11-dg: the
             // rebuild resets RepathIn, so skipping it would move the Sim).
             nav.FieldWallVersion = -1;
-            if (guard && regions)
+            if (guard && regions && deferRegions) b.RegionsDirty = true;
+            else if (guard && (regions || b.RegionsDirty))
             {
+                b.RegionsDirty = false;
                 SimProfile.ClearanceRegionBuilds++;
                 BuildRegions(w);
             }
@@ -418,6 +446,7 @@ namespace CriticalMass.Sim.Core
         /// <summary>fix/movement-shiver-1: region label of the clearance cell nearest (x, z) within GoalSnapRings (0 = none).</summary>
         internal static int RegionAt(World w, double x, double z, out int cx, out int cz)
         {
+            EnsureRegions(w);
             if (!NearestClearCell(w, x, z, GoalSnapRings, out cx, out cz)) return 0;
             return w.KaijuNav.Region[cz * w.Map.Width + cx];
         }

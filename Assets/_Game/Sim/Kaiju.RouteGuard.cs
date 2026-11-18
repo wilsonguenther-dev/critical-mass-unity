@@ -170,7 +170,7 @@ namespace CriticalMass.Sim.Core
             // The clearance BEFORE the change: the Kaiju's own shadow grid, brought up to date with the tentative cells put back
             // (RefreshClearance is a pure function of the grid, byte-identical whenever it runs; the Kaiju step would run it next).
             for (int k = 0; k < n; k++) cells[idx[k]] = old[k];
-            RefreshClearance(w);
+            RefreshClearance(w, true);   // b14 sim cost: shadow cells only; region labels wait for their next reader
             for (int k = 0; k < n; k++) cells[idx[k]] = next[k];
             KaijuNav nav = w.KaijuNav;
             byte[] before = nav.Clear.Cells;
