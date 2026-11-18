@@ -78,6 +78,9 @@ namespace CriticalMass.Sim.Core
                 // b15 combat feel: the class rows carry every strike (LightWeapons is off under it), so the Demolitions Expert
                 // and the Healer swing their own rows.
                 if (a.Cls == ClassId.Demolitions && lw == null && !feel) continue;
+                // b15: with her TNT ready the attack press is the throw (Demolitions.AttackThrowsNow, before Combat next tick);
+                // the pry bar swings only while the TNT cools down (a held press no longer pry-swings the TNT away for good).
+                if (feel && a.Cls == ClassId.Demolitions && w.Config.Abilities.DemolitionsTnt.ThrowOnAttack && w.Tick >= w.Demolitions.TntReadyTick[i]) continue;
                 if (a.Cls == ClassId.Healer)
                 {
                     // DG-40 (U-061): the attack press mends a hurt ally FIRST (support first); the lantern swings only when

@@ -709,6 +709,65 @@ namespace CriticalMass.Sim.Tests
         }
 
         /// <summary>
+        /// The shiver gate's match (MovementShiverTests: seed 7, 16v16, Kaiju out at 0:30, two minutes) counted for the rule off,
+        /// on, and on with one part taken back, so a flag count names its part. Printed only (the gate itself asserts).
+        /// </summary>
+        [Test]
+        public void ShiverFlagsOfTheGateMatchByPartOfTheRule()
+        {
+            string[] names = { "off", "on", "on, blended flow", "on, no stagger or knock", "on, shipped wind-ups", "on, no move slow in swings" };
+            for (int a = 0; a < names.Length; a++)
+            {
+                GameConfig cfg = GameConfig.CreateDefault();
+                cfg.HatchSeconds = 30;
+                CombatFeelConfig f = cfg.Depth.CombatFeel;
+                f.Enabled = a != 0;
+                if (a == 2) f.BotNarrowRawStep = false;
+                if (a == 3)
+                {
+                    f.StaggerSeconds = 0;
+                    f.HeavyStaggerSeconds = 0;
+                    for (int c = 0; c < 6; c++) f.Strikes[c].Knock = 0;
+                }
+                if (a == 4)
+                {
+                    GameConfig shipped = Full(false);
+                    for (int c = 0; c < 6; c++)
+                    {
+                        f.Classes[c].AttackWindupSeconds = shipped.Classes[c].AttackWindupSeconds;
+                        f.Classes[c].RecoverySeconds = shipped.Classes[c].RecoverySeconds;
+                    }
+                }
+                if (a == 5)
+                {
+                    f.WindupMoveMultiplier = 1;
+                    f.RecoveryMoveMultiplier = 1;
+                    f.StaggerSlowMultiplier = 1;
+                }
+                World w = World.CreateWorld(new WorldOptions { Seed = 7, TeamSize = 16, HumanTeam = TeamId.Azure, HumanClass = ClassId.Warrior, Config = cfg });
+                var watch = new ShiverWatch();
+                InputFrame scratch = SimInput.EmptyInput();
+                for (int t = 0; t < 3600 && w.Match.Phase != MatchPhase.Ended; t++)
+                {
+                    MatchTick.Advance(w, null, scratch);
+                    watch.Observe(w);
+                }
+                int kaiju = 0, hard = 0, fightRev = 0;
+                foreach (ShiverFlag fl in watch.Flags)
+                {
+                    if (fl.Actor == ShiverWatch.KaijuId) { kaiju++; continue; }
+                    if (fl.Kind == ShiverKind.Reversals || (fl.Kind == ShiverKind.Dither && fl.Reversals >= 4))
+                    {
+                        hard++;
+                        if (fl.State == AiState.Fight) fightRev++;
+                    }
+                }
+                Console.WriteLine("{\"item\":\"b15 shiver by part\",\"arm\":\"" + names[a] + "\",\"flags\":" + watch.Count + ",\"hard\":" + hard + ",\"hardInFight\":" + fightRev +
+                                  ",\"kaiju\":" + kaiju + ",\"dodges\":" + w.Dodges.Count + "}");
+            }
+        }
+
+        /// <summary>
         /// Sim cost per tick, same job, arms stepped in turn tick by tick (B13CombinedCostTests' method: JIT and runner drift fall
         /// on every arm alike; trimmed mean drops the slowest 2%). Arms: off; on; and on with one part of the rule taken back,
         /// so a cost over budget names its part. The rule changes the fight, so on and off are different matches.
