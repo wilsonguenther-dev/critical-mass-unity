@@ -136,7 +136,7 @@ namespace CriticalMass.Sim.Core
             public World W;
             /// <summary>The whole grid the verdict was worked out on (exact compare: a raw cell write without a GridVersion bump, as
             /// the tests paint, still misses).</summary>
-            public byte[] Grid = new byte[0];
+            public byte[] Grid = new byte[CriticalMass.Sim.Maps.SkybreakBasinMap.MapWidth * CriticalMass.Sim.Maps.SkybreakBasinMap.MapHeight];   // the shipped map: no allocation in play
             public long Epoch;
             /// <summary>What the Kaiju route guard read (Used false: the verdict did not depend on the Kaiju: pads cut, nothing narrowed, guard off).</summary>
             public Kaiju.GuardKey Guard;
