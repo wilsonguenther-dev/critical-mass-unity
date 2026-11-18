@@ -141,7 +141,8 @@ namespace CriticalMass.Sim.Config
         public double HealerBotStandOff = 4;
 
         // ---- F. ladders
-        public double LadderSpeedMultiplier = 0.3;
+        /// <summary>Speed over a built ladder's cells (a ladder is at most LadderMaxCells = 2 long: about 0.9 s to climb at 0.55).</summary>
+        public double LadderSpeedMultiplier = 0.55;
         public bool LadderAllyPass = true;
         public double LadderFallKnock = 1.2;
 

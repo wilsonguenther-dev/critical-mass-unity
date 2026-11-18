@@ -473,7 +473,7 @@ namespace CriticalMass.Sim.Core
             b.ThrownTick = w.Tick;
             b.BlastTick = w.Tick + Durations.T30(w.Config, cfg.FuseTicks);
             b.LandTick = Math.Min(b.BlastTick, w.Tick + Durations.T30(w.Config, cfg.FlightTicks));
-            s.TntReadyTick[id] = w.Tick + CombatFeel.TntCooldown(w.Config); // b15: CombatFeelConfig.TntCooldownTicks under the rule
+            s.TntReadyTick[id] = w.Tick + CombatFeel.TntCooldown(w.Config); // b15: the combat feel TNT cooldown under the rule (through Durations.T30)
             s.Stats.TntThrown++;
             a.AnimAction = 0;
             a.SpawnProtect = 0;

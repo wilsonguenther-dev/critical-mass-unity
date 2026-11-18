@@ -110,11 +110,14 @@ namespace CriticalMass.Sim.Tests
             double reach = cc.AttackRange + r;
             bool farmer = w.Actors[me].Cls == ClassId.Farmer;
             double want = farmer ? reach - 0.35 : reach * 0.75;
+            // The Demolitions expert plays her kit: with the TNT ready she holds 3 u off and throws it, else she closes and pries.
+            bool tnt = w.Actors[me].Cls == ClassId.Demolitions && Demolitions.TntWaitTicks(w, me) <= 0;
+            if (tnt) want = 3.0;
             f.MoveX = 0;
             f.MoveZ = 0;
             f.AimX = w.X[foe];
             f.AimZ = w.Z[foe];
-            f.Attack = d <= reach - 0.05;
+            f.Attack = tnt ? d >= w.Config.Abilities.DemolitionsTnt.MinThrowRange + 0.1 && d <= 4.5 : d <= reach - 0.05;
             f.Ability = false;
             f.Terraform = false;
             f.Jump = false;
@@ -124,7 +127,7 @@ namespace CriticalMass.Sim.Tests
                 f.MoveX = dx / d;
                 f.MoveZ = dz / d;
             }
-            else if (farmer && d < want - 0.6)
+            else if ((farmer && d < want - 0.6) || (tnt && d < want - 0.4))
             {
                 f.MoveX = -dx / d;
                 f.MoveZ = -dz / d;
@@ -467,6 +470,9 @@ namespace CriticalMass.Sim.Tests
                 b.Cx = (int)X0 - 3;
                 b.Cz = (int)Z0 + 2;
                 b.Hp = 100;
+                b.Ttl = 1e6;
+                b.PrevCell = Cell.Floor;
+                w.Map.Cells[b.Cz * w.Map.Width + b.Cx] = Cell.Barricade;
             });
             Console.WriteLine("{\"item\":\"b15 class mods\",\"minerOnWarrior\":" + minerOnWarrior + ",\"minerOnFarmer\":" + minerOnFarmer + ",\"farmerFar\":" + farmerFar +
                               ",\"farmerClose\":" + farmerClose + ",\"builderOpen\":" + builderOpen + ",\"builderHome\":" + builderHome + "}");
@@ -556,31 +562,27 @@ namespace CriticalMass.Sim.Tests
 
         // ------------------------------------------------------------------------------------------------ F. ladders
 
-        /// <summary>A ladder lane of three cells at x = X0 + 1 .. X0 + 3 (Bridge over Wall, as BuiltPieces lays one), walls beside it.</summary>
+        /// <summary>A built ladder of the real maximum length (LadderMaxCells = 2) at x = 57..58 on row 40 (Bridge over Wall, as
+        /// BuiltPieces lays one), wall beside it, the enemy dead.</summary>
         private static World LadderArena()
         {
             World w = Arena(ClassId.Warrior, ClassId.Farmer);
-            int W = w.Map.Width;
-            int lz = (int)Z0;
-            for (int cx = (int)X0 + 1; cx <= (int)X0 + 3; cx++)
-            {
-                w.Map.Cells[(lz - 1) * W + cx] = Cell.Wall;
-                w.Map.Cells[(lz + 1) * W + cx] = Cell.Wall;
-                w.Map.Cells[lz * W + cx] = Cell.Bridge;
-            }
+            int W = w.Map.Width, lz = (int)Z0, l0 = (int)X0 + 1;
             BuiltPiece p = w.Builder.Pieces[0];
             p.Active = true;
             p.Carried = false;
             p.Kind = BuiltPieces.Ladder;
             p.Team = TeamId.Azure;
-            p.Count = 3;
-            for (int k = 0; k < 3; k++)
+            p.Count = 2;
+            for (int k = 0; k < 2; k++)
             {
-                p.Cells[k] = lz * W + (int)X0 + 1 + k;
+                w.Map.Cells[(lz - 1) * W + l0 + k] = Cell.Wall;
+                w.Map.Cells[(lz + 1) * W + l0 + k] = Cell.Wall;
+                w.Map.Cells[lz * W + l0 + k] = Cell.Bridge;
+                p.Cells[k] = lz * W + l0 + k;
                 p.Prev[k] = Cell.Wall;
             }
             p.ExpireTick = int.MaxValue;
-            Put(w, Foe(w), X0 - 6, Z0 + 3);
             w.Actors[Foe(w)].Alive = false;
             return w;
         }
@@ -589,38 +591,46 @@ namespace CriticalMass.Sim.Tests
         public void ALadderClimbTakesAReadableTimeAndTeammatesPassEachOtherOnIt()
         {
             World w = LadderArena();
-            Put(w, 0, X0 + 0.5, Z0 + 0.5);
+            double l0 = (int)X0 + 1, l1 = l0 + 2;
+            Put(w, 0, l0 - 1.5, Z0);
             var go = SimInput.EmptyInput();
             go.MoveX = 1;
+            go.AimX = l1 + 5;
+            go.AimZ = Z0;
             int t0 = -1, t1 = -1;
-            for (int t = 0; t < 120 && t1 < 0; t++)
+            for (int t = 0; t < 150 && t1 < 0; t++)
             {
                 Tick(w, go, null);
-                if (t0 < 0 && w.X[0] >= X0 + 1) t0 = t;
-                if (w.X[0] >= X0 + 3.5) t1 = t;
+                if (t0 < 0 && w.X[0] >= l0) t0 = t;
+                if (t0 >= 0 && w.X[0] >= l1) t1 = t;
             }
-            double secs = (t1 - t0) / w.Config.SimHz;
-            Console.WriteLine("{\"item\":\"b15 ladder climb\",\"cells\":3,\"seconds\":" + secs.ToString("0.00") + ",\"limit\":\"0.75-1.2\"}");
+            double secs = t1 < 0 || t0 < 0 ? -1 : (t1 - t0) / w.Config.SimHz;
+            Console.WriteLine("{\"item\":\"b15 ladder climb\",\"cells\":2,\"seconds\":" + secs.ToString("0.00") + ",\"x\":" + w.X[0].ToString("0.00") + ",\"limit\":\"0.75-1.2\"}");
             Assert.GreaterOrEqual(secs, 0.75);
             Assert.LessOrEqual(secs, 1.2);
 
-            // Two teammates head-on on the lane both get through (no blocker).
+            // Two teammates head-on over the one-cell-wide ladder both get through (neither blocks the lane).
             World v = LadderArena();
             int mate = 1;
-            Put(v, 0, X0 + 0.5, Z0 + 0.5);
-            Put(v, mate, X0 + 4.5, Z0 + 0.5);
+            Put(v, 0, l0 - 1.5, Z0);
+            Put(v, mate, l1 + 1.5, Z0);
+            v.Actors[mate].Team = v.Actors[0].Team;
             var east = SimInput.EmptyInput();
             east.MoveX = 1;
+            east.AimX = l1 + 5;
+            east.AimZ = Z0;
             var west = SimInput.EmptyInput();
             west.MoveX = -1;
+            west.AimX = l0 - 5;
+            west.AimZ = Z0;
             for (int t = 0; t < 150; t++)
             {
                 SimInput.ApplyInput(v, mate, west);
                 Tick(v, east, null);
             }
-            Console.WriteLine("{\"item\":\"b15 ladder traffic\",\"eastX\":" + v.X[0].ToString("0.00") + ",\"westX\":" + v.X[mate].ToString("0.00") + "}");
-            Assert.Greater(v.X[0], X0 + 3.5, "the east-bound climber got through");
-            Assert.Less(v.X[mate], X0 + 1, "the west-bound climber got through");
+            Console.WriteLine("{\"item\":\"b15 ladder traffic\",\"eastX\":" + v.X[0].ToString("0.00") + ",\"westX\":" + v.X[mate].ToString("0.00") + ",\"laneFrom\":" + l0 + ",\"laneTo\":" + l1 + "}");
+            Assert.Greater(v.X[0], l1, "the east-bound climber got through");
+            Assert.Less(v.X[mate], l0, "the west-bound climber got through");
         }
 
         // ------------------------------------------------------------------------------------------------ rule off, determinism, cost
@@ -698,26 +708,70 @@ namespace CriticalMass.Sim.Tests
             }
         }
 
+        /// <summary>
+        /// Sim cost per tick, same job, arms stepped in turn tick by tick (B13CombinedCostTests' method: JIT and runner drift fall
+        /// on every arm alike; trimmed mean drops the slowest 2%). Arms: off; on; and on with one part of the rule taken back,
+        /// so a cost over budget names its part. The rule changes the fight, so on and off are different matches.
+        /// </summary>
         [Test]
         public void TickCostWithTheRuleOnIsWithinTheBudget()
         {
-            double[] us = new double[2];
-            for (int rep = 0; rep < 3; rep++)
-                foreach (bool feel in new[] { false, true })
+            string[] names = { "off", "on", "on, shipped wind-ups", "on, no stagger or knock", "on, blended flow" };
+            int n = names.Length;
+            const int Warm = 7500, Ticks = 900;
+            var worlds = new World[n];
+            var scratch = new InputFrame[n];
+            for (int a = 0; a < n; a++)
+            {
+                GameConfig cfg = GameConfig.CreateBrowser5v5().ApplyRules(RulesProfile.Full);
+                CombatFeelConfig f = cfg.Depth.CombatFeel;
+                f.Enabled = a != 0;
+                if (a == 2)
                 {
-                    GameConfig cfg = GameConfig.CreateBrowser5v5().ApplyRules(RulesProfile.Full);
-                    cfg.Depth.CombatFeel.Enabled = feel;
-                    World w = World.CreateWorld(new WorldOptions { Seed = 4242, TeamSize = 16, HumanTeam = TeamId.Azure, HumanClass = ClassId.Warrior, Config = cfg });
-                    InputFrame scratch = SimInput.EmptyInput();
-                    for (int t = 0; t < 600; t++) MatchTick.Advance(w, null, scratch);
-                    var sw = Stopwatch.StartNew();
-                    for (int t = 0; t < 1800; t++) MatchTick.Advance(w, null, scratch);
-                    sw.Stop();
-                    if (rep > 0) us[feel ? 1 : 0] += sw.Elapsed.TotalMilliseconds * 1000 / 1800;
+                    GameConfig shipped = Full(false);
+                    for (int c = 0; c < 6; c++)
+                    {
+                        f.Classes[c].AttackWindupSeconds = shipped.Classes[c].AttackWindupSeconds;
+                        f.Classes[c].RecoverySeconds = shipped.Classes[c].RecoverySeconds;
+                    }
                 }
-            double off = us[0] / 2, on = us[1] / 2, delta = on / off - 1;
-            Console.WriteLine("{\"item\":\"b15 tick cost\",\"offUs\":" + off.ToString("0.0") + ",\"onUs\":" + on.ToString("0.0") + ",\"delta\":" + delta.ToString("0.000") +
-                              ",\"target\":0.05,\"limit\":0.10,\"note\":\"the rule changes the match, so the two arms run different fights\"}");
+                if (a == 3)
+                {
+                    f.StaggerSeconds = 0;
+                    f.HeavyStaggerSeconds = 0;
+                    for (int c = 0; c < 6; c++) f.Strikes[c].Knock = 0;
+                }
+                if (a == 4) f.BotNarrowRawStep = false;
+                worlds[a] = World.CreateWorld(new WorldOptions { Seed = 4242, TeamSize = 16, HumanTeam = TeamId.Azure, HumanClass = ClassId.Warrior, Config = cfg });
+                scratch[a] = SimInput.EmptyInput();
+            }
+            for (int t = 0; t < Warm; t++)
+                for (int a = 0; a < n; a++) MatchTick.Advance(worlds[a], null, scratch[a]);
+            var per = new long[n][];
+            for (int a = 0; a < n; a++) per[a] = new long[Ticks];
+            for (int t = 0; t < Ticks; t++)
+                for (int a = 0; a < n; a++)
+                {
+                    long c0 = Stopwatch.GetTimestamp();
+                    MatchTick.Advance(worlds[a], null, scratch[a]);
+                    per[a][t] = Stopwatch.GetTimestamp() - c0;
+                }
+            var us = new double[n];
+            int keep = Ticks - Ticks / 50;
+            for (int a = 0; a < n; a++)
+            {
+                long[] s = (long[])per[a].Clone();
+                Array.Sort(s);
+                long sum = 0;
+                for (int i = 0; i < keep; i++) sum += s[i];
+                us[a] = sum * 1e6 / Stopwatch.Frequency / keep;
+                int alive = 0;
+                for (int i = 0; i < worlds[a].ActorCount; i++) if (worlds[a].Actors[i].Alive) alive++;
+                Console.WriteLine("{\"item\":\"b15 tick cost arm\",\"arm\":\"" + names[a] + "\",\"usPerTick\":" + us[a].ToString("0.0") + ",\"vsOff\":" + (us[a] / us[0] - 1).ToString("0.000") +
+                                  ",\"alive\":" + alive + ",\"dodges\":" + worlds[a].Dodges.Count + "}");
+            }
+            double delta = us[1] / us[0] - 1;
+            Console.WriteLine("{\"item\":\"b15 tick cost\",\"offUs\":" + us[0].ToString("0.0") + ",\"onUs\":" + us[1].ToString("0.0") + ",\"delta\":" + delta.ToString("0.000") + ",\"target\":0.05,\"limit\":0.10}");
             Assert.LessOrEqual(delta, 0.10, "sim cost on vs off");
         }
     }

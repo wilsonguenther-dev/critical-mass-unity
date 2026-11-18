@@ -758,6 +758,7 @@ namespace CriticalMass.Runtime.View.Effects
             }
 
             DrawKaijuState(w, ground, air, now);
+            DrawSwingTelegraphs(w, ground);
             DrawShields(w, air, now);
             BuildBoomGround(now, ground);
 
@@ -1076,6 +1077,48 @@ namespace CriticalMass.Runtime.View.Effects
                     air.Star(p, Vector3.right, Vector3.up, 0.16f * (1 - ph) + 0.04f, 0.45f, 4, 0.785f, A(Navy, 1 - ph));
                     air.Star(p, Vector3.right, Vector3.up, 0.12f * (1 - ph), 0.45f, 4, 0.785f, A(Berserk, 1 - ph));
                 }
+            }
+        }
+
+        /// <summary>
+        /// b15 combat feel (view half of item A): every fighter's wind-up draws its real hit shape on the ground for the
+        /// whole wind-up: a wedge of the class row's AttackRange and AttackArcDeg (GameConfig.Class, the numbers ResolveSwing
+        /// uses) along the locked SwingFacing, from the swinger's body; a body touching the drawn edge is hit. The fill
+        /// grows from the body to the edge as the wind-up runs out. Quiet for everyone (threat tier 2); brighter and
+        /// orange-edged when the local fighter is inside an enemy's wedge (tier 1: "this one is coming at you"). Drawn only
+        /// while CombatFeel is on (with it off the 0.10 s wind-ups are too short to read).
+        /// </summary>
+        private void DrawSwingTelegraphs(World w, FxMeshBuilder ground)
+        {
+            if (!CombatFeel.On(w.Config)) return;
+            Vector3 gr = Vector3.right, gu = Vector3.forward;
+            int me = LocalSeat.Actor;
+            for (int i = 0; i < w.ActorCount; i++)
+            {
+                Actor a = w.Actors[i];
+                if (!a.Alive || !a.SwingPending || a.SwingWindup <= 0) continue;
+                int left = a.SwingTick + a.SwingWindup - w.Tick;
+                if (left <= 0) continue;
+                ClassConfig cc = _cfg.Class(a.Cls);
+                float reach = (float)cc.AttackRange, half = (float)(cc.AttackArcDeg * 0.5 * Math.PI / 180);
+                float p = Mathf.Clamp01((float)((a.SwingWindup - left + Alpha) / a.SwingWindup));
+                double x = w.PrevX[i] + (w.X[i] - w.PrevX[i]) * Alpha, z = w.PrevZ[i] + (w.Z[i] - w.PrevZ[i]) * Alpha;
+                Vector3 c = W(x, Ground(x, z) + 0.035, z);
+                float ang = -(float)a.SwingFacing; // sim (cos f, sin f) is world (cos f, -sin f)
+                bool atMe = false;
+                if (me >= 0 && me < w.ActorCount && me != i && w.Actors[me].Alive && w.Actors[me].Team != a.Team)
+                {
+                    double dx = w.X[me] - w.X[i], dz = w.Z[me] - w.Z[i], d = Math.Sqrt(dx * dx + dz * dz);
+                    double off = Math.Abs(Math.IEEERemainder(Math.Atan2(dz, dx) - a.SwingFacing, Math.PI * 2));
+                    atMe = d <= reach + _cfg.Class(w.Actors[me].Cls).Radius && off <= half;
+                }
+                Color32 team = a.Team == TeamId.Azure ? AzureC : CrimsonC;
+                float k = atMe ? 1f : 0.55f;
+                int seg = Mathf.Clamp((int)(cc.AttackArcDeg / 9), 6, 16);
+                ground.Ring(c, gr, gu, 0.3f, reach, ang - half, ang + half, seg, A(atMe ? WarnHot : team, 0.07f * k), A(atMe ? Warn : team, 0.16f * k));
+                if (p > 0.02f) ground.Ring(c, gr, gu, 0.3f, Mathf.Max(0.32f, reach * p), ang - half, ang + half, seg, A(atMe ? WarnHot : team, 0.16f * k), A(atMe ? Warn : team, 0.3f * k));
+                ground.Ring(c, gr, gu, reach - 0.07f, reach + 0.02f, ang - half, ang + half, seg, A(Navy, 0.55f * k));
+                ground.Ring(c, gr, gu, reach - 0.05f, reach, ang - half, ang + half, seg, A(atMe ? WarnHot : team, 0.75f * k));
             }
         }
 
