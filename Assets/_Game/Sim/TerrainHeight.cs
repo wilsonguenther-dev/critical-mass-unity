@@ -24,7 +24,7 @@ namespace CriticalMass.Sim.Core
         public byte[] ClimbHit;
 
         // ---- stats (tests print them)
-        public int Stacks, Lowered, Deepened, Steps, Drops, Climbs, Smashed, TntLowered, RouteRefusals, PitLadders;
+        public int Stacks, Lowered, Deepened, Steps, Drops, Climbs, Smashed, TntLowered, RouteRefusals, PitLadders, LaddersLost;
 
         // ---- route proof memo (the ghost asks every frame): (cell * 8 + next + 4) at World.GridVersion
         internal readonly long[] MemoKey = new long[8];
@@ -54,7 +54,7 @@ namespace CriticalMass.Sim.Core
             Array.Clear(SlowKind, 0, SlowKind.Length);
             Array.Clear(Climb, 0, Climb.Length);
             Array.Clear(ClimbHit, 0, ClimbHit.Length);
-            Stacks = Lowered = Deepened = Steps = Drops = Climbs = Smashed = TntLowered = RouteRefusals = PitLadders = 0;
+            Stacks = Lowered = Deepened = Steps = Drops = Climbs = Smashed = TntLowered = RouteRefusals = PitLadders = LaddersLost = 0;
             for (int k = 0; k < MemoVersion.Length; k++) { MemoVersion[k] = int.MinValue; MemoKey[k] = -1; MemoOk[k] = 0; }
             MemoNext = 0;
         }
@@ -134,7 +134,7 @@ namespace CriticalMass.Sim.Core
             if (d == 0) return 0;
             int hi = d > 0 ? n : c;
             if (d < 0) d = -d;
-            if (map.Cells[hi] == Cell.Bridge) return 0;
+            if (map.Cells[hi] == Cell.Bridge) return map.LiftCostLadder;   // a height ladder (or a deck on a raised cell): a ramp
             if (d == 1) return map.LiftCost1;
             if (d == 2) return map.LiftCost2;
             return -1;
@@ -266,6 +266,44 @@ namespace CriticalMass.Sim.Core
         }
 
         // -----------------------------------------------------------------------------------------------------------
+        // Height ladders (a Ladder piece laid on a lift cell: the cell is Bridge, its lift kept, the piece remembers the ground)
+
+        /// <summary>
+        /// Cell i is a Bridge of an active, laid Ladder piece whose ground before it was a lift cell (Floor / BreakableDestroyed):
+        /// a height ladder. prev = that ground type. Scans the fixed piece pool (call only for Bridge cells with the layer on).
+        /// </summary>
+        public static bool LadderGround(World w, int i, out byte prev)
+        {
+            prev = 0;
+            if (w.Map.Lift == null || w.Map.Cells[i] != Cell.Bridge || w.Builder == null || w.Builder.Pieces == null) return false;
+            BuiltPiece[] ps = w.Builder.Pieces;
+            for (int k = 0; k < ps.Length; k++)
+            {
+                BuiltPiece p = ps[k];
+                if (p == null || !p.Active || p.Carried || p.Kind != BuiltPieces.Ladder || p.Cells == null) continue;
+                for (int q = 0; q < p.Count; q++)
+                {
+                    if (p.Cells[q] != i) continue;
+                    if (!IsLiftType(p.Prev[q])) return false;
+                    prev = p.Prev[q];
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// The ladder on cell i goes: its ground comes back (MapGrid.SetCell, so every version bumps); BuiltPieces sees a cell
+        /// that is no longer Bridge and ends the piece (PieceDestroyed). The lift is untouched (the caller lowers it).
+        /// </summary>
+        public static void DropLadder(World w, int i)
+        {
+            if (!LadderGround(w, i, out byte prev)) return;
+            MapGrid.SetCell(w, i % w.Map.Width, i / w.Map.Width, prev);
+            w.Depth.Height.LaddersLost++;
+        }
+
+        // -----------------------------------------------------------------------------------------------------------
         // Edits
 
         /// <summary>Is (cx, cz) inside either team's station / hut zone (Stations.Range around the pad)?</summary>
@@ -311,7 +349,7 @@ namespace CriticalMass.Sim.Core
             MapDef map = w.Map;
             int i = cz * map.Width + cx;
             int l = map.Lift[i];
-            if (l > 0) return 0;
+            if (l > 0 || map.Cells[i] == Cell.Bridge) return 0;   // a top block (bodies on it drop one level), or a height ladder
             if (map.Cells[i] != Cell.Floor) return Terraform.RefusedTarget;
             if (l <= -w.Config.Depth.TerrainHeight.MaxDepth) return RefusedTooDeep;
             int why = Terraform.VoidRefusalBeforeRoute(w, cx, cz);
@@ -396,6 +434,14 @@ namespace CriticalMass.Sim.Core
         {
             int i = cz * w.Map.Width + cx;
             int l = w.Map.Lift[i];
+            if (w.Map.Cells[i] == Cell.Bridge)
+            {
+                // a height ladder: it comes down with the top block it leans on (a ladder on level or pit ground just comes down)
+                DropLadder(w, i);
+                if (l > 0) { w.Depth.Height.Lowered++; SetLift(w, i, l - 1); }
+                TeamCooldown(w, id);
+                return;
+            }
             if (l > 0) w.Depth.Height.Lowered++;
             else w.Depth.Height.Deepened++;
             SetLift(w, i, l - 1);
@@ -410,9 +456,11 @@ namespace CriticalMass.Sim.Core
         {
             MapDef map = w.Map;
             int i = cz * map.Width + cx;
-            if (!Raised(map, i)) return false;
+            bool ladder = map.Lift != null && map.Lift[i] > 0 && map.Cells[i] == Cell.Bridge && LadderGround(w, i, out _);
+            if (!ladder && !Raised(map, i)) return false;
             int next = map.Lift[i] - w.Config.Depth.TerrainHeight.TntLevels;
             if (next < 0) next = 0;
+            if (ladder) DropLadder(w, i);   // the blast takes the ladder with the blocks it leans on
             if (!KeepsRoutes(w, i, next))
             {
                 World.PushEvent(w, SimEventType.Terraform, owner, i, cx + 0.5, cz + 0.5, Terraform.RefusedRoute);
@@ -443,15 +491,22 @@ namespace CriticalMass.Sim.Core
                 for (int cx = x0; cx <= x1; cx++)
                 {
                     int i = cz * map.Width + cx;
-                    if (map.Lift[i] < c.KaijuSmashFrom || !IsLiftType(map.Cells[i])) continue;
+                    if (map.Lift[i] < c.KaijuSmashFrom) continue;
+                    bool ladder = map.Cells[i] == Cell.Bridge && LadderGround(w, i, out _);
+                    if (!ladder && !IsLiftType(map.Cells[i])) continue;
                     if (!Terraform.CircleHitsCell(k.X, k.Z, r, cx, cz)) continue;
+                    if (ladder) DropLadder(w, i);   // the block it leans on goes, so the ladder goes
                     SetLift(w, i, c.SmashTo);
                     w.Depth.Height.Smashed++;
                 }
             }
         }
 
-        /// <summary>Builder ladder from a pit: cell `to` is a lift cell at least JumpUp levels above cell `from` (a ledge).</summary>
+        /// <summary>
+        /// Builder height ladder: cell `to` (the cell faced) is a lift cell at least JumpUp levels above the Builder's cell `from`:
+        /// a pit wall (the ledge above a pit), the side of a stack or tower, or any other face of 2+ levels. The ladder is laid ON
+        /// that cell (it becomes a Bridge, a ramp, keeping its lift), so climbing it puts you on the ledge or the stack top.
+        /// </summary>
         public static bool LedgeAbove(MapDef map, int from, int to, GameConfig cfg)
         {
             sbyte[] l = map.Lift;

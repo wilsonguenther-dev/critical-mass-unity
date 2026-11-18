@@ -214,6 +214,7 @@ namespace CriticalMass.Runtime.View
         {
             if (Lift == null || !In(cx, cz)) return 0;
             int i = cz * _w + cx;
+            if (_cells[i] == Cell.Bridge) return Lift[i] > 0 ? Lift[i] : 0;   // a height ladder on a stack: the stack under it
             return CriticalMass.Sim.Core.TerrainHeight.IsLiftType(_cells[i]) ? Lift[i] : 0;
         }
 

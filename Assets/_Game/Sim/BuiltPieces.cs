@@ -275,11 +275,15 @@ namespace CriticalMass.Sim.Core
             // b15 terrain height: a Builder in a pit facing a ledge JumpUp or more levels above lays a 1-cell LADDER on the
             // ledge cell (a Bridge cell is a ramp: nobody is blocked by height stepping onto it). When it goes, the cell comes
             // back with its lift.
+            // The same applies to the side of a stacked block or tower 2-3 levels above the Builder (coordinator 2026-11-17): a
+            // height ladder is laid ON the faced cell; it comes down with the block it leans on (TerrainHeight.DropLadder).
             if (map.Lift != null && (kindWanted == 0 || kindWanted == Ladder) && MapGrid.InBounds(map, ax + dx, az + dz) && !OnEdge(map, ax + dx, az + dz)
                 && TerrainHeight.LedgeAbove(map, az * map.Width + ax, (az + dz) * map.Width + ax + dx, w.Config))
             {
-                EnsurePlan(1);
                 int li = (az + dz) * map.Width + ax + dx;
+                double shx = ax + dx + 0.5 - map.Shrine.X, shz = az + dz + 0.5 - map.Shrine.Z;
+                if (shx * shx + shz * shz <= Barricades.ShrineKeepout * Barricades.ShrineKeepout) return RefusedOccupied;
+                EnsurePlan(1);
                 PlanCells[0] = li;
                 PlanPrev[0] = map.Cells[li];
                 PlanCount = 1;

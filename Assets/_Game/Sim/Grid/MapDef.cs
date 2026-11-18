@@ -105,7 +105,7 @@ namespace CriticalMass.Sim.Grid
         /// </summary>
         public sbyte[] Lift;
         /// <summary>b15: extra path cost of a 1-level and a 2-level edge (TerrainHeightConfig.PathCostStep1 / 2), set with Lift.</summary>
-        public double LiftCost1, LiftCost2;
+        public double LiftCost1, LiftCost2, LiftCostLadder;
         /// <summary>b15: world units per lift level for the view (TerrainHeightConfig.StepU), set with Lift.</summary>
         public double LiftStepU;
 

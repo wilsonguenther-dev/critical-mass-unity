@@ -69,6 +69,7 @@ namespace CriticalMass.Runtime.View
         public static Kind Classify(byte pristine, byte current, bool touched, sbyte lift)
         {
             if (lift != 0 && CriticalMass.Sim.Core.TerrainHeight.IsLiftType(current)) return lift < 0 ? Kind.Pit : Kind.Raised;
+            if (lift > 0 && current == Cell.Bridge) return Kind.Raised;   // a height ladder on a stack: the stack still stands under it
             return Classify(pristine, current, touched);
         }
 

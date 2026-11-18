@@ -546,7 +546,8 @@ namespace CriticalMass.Sim.Core
                     {
                         int i = cz * map.Width + cx;
                         byte t = map.Cells[i];
-                        bool raised = TerrainHeight.Raised(map, i);   // b15: false without the height rule
+                        // b15: a raised cell, or a height ladder on one (false without the height rule)
+                        bool raised = TerrainHeight.Raised(map, i) || (map.Lift != null && map.Lift[i] > 0 && t == Cell.Bridge && TerrainHeight.LadderGround(w, i, out _));
                         if (!raised && t != Cell.Floor && t != Cell.Bridge) continue;
                         double dx = cx + 0.5 - bx;
                         double dz = cz + 0.5 - bz;

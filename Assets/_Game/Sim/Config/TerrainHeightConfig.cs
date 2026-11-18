@@ -29,6 +29,8 @@ namespace CriticalMass.Sim.Config
         /// <summary>Bot fields: extra cost of an edge with a 1-level and a 2-level difference (3 or more: closed).</summary>
         public double PathCostStep1 = 0.5;
         public double PathCostStep2 = 3.0;
+        /// <summary>Extra path cost of climbing a height ladder (a Bridge cell 1+ levels above its neighbour): about 1 cell.</summary>
+        public double PathCostLadder = 1.0;
         /// <summary>TNT: levels a raised cell in CarveRadius loses (people on it drop).</summary>
         public int TntLevels = 2;
         /// <summary>Kaiju: a cell its body overlaps at this lift or more is smashed down to SmashTo at once.</summary>

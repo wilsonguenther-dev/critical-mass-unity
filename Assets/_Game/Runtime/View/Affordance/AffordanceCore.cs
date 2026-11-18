@@ -111,6 +111,8 @@ namespace CriticalMass.Runtime.View.Affordance
             NotFeeder = "cannot feed";
         /// <summary>b14: the Builder's ladder / bridge tools facing nothing they can span.</summary>
         public const string NoCliff = "face a cliff", NoGap = "face a gap";
+        /// <summary>b15 terrain height: where a ladder goes once height is in (a rock wall, a pit wall, a stack or tower side).</summary>
+        public const string NoClimbFace = "face a wall, a ledge or a stack";
         /// <summary>b12 r3: the Demolitionist's detail line while her TNT reloads (her attack is the pry bar meanwhile).</summary>
         public const string TntIn = GrenadeTuning.Name + " in";
         /// <summary>b12 r3: her prompt verbs on the attack binding: TNT ready, and the pry bar while it reloads.</summary>
@@ -662,7 +664,7 @@ namespace CriticalMass.Runtime.View.Affordance
                 if (why == 0 && w.Tick - w.WallChangeTick < Durations.T30(c, c.Abilities.MinerTerraform.MinGapTicks)) why = BuiltPieces.RefusedRate;
                 p.Count = -1;
                 if (a.StandUp > 0) Refuse(p, AffWords.GettingUp);
-                else if (plan != 0 && plan != BuiltPieces.RefusedLength && plan != BuiltPieces.RefusedOccupied) Refuse(p, t == BuilderTool.Ladder ? AffWords.NoCliff : AffWords.NoGap);
+                else if (plan != 0 && plan != BuiltPieces.RefusedLength && plan != BuiltPieces.RefusedOccupied) Refuse(p, t == BuilderTool.Ladder ? (TerrainHeight.On(w) ? AffWords.NoClimbFace : AffWords.NoCliff) : AffWords.NoGap);
                 else if (why != 0) Refuse(p, BuilderWhy(why));
                 else if (a.AbilityCd > 0) { Refuse(p, AffWords.Wait); p.WaitSeconds = a.AbilityCd; }
                 else p.Valid = true;

@@ -219,6 +219,13 @@ namespace CriticalMass.Sim.Core
                 int hw = TerrainHeight.DigRefusalBeforeRoute(w, cx, cz);
                 if (hw != 0) return hw;
                 int i = cz * w.Map.Width + cx;
+                if (w.Map.Cells[i] == Cell.Bridge)
+                {
+                    // a height ladder: the proof runs with its ground back and one level off a raised cell
+                    TerrainHeight.LadderGround(w, i, out byte prev);
+                    int l = w.Map.Lift[i];
+                    return LiftKeepsRoutes(w, i, (sbyte)(l > 0 ? l - 1 : l), prev) ? 0 : RefusedRoute;
+                }
                 return TerrainHeight.KeepsRoutes(w, i, w.Map.Lift[i] - 1) ? 0 : RefusedRoute;
             }
             return VoidDigRefusal(w, cx, cz);
@@ -237,7 +244,9 @@ namespace CriticalMass.Sim.Core
         {
             MapDef map = w.Map;
             if (map.Lift == null || cx < 0 || cz < 0 || cx >= map.Width || cz >= map.Height) return false;
-            return TerrainHeight.IsLiftType(map.Cells[cz * map.Width + cx]);
+            int i = cz * map.Width + cx;
+            if (map.Cells[i] == Cell.Bridge) return TerrainHeight.LadderGround(w, i, out _);   // a height ladder: it comes down
+            return TerrainHeight.IsLiftType(map.Cells[i]);
         }
 
         /// <summary>
@@ -322,12 +331,14 @@ namespace CriticalMass.Sim.Core
         /// the shrine ring now loses it (the fields respect height). The tentative write is restored before returning. The
         /// Kaiju ignores height, so its route is not part of this proof.
         /// </summary>
-        public static bool LiftKeepsRoutes(World w, int i, sbyte next)
+        public static bool LiftKeepsRoutes(World w, int i, sbyte next, byte cellType = 255)
         {
             MapDef map = w.Map;
             sbyte[] lift = map.Lift;
             sbyte old = lift[i];
+            byte oldCell = map.Cells[i];
             lift[i] = next;
+            if (cellType != 255) map.Cells[i] = cellType;   // b15 height ladder: the proof with its ground back
             bool ok = false;
             try
             {
@@ -340,6 +351,7 @@ namespace CriticalMass.Sim.Core
                     if (!aAfter || !cAfter)
                     {
                         lift[i] = old;
+                        map.Cells[i] = oldCell;
                         FlowField g = FlowField.ComputeFlowField(map, ShrineRing(w), ScratchField(map));
                         if ((!aAfter && PadReached(map, g, TeamId.Azure)) || (!cAfter && PadReached(map, g, TeamId.Crimson))) ok = false;
                     }
@@ -348,6 +360,7 @@ namespace CriticalMass.Sim.Core
             finally
             {
                 lift[i] = old;
+                map.Cells[i] = oldCell;
             }
             return ok;
         }

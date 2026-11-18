@@ -389,6 +389,110 @@ namespace CriticalMass.Sim.Tests
             Assert.Less(t, 30);
         }
 
+        /// <summary>A real LADDER build by actor 0 (a Builder) toward (aimX, aimZ): cooldown, bank and the world gap cleared first.</summary>
+        private static int BuildLadder(World w, double aimX, double aimZ)
+        {
+            w.Actors[Me].AbilityCd = 0;
+            w.HasAim[Me] = 1;
+            w.Inputs[Me].AimX = aimX;
+            w.Inputs[Me].AimZ = aimZ;
+            w.WallChangeTick = World.NeverTick;
+            w.Builder.Spent[0] = -1000;   // a full bank for the staging
+            return BuiltPieces.Build(w, Me, aimX, aimZ);
+        }
+
+        [Test]
+        public void ALadderOnTheSideOfAThreeHighTowerClimbsItAndComesDownWithTheTopBlock()
+        {
+            World w = Field();
+            Open(w, 4, out int ox, out int oz);
+            MapDef m = w.Map;
+            int a = oz * m.Width + ox + 1, b = oz * m.Width + ox + 2;
+            m.Lift[a] = 3; m.Lift[b] = 3;
+            Put(w, Me, ox + 0.5, oz + 0.5);
+            int built = BuildLadder(w, ox + 1.5, oz + 0.5);
+            bool ground = TerrainHeight.LadderGround(w, a, out byte prev);
+            Line("LADDER facing a 3-high tower from level ground: code / cell / lift / height ladder (ground)", built + " / " + m.Cells[a] + " / " + m.Lift[a] + " / " + ground + " (" + prev + ")",
+                 BuiltPieces.BuiltLadderCode + " / " + Cell.Bridge + " / 3 / True (" + Cell.Floor + ")");
+            Assert.AreEqual(BuiltPieces.BuiltLadderCode, built);
+            Assert.AreEqual(Cell.Bridge, m.Cells[a]);
+            Assert.IsTrue(ground);
+            Line("path edge ground -> ladder cell (3 levels up)", TerrainHeight.EdgeExtra(m, oz * m.Width + ox, a).ToString("F2"), "PathCostLadder " + m.LiftCostLadder.ToString("F2") + " (open, not -1)");
+            Assert.AreEqual(m.LiftCostLadder, TerrainHeight.EdgeExtra(m, oz * m.Width + ox, a), 1e-12);
+            int t = 0;
+            Walk(w, 0, 0);
+            while (t < 45 && !(w.X[Me] > ox + 2.3)) { Walk(w, 1, 0); t++; }
+            int top = TerrainHeight.ActorLevel(w, Me);
+            Line("walking up the ladder onto the tower: ticks / level on top", t + " / " + top, "< 45 / 3");
+            Assert.Less(t, 45);
+            Assert.AreEqual(3, top);
+            Put(w, Me, ox + 0.5, oz + 0.5);
+            w.Tick += 120;
+            w.Terraform.Carried[Me] = 0;
+            int dug = Terraform.Dig(w, Me, ox + 1.5, oz + 0.5);
+            Line("DIG on the ladder cell: verdict / cell / lift / still a ladder", dug + " / " + m.Cells[a] + " / " + m.Lift[a] + " / " + TerrainHeight.LadderGround(w, a, out _),
+                 Terraform.Dug + " / " + Cell.Floor + " / 2 / False");
+            Assert.AreEqual(Terraform.Dug, dug);
+            Assert.AreEqual(Cell.Floor, m.Cells[a]);
+            Assert.AreEqual(2, m.Lift[a]);
+        }
+
+        [Test]
+        public void TntAndTheKaijuTakeAHeightLadderDownWithTheBlocks()
+        {
+            int bad = 0;
+            for (int arm = 0; arm < 2; arm++)
+            {
+                World w = Field();
+                Open(w, 4, out int ox, out int oz);
+                MapDef m = w.Map;
+                int a = oz * m.Width + ox + 1;
+                m.Lift[a] = 3;
+                Put(w, Me, ox + 0.5, oz + 0.5);
+                Assert.AreEqual(BuiltPieces.BuiltLadderCode, BuildLadder(w, ox + 1.5, oz + 0.5));
+                string what;
+                if (arm == 0) { TerrainHeight.TntCell(w, Me, ox + 1, oz); what = "TNT"; }
+                else
+                {
+                    w.Actors[Me].Alive = false;
+                    w.Kaiju.State = KaijuState.Azure;
+                    w.Kaiju.X = ox + 1.5; w.Kaiju.Z = oz + 0.5;
+                    TerrainHeight.HeightSystem(w);
+                    what = "Kaiju";
+                }
+                int want = arm == 0 ? 1 : w.Config.Depth.TerrainHeight.SmashTo;
+                Line(what + " on a ladder against a 3-high block: cell / lift / ladders lost", m.Cells[a] + " / " + m.Lift[a] + " / " + w.Depth.Height.LaddersLost, Cell.Floor + " / " + want + " / 1");
+                if (m.Cells[a] != Cell.Floor || m.Lift[a] != want || w.Depth.Height.LaddersLost != 1) bad++;
+            }
+            Assert.AreEqual(0, bad);
+        }
+
+        /// <summary>
+        /// Natural cliff faces: the island's elevation (Height01) is view-only in the sim, so a ladder there would change nothing.
+        /// Census of the Full map: orthogonal pairs of walkable cells whose island heights differ by 2+ steps (StepU each), and
+        /// the rock-wall cells a ladder can take today. Printed for the owner; not a limit.
+        /// </summary>
+        [Test]
+        public void NaturalCliffFacesOfTwoStepsCensus()
+        {
+            World w = Field();
+            MapDef m = w.Map;
+            double step = w.Config.Depth.TerrainHeight.StepU;
+            int faces = 0, walls = 0;
+            for (int cz = 0; cz < m.Height; cz++)
+            for (int cx = 0; cx < m.Width; cx++)
+            {
+                int i = cz * m.Width + cx;
+                if (m.Cells[i] == Cell.Wall) walls++;
+                if (!MapGrid.IsWalkableType(m.Cells[i])) continue;
+                if (cx + 1 < m.Width && MapGrid.IsWalkableType(m.Cells[i + 1]) && Math.Abs(m.Height01[i + 1] - m.Height01[i]) >= 2 * step - 1e-9) faces++;
+                if (cz + 1 < m.Height && MapGrid.IsWalkableType(m.Cells[i + m.Width]) && Math.Abs(m.Height01[i + m.Width] - m.Height01[i]) >= 2 * step - 1e-9) faces++;
+            }
+            Line("Full map: walkable-to-walkable natural faces of 2+ steps (" + (2 * step).ToString("F2") + " u of island height)", faces, "printed (view-only height: walkable in the sim)");
+            Line("Full map: rock-wall cells (Cell.Wall)", walls, "printed");
+            Assert.GreaterOrEqual(faces, 0);
+        }
+
         // ------------------------------------------------------------------ whole matches
 
         /// <summary>

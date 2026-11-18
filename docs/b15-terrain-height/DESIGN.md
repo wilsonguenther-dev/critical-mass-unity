@@ -46,8 +46,18 @@ PhysicsOnly never allocate the layer and their checksum rows cannot move.
 - Removing a tower: dig the top block first, level by level. TNT: every raised cell in CarveRadius loses 2 levels (people
   on it drop); cells at 0 or below keep today's crater rule (Void, through the dig rules); a pit that is cratered resets to 0.
 - WALL pieces stand only on level-0 ground (keeps the barricade slots and lifts apart; "Level ground only").
-- Ladder from a pit: a Builder whose LADDER faces a cell 2+ steps above him lays a 1-cell ladder (Bridge) on that ledge;
-  when it crumbles the cell comes back with its lift.
+- HEIGHT LADDERS (coordinator addition 2026-11-17, owner-approved): a Builder whose LADDER faces a lift cell 2+ steps above
+  his own cell lays a 1-cell ladder ON it: (a) a pit wall (the ledge above a 2-deep pit), (b) the side of a 2-3 high stack
+  or tower. Same tool wheel slot, same cost and limits; the ghost and the model stand flat against the face. The cell
+  becomes a Bridge (a ramp) and keeps its lift, so climbing it puts you on the ledge / the stack top. The ladder comes down
+  with the block it leans on: DIG on it (ladder down, one level off), TNT (ladder down, 2 levels off), the Kaiju (ladder
+  down, smashed to +1). When it crumbles the ground comes back with its lift. Path edge onto a ladder: +PathCostLadder (1.0);
+  bots use them through their fields. Rock-wall ladders and bridges are unchanged.
+- (c) NATURAL CLIFFS: the island's elevation is view-only in the sim (Height01), and on Skybreak Basin every island is at
+  0 / 0.75 / 1.5 u, separated by void and bridges, so no two walkable cells differ by 2 steps; a ladder on a natural face
+  would change nothing in the sim. The census test prints the count; making natural cliffs sim height is a separate call.
+- Prompt for a ladder with nowhere to go: "face a wall, a ledge or a stack" (PR #210's "face a rock wall" is rewritten to
+  this when it lands).
 - Kaiju: ignores height (it is 3 m tall); any cell at +2 or more under its body is smashed to +1 at once (one Terraform
   event). Its clearance grid and route guard are unchanged; digging cannot trap it any more because pits are floor.
 - Route guard: one tentative lift write, then the existing proofs (pads reach the hill, no new shrine cut) on fields that

@@ -38,6 +38,8 @@ namespace CriticalMass.Runtime.View.Mechanics
             {
                 BuiltPiece p = ps[k];
                 if (p == null || !p.Active || p.Carried || p.Kind != BuiltPieces.Ladder) continue;
+                // b15: a height ladder (on a pit ledge or a stack) has no A-frame: GroundHeight.Body already stands the body on its level
+                if (p.Count == 1 && p.Cells != null && w.Map.Lift != null && TerrainHeight.LadderGround(w, p.Cells[0], out _)) continue;
                 double ox = x - p.X, oz = z - p.Z;
                 double along = ox * p.Dx + oz * p.Dz;
                 double across = -ox * p.Dz + oz * p.Dx;
