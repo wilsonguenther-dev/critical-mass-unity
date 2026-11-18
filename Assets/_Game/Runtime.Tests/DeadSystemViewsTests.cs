@@ -83,7 +83,7 @@ namespace CriticalMass.Runtime.Tests
         public void TheRewardsPanelDropsTheCoinColumnAndCoinOnlyLines()
         {
             var input = new MatchStatsInput { KnockOuts = 3, HillSeconds = 40, CoinsPicked = 12, Completed = true, Outcome = MatchOutcome.Win };
-            MatchRewards r = MatchRewards.Compute(input);
+            MatchRewards r = RewardRules.Compute(input);
             int coinOnly = 0;
             foreach (RewardLine l in r.Lines) if (l.Coins > 0 && l.SkillPoints <= 0) coinOnly++;
             var go = new GameObject("Rewards Under Test", typeof(RectTransform));
