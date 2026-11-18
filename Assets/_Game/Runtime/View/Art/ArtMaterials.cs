@@ -113,8 +113,21 @@ namespace CriticalMass.Runtime.View.Art
             // Props v2 marker codes 3 and 7 (authored Azure #27F8F8 / #43C2C5; Crimson #E6A595 / #D6594F).
             m.SetColor("_TeamMarker", Hex(team == TeamId.Azure ? MarkerAzure : MarkerCrimson));
             m.SetColor("_TeamMarkerDark", Hex(team == TeamId.Azure ? MarkerDarkAzure : MarkerDarkCrimson));
+            // b14 polish (team read from above): characters draw their ink in a dark team colour and lay the team cloth over
+            // their top-facing fixed colours (headgear, shoulders), the same amounts for both teams.
+            if (spec.Kind == ArtKind.Character)
+            {
+                m.SetColor("_OutlineColor", Hex(TeamInk(team)));
+                m.SetFloat("_TeamTopTint", TeamTopTint);
+            }
             return m;
         }
+
+        /// <summary>b14 polish: share of team cloth over a character's top-facing fixed colours (CMToonTeamTop).</summary>
+        public const float TeamTopTint = 0.45f;
+        /// <summary>b14 polish: a character's outline ink per team (dark, saturated, near-equal luma; the self rim still wins).</summary>
+        public const string InkAzure = "#0E6178", InkCrimson = "#8A1F2B";
+        public static string TeamInk(TeamId team) => team == TeamId.Azure ? InkAzure : InkCrimson;
 
         public const string MarkerAzure = "#27F8F8", MarkerDarkAzure = "#43C2C5", MarkerCrimson = "#E6A595", MarkerDarkCrimson = "#D6594F";
 

@@ -25,8 +25,9 @@ namespace CriticalMass.Runtime.View.B13
         readonly float[] _born = new float[PerTeam * 2];
         readonly int[] _next = new int[2];
         int[] _lastTick = new int[64];
-        MaterialPropertyBlock _block;
-        Material _mat;
+        // b14 polish (draw-call budget): one shared material per team instead of one material plus a property block per
+        // quad: a property block takes each renderer out of the SRP Batcher, so 12 streaks cost up to 12 batches.
+        Material _mat, _matCrimson;
 
         /// <summary>Forward lean (degrees) of actor id at render alpha: a hump over the dash, 0 when not dashing.</summary>
         public static float LeanDeg(World w, int id, double alpha)
@@ -36,13 +37,28 @@ namespace CriticalMass.Runtime.View.B13
             return (float)(LeanMaxDeg * 4 * p * (1 - p) + LeanMaxDeg * 0.25 * (1 - p));
         }
 
+        static void Tint(Material m, Color c)
+        {
+            if (m == null) return;
+            if (m.HasProperty("_BaseColor")) m.SetColor("_BaseColor", c);
+            if (m.HasProperty("_Color")) m.SetColor("_Color", c);
+        }
+
+        void OnDestroy()
+        {
+            if (_mat != null) Destroy(_mat);
+            if (_matCrimson != null) Destroy(_matCrimson);
+        }
+
         void Awake()
         {
             _driver = GetComponentInParent<SimDriverBehaviour>();
-            _block = new MaterialPropertyBlock();
             Shader sh = Shader.Find("Universal Render Pipeline/Unlit");
             if (sh == null) sh = Shader.Find("Unlit/Color");
-            _mat = sh != null ? new Material(sh) : null;
+            _mat = sh != null ? new Material(sh) { name = "Dodge Streak Azure" } : null;
+            _matCrimson = sh != null ? new Material(sh) { name = "Dodge Streak Crimson" } : null;
+            Tint(_mat, AzureTint);
+            Tint(_matCrimson, CrimsonTint);
             for (int i = 0; i < _quads.Length; i++)
             {
                 GameObject q = GameObject.CreatePrimitive(PrimitiveType.Quad);
@@ -51,12 +67,10 @@ namespace CriticalMass.Runtime.View.B13
                 if (c != null) Destroy(c);
                 q.transform.SetParent(transform, false);
                 Renderer r = q.GetComponent<Renderer>();
-                if (_mat != null) r.sharedMaterial = _mat;
+                Material team = i < PerTeam ? _mat : _matCrimson;
+                if (team != null) r.sharedMaterial = team;
                 r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
                 r.receiveShadows = false;
-                _block.SetColor("_BaseColor", i < PerTeam ? AzureTint : CrimsonTint);
-                _block.SetColor("_Color", i < PerTeam ? AzureTint : CrimsonTint);
-                r.SetPropertyBlock(_block);
                 _quads[i] = q.transform;
                 _renderers[i] = r;
                 _born[i] = -1f;

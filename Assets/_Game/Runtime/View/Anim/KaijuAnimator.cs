@@ -194,7 +194,7 @@ namespace CriticalMass.Runtime.View.Anim
             KaijuType type = w.Match.Hatched ? KaijuTypes.Type(w) : KaijuType.Elder;
             s *= KaijuTypeLook.Scale(type);
             DrawnType = type;
-            ApplyTypeLook(m, type, k.State);
+            ApplyTypeLook(m, type, k.State, w.Match.Hatched);
             Scale = s;
             m.Transform.localScale = m.BaseScale * s;   // fix/model-scale: set from the stored base, the Kaiju's own models only
 
@@ -393,15 +393,18 @@ namespace CriticalMass.Runtime.View.Anim
         public KaijuType DrawnType { get; private set; }
 
         /// <summary>
-        /// b12-r: the type tint on the Kaiju's own renderers. STANDARD clears it (today's look exactly). GROVE / BRUTE shift the
-        /// mid and shadow bands of the body (_MidRatio / _ShadowRatio, per channel), and while the Kaiju is NEUTRAL its crystals
-        /// (team-glow code 6) take the type colour; an owned or berserk Kaiju keeps its allegiance glow on the crystals.
-        /// No allocation: one block, applied only on a change. The renderers leave the SRP Batcher while tinted (same draw calls).
+        /// b12-r: the type tint on the Kaiju's own renderers. Before the hatch it is cleared (today's egg / hatchling look).
+        /// b14 polish (Kaiju readability at night): once hatched EVERY type, ELDER included, takes its look: the body bands
+        /// lifted (KaijuTypeLook.BodyLift: a lighter value that separates from the dark ground), a soft fresnel emissive and a
+        /// per-type glow pattern in the type hue (_KaijuGlow / _KaijuPattern, CMToonCommon.hlsl), and while NEUTRAL the
+        /// crystals (team-glow code 6) take the type colour; an owned or berserk Kaiju keeps its allegiance glow on the crystals
+        /// and its hard rim, so the side still reads. No allocation: one block, applied only on a change. The renderers leave
+        /// the SRP Batcher while tinted (same draw calls: one Kaiju).
         /// </summary>
-        void ApplyTypeLook(ModelView m, KaijuType type, KaijuState state)
+        void ApplyTypeLook(ModelView m, KaijuType type, KaijuState state, bool hatched)
         {
             if (m == null) return;
-            int key = type == KaijuType.Elder ? 0 : (int)type * 2 + (state == KaijuState.Neutral ? 1 : 0);
+            int key = !hatched ? 0 : 10 + (int)type * 2 + (state == KaijuState.Neutral ? 1 : 0);
             // Two models take the look (hatchling and adult): remember the last key per model.
             if (m != _lookModelA && m != _lookModelB)
             {
@@ -417,9 +420,15 @@ namespace CriticalMass.Runtime.View.Anim
             if (key != 0)
             {
                 Vector4 body = KaijuTypeLook.BodyRatio(type);
-                _typeBlock.SetVector("_MidRatio", body);
-                _typeBlock.SetVector("_ShadowRatio", body);
-                if (state == KaijuState.Neutral) _typeBlock.SetColor("_TeamGlow", ArtMaterials.Hex(KaijuTypeLook.CrystalHex(type)));
+                _typeBlock.SetVector("_MidRatio", body * KaijuTypeLook.MidLift);
+                _typeBlock.SetVector("_ShadowRatio", body * KaijuTypeLook.ShadowLift);
+                _typeBlock.SetFloat("_LitMultiplier", KaijuTypeLook.LitLift);
+                Color g = ArtMaterials.Hex(KaijuTypeLook.GlowHex(type));
+                g.a = KaijuTypeLook.GlowStrength;
+                _typeBlock.SetColor("_KaijuGlow", g);
+                _typeBlock.SetFloat("_KaijuPattern", KaijuTypeLook.Pattern(type));
+                if (state == KaijuState.Neutral && type != KaijuType.Elder)
+                    _typeBlock.SetColor("_TeamGlow", ArtMaterials.Hex(KaijuTypeLook.CrystalHex(type)));
             }
             Renderer[] rs = m.Renderers;
             for (int i = 0; i < rs.Length; i++)
@@ -752,6 +761,17 @@ namespace CriticalMass.Runtime.View.Anim
         /// <summary>The crystal colour of a NEUTRAL Kaiju of this type (ELDER: the neutral glow, as today).</summary>
         public static string CrystalHex(KaijuType t) =>
             t == KaijuType.Grove ? GroveCrystal : t == KaijuType.Brute ? BruteCrystal : t == KaijuType.Timber ? TimberCrystal : t == KaijuType.Mire ? MireCrystal : ArtMapping.GlowNeutral;
+        // b14 polish (Kaiju readability at night): the hatched body is one value step lighter than the dark ground (lit band
+        // x LitLift, mid x MidLift, shadow x ShadowLift on top of the type ratio), plus a glow hue and a glow SHAPE per type:
+        // GROVE leaf green crest, BRUTE amber back plates, TIMBER pale bark bands, MIRE blue-violet mist spots, ELDER gold spine.
+        // Hues stay off both team hues (Azure cyan, Crimson red) and the corruption purple #8E3FD1.
+        public const float LitLift = 1.22f, MidLift = 1.38f, ShadowLift = 1.55f, GlowStrength = 0.85f;
+        public const string GroveGlow = "#86F25A", BruteGlow = "#FF9A2E", TimberGlow = "#F3DDA8", MireGlow = "#9AB0FF", ElderGlow = "#FFD24A";
+        /// <summary>Pattern ids of CMToonKaijuGlow: 1 crest, 2 plates, 3 bands, 4 spots, 5 spine.</summary>
+        public static float Pattern(KaijuType t) =>
+            t == KaijuType.Grove ? 1f : t == KaijuType.Brute ? 2f : t == KaijuType.Timber ? 3f : t == KaijuType.Mire ? 4f : 5f;
+        public static string GlowHex(KaijuType t) =>
+            t == KaijuType.Grove ? GroveGlow : t == KaijuType.Brute ? BruteGlow : t == KaijuType.Timber ? TimberGlow : t == KaijuType.Mire ? MireGlow : ElderGlow;
         /// <summary>"GROVE KAIJU" ... "MIRE KAIJU", null for ELDER.</summary>
         public static string Name(KaijuType t) =>
             t == KaijuType.Grove ? GroveName : t == KaijuType.Brute ? BruteName : t == KaijuType.Timber ? TimberName : t == KaijuType.Mire ? MireName : null;

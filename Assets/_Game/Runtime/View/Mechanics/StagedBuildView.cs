@@ -55,6 +55,9 @@ namespace CriticalMass.Runtime.View.Mechanics
         }
 
         Model _ladder, _bridge, _barricade, _ladderCarried, _bridgeCarried, _glow;
+        /// <summary>b14 polish: the chunky procedural ladder instead of the authored placed one (tests may turn it off).</summary>
+        public static bool UseChunkyLadder = true;
+        Material _ghostMat;
         bool _loaded;
         int _observedFrame = -1;
         SimDriverBehaviour _driver;
@@ -87,6 +90,7 @@ namespace CriticalMass.Runtime.View.Mechanics
         {
             if (Active == this) Active = null;
             RestoreAllBarricades();
+            if (_ghostMat != null) Destroy(_ghostMat);
             // the cut meshes live in CutCache (made once per process, shared by every world): nothing to destroy here
         }
 
@@ -103,6 +107,16 @@ namespace CriticalMass.Runtime.View.Mechanics
             ArtCatalog cat = ArtCatalog.Load();
             if (cat == null) return;
             _ladder = Load(cat, StagedBuildCore.KindLadder, StagedBuildCore.PlacedMesh(StagedBuildCore.KindLadder), true);
+            // b14 polish: the built ladder draws the chunky wooden ladder (ChunkyLadder) in place of the thin authored rails;
+            // same A-frame, same team materials, same staged cut (the mesh is readable).
+            if (_ladder != null && UseChunkyLadder)
+            {
+                _ladder.Whole = ChunkyLadder.Mesh;
+                _ladder.Local = Matrix4x4.identity;
+                _ladder.Bounds = _ladder.Whole.bounds;
+                _ladder.Cuttable = true;
+                _ladder.TopSign = LadderTopSign(_ladder.Whole, _ladder.Bounds);
+            }
             _bridge = Load(cat, StagedBuildCore.KindBridge, StagedBuildCore.PlacedMesh(StagedBuildCore.KindBridge), true);
             _barricade = Load(cat, StagedBuildCore.KindBarricade, StagedBuildCore.PlacedMesh(StagedBuildCore.KindBarricade), true);
             _ladderCarried = Load(cat, StagedBuildCore.KindLadder, ArtMapping.LadderCarried, false);
@@ -331,23 +345,9 @@ namespace CriticalMass.Runtime.View.Mechanics
             else
             {
                 // An A-frame over the wall: one leaning ladder pair up the near face, one down the far face, two lanes wide.
-                float run = Mathf.Max(0.1f, m.Bounds.size.z), rise = Mathf.Max(0.1f, m.Bounds.max.y);
-                float d = len * 0.5f + 0.35f;
-                var scale = new Vector3(1.7f, 1.6f / rise, d / run);
-                float footZ = m.TopSign < 0f ? m.Bounds.max.z : m.Bounds.min.z;
                 for (int side = 0; side < 2; side++)
-                {
-                    float sgn = side == 0 ? -1f : 1f;
-                    Vector3 foot = c + along * (d * sgn);
-                    Vector3 toCentre = -along * sgn;
-                    Quaternion qs = Quaternion.LookRotation(toCentre * m.TopSign, Vector3.up);
-                    Vector3 o = foot - qs * new Vector3(0f, 0f, footZ * scale.z);
                     for (int lane = -1; lane <= 1; lane += 2)
-                    {
-                        Matrix4x4 baseM = Matrix4x4.TRS(o + across * (0.6f * lane), qs, scale);
-                        DrawStaged(m, mat, baseM, side * stages, 2 * stages, sequencing, t, reduce, ref seq, kind);
-                    }
-                }
+                        DrawStaged(m, mat, LadderMatrix(m, c, along, across, len, side, lane), side * stages, 2 * stages, sequencing, t, reduce, ref seq, kind);
             }
             if (sequencing)
             {
@@ -359,6 +359,51 @@ namespace CriticalMass.Runtime.View.Mechanics
         }
 
         StagedBuildCore.Seq _none;
+
+        /// <summary>One leaning ladder of the A-frame (side 0 near face, 1 far face; lane -1 / +1), in world space.</summary>
+        static Matrix4x4 LadderMatrix(Model m, Vector3 c, Vector3 along, Vector3 across, float len, int side, int lane)
+        {
+            float run = Mathf.Max(0.1f, m.Bounds.size.z), rise = Mathf.Max(0.1f, m.Bounds.max.y);
+            float d = len * 0.5f + 0.35f;
+            // the chunky ladder is already built wide and thick: no extra x stretch (the authored rails needed 1.7)
+            float sx = m.Whole == ChunkyLadder.Mesh ? 1.25f : 1.7f;
+            var scale = new Vector3(sx, 1.6f / rise, d / run);
+            float footZ = m.TopSign < 0f ? m.Bounds.max.z : m.Bounds.min.z;
+            float sgn = side == 0 ? -1f : 1f;
+            Vector3 foot = c + along * (d * sgn);
+            Vector3 toCentre = -along * sgn;
+            Quaternion qs = Quaternion.LookRotation(toCentre * m.TopSign, Vector3.up);
+            Vector3 o = foot - qs * new Vector3(0f, 0f, footZ * scale.z);
+            return Matrix4x4.TRS(o + across * (0.6f * lane), qs, scale);   // DrawStaged appends m.Local
+        }
+
+        /// <summary>
+        /// b14 polish: the Builder's LADDER ghost as the same chunky A-frame the build will lay, in see-through green (will
+        /// build) or red (refused). c is the span centre (world), along the unit span direction, len its length. Four draws
+        /// of one cached mesh, no allocation. False when the ladder art is not loaded.
+        /// </summary>
+        public bool DrawLadderGhost(World w, Vector3 c, Vector3 along, float len, bool ok)
+        {
+            EnsureObserved(w);
+            Model m = _ladder;
+            if (m == null || m.Whole != ChunkyLadder.Mesh) return false;
+            if (_ghostMat == null)
+            {
+                Shader sh = Resources.Load<Shader>("CMFxUnlit");
+                if (sh == null) sh = Shader.Find("CM/FxUnlit");
+                if (sh == null) return false;
+                _ghostMat = new Material(sh) { name = "Ladder Ghost", renderQueue = 3080, hideFlags = HideFlags.DontSave };
+                _ghostMat.SetFloat("_Cull", 2);
+                _ghostMat.SetFloat("_ZWrite", 0);
+            }
+            Mesh g = ChunkyLadder.Ghost(ok);
+            Vector3 across = Vector3.Cross(Vector3.up, along);
+            var rp = new RenderParams(_ghostMat) { shadowCastingMode = ShadowCastingMode.Off, receiveShadows = false, layer = gameObject.layer };
+            for (int side = 0; side < 2; side++)
+                for (int lane = -1; lane <= 1; lane += 2)
+                    Graphics.RenderMesh(rp, g, 0, LadderMatrix(m, c, along, across, len, side, lane) * m.Local);
+            return true;
+        }
 
         int BridgeSegments(Model m, float len) => Mathf.Clamp(Mathf.CeilToInt(len / (Mathf.Max(0.5f, m.Bounds.size.z) * 1.15f)), 1, 4);
 
