@@ -127,13 +127,13 @@ namespace CriticalMass.Sim.Config
         public double FarmerCloseShare = 0.6;
         public double SunderSeconds = 3;
         public double SunderDamageTaken = 0.25;
-        public double MinerHeavyPierce = 1.3;
+        public double MinerHeavyPierce = 1.4;
         public double MinerHeavyMass = 1.3;
         public double MinerStructureMultiplier = 2;
         public double BuilderHomeRadius = 3.5;
         public double BuilderHomeMultiplier = 1.5;
         /// <summary>TNT cooldown (ticks at 30 Hz) while the rule is on (DemolitionsTntConfig.CooldownTicks is 150).</summary>
-        public double TntCooldownTicks = 135; // 120 put her kill share at 0.29 (DemolitionsAttackThrowTests limit 0.25); 150 is the shipped value
+        public double TntCooldownTicks = 120; // OWNER FEEL-TEST: her kill share is 0.29 at 120 (DemolitionsAttackThrowTests limit 0.25); 150 is the shipped value
         /// <summary>Share of her own TNT's blast damage the thrower takes when she stands inside its radius.</summary>
         public double TntSelfShare = 0.35;
         /// <summary>The Healer's mend while the rule is on (HealerConfig MendHeal 6 / MendRange 5.5).</summary>
