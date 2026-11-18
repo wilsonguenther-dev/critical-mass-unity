@@ -85,6 +85,14 @@ namespace CriticalMass.Sim.Bots
         public double[] TaskUntil;   // b13-hook
         /// <summary>CM b13: who owns the task (B13Hooks.BotTaskAct routes it): 1-9 H, 10-19 B, 20-29 C, 30-39 K; 0 = none.</summary>
         public byte[] TaskKind;   // b13-hook
+        /// <summary>b15 combat feel, the steering unjam: position and tick at the start of the current pressed window.</summary>
+        public double[] JamX, JamZ;
+        public int[] JamTick;
+        /// <summary>b15: a side-step in progress until this tick (World.Tick), along (SideX, SideZ).</summary>
+        public int[] SideUntil;
+        /// <summary>b15: side-steps started this match (a counter the tests print).</summary>
+        public int Unjams;
+        public double[] SideX, SideZ;
 
         /// <summary>Browser createBotsState: allocate every per-actor array at ActorCapacity (no reset).</summary>
         public static BotsState CreateBotsState(World w)
@@ -139,6 +147,12 @@ namespace CriticalMass.Sim.Bots
                 TaskZ = new double[cap],   // b13-hook
                 TaskUntil = new double[cap],   // b13-hook
                 TaskKind = new byte[cap],   // b13-hook
+                JamX = new double[cap],
+                JamZ = new double[cap],
+                JamTick = new int[cap],
+                SideUntil = new int[cap],
+                SideX = new double[cap],
+                SideZ = new double[cap],
             };
         }
 
@@ -192,6 +206,13 @@ namespace CriticalMass.Sim.Bots
                 st.TaskZ[id] = 0;   // b13-hook
                 st.TaskUntil[id] = 0;   // b13-hook
                 st.TaskKind[id] = 0;   // b13-hook
+                st.JamX[id] = w.X[id];
+                st.JamZ[id] = w.Z[id];
+                st.JamTick[id] = w.Tick;
+                st.SideUntil[id] = 0;
+                st.Unjams = 0;
+                st.SideX[id] = 0;
+                st.SideZ[id] = 0;
             }
             BotFields.ResetFields(st.Fields, w);
             BotFields.BuildAllFields(st.Fields, w);

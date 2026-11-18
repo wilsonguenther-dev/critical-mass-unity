@@ -135,11 +135,13 @@ namespace CriticalMass.Runtime.PlayTests
                     if (spec != null && head != null && hips != null && head.position.y - hips.position.y < 0.15f * spec.Height)
                         Fail($"{at}: its head is not above its hips (lying down or upside down while alive)");
                     Renderer body = SanityWorld.Body(model, spec);
-                    // b15 combat feel: mid-swing (SwingPending) the view holds the clip's wind-up extreme for the whole wind-up
-                    // (AttackTiming.ClipTime, fix/hit-feel-3), arms and weapon raised above the head, so the body's bounds are
-                    // taller than the model without any scale change (actor 19 at 19 s: 3.17 u in run 44239149225, a 0.40 s
-                    // Warrior-length wind-up). The scale check reads standing fighters only.
-                    if (spec != null && body != null && spec.Height > 0 && !a.SwingPending)
+                    // b15 combat feel: the body renderer is skinned with updateWhenOffscreen off (ModelView), so its bounds are the
+                    // mesh's local box carried by the root bone: while the attack clip holds its wind-up extreme and plays the
+                    // strike (AttackTiming.ClipTime, fix/hit-feel-3) the hips tilt and the axis-aligned box grows taller than the
+                    // body. Actor 19 at 19 s in run 44239149225 read 3.17 u that way, mid-swing (the rule's 0.40 s heavy wind-up
+                    // makes a frame inside a swing far more likely). The scale check reads fighters outside a swing only.
+                    bool swinging = a.SwingPending || (a.SwingTick > 0 && w.Tick - a.SwingTick <= a.SwingWindup + 15);
+                    if (spec != null && body != null && spec.Height > 0 && !swinging)
                     {
                         float ratio = body.bounds.size.y / spec.Height;
                         if (ratio < 0.7f || ratio > 1.4f)

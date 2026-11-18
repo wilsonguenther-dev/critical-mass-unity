@@ -36,9 +36,11 @@ namespace CriticalMass.Sim.Tests
         private static readonly Knob[] Knobs =
         {
             new Knob { Name = "Warrior.AttackDamage", Set = (f, v) => Row(f, ClassId.Warrior).AttackDamage = v, Values = new[] { 27.0, 24, 21, 19 } },
-            new Knob { Name = "Warrior.MaxHp", Set = (f, v) => Row(f, ClassId.Warrior).MaxHp = v, Values = new[] { 160.0, 145, 130 } },
+            new Knob { Name = "Warrior.MaxHp", Set = (f, v) => Row(f, ClassId.Warrior).MaxHp = v, Values = new[] { 160.0, 145, 130, 120 } },
             new Knob { Name = "Farmer.AttackDamage", Set = (f, v) => Row(f, ClassId.Farmer).AttackDamage = v, Values = new[] { 20.0, 23, 26 } },
             new Knob { Name = "Miner.AttackDamage", Set = (f, v) => Row(f, ClassId.Miner).AttackDamage = v, Values = new[] { 12.0, 10, 14 } },
+            new Knob { Name = "Miner.AttackCooldown", Set = (f, v) => Row(f, ClassId.Miner).AttackCooldown = v, Values = new[] { 0.55, 0.65, 0.75 } },
+            new Knob { Name = "Miner.MaxHp", Set = (f, v) => Row(f, ClassId.Miner).MaxHp = v, Values = new[] { 120.0, 105, 95 } },
             new Knob { Name = "MinerHeavyPierce", Set = (f, v) => f.MinerHeavyPierce = v, Values = new[] { 1.4, 1.2, 1.0 } },
             new Knob { Name = "SunderDamageTaken", Set = (f, v) => f.SunderDamageTaken = v, Values = new[] { 0.25, 0.15, 0.08 } },
             new Knob { Name = "SunderSeconds", Set = (f, v) => f.SunderSeconds = v, Values = new[] { 3.0, 2.0 } },
@@ -65,7 +67,8 @@ namespace CriticalMass.Sim.Tests
         {
             public double Duel, Spread, Demo, Shiver;
             public double Top10, WarriorShare, DemoKillShare, KillsPerMin, DemoGateShare;
-            public int ShiverHard, ShiverKaiju, ShiverMild, Nevers, AllWins;
+            public int ShiverHard, ShiverKaiju, ShiverMild, Nevers, AllWins, MaxLock;
+            public List<string> Flags;
             public double Total => Duel + Spread + Demo + Shiver;
         }
 
@@ -124,10 +127,17 @@ namespace CriticalMass.Sim.Tests
                 InputFrame scratch = SimInput.EmptyInput();
                 int n = w.ActorCount, head = w.EventHead;
                 var dealt = new double[n];
+                var lk = new int[n];
                 double matchDmg = 0;
                 while (w.Match.Phase != MatchPhase.Ended && w.Tick < 15000)
                 {
                     MatchTick.Advance(w, null, scratch);
+                    for (int i = 0; i < n; i++)
+                    {
+                        Actor a = w.Actors[i];
+                        lk[i] = a.Alive && a.HitStunTicks > 0 && a.LastCause == DamageCause.Melee ? lk[i] + 1 : 0;
+                        if (lk[i] > s.MaxLock) s.MaxLock = lk[i];
+                    }
                     for (; head < w.EventHead; head++)
                     {
                         SimEvent e = w.Events[head % World.EventCapacity];
@@ -154,7 +164,7 @@ namespace CriticalMass.Sim.Tests
             s.DemoKillShare = kills > 0 ? demoKills / kills : 0;
             s.KillsPerMin = minutes > 0 ? kills / minutes : 0;
             s.Spread = 30 * Math.Max(0, s.Top10 - 0.50) + 30 * Math.Max(0, s.WarriorShare - 0.35) + 30 * Math.Max(0, s.DemoKillShare - 0.25) +
-                       0.5 * Math.Max(0, 34 - s.KillsPerMin);
+                       0.5 * Math.Max(0, 34 - s.KillsPerMin) + 0.5 * Math.Max(0, s.MaxLock - 15);
         }
 
         /// <summary>DemolitionsAttackThrowTests.SameSeedBalanceHerKillShareBeforeVersusAfter's rule-on arm (limit 0.25).</summary>
@@ -219,7 +229,8 @@ namespace CriticalMass.Sim.Tests
         {
             GameConfig cfg = GameConfig.CreateDefault();
             Apply(cfg, vals);
-            ShiverGate(cfg, out s.ShiverKaiju, out s.ShiverHard, out s.ShiverMild, null);
+            s.Flags = new List<string>();
+            ShiverGate(cfg, out s.ShiverKaiju, out s.ShiverHard, out s.ShiverMild, s.Flags);
             s.Shiver = 5 * (s.ShiverKaiju + s.ShiverHard) + Math.Max(0, s.ShiverMild - 6);
         }
 
@@ -243,7 +254,7 @@ namespace CriticalMass.Sim.Tests
                 .Append(",\"shiverHard\":").Append(s.ShiverHard).Append(",\"shiverKaiju\":").Append(s.ShiverKaiju).Append(",\"shiverMild\":").Append(s.ShiverMild)
                 .Append(",\"demoGate\":").Append(s.DemoGateShare.ToString("0.000")).Append(",\"top10\":").Append(s.Top10.ToString("0.000"))
                 .Append(",\"warrior\":").Append(s.WarriorShare.ToString("0.000")).Append(",\"demoKill\":").Append(s.DemoKillShare.ToString("0.000"))
-                .Append(",\"kpm\":").Append(s.KillsPerMin.ToString("0.00")).Append(",\"set\":{");
+                .Append(",\"kpm\":").Append(s.KillsPerMin.ToString("0.00")).Append(",\"maxLockTicks\":").Append(s.MaxLock).Append(",\"set\":{");
             for (int k = 0; k < Knobs.Length; k++) sb.Append(k > 0 ? "," : "").Append('"').Append(Knobs[k].Name).Append("\":").Append(vals[k].ToString("0.###"));
             return sb.Append("}}").ToString();
         }
@@ -263,6 +274,8 @@ namespace CriticalMass.Sim.Tests
             for (int k = 0; k < Knobs.Length; k++) best[k] = Knobs[k].Values[0];
             Score bestScore = Evaluate(best, double.PositiveInfinity);
             Console.WriteLine(Line("start", best, bestScore));
+            int shownFlags = 0;
+            if (bestScore.Flags != null) foreach (string fl in bestScore.Flags) Console.WriteLine("[tune shiver flag start] " + fl);
             for (int pass = 0; pass < 2 && bestScore.Total > 0; pass++)
                 for (int k = 0; k < Knobs.Length && bestScore.Total > 0; k++)
                     foreach (double v in Knobs[k].Values)
@@ -273,6 +286,8 @@ namespace CriticalMass.Sim.Tests
                         cand[k] = v;
                         Score s = Evaluate(cand, bestScore.Total);
                         Console.WriteLine(Line("pass " + pass + " " + Knobs[k].Name + "=" + v.ToString("0.###"), cand, s));
+                        if (s.ShiverHard + s.ShiverKaiju > 0 && shownFlags++ < 4 && s.Flags != null)
+                            foreach (string fl in s.Flags) Console.WriteLine("[tune shiver flag] " + fl);
                         if (s.Total < bestScore.Total) { best = cand; bestScore = s; }
                     }
             var matrix = new StringBuilder();
@@ -356,10 +371,11 @@ namespace CriticalMass.Sim.Tests
                                                   ",\"at\":\"" + w.X[i].ToString("0.0") + "," + w.Z[i].ToString("0.0") + "\",\"move\":\"" + f.MoveX.ToString("0.00") + "," + f.MoveZ.ToString("0.00") +
                                                   "\",\"wallAhead\":" + (wall ? "true" : "false") + ",\"nearest\":" + nd.ToString("0.00") + ",\"nearestTeamMate\":" +
                                                   (near >= 0 && w.Actors[near].Team == a.Team ? "true" : "false") + ",\"target\":" + t + ",\"targetDist\":" + td.ToString("0.0") +
+                                                  ",\"kaiju\":\"" + w.Kaiju.X.ToString("0.0") + "," + w.Kaiju.Z.ToString("0.0") + "\",\"telegraph\":" + (w.Kaiju.TelegraphIn > 0 || w.Kaiju.MeleeWindupIn > 0 ? "true" : "false") +
                                                   ",\"stun\":" + a.HitStunTicks + ",\"kv\":" + (a.KVx != 0 || a.KVz != 0 ? "true" : "false") + "}");
                         }
                     }
-                    Console.WriteLine("{\"item\":\"b15 stuck match\",\"feel\":" + (feel ? "true" : "false") + ",\"seed\":" + seed + ",\"episodes\":" + count + "}");
+                    Console.WriteLine("{\"item\":\"b15 stuck match\",\"feel\":" + (feel ? "true" : "false") + ",\"seed\":" + seed + ",\"episodes\":" + count + ",\"unjams\":" + st.Unjams + "}");
                 }
             var sb = new StringBuilder();
             foreach (KeyValuePair<string, int> kv in byState) sb.Append(kv.Key).Append('=').Append(kv.Value).Append(' ');
@@ -375,25 +391,27 @@ namespace CriticalMass.Sim.Tests
 
         private static readonly string[] SysNames =
         {
-            "bots", "abilities", "movement", "hash", "combat", "pickups", "events", "topple", "pieces", "barricades", "walls",
+            "bot0+reflex", "botsThink", "botsSteer", "abilities", "movement", "hash", "combat", "pickups", "events", "topple", "pieces", "barricades", "walls",
             "resources", "corruption", "handoff", "sources", "hut", "kaiju", "station", "ping", "respawn", "heal", "hill", "match", "endstep",
         };
 
         private static void TimedTick(World w, InputFrame scratch, long[] acc, Stopwatch sw)
         {
             long t0 = sw.ElapsedTicks;
+            int k = 0;
+            void Lap() { long t1 = sw.ElapsedTicks; acc[k++] += t1 - t0; t0 = t1; }
             BotReflex.BeginFills(w);
             BotBrain.FillBotInput(w, 0, scratch);
             SimInput.ApplyInput(w, 0, scratch);
+            Lap();
             BotBrain.BotsThink(w, SimStep.Dt(w.Config));
+            Lap();
             for (int id = 1; id < w.ActorCount; id++)
             {
                 BotBrain.FillBotInput(w, id, scratch);
                 SimInput.ApplyInput(w, id, scratch);
             }
             BotReflex.EndFills(w);
-            int k = 0;
-            void Lap() { long t1 = sw.ElapsedTicks; acc[k++] += t1 - t0; t0 = t1; }
             Lap();
             if (w.Match.Phase == MatchPhase.Ended) return;
             double dt = SimStep.Dt(w.Config);

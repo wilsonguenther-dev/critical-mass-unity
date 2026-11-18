@@ -425,6 +425,80 @@ namespace CriticalMass.Sim.Bots
             return true;
         }
 
+        /// <summary>b15 unjam: the pressed window (ticks at 30 Hz) and the side-step length (ticks).</summary>
+        public const int JamWindowTicks = 15, SideStepTicks = 12;
+
+        /// <summary>
+        /// b15 combat feel, the steering-level stuck detector (deterministic, no RNG): a bot whose own steer pressed at least
+        /// half speed for a whole JamWindowTicks window and covered under a quarter of the walk it asked for (a wall corner, a
+        /// bridge end, the hill crowd) side-steps for SideStepTicks along the perpendicular with the clear line and fewer bodies
+        /// (a tie: by id parity), slightly forward. The FSM's slower unstick (StuckSeconds) still runs behind it. True while it
+        /// steers the output.
+        /// </summary>
+        private static bool Unjam(World w, BotsState st, int id, ClassConfig cc, InputFrame output)
+        {
+            Actor a = w.Actors[id];
+            double x = w.X[id], z = w.Z[id];
+            if (w.Tick < st.SideUntil[id])
+            {
+                output.MoveX = st.SideX[id];
+                output.MoveZ = st.SideZ[id];
+                return true;
+            }
+            double mx = output.MoveX, mz = output.MoveZ;
+            double m2 = mx * mx + mz * mz;
+            if (m2 < 0.25 || a.HitStunTicks > 0 || a.AirLen > 0 || a.StandUp > 0 || a.KVx != 0 || a.KVz != 0)
+            {
+                st.JamX[id] = x;
+                st.JamZ[id] = z;
+                st.JamTick[id] = w.Tick;
+                return false;
+            }
+            int span = w.Tick - st.JamTick[id];
+            if (span < JamWindowTicks) return false;
+            double ex = x - st.JamX[id], ez = z - st.JamZ[id];
+            double want = cc.MoveSpeed * CombatFeel.SpeedScale(w, id) * span / w.Config.SimHz * 0.25;
+            st.JamX[id] = x;
+            st.JamZ[id] = z;
+            st.JamTick[id] = w.Tick;
+            if (ex * ex + ez * ez >= want * want) return false;
+            double inv = 1 / Math.Sqrt(m2);
+            mx *= inv;
+            mz *= inv;
+            double best = double.NegativeInfinity, bx = 0, bz = 0;
+            for (int s = 0; s < 2; s++)
+            {
+                double side = ((id + s) & 1) == 0 ? 1 : -1;
+                double px = -mz * side * 0.9 + mx * 0.3, pz = mx * side * 0.9 + mz * 0.3;
+                double score = (id + s) & 1;   // the parity tie-break, under every real difference
+                // Sliding along a wall: keep the slide's side (a side-step against it would read as a reversal).
+                if (px * w.Vx[id] + pz * w.Vz[id] > 0.05) score += 5;
+                if (FirstBlockedCell(w.Map, x, z, x + px * 1.2, z + pz * 1.2) >= 0) score -= 100;
+                int cnt = SpatialHash.QueryCircle(w.Hash, x + px * 0.9, z + pz * 0.9, 0.8, Mates);
+                for (int k = 0; k < cnt; k++)
+                {
+                    int j = Mates[k];
+                    if (j == id || j >= w.ActorCount || !w.Actors[j].Alive) continue;
+                    double qx = w.X[j] - (x + px * 0.9), qz = w.Z[j] - (z + pz * 0.9);
+                    if (qx * qx + qz * qz <= 0.64) score -= 10;
+                }
+                if (score > best)
+                {
+                    best = score;
+                    bx = px;
+                    bz = pz;
+                }
+            }
+            double l = Math.Sqrt(bx * bx + bz * bz);
+            st.SideX[id] = bx / l;
+            st.SideZ[id] = bz / l;
+            st.SideUntil[id] = w.Tick + SideStepTicks;
+            st.Unjams++;
+            output.MoveX = st.SideX[id];
+            output.MoveZ = st.SideZ[id];
+            return true;
+        }
+
         /// <summary>Steer bot `id` (state in actor.AiState and st) into `output`.</summary>
         public static void SteerBot(World w, BotsState st, int id, InputFrame output)
         {
@@ -929,6 +1003,8 @@ namespace CriticalMass.Sim.Bots
             if (dsk != null && dsk.DodgeKaiju && Phys.On(w, true) && DodgeKaiju(w, id, output)) st.WantMove[id] = 1;
             // b13 r3 [K]: a bot the SHROUD would blind leaves the cloud and skirts it, unless it is contesting the hill.
             if (BotKaijuFeed.AvoidCloud(w, id, output)) st.WantMove[id] = 1;
+            // b15 combat feel: a bot that has pressed for JamSeconds and covered under a quarter of its walk side-steps.
+            if (CombatFeel.On(w) && Unjam(w, st, id, cc, output)) st.WantMove[id] = 1;
 
             // Ability press decided at think time.
             if (st.AbilityReq[id] == 1)
