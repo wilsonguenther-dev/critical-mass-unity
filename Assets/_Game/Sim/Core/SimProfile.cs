@@ -21,6 +21,15 @@ namespace CriticalMass.Sim.Core
         public static int ClearanceFullRebuilds, ClearancePatches, ClearanceRegionBuilds;
 
         /// <summary>
+        /// b14 sim cost: route guard proofs (Terraform.CellsKeepRoutes) worked out in full, and those answered from the
+        /// verdict memo. Counted only; nothing in the Sim reads them.
+        /// </summary>
+        public static int RouteProofs, RouteMemoHits;
+
+        /// <summary>b14 sim cost, tests only: true = every route proof is worked out in full (no verdict memo). Same results.</summary>
+        public static bool NoRouteMemo;
+
+        /// <summary>
         /// b11-dg, tests only: true = every clearance refresh is a full rebuild (the path before b11-dg). Both paths give
         /// byte-identical shadow cells, squeeze flags and regions, so the Sim result is the same either way.
         /// </summary>
@@ -32,6 +41,8 @@ namespace CriticalMass.Sim.Core
             ClearanceFullRebuilds = 0;
             ClearancePatches = 0;
             ClearanceRegionBuilds = 0;
+            RouteProofs = 0;
+            RouteMemoHits = 0;
         }
 
         /// <summary>

@@ -121,7 +121,12 @@ namespace CriticalMass.Sim.Core
             // Kaiju start cell on the same clearance build) has the same verdict: answer it from the memo (an expired piece
             // whose lift is refused retries every tick; each retry paid two flow fields and the Kaiju guard's searches).
             int hit = RouteMemoFind(w, idx, next, n);
-            if (hit >= 0) return Memo[hit].Ok;
+            if (hit >= 0)
+            {
+                SimProfile.RouteMemoHits++;
+                return Memo[hit].Ok;
+            }
+            SimProfile.RouteProofs++;
             Kaiju.GuardUsedStart = -1;
             bool verdict = CellsKeepRoutesUncached(w, idx, next, n);
             RouteMemoStore(w, idx, next, n, verdict, Kaiju.GuardUsedStart);
@@ -161,7 +166,7 @@ namespace CriticalMass.Sim.Core
 
         private static int RouteMemoFind(World w, int[] idx, byte[] next, int n)
         {
-            if (n > RouteMemoMaxCells) return -1;
+            if (n > RouteMemoMaxCells || SimProfile.NoRouteMemo) return -1;
             int start = -2;
             for (int e = 0; e < Memo.Length; e++)
             {
