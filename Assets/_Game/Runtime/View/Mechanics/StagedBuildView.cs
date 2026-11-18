@@ -280,6 +280,7 @@ namespace CriticalMass.Runtime.View.Mechanics
         {
             if (_driver == null || _driver.World == null) return;
             World w = _driver.World;
+            GroundHeight.Live = w;   // b14 bridge fix: rope-bridge decks in the view's ground height
             EnsureObserved(w);
             PiecesDrawn = 0;
             StagesDrawn = 0;
@@ -330,24 +331,37 @@ namespace CriticalMass.Runtime.View.Mechanics
             int kind = p.Kind == BuiltPieces.Bridge ? StagedBuildCore.KindBridge : StagedBuildCore.KindLadder;
             if (p.Kind == BuiltPieces.Bridge)
             {
+                // b14 bridge fix: the deck runs straight from the near bank's height to the far bank's (it lay flat at the
+                // void's 0, a 1.5 u step down off a high bank); LadderClimb.Sample lifts the fighters along the same line.
+                LadderClimb.BridgeBanks(w.Map, p, out float hNear, out float hFar);
+                float baseY = (float)GroundHeight.At(w.Map, p.X, p.Z);
+                Vector3 run = along * len + Vector3.up * (hFar - hNear);
+                float slen = run.magnitude;
+                Vector3 alongT = run / Mathf.Max(1e-4f, slen);
+                Quaternion qt = Quaternion.LookRotation(alongT, Vector3.up);
                 Vector3 size = m.Bounds.size;
-                float segLen = len / groups;
+                float segLen = slen / groups;
                 float sz = segLen / Mathf.Max(0.1f, size.z);
                 float sx = Mathf.Max(0.6f, (widthCells - 0.24f) / Mathf.Max(0.1f, size.x));
-                Vector3 start = c - along * (len * 0.5f);
+                Vector3 start = c + Vector3.up * ((hNear + hFar) * 0.5f - baseY) - alongT * (slen * 0.5f);
                 for (int j = 0; j < groups; j++)
                 {
-                    Vector3 o = start + along * (j * segLen - m.Bounds.min.z * sz);
-                    Matrix4x4 baseM = Matrix4x4.TRS(o, q, new Vector3(sx, 1f, sz));
+                    Vector3 o = start + alongT * (j * segLen - m.Bounds.min.z * sz);
+                    Matrix4x4 baseM = Matrix4x4.TRS(o, qt, new Vector3(sx, 1f, sz));
                     DrawStaged(m, mat, baseM, j * stages, groups * stages, sequencing, t, reduce, ref seq, kind);
                 }
             }
             else
             {
-                // An A-frame over the wall: one leaning ladder pair up the near face, one down the far face, two lanes wide.
+                // b14 ladder fix: one ladder up the near face and one down the far face of every lane the piece really
+                // converted, feet on the ground clear of the face, rails resting on the rock lip (LadderClimb's shape).
+                float top = LadderClimb.RockTop(w.Map, p.X, p.Z);
+                int lanes = LadderClimb.LaneMask(w.Map, p);
                 for (int side = 0; side < 2; side++)
-                    for (int lane = -1; lane <= 1; lane += 2)
-                        DrawStaged(m, mat, LadderMatrix(m, c, along, across, len, side, lane), side * stages, 2 * stages, sequencing, t, reduce, ref seq, kind);
+                    for (int lane = -1; lane <= 1; lane++)
+                        if ((lanes & (1 << (lane + 1))) != 0)
+                            DrawStaged(m, mat, LadderMatrix(m, c, along, across, len, side, lane, top), side * stages, 2 * stages, sequencing, t, reduce, ref seq, kind);
+                if (!sequencing && !hidden) DrawClimbMarks(c, along, across, len, top, lanes, p.Team);
             }
             if (sequencing)
             {
@@ -360,21 +374,94 @@ namespace CriticalMass.Runtime.View.Mechanics
 
         StagedBuildCore.Seq _none;
 
-        /// <summary>One leaning ladder of the A-frame (side 0 near face, 1 far face; lane -1 / +1), in world space.</summary>
-        static Matrix4x4 LadderMatrix(Model m, Vector3 c, Vector3 along, Vector3 across, float len, int side, int lane)
+        /// <summary>
+        /// b14 ladder fix: one leaning ladder (side 0 near face, 1 far face; lane -1 / 0 / +1 across, one cell each), in world
+        /// space. Its rails rest on the wall lip `top` u over the ground at LadderClimb.FaceDist from the span centre and its
+        /// feet stand on the ground top x Lean further out, so it never cuts into the rock (owner review 2026-11-18: the
+        /// old A-frame stood 1.6 u high in the middle of a 3.0 u rock wall). c is the span centre on the ground (world).
+        /// </summary>
+        static Matrix4x4 LadderMatrix(Model m, Vector3 c, Vector3 along, Vector3 across, float len, int side, int lane, float top)
         {
-            float run = Mathf.Max(0.1f, m.Bounds.size.z), rise = Mathf.Max(0.1f, m.Bounds.max.y);
-            float d = len * 0.5f + 0.35f;
-            // the chunky ladder is already built wide and thick: no extra x stretch (the authored rails needed 1.7)
-            float sx = m.Whole == ChunkyLadder.Mesh ? 1.25f : 1.7f;
-            var scale = new Vector3(sx, 1.6f / rise, d / run);
+            if (m.Whole == ChunkyLadder.Mesh) return ChunkyLadderMatrix(c, along, across, len, side, lane, top);
+            // the authored rails: their own bounds (rails reach 4% over the top contact, like the chunky ladder)
+            float run0 = Mathf.Max(0.1f, m.Bounds.size.z), rise0 = Mathf.Max(0.1f, m.Bounds.max.y / 1.04f);
+            float face = (float)LadderClimb.FaceDist(len * 0.5f), run = top * LadderClimb.Lean;
+            var scale = new Vector3(1.7f, top / rise0, run / run0);
             float footZ = m.TopSign < 0f ? m.Bounds.max.z : m.Bounds.min.z;
             float sgn = side == 0 ? -1f : 1f;
-            Vector3 foot = c + along * (d * sgn);
-            Vector3 toCentre = -along * sgn;
-            Quaternion qs = Quaternion.LookRotation(toCentre * m.TopSign, Vector3.up);
+            Vector3 foot = c + along * ((face + run) * sgn);
+            Quaternion qs = Quaternion.LookRotation(-along * sgn * m.TopSign, Vector3.up);
             Vector3 o = foot - qs * new Vector3(0f, 0f, footZ * scale.z);
-            return Matrix4x4.TRS(o + across * (0.6f * lane), qs, scale);   // DrawStaged appends m.Local
+            return Matrix4x4.TRS(o + across * lane, qs, scale);   // DrawStaged appends m.Local
+        }
+
+        /// <summary>
+        /// The chunky ladder's matrix (public for tests): its build frame has the foot at z = 0 and the top contact Rise up
+        /// and Run back; scaled so the top contact lands `top` u up at LadderClimb.FaceDist from the span centre c (on the
+        /// ground) and the feet top x Lean further out; one lane (a cell) wide.
+        /// </summary>
+        public static Matrix4x4 ChunkyLadderMatrix(Vector3 c, Vector3 along, Vector3 across, float len, int side, int lane, float top)
+        {
+            float face = (float)LadderClimb.FaceDist(len * 0.5f), run = top * LadderClimb.Lean;
+            var scale = new Vector3(1.3f, top / ChunkyLadder.Rise, run / ChunkyLadder.Run);
+            float sgn = side == 0 ? -1f : 1f;
+            Vector3 foot = c + along * ((face + run) * sgn);
+            // the mesh leans back toward -z: its local +z points away from the wall, so the top lands at the face
+            Quaternion qs = Quaternion.LookRotation(along * sgn, Vector3.up);
+            return Matrix4x4.TRS(foot + across * lane, qs, scale);
+        }
+
+        /// <summary>Old A-frame signature (both lanes of the hill rock): kept for any caller outside this file.</summary>
+        static Matrix4x4 LadderMatrix(Model m, Vector3 c, Vector3 along, Vector3 across, float len, int side, int lane)
+            => LadderMatrix(m, c, along, across, len, side, lane, LadderClimb.HillRockTop);
+
+        static Mesh _chevron;
+        Material _markMat;
+
+        /// <summary>A flat up-arrow chevron (unit size, pointing +z, in the xz plane), built once.</summary>
+        static Mesh Chevron()
+        {
+            if (_chevron != null) return _chevron;
+            var v = new[] { new Vector3(-0.5f, 0f, -0.2f), new Vector3(0f, 0f, 0.3f), new Vector3(0.5f, 0f, -0.2f),
+                            new Vector3(0.5f, 0f, 0.1f), new Vector3(0f, 0f, 0.6f), new Vector3(-0.5f, 0f, 0.1f) };
+            var tr = new[] { 0, 1, 5, 1, 4, 5, 1, 2, 4, 2, 3, 4 };
+            var col = new Color32[6];
+            for (int i = 0; i < 6; i++) col[i] = new Color32(0xF4, 0xE7, 0xC4, 210);
+            _chevron = new Mesh { name = "Climb Chevron", vertices = v, triangles = tr, colors32 = col, hideFlags = HideFlags.DontSave };
+            _chevron.RecalculateNormals();
+            _chevron.RecalculateBounds();
+            return _chevron;
+        }
+
+        /// <summary>
+        /// b14 ladder fix: the "climb here" mark. A pale chevron on the ground at the foot of each ladder, pointing up the
+        /// ladder at the wall, gently bobbing, so a fighter of either team reads a built ladder as a way over the rock.
+        /// </summary>
+        void DrawClimbMarks(Vector3 c, Vector3 along, Vector3 across, float len, float top, int lanes, TeamId team)
+        {
+            if (_markMat == null)
+            {
+                Shader sh = Resources.Load<Shader>("CMFxUnlit");
+                if (sh == null) sh = Shader.Find("CM/FxUnlit");
+                if (sh == null) return;
+                _markMat = new Material(sh) { name = "Climb Mark", renderQueue = 3070, hideFlags = HideFlags.DontSave };
+                _markMat.SetFloat("_Cull", 0);
+                _markMat.SetFloat("_ZWrite", 0);
+            }
+            var rp = new RenderParams(_markMat) { shadowCastingMode = ShadowCastingMode.Off, receiveShadows = false, layer = gameObject.layer };
+            float face = (float)LadderClimb.FaceDist(len * 0.5f), run = top * LadderClimb.Lean;
+            float bob = ReduceMotion ? 0f : 0.08f * Mathf.Sin(Now * 4f);
+            for (int side = 0; side < 2; side++)
+            {
+                float sgn = side == 0 ? -1f : 1f;
+                Quaternion q = Quaternion.LookRotation(-along * sgn, Vector3.up);
+                for (int lane = -1; lane <= 1; lane++)
+                {
+                    if ((lanes & (1 << (lane + 1))) == 0) continue;
+                    Vector3 at = c + along * ((face + run + 0.55f + bob) * sgn) + across * lane + Vector3.up * 0.05f;
+                    Graphics.RenderMesh(rp, Chevron(), 0, Matrix4x4.TRS(at, q, new Vector3(0.62f, 1f, 0.62f)));
+                }
+            }
         }
 
         /// <summary>
@@ -382,7 +469,10 @@ namespace CriticalMass.Runtime.View.Mechanics
         /// build) or red (refused). c is the span centre (world), along the unit span direction, len its length. Four draws
         /// of one cached mesh, no allocation. False when the ladder art is not loaded.
         /// </summary>
-        public bool DrawLadderGhost(World w, Vector3 c, Vector3 along, float len, bool ok)
+        public bool DrawLadderGhost(World w, Vector3 c, Vector3 along, float len, bool ok) => DrawLadderGhost(w, c, along, len, ok, LadderClimb.HillRockTop, 2);
+
+        /// <summary>b14 ladder fix: the ghost with the wall's rock top and the lanes the build will really convert.</summary>
+        public bool DrawLadderGhost(World w, Vector3 c, Vector3 along, float len, bool ok, float top, int lanes)
         {
             EnsureObserved(w);
             Model m = _ladder;
@@ -400,8 +490,9 @@ namespace CriticalMass.Runtime.View.Mechanics
             Vector3 across = Vector3.Cross(Vector3.up, along);
             var rp = new RenderParams(_ghostMat) { shadowCastingMode = ShadowCastingMode.Off, receiveShadows = false, layer = gameObject.layer };
             for (int side = 0; side < 2; side++)
-                for (int lane = -1; lane <= 1; lane += 2)
-                    Graphics.RenderMesh(rp, g, 0, LadderMatrix(m, c, along, across, len, side, lane) * m.Local);
+                for (int lane = -1; lane <= 1; lane++)
+                    if ((lanes & (1 << (lane + 1))) != 0)
+                        Graphics.RenderMesh(rp, g, 0, LadderMatrix(m, c, along, across, len, side, lane, top) * m.Local);
             return true;
         }
 

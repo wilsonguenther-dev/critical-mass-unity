@@ -113,6 +113,8 @@ namespace CriticalMass.Runtime.View.Affordance
         public const string NoCliff = "face a rock wall", NoGap = "face a gap";
         /// <summary>b14 review: nothing a ladder / bridge could span anywhere near (ladders only cross the hill's rock walls).</summary>
         public const string NoRockNear = "rock walls: on the hill", NoGapNear = "no gap near";
+        /// <summary>b14 ladder fix: the ladder would only skip a short walk round the wall's end.</summary>
+        public const string NoShortcut = "no shortcut here";
         /// <summary>b12 r3: the Demolitionist's detail line while her TNT reloads (her attack is the pry bar meanwhile).</summary>
         public const string TntIn = GrenadeTuning.Name + " in";
         /// <summary>b12 r3: her prompt verbs on the attack binding: TNT ready, and the pry bar while it reloads.</summary>
@@ -131,6 +133,8 @@ namespace CriticalMass.Runtime.View.Affordance
     public sealed class AffordanceScan
     {
         public const int MaxMarkers = 64;
+        /// <summary>b14 ladder fix: the LADDER prompt verbs (what the ladder does, not just "build").</summary>
+        public const string LadderToHill = "LADDER TO THE HILL", LadderOverWall = "LADDER OVER THE WALL";
         /// <summary>Marker radius around the player (world units), and while the show-all key is held.</summary>
         public const double Radius = 5.5, RadiusAll = 9.5;
         /// <summary>New route proofs per Scan (each is one or two flow fields over the map).</summary>
@@ -610,6 +614,11 @@ namespace CriticalMass.Runtime.View.Affordance
                 p.Verb = t == BuilderTool.Ladder ? "BUILD LADDER" : "BUILD BRIDGE";
                 p.Ghost = 3;
                 int plan = BuiltPieces.Plan(w, id, dx, dz, kind);
+                // b14 ladder fix: a ladder must be a real shortcut over the rock (not a step round the wall's end), and its
+                // prompt says what it does (owner: "Ladder: climb this rock wall to the hill")
+                bool shortcut = plan != 0 || kind != BuiltPieces.Ladder || Mechanics.LadderClimb.LastPlanIsShortcut(w, id, dx, dz);
+                bool toHill = plan == 0 && kind == BuiltPieces.Ladder && Mechanics.LadderClimb.LastPlanToHill(w, id, dx, dz);
+                if (plan == 0 && kind == BuiltPieces.Ladder) p.Verb = toHill ? LadderToHill : LadderOverWall;
                 if (plan == 0 && BuiltPieces.LastPlanCount > 0)
                 {
                     int n = BuiltPieces.LastPlanCount;
@@ -644,6 +653,7 @@ namespace CriticalMass.Runtime.View.Affordance
                 else if (a.AbilityCd > c.Abilities.BuilderPieces.RefuseLockSeconds + 1e-9) { Refuse(p, AffWords.Wait); p.WaitSeconds = a.AbilityCd; }
                 else if (plan != 0 && plan != BuiltPieces.RefusedLength && plan != BuiltPieces.RefusedOccupied)
                     Refuse(p, t == BuilderTool.Ladder ? (near > 0 ? AffWords.NoCliff : AffWords.NoRockNear) : (near > 0 ? AffWords.NoGap : AffWords.NoGapNear));
+                else if (!shortcut) Refuse(p, AffWords.NoShortcut);
                 else if (why != 0) Refuse(p, BuilderWhy(why));
                 else if (a.AbilityCd > 0) { Refuse(p, AffWords.Wait); p.WaitSeconds = a.AbilityCd; }
                 else p.Valid = true;

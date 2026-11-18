@@ -250,8 +250,10 @@ namespace CriticalMass.Runtime.View.Mechanics
                 if (_staged != null && _staged.DrawPiece(w, k, p, c, along, len, (float)pc.WidthCells, warn && blink < 0.5f && !reduceFlash,
                         out float buildProgress, out bool building))
                 {
-                    if (!building) Countdown(c + Vector3.up * 0.75f, 0.42f, 0.08f, left, ringCol, blink);
-                    else if (WorldFeedbackSettings.Progress) Countdown(c + Vector3.up * 0.75f, 0.42f, 0.05f, buildProgress, team, 1f);
+                    // b14 ladder fix: a ladder's ring floats over the rock top (it sat inside the 3 u hill rock)
+                    float ringUp = p.Kind == BuiltPieces.Ladder ? LadderClimb.RockTop(w.Map, p.X, p.Z) + 0.45f : 0.75f;
+                    if (!building) Countdown(c + Vector3.up * ringUp, 0.42f, 0.08f, left, ringCol, blink);
+                    else if (WorldFeedbackSettings.Progress) Countdown(c + Vector3.up * ringUp, 0.42f, 0.05f, buildProgress, team, 1f);
                     continue;
                 }
                 double popWall = Feed.Wall((w.Tick + alpha - p.PlacedTick) / hz);

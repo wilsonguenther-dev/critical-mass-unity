@@ -277,6 +277,9 @@ namespace CriticalMass.Runtime.View
                     TerrainEdits.Kind kind = pristine != null ? TerrainEdits.Classify(pristine[i], cur, touched[i]) : TerrainEdits.Kind.None;
                     if (TerrainEditMesh.Owns(cur, kind) && !(cur == Cell.Barricade && !BarricadeModelShown)) continue;
                     if (Dressing.WorldView.Draws(i, _cellsCopy[i])) continue;
+                    // b14 bridge fix: a built rope bridge draws its own deck from bank to bank (StagedBuildView); the flat
+                    // brass slab at the void's height would show under the raised deck.
+                    if (cur == Cell.Bridge && UnderBuiltBridge(i)) continue;
                     if (!CellBox(_cellsCopy[i], _map.Height01[i], out double top, out double bottom, out int look)) continue;
                     AddBox(cx, cx + 1, cz, cz + 1, bottom, top, _tris[look]);
                     if (_cellsCopy[i] == Cell.Water) AddFoam(cx, cz);
@@ -322,6 +325,18 @@ namespace CriticalMass.Runtime.View
         }
 
         /// <summary>True when the art catalog carries the Miner barricade model (art import 2026-11-12).</summary>
+        private bool UnderBuiltBridge(int cell)
+        {
+            var ps = _driver != null && _driver.World != null && _driver.World.Builder != null ? _driver.World.Builder.Pieces : null;
+            if (ps == null) return false;
+            foreach (var p in ps)
+            {
+                if (p == null || !p.Active || p.Carried || p.Kind != CriticalMass.Sim.Core.BuiltPieces.Bridge) continue;
+                for (int k = 0; k < p.Count; k++) if (p.Cells[k] == cell) return true;
+            }
+            return false;
+        }
+
         private static bool BarricadeModelShown =>
             CriticalMass.Runtime.View.Art.ArtCatalog.Load()?.Find(CriticalMass.Runtime.View.Art.ArtMapping.MinerBarricade) != null;
 

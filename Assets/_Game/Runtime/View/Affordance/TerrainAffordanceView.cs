@@ -694,7 +694,15 @@ namespace CriticalMass.Runtime.View.Affordance
             Vector3 along = SimSpace.ToWorld(ax, 0, az);
             if (along.sqrMagnitude < 1e-6f) return;
             along.Normalize();
-            sv.DrawLadderGhost(w, c, along, Mathf.Max(0.5f, (float)(hi - lo + 1.0)), ok);
+            // b14 ladder fix: the ghost centre on the actor's line (the piece's own centre), the wall's real rock top and only
+            // the lanes the build converts, so the ghost is exactly the ladder the build lays
+            double ox = w.X[LocalActor], oz = w.Z[LocalActor];
+            double lx = Math.Floor(ox) + 0.5, lz = Math.Floor(oz) + 0.5;
+            double mid = (lo + hi) * 0.5 - (lx * ax + lz * az);
+            double pcx = lx + ax * mid, pcz = lz + az * mid;
+            c = SimSpace.ToWorld(pcx, GroundHeight.At(m, pcx, pcz) + 0.02, pcz);
+            int lanes = Mechanics.LadderClimb.LaneMask(m, t.GhostCells, t.GhostCount, pcx, pcz, Scan.ToolDx, Scan.ToolDz);
+            sv.DrawLadderGhost(w, c, along, Mathf.Max(0.5f, (float)(hi - lo + 1.0)), ok, Mechanics.LadderClimb.RockTop(m, pcx, pcz), lanes);
         }
 
         // ------------------------------------------------------------------ reactions and damage stages
