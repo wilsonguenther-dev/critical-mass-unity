@@ -121,7 +121,10 @@ namespace CriticalMass.Runtime.Tests
         {
             string path = Path.Combine(Path.GetDirectoryName(Application.dataPath), "tools/art/world-plan.tsv");
             Assert.IsTrue(File.Exists(path), path + " (run -executeMethod CriticalMass.Editor.Dressing.WorldBake.Bake)");
-            Assert.AreEqual(File.ReadAllText(path), WorldDresser.Plan(Map(), BasesFile.Load(), Cat.Centroid, Cat.Body).Summary(),
+            string now = WorldDresser.Plan(Map(), BasesFile.Load(), Cat.Centroid, Cat.Body).Summary();
+            // b15: the current summary between markers in the log, so a stale file can be re-baked from a CI log without Unity.
+            if (File.ReadAllText(path) != now) Debug.Log("[WorldPlanSummary] BEGIN\n" + now + "\n[WorldPlanSummary] END");
+            Assert.AreEqual(File.ReadAllText(path), now,
                 "tools/art/world-plan.tsv is stale: the map, a kit or the rules changed; re-bake and review the diff");
         }
 
