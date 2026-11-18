@@ -366,17 +366,7 @@ namespace CriticalMass.Runtime.Menu
         }
 
         /// <summary>"Unlocked: HORNED HELM, SUNBURST" for the levels from..to (all classes, at most 3 names).</summary>
-        public static string UnlockLine(int from, int to)
-        {
-            var names = new List<string>();
-            for (int l = from; l <= to; l++)
-                foreach (CosmeticItem it in CosmeticItems.UnlockedAtLevel(l))
-                    if (!names.Contains(it.DisplayName)) names.Add(it.DisplayName);
-            if (names.Count == 0) return string.Empty;
-            int more = names.Count - 3;
-            string s = "Unlocked: " + string.Join(", ", names.GetRange(0, Mathf.Min(3, names.Count)));
-            return more > 0 ? s + " and " + more.ToString(CultureInfo.InvariantCulture) + " more" : s;
-        }
+        public static string UnlockLine(int from, int to) => UnlockHonesty.LevelUpLine(from, to);   // b15 item 6: real looks only
     }
 
     /// <summary>

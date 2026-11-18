@@ -95,6 +95,11 @@ namespace CriticalMass.Runtime.Game
         public static string MinerAbility = "Haul";
         public static string MoreComing = "More looks are coming.";
         public static string TopLevelNothingNew = "Levels past {level} unlock nothing yet.";
+        public static string NoLookYet = "NONE YET";
+        public static string OutfitNote = "Choose a look for each class.";
+        public static string OutfitNoteMore = "Choose a look for each class. New pieces unlock as you level up.";
+        public static string HowSkill = "Knock-outs, deliveries to the egg, time on the hill and knocking out the Kaiju earn skill points at the end of every match. Levels unlock looks only, never strength.";
+        public static string HowSkillCoins = "Knock-outs, deliveries to the egg, time on the hill and knocking out the Kaiju earn skill points and coins at the end of every match. Levels unlock looks only, never strength.";
 
         // ---------------------------------------------------------------- helpers
 
@@ -143,6 +148,7 @@ namespace CriticalMass.Runtime.Game
                 StoryTab, StoryHeading, AwardsHeading, AxisSeconds, LegendAzure, LegendCrimson, LegendHatch, LegendHut, LegendLead,
                 TeamAzure, TeamCrimson, TurnLedAndHeld, TurnRetook, TurnComeback, TurnLate, TurnDraw, TurnNobody, TurnNoMark,
                 AwardNobody, BestPrefix, BestRank, BestOnCard, BestKnockOuts, BestNothing, You, GoalDone, MinerAbility, MoreComing, TopLevelNothingNew,
+                NoLookYet, OutfitNote, OutfitNoteMore, HowSkill, HowSkillCoins,
             }) yield return s;
             foreach (string s in AwardTitles) yield return s;
             foreach (string s in AwardLines) yield return s;
