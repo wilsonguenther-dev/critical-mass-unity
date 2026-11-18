@@ -40,6 +40,7 @@ namespace CriticalMass.Net.Replay
         int _handCount;
         readonly int[] _botToHuman = new int[ReplayInputStream.MaxActors];   // b15-rejoin
         int _backCount;
+        int _fpAt = -1;   // the tick whose fingerprint is stored (a hand-over tap can come before Record in that tick)
         ulong _lastMask;
         bool _lastNoHuman;
         int _repeat;
@@ -72,6 +73,7 @@ namespace CriticalMass.Net.Replay
             _fpCount = 0;
             _handCount = 0;
             _backCount = 0;
+            _fpAt = -1;
             _lastMask = 0;
             _lastNoHuman = false;
             _repeat = 0;
@@ -106,6 +108,7 @@ namespace CriticalMass.Net.Replay
         public void OnHandToBot(World w, int id)
         {
             if (!ReferenceEquals(w, World) || Done) return;
+            Fingerprint(w);   // b15-rejoin: the tick's fingerprint is of the world before the hand-over, as playback checks it
             if (_handCount < _handToBot.Length) _handToBot[_handCount++] = id;
         }
 
@@ -113,12 +116,20 @@ namespace CriticalMass.Net.Replay
         public void OnBotToHuman(World w, int id)
         {
             if (!ReferenceEquals(w, World) || Done) return;
+            Fingerprint(w);
             if (_backCount < _botToHuman.Length) _botToHuman[_backCount++] = id;
+        }
+
+        void Fingerprint(World w)
+        {
+            if (w.Tick % Header.HashEvery != 0 || _fpAt == w.Tick) return;
+            _fpAt = w.Tick;
+            AddFingerprint(w.Tick, StateHash.Of(w));
         }
 
         void Record(World w, InputFrame[] frames, bool noHuman)
         {
-            if (w.Tick % Header.HashEvery == 0) AddFingerprint(w.Tick, StateHash.Of(w));
+            Fingerprint(w);
             int n = w.ActorCount;
             ulong mask = 0;
             bool changed = false;
