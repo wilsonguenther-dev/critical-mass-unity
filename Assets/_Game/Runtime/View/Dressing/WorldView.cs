@@ -398,6 +398,7 @@ namespace CriticalMass.Runtime.View.Dressing
             // b14 terrain look: plan from the painted cell wherever a dig, crater, fill or place touched the grid (no new rim
             // and no cliff into the sky around a pit), then drop the dressing standing on those cells (TerrainEdits).
             MapDef snap = _map.WithCells(TerrainEdits.PlanningCells(_map, out bool[] edited));
+            byte[] now = (byte[])_map.Cells.Clone();   // b14 review: the current cells for FilterPlan (water on placed ground, rims at pits)
             WorldPlan old = Plan;
             bool clutter = _clutterOn;
             BasesFile bases = _bases;
@@ -405,7 +406,7 @@ namespace CriticalMass.Runtime.View.Dressing
             var task = System.Threading.Tasks.Task.Run(() =>
             {
                 WorldPlan p = WorldDresser.Plan(snap, bases, cat.Centroid, cat.Body, clutter);
-                TerrainEdits.FilterPlan(p, edited);
+                TerrainEdits.FilterPlan(p, edited, now);
                 return (p, ChangedGroups(old, p));
             });
             while (!task.IsCompleted) yield return null;
@@ -415,7 +416,7 @@ namespace CriticalMass.Runtime.View.Dressing
             {
                 Debug.LogWarning("[CM.World] re-plan on a worker failed, planning on the main thread: " + task.Exception?.GetBaseException().Message);
                 next = WorldDresser.Plan(snap, bases, cat.Centroid, cat.Body, clutter);
-                TerrainEdits.FilterPlan(next, edited);
+                TerrainEdits.FilterPlan(next, edited, now);
                 changed = ChangedGroups(old, next);
             }
             else (next, changed) = task.Result;
@@ -458,7 +459,7 @@ namespace CriticalMass.Runtime.View.Dressing
         {
             MapDef planMap = _map.WithCells(TerrainEdits.PlanningCells(_map, out bool[] edited));
             WorldPlan p = WorldDresser.Plan(planMap, _bases, _catalog.Centroid, _catalog.Body, _clutterOn);
-            TerrainEdits.FilterPlan(p, edited);
+            TerrainEdits.FilterPlan(p, edited, _map.Cells);
             return p;
         }
 

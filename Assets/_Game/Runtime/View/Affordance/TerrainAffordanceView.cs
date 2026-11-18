@@ -334,7 +334,7 @@ namespace CriticalMass.Runtime.View.Affordance
             }
             double now = Time.unscaledTimeAsDouble;
             UnityEngine.Camera cam = UnityEngine.Camera.main;
-            if (w == null || w.Map == null || CriticalMass.Runtime.Flow.GameFlow.MenuIdle)
+            if (w == null || w.Map == null || CriticalMass.Runtime.Flow.GameFlow.MenuIdle || MenuCovers)   // b14 review: an overlay canvas, it drew over the CHARACTERS screen and the Controls page
             {
                 Showing = false;
                 HideUi();
@@ -409,6 +409,17 @@ namespace CriticalMass.Runtime.View.Affordance
             UpdateBar(w, cam, local);
             UpdateMiniBars(w, cam, local, now);
         }
+
+        /// <summary>
+        /// b14 review: a full-screen menu is up over the match (CHARACTERS, the Controls page, a codex card, the character or
+        /// rewards panel, credits, the results highlights). Those are camera-space canvases, so the HUD's overlay canvases
+        /// (this prompt pill, the tool strip) drew on top of them, over their BACK buttons.
+        /// </summary>
+        public static bool MenuCovers =>
+            CriticalMass.Runtime.Menus.Characters.CharactersScreen.IsOpenNow || CriticalMass.Runtime.Menus.ControlsCardScreen.IsOpen
+            || CriticalMass.Runtime.Codex.LoreCard.IsOpen || CriticalMass.Runtime.Menu.CharacterPanel.IsOpen
+            || CriticalMass.Runtime.Menu.RewardsOverlay.IsOpen || CriticalMass.Runtime.Menus.Credits.IsOpen
+            || CriticalMass.Runtime.Menu.ResultsHighlights.IsOpen;
 
         void AimOf(World w, out bool hasAim, out double ax, out double az)
         {

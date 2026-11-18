@@ -11,17 +11,20 @@ namespace CriticalMass.Runtime.View
     /// edits). View only; a pure builder over plain arrays, so EditMode tests build it without a scene.
     /// <list type="bullet">
     /// <item>PIT (TerrainEdits.Kind.Pit): inner walls on every side whose neighbour is not a pit (earth strata from the cut
-    /// rim down: a grass lip, dark topsoil, soil with a ragged lower edge, light rock, dark rock), each wall tapered 0.07 u
+    /// rim down: an overhanging grass lip, topsoil, soil with a ragged lower edge, light rock, dark rock; shading normals
+    /// leaned toward up so all four walls take the same lit band), each wall tapered 0.07 u
     /// inward at the bottom (a dug look; the corners of two walls share one edge, so there is no gap), a packed-dirt floor
-    /// with two pebbles, a step wall down to a deeper neighbouring pit, and a spoil lump on the untouched ground at each
-    /// walled rim. Depth grows toward the middle of a dug area: 0.9 u for a cell touching unbroken ground, 1.35 u one ring
+    /// with a trodden patch and two pebbles, a step wall down to a deeper neighbouring pit, and a low six-sided spoil heap on
+    /// the untouched ground at about two walled rims in three. Depth grows toward the middle of a dug area: 0.9 u for a cell touching unbroken ground, 1.35 u one ring
     /// in, 1.8 u from two rings in (deeper digs show taller walls). The floor closes the hole: the island's underside is
     /// 6 u down, so no pit reaches it and none is see-through.</item>
     /// <item>PLACED / FILLED: an earth block, top at the cell's height with a 0.06 u bevel all round (a V seam between
     /// neighbouring blocks and around a fill), a grass cap, strata on every side that shows (sides only toward the void;
-    /// toward a pit the pit's wall is drawn), a dark rock bottom 1.0 u down for a block placed out into the void.</item>
+    /// toward a pit the pit's wall is drawn) in the island cliff's rock colours, and for a block placed out into the void a
+    /// body 1.0 u deep whose underside tapers in to a rock keel (UnderInset / UnderDepth) like the island's own underside.</item>
     /// <item>SHORT WALL / BLOCK piece (Cell.LowWall): a dressed-stone block standing on the cell, top exactly WallView.ShortTop
-    /// above the ground, bevelled top, two courses with a mortar line, a dark footing band, vertical seams at each cell end,
+    /// above the ground, 0.1 u bevelled top (WallView's team inlay sits inside it), two courses with a mortar line and a
+    /// staggered joint in the top course, a dark footing band, vertical seams at each cell end,
     /// faces between two wall cells left out (they never show), so a run of blocks reads as stacked stones with seams.</item>
     /// </list>
     /// One material (CM/Toon in vertex-colour mode, the kit's own colour path; outline weight per vertex from UV4.x: pit
@@ -34,18 +37,26 @@ namespace CriticalMass.Runtime.View
         public const float PitDepth1 = 0.9f, PitDepthStep = 0.45f, PitDepthMax = 1.8f;
         public const float Taper = 0.07f;
         public const float PlacedDepth = 1.0f;
-        public const float EarthBevel = 0.06f, StoneBevel = 0.07f;
+        public const float EarthBevel = 0.06f, StoneBevel = 0.1f;
         /// <summary>A short wall's top above its ground (the ghost and WallView's team cap use the same number).</summary>
         public const float ShortTop = B13.WallView.ShortTop;
         /// <summary>A short wall's footing below its ground (hidden by the ground, closes any seam with the ground art).</summary>
         public const float ShortSink = 0.02f;
 
-        // Palette (sRGB, alpha 0 = CMToon mask code 0, a fixed colour).
+        // Palette (sRGB, alpha 0 = CMToon mask code 0, a fixed colour). Review 2026-11-17 (in-engine, night seed 1337): the
+        // first palette read near-black inside a pit and on every block side; earth tones are lifted and warmed so the strata
+        // separate at the gameplay camera, and the stone matches the tall-wall kit's blue-grey instead of slate.
         static readonly Color32 Grass = C(163, 193, 80), GrassDark = C(128, 156, 62);
-        static readonly Color32 Topsoil = C(94, 66, 43), Soil = C(122, 88, 56);
-        static readonly Color32 RockLight = C(106, 108, 101), RockDark = C(76, 79, 75);
-        static readonly Color32 FloorDirt = C(112, 84, 56), Pebble = C(140, 142, 134), Spoil = C(128, 94, 62);
-        static readonly Color32 StoneTop = C(166, 167, 157), StoneSide = C(130, 132, 123), StoneFoot = C(100, 103, 96), Seam = C(70, 72, 68);
+        static readonly Color32 Topsoil = C(116, 80, 50), Soil = C(158, 114, 72);
+        static readonly Color32 RockLight = C(150, 146, 134), RockDark = C(112, 110, 102);
+        static readonly Color32 FloorDirt = C(140, 104, 68), FloorClod = C(118, 86, 56), Pebble = C(168, 168, 158), Spoil = C(156, 114, 72), SpoilTop = C(176, 132, 86);
+        static readonly Color32 StoneTop = C(196, 198, 200), StoneSide = C(152, 156, 166), StoneFoot = C(118, 122, 132), Seam = C(84, 86, 96);
+        static readonly Color32 CliffRock = C(128, 130, 122), CliffDark = C(96, 98, 92);
+        /// <summary>Pit faces lean their shading normal this far toward up (0 = true wall normal): every side of a pit then
+        /// takes the same lit band instead of one wall lit and three in the shadow band (they read as a black hole).</summary>
+        public const float PitNormalUp = 0.75f;
+        /// <summary>The grass lip that overhangs a pit's cut edge (sim units, inward from the cell boundary / its drop).</summary>
+        public const float LipWidth = 0.08f, LipDrop = 0.07f;
 
         static Color32 C(byte r, byte g, byte b) => new Color32(r, g, b, 0);
 
@@ -225,6 +236,13 @@ namespace CriticalMass.Runtime.View
             Color32 floor = Jit(FloorDirt, cx, cz, 11);
             QuadSim(cx + tW, yf, cz + tS, cx + 1 - tE, yf, cz + tS, cx + 1 - tE, yf, cz + 1 - tN, cx + tW, yf, cz + 1 - tN, 0, 1, 0, floor, 0f, default);
             PitFloorFaces++;
+            // A trodden darker patch on the floor (irregular quad, 1 cm up) so the floor is not one flat fill.
+            {
+                double fx = cx + 0.3 + 0.25 * Hash01(cx, cz, 12), fz = cz + 0.3 + 0.25 * Hash01(cx, cz, 13);
+                double r0 = 0.16 + 0.08 * Hash01(cx, cz, 14), r1 = 0.12 + 0.08 * Hash01(cx, cz, 15);
+                double yc = yf + 0.01;
+                QuadSim(fx - r0, yc, fz - r1 * 0.6, fx + r1, yc, fz - r0, fx + r0 * 0.8, yc, fz + r1, fx - r1 * 0.7, yc, fz + r0 * 0.9, 0, 1, 0, Jit(FloorClod, cx, cz, 16), 0f, default);
+            }
             MinFloorY = Mathf.Min(MinFloorY, (float)yf);
             MaxFloorY = Mathf.Max(MaxFloorY, (float)yf);
 
@@ -249,10 +267,13 @@ namespace CriticalMass.Runtime.View
                 int nx = cx + DX[s], nz = cz + DZ[s];
                 byte nc = Cur(nx, nz);
                 if ((nc != Cell.Floor && nc != Cell.BreakableDestroyed) || KindAt(nx, nz) != TerrainEdits.Kind.None) continue;
-                double along = (Hash01(cx, cz, 71 + s) - 0.5) * 0.5;
-                double mx = cx + 0.5 + DX[s] * 0.68 + (DX[s] == 0 ? along : 0);
-                double mz = cz + 0.5 + DZ[s] * 0.68 + (DZ[s] == 0 ? along : 0);
-                Lump(mx, H(nx, nz) - 0.01, mz, 0.11 + 0.04 * Hash01(cx, cz, 81 + s), 0.08 + 0.05 * Hash01(cx, cz, 91 + s), Jit(Spoil, cx, cz, 101 + s));
+                // Not every rim gets a heap (a ring of identical heaps reads as a pattern): about two in three.
+                if (Hash01(cx, cz, 111 + s) < 0.3) continue;
+                double along = (Hash01(cx, cz, 71 + s) - 0.5) * 0.4;
+                double mx = cx + 0.5 + DX[s] * 0.74 + (DX[s] == 0 ? along : 0);
+                double mz = cz + 0.5 + DZ[s] * 0.74 + (DZ[s] == 0 ? along : 0);
+                double len = 0.26 + 0.08 * Hash01(cx, cz, 81 + s), wid = 0.15 + 0.04 * Hash01(cx, cz, 121 + s);
+                Mound(mx, H(nx, nz) - 0.015, mz, DX[s] == 0 ? len : wid, DX[s] == 0 ? wid : len, 0.08 + 0.04 * Hash01(cx, cz, 91 + s), cx, cz, 101 + s * 7);
                 SpoilLumps++;
             }
         }
@@ -270,18 +291,23 @@ namespace CriticalMass.Runtime.View
             double b1x = bx + ix * Taper - ux * tb, b1z = bz + iz * Taper - uz * tb;
             double nl = System.Math.Sqrt(dh * dh + Taper * Taper);
             double nx = ix * dh / nl, ny = Taper / nl, nz = iz * dh / nl;
+            // Shading normal leaned toward up (PitNormalUp), so all four walls share one band.
+            nx *= 1 - PitNormalUp; nz *= 1 - PitNormalUp; ny = ny * (1 - PitNormalUp) + PitNormalUp;
+            double nn = System.Math.Sqrt(nx * nx + ny * ny + nz * nz);
+            nx /= nn; ny /= nn; nz /= nn;
+            Lip(cx, cz, h, ax, az, bx, bz, ix, iz, ta > 0, tb > 0);
             for (int seg = 0; seg < 2; seg++)
             {
                 double u0 = seg * 0.5, u1 = u0 + 0.5;
-                double soil = System.Math.Min(dh * 0.72, 0.46 + 0.2 * Hash01(cx * 4 + side, cz, 7 + seg));
-                double rockSplit = soil + (dh - soil) * 0.5;
-                double d0 = 0;
-                for (int band = 0; band < 5; band++)
+                double soil = System.Math.Min(dh * 0.62, 0.36 + 0.18 * Hash01(cx * 4 + side, cz, 7 + seg));
+                double rockSplit = soil + (dh - soil) * 0.55;
+                double d0 = LipDrop;
+                for (int band = 1; band < 5; band++)
                 {
-                    double d1 = band == 0 ? 0.05 : band == 1 ? 0.24 : band == 2 ? soil : band == 3 ? rockSplit : dh;
+                    double d1 = band == 1 ? 0.2 + 0.05 * Hash01(cx * 4 + side, cz, 17 + seg) : band == 2 ? soil : band == 3 ? rockSplit : dh;
                     if (d1 > dh) d1 = dh;
                     if (d1 <= d0 + 1e-4) continue;
-                    Color32 c = band == 0 ? GrassDark : band == 1 ? Topsoil : band == 2 ? Soil : band == 3 ? RockLight : RockDark;
+                    Color32 c = band == 1 ? Topsoil : band == 2 ? Soil : band == 3 ? RockLight : RockDark;
                     c = Jit(c, cx, cz, 200 + side * 10 + band);
                     WallPoint(ax, az, bx, bz, b0x, b0z, b1x, b1z, h, dh, u0, d0, out double p0x, out double p0y, out double p0z);
                     WallPoint(ax, az, bx, bz, b0x, b0z, b1x, b1z, h, dh, u1, d0, out double p1x, out double p1y, out double p1z);
@@ -292,6 +318,62 @@ namespace CriticalMass.Runtime.View
                 }
             }
             PitWallFaces++;
+        }
+
+        /// <summary>
+        /// The grass lip over a rim wall's top: a top strip LipWidth wide (mitred where the neighbouring side is a rim too, so
+        /// two lips never overlap), its front face LipDrop deep, and the underside back to the wall. A lit grass line round
+        /// the cut edge is what makes the hole read as dug from the gameplay camera.
+        /// </summary>
+        void Lip(int cx, int cz, double h, double ax, double az, double bx, double bz, int ix, int iz, bool mitreA, bool mitreB)
+        {
+            double ux = bx - ax, uz = bz - az;
+            double y = h, yb = h - LipDrop;
+            double ia = mitreA ? LipWidth : 0, ib = mitreB ? LipWidth : 0;
+            double a2x = ax + ix * LipWidth + ux * ia, a2z = az + iz * LipWidth + uz * ia;
+            double b2x = bx + ix * LipWidth - ux * ib, b2z = bz + iz * LipWidth - uz * ib;
+            const double up = 0.6;
+            Color32 g = Jit(Grass, cx, cz, 701);
+            QuadSim(ax, y, az, bx, y, bz, b2x, y, b2z, a2x, y, a2z, 0, 1, 0, g, 0f, default);
+            QuadSim(a2x, y, a2z, b2x, y, b2z, b2x, yb, b2z, a2x, yb, a2z, ix * (1 - up), up, iz * (1 - up), Jit(GrassDark, cx, cz, 702), 0f, default);
+            double wa = 0.005;
+            QuadSim(ax + ix * wa, yb, az + iz * wa, bx + ix * wa, yb, bz + iz * wa, b2x, yb, b2z, a2x, yb, a2z, ix * 0.3, -0.95, iz * 0.3, Jit(Topsoil, cx, cz, 703), 0f, default);
+        }
+
+        /// <summary>
+        /// A low spoil mound at sim (x, z) on ground y: an octagon of half-extents (rx, rz) rising t to a smaller top, lighter
+        /// on top. Reads as a heap of soil, not a box (the first lumps were truncated cubes: "chocolate bricks").
+        /// </summary>
+        void Mound(double x, double y, double z, double rx, double rz, double t, int cx, int cz, int salt)
+        {
+            Vector3 centre = SimSpace.ToWorld(x, y - 0.05, z);
+            Color32 side = Jit(Spoil, cx, cz, salt), top = Jit(SpoilTop, cx, cz, salt + 1);
+            const double k = 0.5;   // top ring scale
+            double yt = y + t;
+            for (int s = 0; s < 6; s++)
+            {
+                int s1 = (s + 1) % 6;
+                double j0 = 0.85 + 0.3 * Hash01(cx * 8 + s, cz, salt + 3), j1 = 0.85 + 0.3 * Hash01(cx * 8 + s1, cz, salt + 3);
+                double px0 = x + HexC[s] * rx * j0, pz0 = z + HexS[s] * rz * j0, px1 = x + HexC[s1] * rx * j1, pz1 = z + HexS[s1] * rz * j1;
+                _hx[s] = x + HexC[s] * rx * k * j0; _hz[s] = z + HexS[s] * rz * k * j0;
+                double qx1 = x + HexC[s1] * rx * k * j1, qz1 = z + HexS[s1] * rz * k * j1;
+                double nx = HexMC[s] * t, nz = HexMS[s] * t, ny = (rx + rz) * 0.5 * (1 - k);
+                QuadSim(px0, y, pz0, px1, y, pz1, qx1, yt, qz1, _hx[s], yt, _hz[s], nx, ny, nz, side, 1f, centre);
+            }
+            // the top hexagon as two quads
+            QuadSim(_hx[0], yt, _hz[0], _hx[1], yt, _hz[1], _hx[2], yt, _hz[2], _hx[3], yt, _hz[3], 0, 1, 0, top, 1f, centre);
+            QuadSim(_hx[0], yt, _hz[0], _hx[3], yt, _hz[3], _hx[4], yt, _hz[4], _hx[5], yt, _hz[5], 0, 1, 0, top, 1f, centre);
+        }
+
+        static readonly double[] HexC = new double[6], HexS = new double[6], HexMC = new double[6], HexMS = new double[6];
+        readonly double[] _hx = new double[6], _hz = new double[6];
+        static TerrainEditMesh()
+        {
+            for (int s = 0; s < 6; s++)
+            {
+                double a = (s + 0.5) * System.Math.PI / 3, am = (s + 1.0) * System.Math.PI / 3;
+                HexC[s] = System.Math.Cos(a); HexS[s] = System.Math.Sin(a); HexMC[s] = System.Math.Cos(am); HexMS[s] = System.Math.Sin(am);
+            }
         }
 
         static void WallPoint(double ax, double az, double bx, double bz, double b0x, double b0z, double b1x, double b1z,
@@ -315,8 +397,9 @@ namespace CriticalMass.Runtime.View
             else if (s == 2) { ax = cx; az = cz; bx = cx + 1; bz = cz; }
             else { ax = cx; az = cz + 1; bx = cx + 1; bz = cz + 1; }
             double mid = (yTop + yf) * 0.5;
-            QuadSim(ax, yTop, az, bx, yTop, bz, bx, mid, bz, ax, mid, az, ix, 0, iz, Jit(RockLight, cx, cz, 300 + s), 0f, default);
-            QuadSim(ax, mid, az, bx, mid, bz, bx, yf, bz, ax, yf, az, ix, 0, iz, Jit(RockDark, cx, cz, 310 + s), 0f, default);
+            double lx = ix * (1 - PitNormalUp), ly = PitNormalUp, lz = iz * (1 - PitNormalUp);
+            QuadSim(ax, yTop, az, bx, yTop, bz, bx, mid, bz, ax, mid, az, lx, ly, lz, Jit(RockLight, cx, cz, 300 + s), 0f, default);
+            QuadSim(ax, mid, az, bx, mid, bz, bx, yf, bz, ax, yf, az, lx, ly, lz, Jit(RockDark, cx, cz, 310 + s), 0f, default);
             StepWallFaces++;
         }
 
@@ -330,19 +413,37 @@ namespace CriticalMass.Runtime.View
             double bottom = top - PlacedDepth;
             Vector3 centre = SimSpace.ToWorld(cx + 0.5, (top + bottom) * 0.5, cz + 0.5);
             BevelTop(cx, cz, top, EarthBevel, Jit(Grass, cx, cz, 401), Jit(GrassDark, cx, cz, 402), centre);
+            bool any = false;
             for (int s = 0; s < 4; s++)
             {
                 int nx = cx + DX[s], nz = cz + DZ[s];
-                if (TerrainEdits.Land(Cur(nx, nz)) || KindAt(nx, nz) == TerrainEdits.Kind.Pit) continue;   // hidden, or the pit's wall
+                _rim[s] = !(TerrainEdits.Land(Cur(nx, nz)) || KindAt(nx, nz) == TerrainEdits.Kind.Pit);   // else hidden, or the pit's wall
+                if (!_rim[s]) continue;
                 Side(cx, cz, s, top - EarthBevel, bottom, false, centre);
                 BlockSideFaces++;
+                any = true;
             }
             if (placed)
             {
-                QuadSim(cx, bottom, cz, cx + 1, bottom, cz, cx + 1, bottom, cz + 1, cx, bottom, cz + 1, 0, -1, 0, Jit(RockDark, cx, cz, 403), 1f, centre);
+                // Review 2026-11-17: a flat bottom 1 u down read as a floating slab ("a big brick"). The underside now tapers
+                // in on every exposed side to a rock keel, like the island's own underside.
+                double ins = any ? UnderInset : 0, tip = bottom - (any ? UnderDepth : 0);
+                double x0 = cx + (_rim[0] ? ins : 0), x1 = cx + 1 - (_rim[1] ? ins : 0);
+                double z0 = cz + (_rim[2] ? ins : 0), z1 = cz + 1 - (_rim[3] ? ins : 0);
+                Color32 ud = Jit(CliffDark, cx, cz, 404);
+                double sl = UnderDepth, sn = System.Math.Sqrt(sl * sl + ins * ins);
+                double hn = ins > 0 ? sl / sn : 1, vn = ins > 0 ? -ins / sn : 0;
+                if (_rim[0]) QuadSim(cx, bottom, cz, cx, bottom, cz + 1, x0, tip, z1, x0, tip, z0, -hn, vn, 0, ud, 1f, centre);
+                if (_rim[1]) QuadSim(cx + 1, bottom, cz, x1, tip, z0, x1, tip, z1, cx + 1, bottom, cz + 1, hn, vn, 0, ud, 1f, centre);
+                if (_rim[2]) QuadSim(cx, bottom, cz, x0, tip, z0, x1, tip, z0, cx + 1, bottom, cz, 0, vn, -hn, ud, 1f, centre);
+                if (_rim[3]) QuadSim(cx, bottom, cz + 1, cx + 1, bottom, cz + 1, x1, tip, z1, x0, tip, z1, 0, vn, hn, ud, 1f, centre);
+                QuadSim(x0, tip, z0, x1, tip, z0, x1, tip, z1, x0, tip, z1, 0, -1, 0, Jit(RockDark, cx, cz, 403), 1f, centre);
                 BlockBottomFaces++;
             }
         }
+
+        /// <summary>A placed block's underside: inset on each exposed side over this depth below its 1 u body.</summary>
+        public const float UnderInset = 0.3f, UnderDepth = 0.5f;
 
         /// <summary>A short wall / block piece: a dressed stone block on the cell, top ShortTop above its ground.</summary>
         void ShortWall(int cx, int cz)
@@ -403,17 +504,29 @@ namespace CriticalMass.Runtime.View
                 }
                 else
                 {
-                    d1 = band == 0 ? 0.22 : band == 1 ? 0.5 : band == 2 ? 0.75 : hgt;
-                    c = band == 0 ? Topsoil : band == 1 ? Soil : band == 2 ? RockLight : RockDark;
+                    // Earth sides match the island's own cliff: a grass lip, topsoil, then cliff rock (the first bands
+                    // were brown-on-brown and read as a brick of chocolate next to the grey island cliffs).
+                    d1 = band == 0 ? 0.06 : band == 1 ? 0.26 : band == 2 ? 0.62 : hgt;
+                    c = band == 0 ? GrassDark : band == 1 ? Topsoil : band == 2 ? CliffRock : CliffDark;
                     if (band == 4) break;
                 }
                 if (d1 > hgt) d1 = hgt;
                 if (d1 <= d0 + 1e-4) { if (d1 >= hgt) break; continue; }
                 c = Jit(c, cx, cz, 600 + s * 10 + band);
                 double ya = y0 - d0, yb = y0 - d1;
-                SeamStrip(ax, az, bx, bz, 0.0, 0.035, ya, yb, nx, nz, Seam, centre);
-                SeamStrip(ax, az, bx, bz, 0.035, 0.965, ya, yb, nx, nz, c, centre);
-                SeamStrip(ax, az, bx, bz, 0.965, 1.0, ya, yb, nx, nz, Seam, centre);
+                double e = stone ? 0.03 : 0.02;
+                SeamStrip(ax, az, bx, bz, 0.0, e, ya, yb, nx, nz, Seam, centre);
+                if (stone && band == 0)
+                {
+                    // The top course is two stones: a vertical joint off-centre (staggered by cell), so a row of blocks
+                    // reads as laid masonry, not one long box.
+                    double uj = 0.5 + (((cx + cz + s) & 1) == 0 ? 0.14 : -0.14);
+                    SeamStrip(ax, az, bx, bz, e, uj - 0.015, ya, yb, nx, nz, c, centre);
+                    SeamStrip(ax, az, bx, bz, uj - 0.015, uj + 0.015, ya, yb, nx, nz, Seam, centre);
+                    SeamStrip(ax, az, bx, bz, uj + 0.015, 1 - e, ya, yb, nx, nz, Jit(c, cx + 7, cz, 650 + s), centre);
+                }
+                else SeamStrip(ax, az, bx, bz, e, 1 - e, ya, yb, nx, nz, c, centre);
+                SeamStrip(ax, az, bx, bz, 1 - e, 1.0, ya, yb, nx, nz, Seam, centre);
                 d0 = d1;
                 if (d1 >= hgt) break;
             }

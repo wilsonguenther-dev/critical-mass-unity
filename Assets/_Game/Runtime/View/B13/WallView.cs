@@ -24,10 +24,27 @@ namespace CriticalMass.Runtime.View.B13
     public sealed class WallView : MonoBehaviour
     {
         public const float ShortTop = 0.6f, TallTop = 1.6f;
+        /// <summary>Inset of a short wall's team-colour inlay from the cell edge (b14 review: was 0.08, a lid over the whole block).</summary>
+        public const float CapInset = 0.2f;
         const int MaxVerts = 4096, MaxIdx = 8192;
 
         static readonly Color32 GhostOk = Pm(72, 220, 120, 110), GhostBad = Pm(240, 64, 56, 110), GhostEdge = Pm(255, 255, 255, 160);
-        static readonly Color32 AzureTop = new Color32(70, 140, 250, 255), CrimsonTop = new Color32(226, 62, 58, 255);
+        // b14 review: a deeper team shade (was 70,140,250 / 226,62,58): the inlay is unlit (FxUnlit), so at full brightness
+        // it glowed like a UI tile on the stone, worst at night. CapLight() also dims it with the sun.
+        static readonly Color32 AzureTop = new Color32(48, 108, 200, 255), CrimsonTop = new Color32(190, 54, 50, 255);
+        /// <summary>Lowest share of the cap colour kept at night.</summary>
+        const float CapNightFloor = 0.55f;
+
+        /// <summary>b14 review: the scene's main light as a 0..1 share (sun intensity times its grey level), floored, so the
+        /// unlit team inlay follows day and night like the lit stone round it.</summary>
+        static float CapLight()
+        {
+            Light sun = RenderSettings.sun;
+            if (sun == null || !sun.isActiveAndEnabled) return 1f;
+            return Mathf.Clamp(sun.intensity * sun.color.grayscale, CapNightFloor, 1f);
+        }
+
+        static Color32 Scale(Color32 c, float k) => new Color32((byte)(c.r * k), (byte)(c.g * k), (byte)(c.b * k), c.a);
         static readonly Color32 Crack = new Color32(34, 30, 40, 255), Warn = Pm(255, 236, 160, 150);
 
         SimDriverBehaviour _driver;
@@ -113,6 +130,7 @@ namespace CriticalMass.Runtime.View.B13
             Barricade[] list = w.Barricades;
             double warn = w.Config.Abilities.BuilderPieces.WarnTicks / CriticalMass.Sim.Config.Durations.ReferenceHz;
             bool blink = (Mathf.FloorToInt(Time.unscaledTime * 8f) & 1) == 0;
+            float capK = CapLight();
             for (int s = 0; s < list.Length; s++)
             {
                 byte kind = BuilderWalls.SlotKind(w, s);
@@ -123,8 +141,10 @@ namespace CriticalMass.Runtime.View.B13
                 if (kind == BuilderWalls.KindShort)
                 {
                     if (!_mesh.Room(4, 6)) return;
-                    Color32 tc = b.Team == TeamId.Azure ? AzureTop : CrimsonTop;
-                    Quad(b.Cx + 0.08f, b.Cz + 0.08f, b.Cx + 0.92f, b.Cz + 0.92f, h + top + 0.015f, tc);
+                    Color32 tc = Scale(b.Team == TeamId.Azure ? AzureTop : CrimsonTop, capK);
+                    // b14 review: the cap is an inlay on the stone top (CapInset), not a lid over the whole block: the bevelled
+                    // stone shows round it, so a row of blocks reads as stones carrying team colour instead of a blue brick.
+                    Quad(b.Cx + CapInset, b.Cz + CapInset, b.Cx + 1f - CapInset, b.Cz + 1f - CapInset, h + top + 0.015f, tc);
                     CapsDrawn++;
                     double max = BuilderWalls.SlotMaxHp(w, s);
                     double share = max > 0 ? b.Hp / max : 1;

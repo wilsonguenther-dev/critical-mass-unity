@@ -55,7 +55,7 @@ namespace CriticalMass.Runtime.Menus.Characters
         readonly Text[] _ctrlLabel = new Text[8], _ctrlKey = new Text[8], _ctrlPad = new Text[8];
         readonly RectTransform[] _ctrlRow = new RectTransform[8];
         readonly Texture2D[,] _stills = new Texture2D[6, CharacterShowcaseData.SlideCount];
-        string[] _captions;
+        string[] _captions, _plainCaptions;
         GameObject _videoHost;
         VideoPlayer _vp;
         RenderTexture _rt;
@@ -271,7 +271,8 @@ namespace CriticalMass.Runtime.Menus.Characters
             if (_nav.Tab == ShowcaseTab.Watch)
             {
                 if (classChanged || tabChanged) StartClip(k.Id);
-                HudText.Set(_caption, _captions[c]);
+                // b14 review: no clip and no still on disk = the portrait stands in; it is not "in a real match"
+                HudText.Set(_caption, _media[c] ? _captions[c] : _plainCaptions[c]);
             }
             else StopClip();
             if (_nav.Tab == ShowcaseTab.HowItWorks && _nav.Slide != _shownSlide)
@@ -391,8 +392,13 @@ namespace CriticalMass.Runtime.Menus.Characters
             return UiIcons.Get(UiIcons.Portrait[c, 0], 4);
         }
 
+        /// <summary>b14 review: class c has a clip or a still on disk (else the Watch tab shows the portrait).</summary>
+        readonly bool[] _media = new bool[6];
+
         void LoadStills()
         {
+            for (int c = 0; c < 6; c++)
+                _media[c] = CharacterShowcaseData.FileThere(CharacterShowcaseData.ClipPath(CharacterShowcaseData.All[c].Id));
             for (int c = 0; c < 6; c++)
                 for (int n = 0; n < CharacterShowcaseData.SlideCount; n++)
                 {
@@ -403,6 +409,7 @@ namespace CriticalMass.Runtime.Menus.Characters
                     tex.Compress(false);
                     tex.Apply(false, true);   // GPU copy only: about 0.9 MB a still
                     _stills[c, n] = tex;
+                    _media[c] = true;
                 }
         }
 
@@ -500,6 +507,8 @@ namespace CriticalMass.Runtime.Menus.Characters
             _caption = MenuUi.Fit(MenuUi.Label(_watch, "Caption", CMTokens.Ui, UiScale.TypeBody, CMTokens.WithAlpha(cream, 0.85f), TextAnchor.MiddleCenter, vc.x, vc.y, vc.width, vc.height, "", 2f), 14);
             _captions = new string[CharacterShowcaseData.All.Length];
             for (int i = 0; i < _captions.Length; i++) _captions[i] = "THE " + CharacterShowcaseData.All[i].Name + " IN A REAL MATCH";
+            _plainCaptions = new string[_captions.Length];
+            for (int i = 0; i < _plainCaptions.Length; i++) _plainCaptions[i] = "THE " + CharacterShowcaseData.All[i].Name;
 
             _how = MenuUi.Rt(space, "How It Works");
             MenuUi.Stretch(_how);
