@@ -14,7 +14,7 @@ using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
 
-namespace CriticalMass.Editor.WorldLook
+namespace CriticalMass.Editor.LookProbes
 {
     /// <summary>
     /// b15 world look: the reviewer's measuring scripts (Editor, Play mode, one Editor instance). Menu "CM/World Look/...".
