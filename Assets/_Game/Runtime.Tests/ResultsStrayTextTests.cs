@@ -25,11 +25,13 @@ namespace CriticalMass.Runtime.Tests
             ("Kaiju Reason", "Instability reached 100 of 100 before the hatch, and corruption fed the egg to the very end."),
             ("Kaiju KOs", "Knocked out 12 times: Azure 6, Crimson 6."),
             ("Kaiju Kills", "Players it knocked out: Azure 16, Crimson 16."),
-            ("You Name", "DEMOLITIONIST\nCRIMSON"),
+            ("You Name", "DEMOLITIONIST  ·  CRIMSON"),
+            // b15 item 2: the player's best stat line (the longest award line at the largest numbers)
+            ("You Best", "YOUR BEST: 9999 structures blown, #32 of 32"),
             ("MVP Name 0", "DEMOLITIONIST 16"),
             ("MVP Name 1", "DEMOLITIONIST 16"),
-            ("MVP Line 0", "24 KO  ·  999 s HILL  ·  9999 BIOMASS"),
-            ("MVP Line 1", "24 KO  ·  999 s HILL  ·  9999 BIOMASS"),
+            ("MVP Line 0", "9999 walls and pieces built, #32 of 32"),
+            ("MVP Line 1", "9999 structures blown, #32 of 32"),
             ("MVP Points 0", "99999 PTS"),
             ("MVP Points 1", "99999 PTS"),
         };

@@ -43,7 +43,23 @@ namespace CriticalMass.Runtime.Menus
         readonly Text[] _tileLabel = new Text[3], _tileTime = new Text[3], _tileEmpty = new Text[3];
         bool _photoHooked;
 
-        public static readonly string[] TabNames = { "SUMMARY", "REWARDS", "ACHIEVEMENTS", "HIGHLIGHTS" };
+        /// <summary>Tab labels in ResultsTab order (b15: MATCH STORY second).</summary>
+        public static readonly string[] TabNames = { "SUMMARY", MatchWords.StoryTab, "REWARDS", "ACHIEVEMENTS", "HIGHLIGHTS" };
+
+        // ---- b15 items 1 and 2: the MATCH STORY page (lead graph, turning point, role awards, your best) ----
+        LeadGraph _graph;
+        Text _turn, _awardsHeading, _bestTitle, _bestLine, _youBest, _axisTop, _axisMid, _axisZero;
+        readonly Text[] _axisTimes = new Text[9];
+        readonly GraphSwatch[] _swatches = new GraphSwatch[ResultsLayout.LegendItems];
+        readonly VectorShape[] _awardPlates = new VectorShape[ResultsLayout.AwardRows];
+        readonly HudIcon[] _awardPortrait = new HudIcon[ResultsLayout.AwardRows];
+        readonly Text[] _awardTitle = new Text[ResultsLayout.AwardRows], _awardLine = new Text[ResultsLayout.AwardRows],
+            _awardWho = new Text[ResultsLayout.AwardRows];
+        AwardResult[] _awards;
+        public AwardResult[] AwardsShown => _awards;
+        public string TurningPointText => _turn != null ? _turn.text : string.Empty;
+        public string YourBestText => _youBest != null ? _youBest.text : string.Empty;
+        public LeadGraph Graph => _graph;
 
         /// <summary>The page on show.</summary>
         public ResultsTab ActiveTab { get; private set; } = ResultsTab.Summary;
@@ -131,6 +147,7 @@ namespace CriticalMass.Runtime.Menus
             BuildKaiju(sum, ResultsLayout.Card(0).x);
             BuildYou(sum, ResultsLayout.Card(1).x);
             BuildMvps(sum, ResultsLayout.Card(2).x);
+            BuildStoryPage(_pages[(int)ResultsTab.Story]);
             BuildRewardsPage(_pages[(int)ResultsTab.Rewards]);
             BuildAchievementsPage(_pages[(int)ResultsTab.Achievements]);
             BuildHighlightsPage(_pages[(int)ResultsTab.Highlights]);
@@ -214,6 +231,130 @@ namespace CriticalMass.Runtime.Menus
         }
 
         void StepTab(int d) => ShowTab((ResultsTab)(((int)ActiveTab + d + ResultsLayout.TabCount) % ResultsLayout.TabCount));
+
+        // ---------------------------------------------------------------- b15 match story page
+
+        void BuildStoryPage(RectTransform page)
+        {
+            Rect sp = ResultsLayout.StoryPanel, ap = ResultsLayout.AwardsPanel;
+            MenuUi.Panel(page, "Story Panel", sp.x, sp.y, sp.width, sp.height);
+            MenuUi.Panel(page, "Awards Panel", ap.x, ap.y, ap.width, ap.height);
+            _turn = L(page, "Turning Point", CMTokens.Ui, UiScale.TypeBody, Cream, TextAnchor.MiddleLeft, ResultsLayout.StoryTurn, 2f);
+
+            Rect g = ResultsLayout.StoryGraph;
+            RectTransform grt = MenuUi.Rt(page, "Lead Graph");
+            MenuUi.Place(grt, g.x, g.y, g.width, g.height);
+            _graph = grt.gameObject.AddComponent<LeadGraph>();
+            _graph.raycastTarget = false;
+            _graph.Ink = CMTokens.VoidNavy.Color;
+            _graph.GuideColor = CMTokens.WithAlpha(Cream, 0.12f);
+            _graph.RuleColor = CMTokens.WithAlpha(Cream, 0.4f);
+
+            Rect ay = ResultsLayout.StoryAxisY;
+            _axisTop = L(page, "Axis Top", CMTokens.Mono, UiScale.TypeSmall, Cream, TextAnchor.UpperRight, new Rect(ay.x, g.y - 6f, ay.width, 28f), 2f);
+            _axisMid = L(page, "Axis Mid", CMTokens.Mono, UiScale.TypeSmall, Cream, TextAnchor.MiddleRight, new Rect(ay.x, g.center.y - 14f, ay.width, 28f), 2f);
+            _axisZero = L(page, "Axis Zero", CMTokens.Mono, UiScale.TypeSmall, Cream, TextAnchor.LowerRight, new Rect(ay.x, g.yMax - 22f, ay.width, 28f), 2f);
+            Rect ax = ResultsLayout.StoryAxisX;
+            for (int i = 0; i < _axisTimes.Length; i++)
+                _axisTimes[i] = L(page, "Axis Time " + i, CMTokens.Mono, UiScale.TypeSmall, Cream, TextAnchor.MiddleCenter, new Rect(g.x - 28f, ax.y, 56f, ax.height), 2f);
+
+            string[] legend = { MatchWords.LegendAzure, MatchWords.LegendCrimson, MatchWords.LegendHatch, MatchWords.LegendHut, MatchWords.LegendLead };
+            var styles = new[] { GraphSwatch.Style.Solid, GraphSwatch.Style.Dashed, GraphSwatch.Style.Diamond, GraphSwatch.Style.Square, GraphSwatch.Style.Circle };
+            for (int i = 0; i < ResultsLayout.LegendItems; i++)
+            {
+                Rect li = ResultsLayout.LegendItem(i);
+                RectTransform srt = MenuUi.Rt(page, "Legend Swatch " + i);
+                MenuUi.Place(srt, li.x + 8f, li.y + li.height * 0.5f - 12f, 44f, 24f);
+                _swatches[i] = srt.gameObject.AddComponent<GraphSwatch>();
+                _swatches[i].Kind = styles[i];
+                _swatches[i].Ink = CMTokens.VoidNavy.Color;
+                _swatches[i].raycastTarget = false;
+                L(page, "Legend " + i, CMTokens.Ui, UiScale.TypeSmall, Cream, TextAnchor.MiddleLeft, new Rect(li.x + 60f, li.y, li.width - 64f, li.height), 2f).text = legend[i];
+            }
+
+            _awardsHeading = L(page, "Awards Heading", CMTokens.Display, UiScale.TypeHeading, Brass, TextAnchor.MiddleCenter, ResultsLayout.AwardsHeading, 3f, UiScale.TypeSmall);
+            HudText.Set(_awardsHeading, MatchWords.AwardsHeading);
+            Rect bb = ResultsLayout.AwardsBest;
+            VectorShape bestPlate = MenuUi.Shape(page, "Your Best Plate", ShapeKind.RoundRect, bb.x, bb.y, bb.width, bb.height, CMTokens.WithAlpha(Brass, 0.22f), 14f);
+            bestPlate.OutlinePx = 0f;
+            bestPlate.RimPx = 2f;
+            bestPlate.RimColor = Brass;
+            _bestTitle = L(page, "Your Best Title", CMTokens.Display, UiScale.TypeSmall, Brass, TextAnchor.MiddleLeft, new Rect(bb.x + 16f, bb.y, 150f, bb.height), 2f);
+            HudText.Set(_bestTitle, MatchWords.BestPrefix);
+            _bestLine = L(page, "Your Best Line", CMTokens.Ui, UiScale.TypeBody, Cream, TextAnchor.MiddleLeft, new Rect(bb.x + 170f, bb.y, bb.width - 186f, bb.height), 2f);
+            for (int i = 0; i < ResultsLayout.AwardRows; i++)
+            {
+                Rect r = ResultsLayout.AwardRow(i);
+                VectorShape plate = MenuUi.Shape(page, "Award " + i, ShapeKind.RoundRect, r.x, r.y, r.width, r.height, CMTokens.VoidNavy.Color, 12f);
+                plate.OutlinePx = 0f;
+                plate.RimPx = 2f;
+                _awardPlates[i] = plate;
+                _awardPortrait[i] = HudIcon.Make(page, "Award Portrait " + i, r.x + 8f, r.y + 6f, 52f, 52f);
+                _awardTitle[i] = L(page, "Award Title " + i, CMTokens.Display, UiScale.TypeSmall, Brass, TextAnchor.MiddleLeft, new Rect(r.x + 70f, r.y + 4f, 250f, 28f), 2f);
+                HudText.Set(_awardTitle[i], MatchWords.AwardTitles[i]);
+                _awardWho[i] = L(page, "Award Who " + i, CMTokens.Display, UiScale.TypeSmall, Cream, TextAnchor.MiddleRight, new Rect(r.x + 324f, r.y + 4f, r.width - 336f, 28f), 2f);
+                _awardLine[i] = L(page, "Award Line " + i, CMTokens.Ui, UiScale.TypeSmall, Cream, TextAnchor.MiddleLeft, new Rect(r.x + 70f, r.y + 32f, r.width - 82f, 28f), 2f);
+            }
+        }
+
+        void RefreshStory()
+        {
+            if (_graph == null || _stats == null || _world == null) return;
+            MatchTimeline tl = _stats.Timeline;
+            _graph.AzureColor = CMTokens.Team(TeamId.Azure);
+            _graph.CrimsonColor = CMTokens.Team(TeamId.Crimson);
+            _graph.SetData(tl);
+            _swatches[0].color = _graph.AzureColor;
+            _swatches[1].color = _graph.CrimsonColor;
+            _swatches[2].color = CMTokens.WarmCream.Color;
+            _swatches[3].color = CMTokens.WarmCream.Color;
+            _swatches[4].color = CMTokens.WarmCream.Color;
+            HudText.Set(_turn, _sum != null ? _sum.TurningPoint : string.Empty);
+            HudText.Set(_axisTop, MatchWords.Fill(MatchWords.AxisSeconds, "s", MatchWords.N(_graph.MaxY)));
+            HudText.Set(_axisMid, MatchWords.Fill(MatchWords.AxisSeconds, "s", MatchWords.N(_graph.MaxY * 0.5)));
+            HudText.Set(_axisZero, MatchWords.Fill(MatchWords.AxisSeconds, "s", "0"));
+            Rect g = ResultsLayout.StoryGraph;
+            int stepS = _graph.MaxT > 300 ? 120 : 60;
+            for (int i = 0; i < _axisTimes.Length; i++)
+            {
+                double t = i * stepS;
+                bool on = t <= _graph.MaxT + 0.5;
+                _axisTimes[i].gameObject.SetActive(on);
+                if (!on) continue;
+                float x = g.x + (float)(t / _graph.MaxT) * g.width;
+                MenuUi.Place(_axisTimes[i].rectTransform, x - 28f, ResultsLayout.StoryAxisX.y, 56f, ResultsLayout.StoryAxisX.height);
+                HudText.Set(_axisTimes[i], MatchWords.Clock(t));
+            }
+
+            _awards = _stats.Awards();
+            for (int i = 0; i < ResultsLayout.AwardRows && i < _awards.Length; i++)
+            {
+                AwardResult a = _awards[i];
+                bool none = a.Actor < 0;
+                bool mine = a.Actor == LocalSeat.Actor;
+                _awardPlates[i].SetFill(mine ? CMTokens.WithAlpha(Brass, 0.35f) : none ? CMTokens.WithAlpha(CMTokens.VoidNavy.Color, 0.6f) : CMTokens.VoidNavy.Color);
+                HudText.Set(_awardLine[i], RoleAwards.Line(a));
+                _awardLine[i].color = none ? CMTokens.WithAlpha(Cream, 0.6f) : Cream;
+                if (none)
+                {
+                    HudText.Set(_awardWho[i], string.Empty);
+                    _awardPortrait[i].Image.enabled = false;
+                    continue;
+                }
+                ActorStats who = _stats.Actors[a.Actor];
+                _awardPortrait[i].Set(UiIcons.Portrait[(int)who.Cls, (int)who.Team], _tier);
+                _awardPortrait[i].Image.enabled = _awardPortrait[i].Image.texture != null;
+                HudText.Set(_awardWho[i], mine ? MatchWords.You : ActorName(a.Actor));
+                _awardWho[i].color = mine ? Brass : CMTokens.TeamInk(who.Team);
+            }
+            HudText.Set(_bestLine, BestLineFor(LocalSeat.Actor));
+        }
+
+        string BestLineFor(int id)
+        {
+            if (_stats == null || id < 0 || id >= _stats.ActorCount) return string.Empty;
+            return RoleAwards.BestLine(_stats.BestOf(id), _stats.Actors[id]);
+        }
 
         // ---------------------------------------------------------------- rewards page
 
@@ -443,7 +584,9 @@ namespace CriticalMass.Runtime.Menus
         {
             Card(p, "You Card", x, "YOUR MATCH");
             _youPortrait = HudIcon.Make(p, "You Portrait", x + 32f, Top + 72f, 104f, 104f);
-            _youName = Wrap(MenuUi.Fit(MenuUi.Label(p, "You Name", CMTokens.Display, UiScale.TypeButton, Cream, TextAnchor.MiddleLeft, x + 156f, Top + 76f, 332f, 96f, "", 3f), 26));
+            // b15 item 2: the name on one line, the player's own best stat under it in brass (prominent, before the table)
+            _youName = Wrap(MenuUi.Fit(MenuUi.Label(p, "You Name", CMTokens.Display, UiScale.TypeButton, Cream, TextAnchor.MiddleLeft, x + 156f, Top + 72f, 332f, 44f, "", 3f), 20));
+            _youBest = Wrap(MenuUi.Label(p, "You Best", CMTokens.Ui, UiScale.TypeBody, Brass, TextAnchor.UpperLeft, x + 156f, Top + 118f, 332f, 60f, "", 2f));
             for (int i = 0; i < StatNames.Length; i++)
             {
                 float y = Top + 196f + i * 42f;
@@ -483,6 +626,7 @@ namespace CriticalMass.Runtime.Menus
             _sum = sum;
             EnsureBuilt();
             Refresh();
+            RefreshStory();
             // Every match opens on the summary (headline, the player's line, the MVPs); the rewards are one tab away.
             ShowTab(ResultsTab.Summary);
         }
@@ -523,7 +667,8 @@ namespace CriticalMass.Runtime.Menus
             {
                 ActorStats me = _stats.Actors[LocalSeat.Actor];
                 _youPortrait.Set(UiIcons.Portrait[(int)me.Cls, (int)me.Team], _tier);
-                HudText.Set(_youName, FlowWords.ClassName(me.Cls) + "\n" + (me.Team == TeamId.Azure ? "AZURE" : "CRIMSON"));
+                HudText.Set(_youName, FlowWords.ClassName(me.Cls) + "  ·  " + (me.Team == TeamId.Azure ? "AZURE" : "CRIMSON"));
+                HudText.Set(_youBest, MatchWords.Fill(MatchWords.BestOnCard, "line", BestLineFor(LocalSeat.Actor)));
                 _youName.color = CMTokens.TeamInk(me.Team);
                 string[] v =
                 {
@@ -548,7 +693,8 @@ namespace CriticalMass.Runtime.Menus
                 _mvpPortrait[t].Set(UiIcons.Portrait[(int)a.Cls, t], _tier);
                 HudText.Set(_mvpName[t], ActorName(id));
                 _mvpName[t].color = id == LocalSeat.Actor ? Brass : Cream;
-                HudText.Set(_mvpLine[t], a.Kills + " KO  ·  " + I(a.HillSeconds) + " s HILL  ·  " + a.Biomass + " BIOMASS");
+                // b15 item 2: the MVP's line names what they did best (their job), not only knock-outs
+                HudText.Set(_mvpLine[t], BestLineFor(id));
                 HudText.Set(_mvpPoints[t], a.Points.ToString(CultureInfo.InvariantCulture) + " PTS");
             }
 
@@ -562,6 +708,7 @@ namespace CriticalMass.Runtime.Menus
             if (tier == _tier) return;
             _tier = tier;
             Refresh();
+            RefreshStory();
             if (ActiveTab == ResultsTab.Highlights) RefreshHighlights();
         }
 
