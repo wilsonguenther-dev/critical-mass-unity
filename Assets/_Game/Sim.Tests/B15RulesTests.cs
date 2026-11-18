@@ -527,9 +527,31 @@ namespace CriticalMass.Sim.Tests
             sink += B15Work(w, N);
             double b15 = (Stopwatch.GetTimestamp() - t1) * 1e6 / Stopwatch.Frequency / N;
             double share = b15 / Math.Max(1e-9, tick);
-            Line("16v16 seed 4242 Full: one tick / the b15 work of a tick (every actor's speed, damage and respawn read, the vote, RALLY)",
-                tick.ToString("0.0") + " us / " + b15.ToString("0.00") + " us = " + (share * 100).ToString("0.00") + " % (sink " + (sink != 0 ? "ok" : "0") + ")", "3 %");
-            Assert.Less(share, 0.03);
+            Line("16v16 seed 4242 Full: one tick / the b15 calls of a tick timed on their own (an upper bound: isolated calls, no inlining into the systems)",
+                tick.ToString("0.0") + " us / " + b15.ToString("0.00") + " us = " + (share * 100).ToString("0.00") + " % (sink " + (sink != 0 ? "ok" : "0") + ")", "printed");
+            // The gate: the same job runs the same 2:00 16v16 match with both rules off and both on, interleaved three times each;
+            // the fastest run of each arm is compared (the fastest is the least disturbed by the shared runner).
+            double bestOff = double.MaxValue, bestOn = double.MaxValue;
+            for (int rep = 0; rep < 3; rep++)
+            {
+                bestOff = Math.Min(bestOff, TimeMatch(Full(false, false)));
+                bestOn = Math.Min(bestOn, TimeMatch(Full()));
+            }
+            double extra = bestOn / bestOff - 1;
+            Line("16v16 seed 4242 Full 2:00, same job, best of 3 interleaved: microseconds per tick both off / both on",
+                bestOff.ToString("0.0") + " / " + bestOn.ToString("0.0") + " = " + (extra >= 0 ? "+" : "") + (extra * 100).ToString("0.00") + " %", "+3 % or less");
+            Assert.LessOrEqual(extra, 0.03);
+        }
+
+        static double TimeMatch(GameConfig cfg)
+        {
+            World w = Make(cfg, 4242, 16);
+            InputFrame scratch = SimInput.EmptyInput();
+            for (int s = 0; s < 30; s++) MatchTick.Advance(w, null, scratch);
+            const int N = 3600;
+            long t0 = Stopwatch.GetTimestamp();
+            for (int s = 0; s < N; s++) MatchTick.Advance(w, null, scratch);
+            return (Stopwatch.GetTimestamp() - t0) * 1e6 / Stopwatch.Frequency / N;
         }
 
         /// <summary>The b15 code a tick runs, n times: the vote, RALLY, the hill tie, the speed hook per actor, 8 hits, 1 knock-out, the mine time.</summary>
