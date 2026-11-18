@@ -217,7 +217,8 @@ namespace CriticalMass.Runtime.PlayTests
                 bool ladder = false;
                 Assert.IsTrue(FindSpot(s => { bool ok = s.Primary.Action == AffAction.Build && s.Primary.Valid; if (ok) ladder = s.Primary.Verb.Contains("LADDER"); return ok; }, 60, k * 6), "a cliff or gap to build across");
                 Assert.IsTrue(BuilderToolbelt.Local != null && BuilderToolbelt.Local.Pick(W, 0, ladder ? BuilderTool.Ladder : BuilderTool.Bridge), "the matching tool on the wheel");
-                yield return Shows(v, "BUILD");
+                // b14 ladder fix: a ladder's prompt says what it does ("LADDER TO THE HILL" / "LADDER OVER THE WALL"), a bridge's stays "BUILD BRIDGE".
+                yield return Shows(v, ladder ? "LADDER" : "BUILD");
                 Debug.Log($"[Affordance] Builder try {k}: view verdict {v.Scan.Primary.Valid} ({v.Scan.Primary.Why}), ghost cells {v.GhostCellsDrawn}, ghost green {v.GhostValid}");
                 Assert.AreEqual(v.Scan.Primary.Valid, v.GhostValid, "the ghost colour is the view's own verdict");
                 green = v.GhostValid;
