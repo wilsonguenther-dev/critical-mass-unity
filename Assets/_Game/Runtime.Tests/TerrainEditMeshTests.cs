@@ -41,6 +41,15 @@ namespace CriticalMass.Runtime.Tests
         [Test]
         public void ADugCellDrawsPitWallsAndAFloor()
         {
+            // b15: these pin the b14 square pits (TerrainEditMesh.OrganicPits off); the natural pits are IslandGeometryTests'.
+            bool was = TerrainEditMesh.OrganicPits;
+            TerrainEditMesh.OrganicPits = false;
+            try { ADugCellDrawsPitWallsAndAFloorSquare(); }
+            finally { TerrainEditMesh.OrganicPits = was; }
+        }
+
+        void ADugCellDrawsPitWallsAndAFloorSquare()
+        {
             byte[] pristine = All(Cell.Floor), cells = All(Cell.Floor);
             var touched = new bool[W * H];
             cells[I(5, 5)] = Cell.Void;
@@ -83,6 +92,15 @@ namespace CriticalMass.Runtime.Tests
 
         [Test]
         public void ADeeperDigShowsTallerWalls()
+        {
+            // b15: these pin the b14 square pits (TerrainEditMesh.OrganicPits off); the natural pits are IslandGeometryTests'.
+            bool was = TerrainEditMesh.OrganicPits;
+            TerrainEditMesh.OrganicPits = false;
+            try { ADeeperDigShowsTallerWallsSquare(); }
+            finally { TerrainEditMesh.OrganicPits = was; }
+        }
+
+        void ADeeperDigShowsTallerWallsSquare()
         {
             byte[] pristine = All(Cell.Floor), cells = All(Cell.Floor);
             var touched = new bool[W * H];
