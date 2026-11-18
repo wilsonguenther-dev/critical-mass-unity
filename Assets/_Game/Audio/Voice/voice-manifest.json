@@ -201,6 +201,15 @@
       "key": "5774268c4e3e"
     },
     {
+      "id": "an-23",
+      "role": "announcer",
+      "text": "Rally! The team behind gets more for the hill.",
+      "voice": "bm_george",
+      "speed": 0.95,
+      "ms": 3271,
+      "key": "dd4f2cad342f"
+    },
+    {
       "id": "story-title",
       "role": "narrator",
       "text": "Critical Mass. Hold the hill.",

@@ -341,8 +341,8 @@ namespace CriticalMass.Sim.Core
         /// <summary>One line each, what it does (indexed by (int)HutOption).</summary>
         public static readonly string[] Line =
         {
-            "", "Back in the fight 1.5 s sooner", "Walls: +50% HP, last 50% longer", "Miners mine 40% faster",
-            "Shields up: 20% less from every side", "TNT blows 30% sooner", "25% less from blasts", "Healers mend from 40% further",
+            "", "Back in the fight 1.5 s sooner", "Walls: +50% HP, last 50% longer", "Mining takes 40% less time",
+            "Shielded Warriors take 20% less", "TNT blows 30% sooner", "25% less from blasts", "Healers mend from 40% further",
             "+25% damage to the Kaiju", "Win ties on the hill", "10% faster off the hill",
         };
 

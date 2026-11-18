@@ -132,6 +132,12 @@
       "trigger": "secretHillAlone",
       "priority": 1,
       "text": "Still up there on your own? Respect."
+    },
+    {
+      "id": "an-23",
+      "trigger": "rally",
+      "priority": 2,
+      "text": "Rally! The team behind gets more for the hill."
     }
   ]
 }

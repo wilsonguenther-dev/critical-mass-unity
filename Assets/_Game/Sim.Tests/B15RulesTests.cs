@@ -521,20 +521,30 @@ namespace CriticalMass.Sim.Tests
             for (int s = 0; s < N; s++) MatchTick.Advance(w, null, scratch);
             double tick = (Stopwatch.GetTimestamp() - t0) * 1e6 / Stopwatch.Frequency / N;
             double sink = 0;
+            // warm the b15 paths once (JIT), then time them
+            sink += B15Work(w, 1);
             long t1 = Stopwatch.GetTimestamp();
-            for (int s = 0; s < N; s++)
-            {
-                HutChoices.VoteSystem(w);
-                sink += Comeback.RallyCredit(w, HillState.Crimson, 0) + HutChoices.AnchorTie(w);
-                for (int i = 0; i < w.ActorCount; i++) sink += B13Hooks.SpeedScale(w, i) - Blacksmith.SpeedScale(w, i) * Corruption.SpeedScale(w, i);
-                for (int i = 0; i < 8; i++) sink += HutChoices.DamageScale(w, i, w.ActorCount - 1 - i, DamageCause.Melee);
-                sink += Comeback.RespawnDelay(w, TeamId.Azure) + Blacksmith.MineTicksFor(w, TeamId.Azure) + Blacksmith.MineTicksFor(w, TeamId.Crimson);
-            }
+            sink += B15Work(w, N);
             double b15 = (Stopwatch.GetTimestamp() - t1) * 1e6 / Stopwatch.Frequency / N;
             double share = b15 / Math.Max(1e-9, tick);
             Line("16v16 seed 4242 Full: one tick / the b15 work of a tick (every actor's speed, damage and respawn read, the vote, RALLY)",
                 tick.ToString("0.0") + " us / " + b15.ToString("0.00") + " us = " + (share * 100).ToString("0.00") + " % (sink " + (sink != 0 ? "ok" : "0") + ")", "3 %");
             Assert.Less(share, 0.03);
+        }
+
+        /// <summary>The b15 code a tick runs, n times: the vote, RALLY, the hill tie, the speed hook per actor, 8 hits, 1 knock-out, the mine time.</summary>
+        static double B15Work(World w, int n)
+        {
+            double sink = 0;
+            for (int s = 0; s < n; s++)
+            {
+                HutChoices.VoteSystem(w);
+                sink += Comeback.RallyCredit(w, HillState.Crimson, 0) + HutChoices.AnchorTie(w);
+                for (int i = 0; i < w.ActorCount; i++) sink += HutChoices.SpeedScale(w, i);
+                for (int i = 0; i < 8; i++) sink += HutChoices.DamageScale(w, i, w.ActorCount - 1 - i, DamageCause.Melee);
+                sink += Comeback.RespawnDelay(w, TeamId.Azure) + HutChoices.MineScale(w, TeamId.Azure) + HutChoices.MineScale(w, TeamId.Crimson);
+            }
+            return sink;
         }
 
         // ------------------------------------------------------------------ determinism and replay

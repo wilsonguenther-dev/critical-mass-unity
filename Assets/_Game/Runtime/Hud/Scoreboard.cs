@@ -66,6 +66,8 @@ namespace CriticalMass.Runtime.Hud
         {
             public RectTransform Rt;
             public Text Name, Total;
+            public Text Picks;   // b15-hook: the team's hut picks
+            public int PicksKey = -1;
             public HudIcon Crest;
             public readonly Row[] Rows = new Row[MaxRows];
             public readonly int[] Order = new int[MaxRows];
@@ -104,6 +106,7 @@ namespace CriticalMass.Runtime.Hud
             MenuUi.Label(tb.Rt, "Total Label", CMTokens.Ui, UiScale.TypeMin, CMTokens.WithAlpha(CMTokens.WarmCream.Color, 0.8f), TextAnchor.MiddleRight,
                 420f, 18f, 240f, 44f, "HILL SECONDS", 2f);
             tb.Total = MenuUi.Label(tb.Rt, "Total", CMTokens.Mono, UiScale.TypeHeading, tc, TextAnchor.MiddleRight, 670f, 18f, 100f, 44f, "", 3f);
+            tb.Picks = MenuUi.Fit(MenuUi.Label(tb.Rt, "Hut Picks", CMTokens.Ui, UiScale.TypeMin, CMTokens.ToolBrass.Color, TextAnchor.MiddleLeft, 62f, 61f, 708f, 22f, "", 2f), 11);   // b15-hook
             for (int c = 0; c < Columns; c++)
                 HudText.SetOneLine(MenuUi.Label(tb.Rt, "Heading " + c, CMTokens.Ui, UiScale.TypeMin, CMTokens.WithAlpha(CMTokens.WarmCream.Color, 0.8f),
                     c == 0 ? TextAnchor.MiddleLeft : TextAnchor.MiddleCenter, ColX[c], 82f, ColW[c], 30f, "", 2f), Headings[c], UiScale.TypeMin, 11);
@@ -203,6 +206,12 @@ namespace CriticalMass.Runtime.Hud
                 Table tb = _tables[t];
                 double hill = t == 0 ? m.HillSeconds.Azure : m.HillSeconds.Crimson;
                 HudText.Set(tb.Total, NumberCache.Int((int)System.Math.Floor(hill)));
+                int picksKey = CriticalMass.Sim.Core.HutChoices.On(w) ? w.HutVote.Mask[t] : -2;   // b15-hook
+                if (picksKey != tb.PicksKey)
+                {
+                    tb.PicksKey = picksKey;
+                    HudText.Set(tb.Picks, Mechanics.B15Hud.Picks(w, (TeamId)t));
+                }
                 for (int r = 0; r < MaxRows; r++)
                 {
                     Row row = tb.Rows[r];
