@@ -222,6 +222,19 @@ namespace CriticalMass.Runtime.PlayTests
             // that moved (bots now walk to the ore veins and the hut), so one spot can turn red in between. Each try prints the
             // view's verdict; the ghost colour must always equal it, and some try must be green.
             // b14: the ladder / bridge is a tool on the wheel; F (or the ability button, B on a pad) uses it.
+            // b14 ladder fix: a ladder that is no shortcut over the rock (a step round the wall's end) shows red with its reason.
+            if (FindSpot(s => s.Primary.Action == AffAction.Build && s.Primary.Valid && s.Primary.Verb.Contains("LADDER") && !UsefulLadderAhead()))
+            {
+                Assert.IsTrue(BuilderToolbelt.Local != null && BuilderToolbelt.Local.Pick(W, 0, BuilderTool.Ladder), "LADDER on the wheel");
+                _driver.StepTicks(1);
+                yield return null;
+                yield return null;
+                Debug.Log($"[Affordance] Builder useless ladder: view verdict {v.Scan.Primary.Valid} ({v.Scan.Primary.Why}), ghost cells {v.GhostCellsDrawn}, ghost green {v.GhostValid}");
+                Assert.IsFalse(v.Scan.Primary.Valid, "a ladder with no shortcut is refused");
+                Assert.AreEqual(AffWords.NoShortcut, v.Scan.Primary.Why, "the refused ladder says why");
+                Assert.IsFalse(v.GhostValid, "its ghost is red");
+            }
+            else Debug.Log("[Affordance] Builder useless ladder: no such spot on this map (limit: none)");
             bool green = false;
             for (int k = 0; k < 6 && !green; k++)
             {
@@ -236,6 +249,7 @@ namespace CriticalMass.Runtime.PlayTests
             }
             Assert.Greater(v.GhostCellsDrawn, 0, "the placement ghost");
             Assert.IsTrue(green, "green when valid (tries above)");
+            Debug.Log($"[Affordance] Builder green spot: tool {BuilderToolbelt.Local.Selected}, verb {v.Scan.Primary.Verb}, ghost cells {v.GhostCellsDrawn}");
             int head = W.EventHead;
             yield return Pad(GamepadButton.East);
             _driver.StepTicks(1);
