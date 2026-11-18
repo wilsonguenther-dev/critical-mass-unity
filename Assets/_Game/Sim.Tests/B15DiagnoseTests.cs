@@ -141,8 +141,8 @@ namespace CriticalMass.Sim.Tests
                         {
                             d.Arrivals++;
                             arriveAt[i] = w.Tick;
-                            int mine = team == 0 ? m.HillCount.Azure : m.HillCount.Crimson;
-                            int theirs = team == 0 ? m.HillCount.Crimson : m.HillCount.Azure;
+                            double mine = team == 0 ? m.HillCount.Azure : m.HillCount.Crimson;
+                            double theirs = team == 0 ? m.HillCount.Crimson : m.HillCount.Azure;
                             if (mine <= 1) d.ArrivalsAlone++;
                             if (theirs - mine >= 2) d.ArrivalsOutnumbered2++;
                             int last = team == 0 ? lastArrivalTick0 : lastArrivalTick1;

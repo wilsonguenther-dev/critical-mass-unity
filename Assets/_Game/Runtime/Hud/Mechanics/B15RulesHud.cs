@@ -87,6 +87,12 @@ namespace CriticalMass.Runtime.Hud.Mechanics
         public bool RallyShown => _rally != null && _rally.gameObject.activeSelf;
         public bool VoteShown => _vote != null && _vote.gameObject.activeSelf;
 
+        /// <summary>True while the local team's hut vote is open: the D-pad left / right are the vote keys, so the ping wheel and
+        /// the minimap zoom (their usual controller binds) ignore D-pad presses until the vote closes (HudInteract reads this).</summary>
+        public static bool VoteOwnsDpad { get; private set; }
+
+        void OnDisable() => VoteOwnsDpad = false;
+
         void Awake()
         {
             _driver = GetComponent<SimDriverBehaviour>();
@@ -150,7 +156,7 @@ namespace CriticalMass.Runtime.Hud.Mechanics
             if (_canvas.worldCamera == null) _canvas.worldCamera = UnityEngine.Camera.main;
             bool hide = w == null || view == null || w.Match.Phase == MatchPhase.Ended || Scoreboard.AnyOpen;
             if (_canvas.enabled == hide) _canvas.enabled = !hide;
-            if (hide) return;
+            if (hide) { VoteOwnsDpad = false; return; }
             int me = view.Feed.LocalActor;
             if (me < 0 || me >= w.ActorCount) return;
             if (w.Epoch != _epoch)
@@ -208,6 +214,7 @@ namespace CriticalMass.Runtime.Hud.Mechanics
         {
             int level = HutChoices.VoteLevel(w, team);
             bool show = level > 0;
+            VoteOwnsDpad = show;
             if (_vote.gameObject.activeSelf != show) _vote.gameObject.SetActive(show);
             if (!show) { _voteKey = int.MinValue; return; }
 
