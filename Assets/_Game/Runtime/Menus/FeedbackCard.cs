@@ -242,8 +242,7 @@ namespace CriticalMass.Runtime.Menus
             string line = FeedbackLog.MatchLine(_pending);
             _pending = null;
             _showAt = -1f;
-            if (FeedbackLog.Append(FilePath, line, out string err)) Debug.Log(LogTag + " match line written to " + FilePath);
-            else Debug.LogWarning(LogTag + " match line not written: " + err);
+            if (!FeedbackLog.Append(FilePath, line, out string err)) Debug.LogWarning(LogTag + " match line not written: " + err);
         }
 
         // ---------------------------------------------------------------- card

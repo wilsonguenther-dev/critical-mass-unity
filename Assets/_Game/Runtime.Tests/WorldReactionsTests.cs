@@ -207,6 +207,9 @@ namespace CriticalMass.Runtime.Tests
                 // integration batch 10 (fix/gore-proof-1): CombatFx reads only EventHead to spot a world reset (never decodes
                 // an event); GoreShots is a capture-only director that finds its own Hit and Death moments
                 "View/Effects/CombatFx.cs", "View/Effects/GoreShots.cs",
+                // b15 safe defaults: the feedback card reads the local player's own Hit and Deliver events once, for the
+                // time-to-first-fun markers (no WorldForce, nothing drawn)
+                "Menus/FeedbackCard.cs",
             };
             var readers = Directory.GetFiles(root, "*.cs", SearchOption.AllDirectories)
                 .Where(f => Regex.IsMatch(File.ReadAllText(f), @"\.EventHead\b"))

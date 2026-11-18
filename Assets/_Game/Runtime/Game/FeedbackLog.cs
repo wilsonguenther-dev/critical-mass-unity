@@ -51,6 +51,7 @@ namespace CriticalMass.Runtime.Game
                 else if (!char.IsControl(c)) b.Append(c);
             }
             string t = b.ToString().Trim();
+            while (t.Contains("  ")) t = t.Replace("  ", " ");   // a line break pasted as CR LF is one space
             return t.Length > NoteMax ? t.Substring(0, NoteMax) : t;
         }
 
