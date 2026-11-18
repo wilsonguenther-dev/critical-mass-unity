@@ -58,6 +58,15 @@ namespace CriticalMass.Net
         public bool HashesOnce = true;
         /// <summary>b15-zero-cost: the keep-alive interval once this machine's match has ended (nothing is waited for then).</summary>
         public int EndedKeepAliveMs = 1000;
+        /// <summary>
+        /// b15-zero-cost: a rejoiner going live waits until the host's clock reaches the tick it starts at. The replay ends at
+        /// the newest bundle it holds, and the host's feed runs to the newest tick the host has SEQUENCED, which is the
+        /// host's input delay (3 ticks or more) ahead of the host's own stepping. Without the wait the rejoiner then played
+        /// at the very edge of what was sequenced, so every bundle that was not sent the instant it was sequenced made it
+        /// wait (with the host's bundles in pairs: every second tick; online-smoke 44247175418 measured 11.7 s of waits in
+        /// 40 s). A normal joiner sits at the host's stepping, the input delay behind that edge. False = the b15-rejoin rule.
+        /// </summary>
+        public bool RejoinWaitsForTheHost = true;
 
         /// <summary>b15-zero-cost: the sending as it was before b15 (one packet per tick, fingerprints repeated), for
         /// before/after measurements and the cost guard's control arm.</summary>
@@ -154,6 +163,8 @@ namespace CriticalMass.Net
         /// <summary>Rejoiner: wall time the session started (ms) and the time it went live (ms, -1 while catching up).</summary>
         public long RejoinStartMs { get; private set; } = -1;
         public long RejoinLiveMs { get; private set; } = -1;
+        /// <summary>b15-zero-cost: ticks the rejoiner held its clock at going live, to start at the host's stepping.</summary>
+        public int RejoinHeldTicks { get; private set; }
         /// <summary>Rejoiner: the tick it went live at, and the wall milliseconds spent stepping the log.</summary>
         public int RejoinLiveTick { get; private set; } = -1;
         public double CatchUpStepMs { get; private set; }
@@ -857,6 +868,11 @@ namespace CriticalMass.Net
         {
             _catchingUp = false;
             _acc = 0;
+            // b15-zero-cost: start where a normal joiner is (at the host's stepping, as last reported), not at the edge of
+            // what the host has sequenced: hold the clock for the difference (at most a second).
+            int ahead = Stepped - _hostSteppedSeen;
+            RejoinHeldTicks = _o.RejoinWaitsForTheHost && ahead > 0 ? Math.Min(ahead, 30) : 0;
+            _acc = -RejoinHeldTicks * _tickMs;
             _mineThrough = Stepped - 1;
             _sentInput = Stepped - 1;
             _hostAckedInput = Stepped - 1;

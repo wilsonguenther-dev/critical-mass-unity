@@ -224,6 +224,94 @@ namespace CriticalMass.Sim.Tests.Net
         [Test]
         public void CostPerPlayerMinuteStaysAtTheBaseline_32Humans() => CompareArms(32, 450);
 
+        // ------------------------------------------------------------------------------------------------ rejoin with pairs
+
+        private struct RejoinArm { public long LiveMs, StallMs, OtherStallMs; public int Held, Checks, LiveTick; }
+
+        /// <summary>A room of `humans` through LocalRelay (in process, 25 ms each way, simulated clock: deterministic); P1
+        /// drops at `dropAt` and rejoins 2 s later with the seat secret, as online-smoke's drop+rejoin script does.</summary>
+        private static RejoinArm MeasureRejoin(int humans, int ticks, int dropAt, LockstepOptions options)
+        {
+            var relay = new LocalRelay(25);
+            var peers = new List<Peer>();
+            Peer host = Make(relay, true, "Host", p => { p.Humans = humans; p.Ticks = ticks; p.Options = options; });
+            peers.Add(host);
+            Begin(host);
+            for (int i = 1; i < humans; i++)
+            {
+                int k = i;
+                Peer j = Make(relay, false, "P" + k, p =>
+                {
+                    p.Code = host.P.Code;
+                    p.Ticks = ticks;
+                    p.Options = options;
+                    p.Team = k % 2 == 1 ? TeamId.Crimson : TeamId.Azure;
+                    if (k == 1) { p.DropAt = dropAt; p.RejoinAfterMs = 2000; }
+                });
+                peers.Add(j);
+                Begin(j);
+            }
+            RunSim(relay, peers, 900000);
+            foreach (Peer p in peers) Assert.AreEqual(0, p.Exit, All(p));
+            LockstepSession r = peers[1].P.Session;
+            Assert.IsTrue(r.IsRejoin && r.RejoinLiveTick >= 0, "P1 rejoined and went live: " + All(peers[1]));
+            var arm = new RejoinArm { LiveMs = r.RejoinLiveMs - r.RejoinStartMs, StallMs = r.StallMs, Held = r.RejoinHeldTicks, LiveTick = r.RejoinLiveTick };
+            var theirs = new Dictionary<int, ulong>();
+            foreach (KeyValuePair<int, ulong> kv in host.P.Hashes) theirs[kv.Key] = kv.Value;
+            foreach (KeyValuePair<int, ulong> kv in peers[1].P.RejoinHashes)
+            {
+                if (!theirs.TryGetValue(kv.Key, out ulong h)) continue;
+                Assert.AreEqual(h.ToString("X16"), kv.Value.ToString("X16"), "the rejoined player differs at tick " + kv.Key);
+                if (kv.Key > r.RejoinLiveTick) arm.Checks++;
+            }
+            for (int i = 2; i < peers.Count; i++) arm.OtherStallMs = Math.Max(arm.OtherStallMs, peers[i].P.Session.StallMs);
+            return arm;
+        }
+
+        private static void RejoinWithPairs(int humans, int ticks, int dropAt)
+        {
+            RejoinArm old = MeasureRejoin(humans, ticks, dropAt, new LockstepOptions { RejoinWaitsForTheHost = false });
+            RejoinArm now = MeasureRejoin(humans, ticks, dropAt, new LockstepOptions());
+            Console.WriteLine($"[zero-cost] rejoin {humans} humans, two ticks a packet: b15-rejoin start rule: live {old.LiveMs} ms after the accept " +
+                              $"at tick {old.LiveTick}, then waited for the host {old.StallMs} ms; waiting for the host's stepping: held {now.Held} ticks, " +
+                              $"live {now.LiveMs} ms at tick {now.LiveTick}, then waited {now.StallMs} ms (another joiner: {now.OtherStallMs} ms); " +
+                              $"{now.Checks} live fingerprints MATCH (limit: live within 3000 ms, waits at most another joiner's + 150 ms)");
+            Assert.Less(now.LiveMs, 3000, "live within 3 s of the accept");
+            Assert.LessOrEqual(now.StallMs, now.OtherStallMs + 150, "a rejoined player waits for the host no more than one who never left");
+            Assert.GreaterOrEqual(now.Checks, (ticks - now.LiveTick) / 30 - 3, "the rejoined player's live fingerprints equal the host's");
+        }
+
+        [Test]
+        public void ARejoinedPlayerIsLiveSoonAndDoesNotWaitOnThePairedBundles_2Humans() => RejoinWithPairs(2, 1200, 300);
+
+        [Test]
+        public void ARejoinedPlayerIsLiveSoonAndDoesNotWaitOnThePairedBundles_8Humans() => RejoinWithPairs(8, 1200, 300);
+
+        [Test]
+        public void ARejoinedPlayerIsLiveSoonAndDoesNotWaitOnThePairedBundles_32Humans() => RejoinWithPairs(32, 720, 180);
+
+        /// <summary>
+        /// Why a 32-human room sends two ticks a packet, not three: three would cut its relay messages far more (the room
+        /// already sent about every two ticks before b15, so two gains only about 9%), but the measured felt input delay
+        /// grows by more than the one tick the b15 brief allows. If this ever stops failing the delay rule, three can be
+        /// reconsidered (LockstepSession.TicksPerPacketFor).
+        /// </summary>
+        [Test]
+        public void ABigRoomSendsTwoTicksAPacketBecauseThreeCostsMoreThanOneTickOfDelay()
+        {
+            Assert.AreEqual(2, LockstepSession.TicksPerPacketFor(32));
+            Arm before = Measure(32, 450, LockstepOptions.PreB15());
+            Arm two = Measure(32, 450, new LockstepOptions());
+            Arm three = Measure(32, 450, new LockstepOptions { ClientTicksPerPacket = 3 });
+            Console.WriteLine($"[zero-cost] 32 humans: relay messages a second before {before.RoomMsgsPerSec:F1}, two a packet {two.RoomMsgsPerSec:F1}, " +
+                              $"three {three.RoomMsgsPerSec:F1}; joiners' felt delay avg {before.AvgLead:F2} / {two.AvgLead:F2} / {three.AvgLead:F2} ticks, " +
+                              $"max {before.LeadMax} / {two.LeadMax} / {three.LeadMax}; fingerprints MATCH in all three (limit: two within +1 tick, three over it)");
+            Assert.LessOrEqual(two.LeadMax, before.LeadMax + 1, "two ticks a packet keeps the one-tick rule");
+            Assert.Less(two.RoomMsgsPerSec, before.RoomMsgsPerSec, "and still saves messages");
+            Assert.Less(three.RoomMsgsPerSec, two.RoomMsgsPerSec, "three would save more");
+            Assert.Greater(three.LeadMax, before.LeadMax + 1, "but three breaks the one-tick rule, which is why it is off");
+        }
+
         [Test]
         public void TheFreeTierInMatchesADayByRoomSize()
         {
