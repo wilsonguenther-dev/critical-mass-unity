@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using CriticalMass.Sim.Bots;
 using CriticalMass.Sim.Config;
 using CriticalMass.Sim.Core;
+using CriticalMass.Sim.Grid;
 using CriticalMass.Sim.Tests.Harness;
 using NUnit.Framework;
 
