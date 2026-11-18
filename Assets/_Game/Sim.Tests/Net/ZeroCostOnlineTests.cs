@@ -198,6 +198,9 @@ namespace CriticalMass.Sim.Tests.Net
             Assert.AreEqual(est, after.RoomMsgsPerSec, est * 0.15, "the in-game estimate (RelayBudget) matches the measured room");
             Assert.LessOrEqual(after.AvgLead, before.AvgLead + 1.0, "average felt input delay grows by at most one tick");
             Assert.LessOrEqual(after.LeadMax, before.LeadMax + 1, "the largest felt input delay grows by at most one tick");
+            double stallBefore = before.StallMs / (double)(humans - 1), stallAfter = after.StallMs / (double)(humans - 1);
+            Console.WriteLine($"[zero-cost] {humans} humans: waiting for the network per joiner {stallBefore:F0} -> {stallAfter:F0} ms in {after.Seconds:F0} s (limit: at most +300 ms)");
+            Assert.LessOrEqual(stallAfter, stallBefore + 300, "joiners do not wait for the network noticeably more");
             // The cost guard: traffic per player-minute never creeps back past the pinned baseline (+10%).
             (double msgs, double bytes) b = Baseline[humans];
             Console.WriteLine($"[zero-cost] cost guard {humans} humans: {after.MsgsPerPlayerMin:F0} msg per player-minute (baseline {b.msgs:F0}, limit {b.msgs * 1.1:F0}); " +
@@ -381,7 +384,7 @@ namespace CriticalMass.Sim.Tests.Net
                 while (clock.ElapsedMilliseconds < 5000 && !listener.TryFind("K7Q2PF", out g)) Thread.Sleep(20);
                 Assert.AreEqual("K7Q2PF", g.Code, "the beacon was heard");
                 Assert.AreEqual(47800, g.Port);
-                Assert.AreEqual("Wilson", g.Name);
+                Assert.AreEqual("WILSON", g.Name, "names travel cleaned, as in the room");
                 Assert.AreEqual(3, g.Humans);
                 Console.WriteLine($"[zero-cost] local network: heard room {g.Code} from {g.Name} at {g.Address}:{g.Port} after {clock.ElapsedMilliseconds} ms");
             }

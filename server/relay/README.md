@@ -29,6 +29,7 @@ For the GitHub cross-machine smoke test, also set the repository variable `CM_RE
 | POST | `/rooms` | new room: `201 {"code":"ABC234","key":"..."}`; the key proves the caller is the host |
 | GET | `/rooms/CODE/ws?v=1[&key=K]` | WebSocket into the room (host if the key matches, else a joiner) |
 | GET | `/health` | `ok` |
+| GET | `/usage` | b15: today's (UTC) count from this relay's rooms: `{"day","messages","connects","alarms","rooms","requests","free"}`. `requests` estimates what the free plan counts. |
 
 Frames are binary: client to relay `[0][to][payload]` (to = peer number or 255 for everyone) or `[1]` (host only:
 lock the room when the match starts). Relay to client: `[0][from][payload]`, `[1][you]` welcome, `[2][peer]`
@@ -47,7 +48,18 @@ room closes after 10 minutes idle, 2 minutes if the host never connects, and 4 h
 - Per object soft limit 1,000 requests a second. https://developers.cloudflare.com/durable-objects/platform/limits/
 
 On the free plan, going over a daily limit makes requests fail until the next day (UTC); it never bills.
-See the audit for matches per day at 3, 8 and 32 humans.
+Matches a day by room size, measured before and after b15's traffic cut: `docs/online/ZERO-COST-ONLINE.md`.
+
+## Watching the allowance (b15)
+
+- `python3 tools/online/relay-usage.py` asks Cloudflare for the account's Durable Object requests per day (the GraphQL
+  Analytics API, with the login `wrangler login` saved on this Mac; nothing is printed or stored). Works today, no deploy.
+- After the next deploy: `GET /usage` returns the relay's own count; the host's game reads it once per room and shows
+  "Online today: about N of M matches left" (and warns before START when the day is nearly used).
+- `wrangler.toml` turns Workers Logs on at a 1% sample (free plan: 200,000 log events a day, 3 days kept).
+
+Deploying this version adds one Durable Object class (`Usage`, migration `v2`). A deploy restarts the room objects, so
+anyone in a room at that moment is disconnected: deploy when nobody is playing (check `relay-usage.py` for the last hour).
 
 ## Test locally (no account needed)
 

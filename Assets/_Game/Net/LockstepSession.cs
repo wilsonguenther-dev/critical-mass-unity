@@ -657,7 +657,10 @@ namespace CriticalMass.Net
             // Adaptive lead (LeadPolicy): how many ticks ahead of the host's stepping our inputs were when it sent this.
             if (myMargin != int.MinValue && _lead != null && hostStepped >= 0)
             {
-                _lead.OnMargin(myMargin, now);
+                // b15-zero-cost: with inputs sent _clientTicks at a time the host sequences (and reports) right after a whole
+                // group arrives, so a group that came just in time shows a margin of _clientTicks - 1. Take that off, so the
+                // policy sees the same slack it saw with one tick a packet (and grows the lead instead of letting the host wait).
+                _lead.OnMargin(myMargin - (_clientTicks - 1), now);
                 Lead = _lead.Lead;
             }
             if (theirDesync >= 0) Desync(theirDesync);

@@ -151,13 +151,14 @@ namespace CriticalMass.Net
         {
             if (humans < 2) return 0;
             bool big = humans > LockstepSession.BigRoomHumans;
-            if (preB15)
-            {
-                double perPeer = big ? 1000.0 / 66.7 : SimHz;   // 30 ms gate on 33 ms ticks = one a tick; big rooms one per 2 ticks
-                return humans * perPeer;
-            }
+            if (preB15) return humans * (big ? 1000.0 / 60 : SimHz);   // a 30 ms gate on 33 ms ticks: one a tick; big rooms a 60 ms gate
             int k = LockstepSession.TicksPerPacketFor(humans);
-            return humans * SimHz / k;
+            // The host's bundles for a group of k ticks need ceil(k / perPacket) packets (a 32-human bundle is 480 bytes, so
+            // two fit in one 1,200-byte packet).
+            int bundle = humans * (1 + InputCodec.Size);
+            int perPacket = Math.Max(1, (Peers.MaxPacket - 48 - humans) / bundle);
+            int hostPackets = (k + perPacket - 1) / perPacket;
+            return ((humans - 1) + hostPackets) * SimHz / k;
         }
 
         /// <summary>Lobby messages a second (measured shape: the host's ping and roster each second, one pong per joiner).</summary>
