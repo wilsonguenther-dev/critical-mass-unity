@@ -201,6 +201,17 @@ namespace CriticalMass.Runtime.PlayTests
             yield return PlayOut(v, start);
         }
 
+        /// <summary>b14 ladder fix: the view (and the belt's press) refuse a ladder that is no real shortcut over the rock
+        /// ("no shortcut here"); the batch 13 scan FindSpot uses does not, so a ladder spot must pass the same check along the
+        /// facing axis.</summary>
+        bool UsefulLadderAhead()
+        {
+            double f = W.Actors[0].Facing;
+            int dx = (int)Math.Round(Math.Cos(f)), dz = (int)Math.Round(Math.Sin(f));
+            return BuiltPieces.Plan(W, 0, dx, dz, BuiltPieces.Ladder) == 0
+                && CriticalMass.Runtime.View.Mechanics.LadderClimb.LastPlanIsShortcut(W, 0, dx, dz);
+        }
+
         [UnityTest]
         public IEnumerator Builder_GhostShows_AndAbilityBuildsThePiece()
         {
@@ -215,7 +226,7 @@ namespace CriticalMass.Runtime.PlayTests
             for (int k = 0; k < 6 && !green; k++)
             {
                 bool ladder = false;
-                Assert.IsTrue(FindSpot(s => { bool ok = s.Primary.Action == AffAction.Build && s.Primary.Valid; if (ok) ladder = s.Primary.Verb.Contains("LADDER"); return ok; }, 60, k * 6), "a cliff or gap to build across");
+                Assert.IsTrue(FindSpot(s => { bool ok = s.Primary.Action == AffAction.Build && s.Primary.Valid; if (ok) ladder = s.Primary.Verb.Contains("LADDER"); if (ok && ladder) ok = UsefulLadderAhead(); return ok; }, 60, k * 6), "a cliff or gap to build across");
                 Assert.IsTrue(BuilderToolbelt.Local != null && BuilderToolbelt.Local.Pick(W, 0, ladder ? BuilderTool.Ladder : BuilderTool.Bridge), "the matching tool on the wheel");
                 // b14 ladder fix: a ladder's prompt says what it does ("LADDER TO THE HILL" / "LADDER OVER THE WALL"), a bridge's stays "BUILD BRIDGE".
                 yield return Shows(v, ladder ? "LADDER" : "BUILD");
