@@ -67,7 +67,7 @@ namespace CriticalMass.Runtime.Tests
             // menus (settings rows, tabs, class cards)
             // settings rows (hud-containment-2): the label column and the value column, the longest words of every tab
             float lw = PauseMenu.ColLabelW, vw = PauseMenu.ColValueW, lh = PauseMenu.LineH;
-            foreach (string s in new[] { "SAVE POWER IN BACKGROUND", "MUTE WHEN IN BACKGROUND", "PLAY INTRO AT LAUNCH", "COLOUR-BLIND TEAMS",
+            foreach (string s in new[] { "SAVE POWER IN BACKGROUND", "MUTE WHEN IN BACKGROUND", "PLAY INTRO AT EVERY LAUNCH", "INTENSE FLASHING", "COLOUR-BLIND TEAMS",
                          "LOOK SENSITIVITY", "FIELD OF VIEW", "CAMERA FOLLOW", "GORE", "CAMERA" })
                 yield return new Spec("settings row label", disp, UiScale.TypeButton, UiScale.TypeMin, lw, lh, s);
             foreach (string s in new[] { "MANUAL, MOUSE OR STICK", "THIRD PERSON, AUTO FOLLOW", "AUTO, BEHIND YOU", "MANUAL, INVERT Y", "BLUE / AMBER",

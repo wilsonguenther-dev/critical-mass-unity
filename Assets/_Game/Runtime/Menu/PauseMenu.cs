@@ -1374,7 +1374,7 @@ namespace CriticalMass.Runtime.Menu
                 // Owner, 2026-11-14: GORE intensity FULL (default) / REDUCED / OFF, one switch (View.Effects.GoreGate), live in a match.
                 Stepper(tab, 1, "GORE", () => global::CriticalMass.Runtime.View.Effects.GoreGate.Label(GameSettings.Gore), d => GameSettings.Gore = global::CriticalMass.Runtime.View.Effects.GoreGate.Step(GameSettings.Gore, d)),
                 // Owner, 2026-11-13: the story intro plays at every launch; this turns that off, WATCH INTRO plays it now.
-                Stepper(tab, 2, "PLAY INTRO AT LAUNCH", () => GameSettings.IntroAtLaunch ? "ON" : "OFF", d => GameSettings.IntroAtLaunch = !GameSettings.IntroAtLaunch),
+                Stepper(tab, 2, "PLAY INTRO AT EVERY LAUNCH", () => GameSettings.IntroAtLaunch ? "ON" : "OFF", d => GameSettings.IntroAtLaunch = !GameSettings.IntroAtLaunch),
                 // controls-1 round 2: blue / amber teams for colour-blind players (HUD, rings, team text).
                 Stepper(tab, 3, "COLOUR-BLIND TEAMS", () => GameSettings.ColourBlindTeams ? "BLUE / AMBER" : "OFF", d => GameSettings.ColourBlindTeams = !GameSettings.ColourBlindTeams),
                 Stepper(tab, 4, "INTRO SUBTITLES", () => GameSettings.IntroSubtitles ? "ON" : "OFF", d => GameSettings.IntroSubtitles = !GameSettings.IntroSubtitles),

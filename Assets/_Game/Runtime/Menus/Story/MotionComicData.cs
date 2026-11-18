@@ -122,7 +122,7 @@ namespace CriticalMass.Runtime.Menus
     public sealed class McTable
     {
         public string schema;
-        public float stageW = 1920f, stageH = 1080f, letterbox = 0.11f, skipPromptAfter = 1.5f, outroSeconds = 0.5f;
+        public float stageW = 1920f, stageH = 1080f, letterbox = 0.11f, skipPromptAfter = 1.0f, outroSeconds = 0.5f;
         public McCue[] cues;
         public McSequence[] sequences;
         public McSequence[] codex;
@@ -592,7 +592,8 @@ namespace CriticalMass.Runtime.Menus
     /// </summary>
     public sealed class SkipGate
     {
-        public const float LockSeconds = 1.5f;
+        /// <summary>b15 safe defaults (owner-approved 2026-11-17): skippable with any key after 1 s (was 1.5 s).</summary>
+        public const float LockSeconds = 1.0f;
         public readonly float Lock;
         bool _wasUp;
 

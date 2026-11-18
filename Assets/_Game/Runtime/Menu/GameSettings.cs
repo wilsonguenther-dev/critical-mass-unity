@@ -170,7 +170,7 @@ namespace CriticalMass.Runtime.Menu
         /// Setting it writes the opt-in key (true = intense off).</summary>
         public static bool ReduceFlashing { get => !IntenseFlashing; set => IntenseFlashing = !value; }
         public static bool ReduceMotion { get => GetB(ReduceMotionKey, false); set => SetB(ReduceMotionKey, value); }
-        public static bool IntroAtLaunch { get => GetB(IntroAtLaunchKey, true); set => SetB(IntroAtLaunchKey, value); }
+        public static bool IntroAtLaunch { get => GetB(IntroAtLaunchKey, false); set => SetB(IntroAtLaunchKey, value); }
         public static bool IntroSubtitles { get => GetB(IntroSubtitlesKey, true); set => SetB(IntroSubtitlesKey, value); }
         /// <summary>Same setting as ReduceMotion (world reactions' name): sway, springs, launches and the edge flash at 25%.</summary>
         public static bool ReducedMotion { get => ReduceMotion; set => ReduceMotion = value; }
