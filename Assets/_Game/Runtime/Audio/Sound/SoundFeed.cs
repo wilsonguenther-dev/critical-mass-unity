@@ -216,6 +216,27 @@ namespace CriticalMass.Runtime.Audio.Sound
                 case Pick.Heal:
                     Emit(sink, cues[ev.B == Healer.KindPulse && cues.Length > 1 ? 1 : 0], w, ev.X, ev.Z, ownA, false, 1f, 1f, ev.A);
                     return;
+                // ---- b15: the Skybreak cues for the b13 events
+                case Pick.Hut:
+                {
+                    // A = the team, B = the Miner who paid: your team's hut is loud and wins a voice; theirs is quieter
+                    if (w.ActorCount == 0) return;
+                    bool mine = ev.A == (int)w.Actors[LocalSeat.Actor].Team;
+                    Emit(sink, cues[0], w, ev.X, ev.Z, mine, false, mine ? 1f : 0.5f, 1f, ev.B);
+                    return;
+                }
+                case Pick.Ore:
+                    if (ev.B < 0) { if (ownA && cues.Length > 1) Emit(sink, cues[1], w, ev.X, ev.Z, true, false, 1f, 1f, 0); return; }
+                    Emit(sink, cues[0], w, ev.X, ev.Z, ownA, false, 1f, 1f, ev.A);
+                    return;
+                case Pick.BuildWall:
+                    if (ev.B < 0) { if (ownA && cues.Length > 2) Emit(sink, cues[2], w, ev.X, ev.Z, true, false, 1f, 1f, 0); return; }
+                    Emit(sink, cues[ev.Value <= 1.0 && cues.Length > 1 ? 1 : 0], w, ev.X, ev.Z, ownA, false, 1f, 1f, ev.A);
+                    return;
+                case Pick.Bank:
+                    if (ev.Bio == BiomassType.Ore) Emit(sink, cues[0], w, ev.X, ev.Z, ownA, false, 1f, 1f, ev.A);
+                    else Silenced++;
+                    return;
                 default:
                     Silenced++;
                     return;
@@ -257,6 +278,11 @@ namespace CriticalMass.Runtime.Audio.Sound
                     return;
                 case SimEventType.HealLanded:
                     Emit(sink, cue, w, ev.X, ev.Z, ownA || ev.B == LocalSeat.Actor, false, ownA ? 1.1f : 0.8f, 1f, ev.A);
+                    return;
+                case SimEventType.Dodge:
+                case SimEventType.WallBroken:
+                    // b15: B is not an actor here (0 / a cell index): own = the dodger / the wall's owner only
+                    Emit(sink, cue, w, ev.X, ev.Z, ownA, false, 1f, 1f, ev.A);
                     return;
                 case SimEventType.Gather:
                 case SimEventType.Respawn:

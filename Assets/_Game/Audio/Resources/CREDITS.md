@@ -47,7 +47,8 @@ The wind ambience (`amb_wind`) has no file: it is procedural filtered noise (`sr
 # Music, stings, UI sounds and voice credits
 
 Every audio file the game ships is listed here with its source page, author, licence and the sha256 of the file
-that was downloaded. Nothing with unclear rights ships. All music and UI sounds below are **CC0 1.0** (public domain
+that was downloaded. Nothing with unclear rights ships. The music, stings and Skybreak effects are original (next
+section). The UI sounds below are **CC0 1.0** (public domain
 dedication, https://creativecommons.org/publicdomain/zero/1.0/): free to ship in a sold game, credit not required;
 we give it anyway. Licences were read on each source page on 2026-11-12 (UTC) (the OpenGameArt "License(s)" field,
 the Kenney page's "License: CC0" and the pack's `License.txt`).
@@ -59,30 +60,26 @@ file. The gate is `tools/audio-loudness-check.sh` (ffmpeg ebur128 on every file 
 
 The sound effects in `Resources/CMSfx` have their own section at the top of this file.
 
-## Music (Assets/_Game/Audio/Music/Resources/CMMusic)
+## Music, stings and Skybreak effects: original (b15, 2026-11-17)
 
-- Page: https://opengameart.org
-- Licence: CC0 1.0 (each source page; details in the table below)
-- Files (4): `music-title.ogg`, `music-match.ogg`, `music-final.ogg`, `music-berserk.ogg`
+The game's music is ONE original score, "Skybreak", in F minor at 80 BPM, written for the story intro film and
+extended for the match. No library music, no samples, no soundfonts, no generated-music or voice service. Every file
+below is rendered from code in this repository (`tools/audio/skybreak/build_game_score.py`, on the instruments of
+`tools/audio/skybreak/score_intro.py`): oscillators, filtered noise and one synthetic hall, so there is no third-party
+audio in it and nothing to credit or license. The four OpenGameArt and Kenney library loops and stings that shipped
+before b15 (qubodup, cynicmusic, Emma_MA, nene, RandomMind, Kenney "Music Jingles") are removed from the build.
 
-| Shipped file | Used as | Title, author | Source page | Downloaded file | sha256 of the download | Licence |
-|---|---|---|---|---|---|---|
-| `music-title.ogg` | title and menus, quietly under results | "Dark Shrine Loop", qubodup | https://opengameart.org/content/dark-shrine-loop | `qubodup-yd-DarkShrineLoop-OpenGameArt.ogg` | `9580618dc851f70c3a11b5ff87672867de44cd38b35dabf926d6befde20e78d0` | CC0 1.0 |
-| `music-match.ogg` | match | "Battle Theme A", cynicmusic | https://opengameart.org/content/battle-theme-a | `battleThemeA.mp3` | `6042399782e581d753d616bc703e66483d5eccb5fb687a20c9a552d68c49e620` | CC0 1.0 |
-| `music-final.ogg` | final-minute lift | "Determined Pursuit (Epic Orchestra Loop)", Emma_MA | https://opengameart.org/content/determined-pursuit-epic-orchestra-loop | `determined_pursuit_loop.wav` | `e4f3be098b50213b56a60aefe60fffae79cd9f7c9008088f93c187ef1bbc856b` | CC0 1.0 |
-| `music-berserk.ogg` | berserk Kaiju | "Boss Battle #2 (Symphonic Metal)", nene (loop part only) | https://opengameart.org/content/boss-battle-2-symphonic-metal | `boss_battle_#2_metal_pack.zip` → `boss_battle_#2_metal_loop.wav` | zip `27845e601593ec3348488b0479111cda656a97127ef69a066256f7c967e125ab` | CC0 1.0 |
+| Folder | What it holds |
+|---|---|
+| `Assets/_Game/Audio/Music/Resources/CMMusic` | `music-title.ogg`: the 16-bar title loop (menus, quietly under the results) |
+| `Assets/_Game/Audio/Music/Resources/CMScore` | 36 stems: 4 eight-bar sections x bed (minor, feed), rhythm (pulse, march, drive, heart), theme (minor, feed, corrupt) |
+| `Assets/_Game/Audio/Music/Resources/CMStings` | victory, defeat and draw stings; one hatch stinger per Kaiju type (elder, grove, brute, timber, mire) |
+| `Assets/_Game/Audio/Resources/CMSfxScore` | 13 short effects (19 files with their variations) in the score's key: dodge, wall and block placed, wall hit and break, hut level-up, ore hit and banked, ladder, climb step, bridge, pit dig, the behind-you tick |
 
-## Stings (Assets/_Game/Audio/Music/Resources/CMStings)
-
-- Page: https://opengameart.org
-- Licence: CC0 1.0 (each source page; details in the table below)
-- Files (3): `sting-victory.ogg`, `sting-defeat.ogg`, `sting-draw.ogg`
-
-| Shipped file | Title, author | Source page | Downloaded file | sha256 of the download | Licence |
-|---|---|---|---|---|---|
-| `sting-victory.ogg` (first 9 s, 2 s fade) | "Medieval: Victory Theme", RandomMind | https://opengameart.org/content/medieval-victory-theme | `victory.wav` | `91f35879d31091cdeb38721fb4d985a0e7363c0caa97d738ec879bf96e8538f4` | CC0 1.0 |
-| `sting-defeat.ogg` (first 9 s, 2.5 s fade) | "Medieval: Defeat Theme", RandomMind | https://opengameart.org/content/medieval-defeat-theme | `defeat.wav` | `832a9062921000cde7044f18838d11682c578067db0c60a124d95473bb122fc8` | CC0 1.0 |
-| `sting-draw.ogg` | "Music Jingles", Kenney (`Pizzicato jingles/jingles_PIZZI07.ogg`) | https://kenney.nl/assets/music-jingles | `kenney_music-jingles.zip` | zip `b729ba57959bd58793d2c5cafa348aaf2655d354f3da35ec4729e03ec77197b8` | CC0 1.0 |
+Tools used to make them (none ships in the game): NumPy and SciPy (BSD-3-Clause), soundfile (BSD-3-Clause), librosa
+(ISC, the analyzer only), FFmpeg (LGPL/GPL command-line encoder, run as a tool; its output carries no licence), and the
+analyzer's ear, the AudioSet AST classifier `MIT/ast-finetuned-audioset-10-10-0.4593` (BSD-3-Clause, run locally as a
+check only). `tools/audio/skybreak/ANALYZER-REPORT.md` holds the key, grid, loudness, balance, click and tagger results.
 
 ## UI sounds (Assets/_Game/Audio/Ui/Resources/CMUi)
 

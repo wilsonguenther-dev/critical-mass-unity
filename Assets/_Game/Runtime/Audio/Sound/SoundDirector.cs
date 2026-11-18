@@ -48,6 +48,8 @@ namespace CriticalMass.Runtime.Audio.Sound
     {
         public const int Voices = 28, FuseVoices = 4, SubVoices = 2;
         public const string ClipFolder = "CMSfx";
+        /// <summary>b15: the Skybreak effects (original, tools/audio/skybreak/build_game_score.py), file names sb_*.</summary>
+        public const string ScoreSfxFolder = "CMSfxScore";
         /// <summary>World sounds behind the title screen (the attract match) play at this gain.</summary>
         public const float TitleGain = 0.5f;
         /// <summary>Story film: while the intro plays, the backdrop match's world sounds and wind sit under the film at this
@@ -162,6 +164,7 @@ namespace CriticalMass.Runtime.Audio.Sound
         {
             var byName = new Dictionary<string, AudioClip>();
             foreach (AudioClip c in Resources.LoadAll<AudioClip>(ClipFolder)) byName[c.name] = c;
+            foreach (AudioClip c in Resources.LoadAll<AudioClip>(ScoreSfxFolder)) byName[c.name] = c;
             int n = SoundTable.Cues.Length;
             _clips = new AudioClip[n][];
             _cursor = new int[n];
@@ -312,12 +315,37 @@ namespace CriticalMass.Runtime.Audio.Sound
             }
             int[] steps = SoundTable.StepCues;
             int cue = steps[StepIndex(w, f.Actor, x, z)];
+            if (OnLadder(w, x, z))
+            {
+                // b15: a rung, not the ground
+                if (_climbCue == -2) _climbCue = SoundTable.IndexOf("sb_climb_step");
+                if (_climbCue >= 0) { PlayCue(_climbCue, x, z, own, false, 1f, 1f, w.Tick); return; }
+            }
             if (cue < 0) return;
             ClassId cls = w.Actors[f.Actor].Cls;
             bool heavy = cls == ClassId.Warrior || cls == ClassId.Miner;
             bool light = cls == ClassId.Healer || cls == ClassId.Builder;
             PlayCue(cue, x, z, own, false, light ? 0.85f : 1f, heavy ? 0.9f : light ? 1.08f : 1f, w.Tick);
             if (heavy && steps.Length > 5) PlayCue(steps[5], x, z, own, false, 0.5f, 1f, w.Tick);
+        }
+
+        /// <summary>b15 (pure; tests): (x, z) is on a standing ladder (within its half length along it, 0.6 across).</summary>
+        public static bool OnLadder(World w, double x, double z)
+        {
+            BuiltPiece[] ps = w != null && w.Builder != null ? w.Builder.Pieces : null;
+            if (ps == null) return false;
+            for (int i = 0; i < ps.Length; i++)
+            {
+                BuiltPiece p = ps[i];
+                if (p == null || !p.Active || p.Carried || p.Kind != BuiltPieces.Ladder) continue;
+                double ax = p.Dx, az = p.Dz, al = Math.Sqrt(ax * ax + az * az);
+                if (al < 1e-6) continue;
+                ax /= al; az /= al;
+                double ox = x - p.X, oz = z - p.Z;
+                double along = ox * ax + oz * az, side = -ox * az + oz * ax;
+                if (Math.Abs(along) <= p.HalfLen + 0.25 && Math.Abs(side) <= 0.6) return true;
+            }
+            return false;
         }
 
         /// <summary>Index into SoundTable.StepCues: grass, wood, stone, dirt, water (team pads are stone).</summary>
@@ -430,16 +458,67 @@ namespace CriticalMass.Runtime.Audio.Sound
         {
             pan = 0f;
             cutoff = SoundSpace.OpenCutoff;
+            _below = 0f;
             if (c.Range == SoundRange.Ui) return 1f;
             float dx = (float)x - _lx, dz = (float)z - _lz;
             float d = Mathf.Sqrt(dx * dx + dz * dz);
             SoundSpace.Range(c.Range, out float near, out float far);
+            _below = 0f;
+            if (_cam != null && _unitsPerHalfH > 0f)
+            {
+                // b15: placed by where it is on screen (pan by screen x, distance by screen distance, darker below centre)
+                Vector3 v = _cam.WorldToViewportPoint(SimSpace.ToWorld(x, 0.0, z));
+                float vx = v.z > 0f ? v.x : 0.5f, vy = v.z > 0f ? v.y : -1f;
+                SoundSpace.Screen(vx, vy, _aspect, _unitsPerHalfH, out pan, out d, out _below);
+            }
+            else pan = SoundSpace.Pan(dx, -dz, _rx, _rz);   // Sim z runs south; world z = -sim z (SimSpace).
             float g = SoundSpace.Gain(d, near, far);
-            if (own) g = Mathf.Max(g, 0.8f);
-            // Sim z runs south; world z = -sim z (SimSpace).
-            pan = SoundSpace.Pan(dx, -dz, _rx, _rz);
-            cutoff = SoundSpace.LowPass(d, near, far);
-            return g;
+            if (own) { g = Mathf.Max(g, 0.8f); _below = 0f; }
+            cutoff = SoundSpace.DepthCutoff(SoundSpace.LowPass(d, near, far), _below);
+            return g * SoundSpace.DepthGain(_below);
+        }
+
+        // b15: the screen-space camera state (UpdateListener) and the last placement's depth below the centre row
+        private UnityEngine.Camera _cam;
+        private float _aspect = 16f / 9f, _unitsPerHalfH, _below;
+        private double _lastBehind = double.NegativeInfinity;
+        private int _behindCue = -2, _climbCue = -2;
+
+        /// <summary>b15: the "behind you" tick, panned to where the threat is (a UI-range cue, so its pan is set here).</summary>
+        private void PlayBehindTick(float pan, int tick)
+        {
+            if (_behindCue == -2) _behindCue = SoundTable.IndexOf("sb_behind_tick");
+            if (_behindCue < 0 || _clips[_behindCue].Length == 0) return;
+            CueDef c = SoundTable.Cue(_behindCue);
+            double now = Time.unscaledTimeAsDouble;
+            AudioClip clip = _clips[_behindCue][0];
+            _plan.BeginFrame(Time.frameCount);
+            int slot = _plan.Request(_behindCue, SoundSpace.Priority(c.Priority, 1f, false, true), now, clip.length, false);
+            if (slot < 0) return;
+            _lastBehind = now;
+            AudioSource s = _src[slot];
+            s.Stop();
+            s.clip = clip;
+            s.pitch = 1f;
+            s.panStereo = Mathf.Clamp(pan * 1.2f, -1f, 1f);
+            _lpf[slot].cutoffFrequency = SoundSpace.OpenCutoff;
+            _base[slot] = c.Gain;
+            _own[slot] = true;
+            _busOf[slot] = c.Bus;
+            s.volume = c.Gain * DuckFor(c.Bus, true);
+            s.Play();
+            Played++;
+            if (c.Caption != null && !_title) _captions.Show(_behindCue, pan, Time.unscaledTime, CaptionShown);
+        }
+
+        /// <summary>b15: a hit on a barricade slot: a Builder wall gets the stone chip (sb_wall_hit), a barricade its wood knock.
+        /// Called by StructureDamage with the slot index.</summary>
+        public static bool PlayStructureHit(int slot, double simX, double simZ)
+        {
+            SoundDirector d = Instance;
+            World w = d != null && d._driver != null ? d._driver.World : null;
+            bool wall = w != null && CriticalMass.Sim.Core.BuilderWalls.IsWallSlot(w, slot);
+            return PlayCueAt(wall ? "sb_wall_hit" : "barricade_hit", simX, simZ);
         }
 
         private bool PlayCue(int cue, double x, double z, bool own, bool threat, float gainScale, float rateScale, int tick)
@@ -463,8 +542,11 @@ namespace CriticalMass.Runtime.Audio.Sound
                     if (far >= 0 && far != cue) return PlayCue(far, x, z, own, threat, gainScale, rateScale, tick);
                 }
             }
+            // b15: LESS SOUND keeps your own sounds, threats and the big ones (priority 50+) from the crowd
+            if (GameSettings.LessSound && !own && !threat && c.Bus == SoundBus.Sfx && c.Priority < 50) { Refused++; return false; }
             float g = Audible(c, x, z, own, out float pan, out float cutoff);
             if (g < 0.02f) { Refused++; return false; }
+            float below = _below;
             float delay = c.Range >= SoundRange.Far ? SoundSpace.Delay(dist) : 0f;
 
             uint seed = (uint)tick * 0x9E3779B1u ^ (uint)cue * 0x85EBCA77u ^ ++_serial * 0xC2B2AE3Du;
@@ -498,6 +580,7 @@ namespace CriticalMass.Runtime.Audio.Sound
             else s.Play();
             Played++;
             if (c.Caption != null && g >= 0.15f && !_title) _captions.Show(cue, pan, Time.unscaledTime, CaptionShown);
+            if (SoundSpace.BehindYou(threat, own, below, now, _lastBehind)) PlayBehindTick(pan, tick);
             return true;
         }
 
@@ -641,11 +724,26 @@ namespace CriticalMass.Runtime.Audio.Sound
                 Vector3 r = t.right;
                 float len = Mathf.Sqrt(r.x * r.x + r.z * r.z);
                 if (len > 1e-4f) { _rx = r.x / len; _rz = r.z / len; }
+                // b15: the screen's scale at the centre row (world units from the focus to the right edge / aspect)
+                _cam = cam;
+                _aspect = Mathf.Max(0.5f, cam.aspect);
+                Ray edge = cam.ViewportPointToRay(new Vector3(1f, 0.5f, 0f));
+                if (f.y < -0.05f && edge.direction.y < -1e-3f)
+                {
+                    Vector3 g = edge.origin + edge.direction * (-edge.origin.y / edge.direction.y);
+                    float half = new Vector2(g.x - focus.x, g.z - focus.z).magnitude;
+                    _unitsPerHalfH = half > 0.5f ? half / _aspect : 0f;
+                }
+                else _unitsPerHalfH = 0f;
             }
-            else if (w != null && w.ActorCount > 0)
+            else
             {
-                _lx = (float)w.X[LocalSeat.Actor];
-                _lz = (float)w.Z[LocalSeat.Actor];
+                _cam = null;
+                if (w != null && w.ActorCount > 0)
+                {
+                    _lx = (float)w.X[LocalSeat.Actor];
+                    _lz = (float)w.Z[LocalSeat.Actor];
+                }
             }
         }
 
@@ -725,7 +823,7 @@ namespace CriticalMass.Runtime.Audio.Sound
 
         private void UpdateBirds(World w)
         {
-            if (w == null || _paused) return;
+            if (w == null || _paused || GameSettings.LessSound) return;   // b15: LESS SOUND has no birds
             double now = Time.unscaledTimeAsDouble;
             if (now < _nextBird) return;
             uint seed = ++_serial * 0x27D4EB2Fu;

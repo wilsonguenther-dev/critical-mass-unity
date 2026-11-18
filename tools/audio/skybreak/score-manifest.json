@@ -1,0 +1,554 @@
+{
+ "bar": 3.0,
+ "beat": 0.75,
+ "bpm": 80,
+ "files": {
+  "Assets/_Game/Audio/Music/Resources/CMMusic/music-title.ogg": {
+   "limiter_db": 0.0,
+   "samples": 2304000,
+   "seconds": 48.0,
+   "wav_sha256": "f03f027b1643cd9f"
+  },
+  "Assets/_Game/Audio/Music/Resources/CMScore/sb-A-bed-feed.ogg": {
+   "limiter_db": 0.0,
+   "samples": 1272000,
+   "seconds": 26.5,
+   "wav_sha256": "5243e4cdb3a3b8cf"
+  },
+  "Assets/_Game/Audio/Music/Resources/CMScore/sb-A-bed-minor.ogg": {
+   "limiter_db": 0.0,
+   "samples": 1272000,
+   "seconds": 26.5,
+   "wav_sha256": "8682f9e893eb1c44"
+  },
+  "Assets/_Game/Audio/Music/Resources/CMScore/sb-A-rhythm-drive.ogg": {
+   "limiter_db": 0.0,
+   "samples": 1272000,
+   "seconds": 26.5,
+   "wav_sha256": "8527191a5e594e6f"
+  },
+  "Assets/_Game/Audio/Music/Resources/CMScore/sb-A-rhythm-heart.ogg": {
+   "limiter_db": 0.0,
+   "samples": 1272000,
+   "seconds": 26.5,
+   "wav_sha256": "9bc9de8b6e7cbee7"
+  },
+  "Assets/_Game/Audio/Music/Resources/CMScore/sb-A-rhythm-march.ogg": {
+   "limiter_db": 0.0,
+   "samples": 1272000,
+   "seconds": 26.5,
+   "wav_sha256": "ea99b26b8efac630"
+  },
+  "Assets/_Game/Audio/Music/Resources/CMScore/sb-A-rhythm-pulse.ogg": {
+   "limiter_db": 0.0,
+   "samples": 1272000,
+   "seconds": 26.5,
+   "wav_sha256": "df03ef8931bce228"
+  },
+  "Assets/_Game/Audio/Music/Resources/CMScore/sb-A-theme-corrupt.ogg": {
+   "limiter_db": 0.0,
+   "samples": 1272000,
+   "seconds": 26.5,
+   "wav_sha256": "6ccee11ffdfca471"
+  },
+  "Assets/_Game/Audio/Music/Resources/CMScore/sb-A-theme-feed.ogg": {
+   "limiter_db": 0.0,
+   "samples": 1272000,
+   "seconds": 26.5,
+   "wav_sha256": "1a792fe17c790fd8"
+  },
+  "Assets/_Game/Audio/Music/Resources/CMScore/sb-A-theme-minor.ogg": {
+   "limiter_db": 0.0,
+   "samples": 1272000,
+   "seconds": 26.5,
+   "wav_sha256": "3769aa70457473ce"
+  },
+  "Assets/_Game/Audio/Music/Resources/CMScore/sb-B-bed-feed.ogg": {
+   "limiter_db": 0.0,
+   "samples": 1272000,
+   "seconds": 26.5,
+   "wav_sha256": "654b65ad8ae03020"
+  },
+  "Assets/_Game/Audio/Music/Resources/CMScore/sb-B-bed-minor.ogg": {
+   "limiter_db": 0.0,
+   "samples": 1272000,
+   "seconds": 26.5,
+   "wav_sha256": "10f492a4493a3c4d"
+  },
+  "Assets/_Game/Audio/Music/Resources/CMScore/sb-B-rhythm-drive.ogg": {
+   "limiter_db": 0.0,
+   "samples": 1272000,
+   "seconds": 26.5,
+   "wav_sha256": "9653d83fc5714d39"
+  },
+  "Assets/_Game/Audio/Music/Resources/CMScore/sb-B-rhythm-heart.ogg": {
+   "limiter_db": 0.0,
+   "samples": 1272000,
+   "seconds": 26.5,
+   "wav_sha256": "2f0635ad32eefe7e"
+  },
+  "Assets/_Game/Audio/Music/Resources/CMScore/sb-B-rhythm-march.ogg": {
+   "limiter_db": 0.0,
+   "samples": 1272000,
+   "seconds": 26.5,
+   "wav_sha256": "57730cc439768901"
+  },
+  "Assets/_Game/Audio/Music/Resources/CMScore/sb-B-rhythm-pulse.ogg": {
+   "limiter_db": 0.0,
+   "samples": 1272000,
+   "seconds": 26.5,
+   "wav_sha256": "8e0df4da5477165a"
+  },
+  "Assets/_Game/Audio/Music/Resources/CMScore/sb-B-theme-corrupt.ogg": {
+   "limiter_db": 0.0,
+   "samples": 1272000,
+   "seconds": 26.5,
+   "wav_sha256": "0a916d1099516a34"
+  },
+  "Assets/_Game/Audio/Music/Resources/CMScore/sb-B-theme-feed.ogg": {
+   "limiter_db": 0.0,
+   "samples": 1272000,
+   "seconds": 26.5,
+   "wav_sha256": "2c0fccdf5b162b8a"
+  },
+  "Assets/_Game/Audio/Music/Resources/CMScore/sb-B-theme-minor.ogg": {
+   "limiter_db": 0.0,
+   "samples": 1272000,
+   "seconds": 26.5,
+   "wav_sha256": "b6c13ebd2422edba"
+  },
+  "Assets/_Game/Audio/Music/Resources/CMScore/sb-C-bed-feed.ogg": {
+   "limiter_db": 0.0,
+   "samples": 1272000,
+   "seconds": 26.5,
+   "wav_sha256": "2e65094a166d642a"
+  },
+  "Assets/_Game/Audio/Music/Resources/CMScore/sb-C-bed-minor.ogg": {
+   "limiter_db": 0.0,
+   "samples": 1272000,
+   "seconds": 26.5,
+   "wav_sha256": "58dbc00850a82115"
+  },
+  "Assets/_Game/Audio/Music/Resources/CMScore/sb-C-rhythm-drive.ogg": {
+   "limiter_db": 0.0,
+   "samples": 1272000,
+   "seconds": 26.5,
+   "wav_sha256": "6672376a808a94ec"
+  },
+  "Assets/_Game/Audio/Music/Resources/CMScore/sb-C-rhythm-heart.ogg": {
+   "limiter_db": 0.0,
+   "samples": 1272000,
+   "seconds": 26.5,
+   "wav_sha256": "7267e77dab1748ef"
+  },
+  "Assets/_Game/Audio/Music/Resources/CMScore/sb-C-rhythm-march.ogg": {
+   "limiter_db": 0.0,
+   "samples": 1272000,
+   "seconds": 26.5,
+   "wav_sha256": "9dd25ace070b0eed"
+  },
+  "Assets/_Game/Audio/Music/Resources/CMScore/sb-C-rhythm-pulse.ogg": {
+   "limiter_db": 0.0,
+   "samples": 1272000,
+   "seconds": 26.5,
+   "wav_sha256": "d0881233f4e86bda"
+  },
+  "Assets/_Game/Audio/Music/Resources/CMScore/sb-C-theme-corrupt.ogg": {
+   "limiter_db": 0.0,
+   "samples": 1272000,
+   "seconds": 26.5,
+   "wav_sha256": "e23d2c091fb56fd4"
+  },
+  "Assets/_Game/Audio/Music/Resources/CMScore/sb-C-theme-feed.ogg": {
+   "limiter_db": 0.0,
+   "samples": 1272000,
+   "seconds": 26.5,
+   "wav_sha256": "fe88b06fb0a42194"
+  },
+  "Assets/_Game/Audio/Music/Resources/CMScore/sb-C-theme-minor.ogg": {
+   "limiter_db": 0.0,
+   "samples": 1272000,
+   "seconds": 26.5,
+   "wav_sha256": "22009b3cab231b48"
+  },
+  "Assets/_Game/Audio/Music/Resources/CMScore/sb-D-bed-feed.ogg": {
+   "limiter_db": 0.0,
+   "samples": 1272000,
+   "seconds": 26.5,
+   "wav_sha256": "76505e3b4201d6c6"
+  },
+  "Assets/_Game/Audio/Music/Resources/CMScore/sb-D-bed-minor.ogg": {
+   "limiter_db": 0.0,
+   "samples": 1272000,
+   "seconds": 26.5,
+   "wav_sha256": "45e7ed4c0f870c6a"
+  },
+  "Assets/_Game/Audio/Music/Resources/CMScore/sb-D-rhythm-drive.ogg": {
+   "limiter_db": 0.0,
+   "samples": 1272000,
+   "seconds": 26.5,
+   "wav_sha256": "c5aa5334322fe529"
+  },
+  "Assets/_Game/Audio/Music/Resources/CMScore/sb-D-rhythm-heart.ogg": {
+   "limiter_db": 0.0,
+   "samples": 1272000,
+   "seconds": 26.5,
+   "wav_sha256": "417b75d878185862"
+  },
+  "Assets/_Game/Audio/Music/Resources/CMScore/sb-D-rhythm-march.ogg": {
+   "limiter_db": 0.0,
+   "samples": 1272000,
+   "seconds": 26.5,
+   "wav_sha256": "90a74ea709e9d1c9"
+  },
+  "Assets/_Game/Audio/Music/Resources/CMScore/sb-D-rhythm-pulse.ogg": {
+   "limiter_db": 0.0,
+   "samples": 1272000,
+   "seconds": 26.5,
+   "wav_sha256": "fbe573b48fcf630b"
+  },
+  "Assets/_Game/Audio/Music/Resources/CMScore/sb-D-theme-corrupt.ogg": {
+   "limiter_db": 0.0,
+   "samples": 1272000,
+   "seconds": 26.5,
+   "wav_sha256": "78af7e855739c5db"
+  },
+  "Assets/_Game/Audio/Music/Resources/CMScore/sb-D-theme-feed.ogg": {
+   "limiter_db": 0.0,
+   "samples": 1272000,
+   "seconds": 26.5,
+   "wav_sha256": "d21d0a3ef914163d"
+  },
+  "Assets/_Game/Audio/Music/Resources/CMScore/sb-D-theme-minor.ogg": {
+   "limiter_db": 0.0,
+   "samples": 1272000,
+   "seconds": 26.5,
+   "wav_sha256": "a1bc9aec0e42a226"
+  },
+  "Assets/_Game/Audio/Music/Resources/CMStings/sting-defeat.ogg": {
+   "limiter_db": 0.0,
+   "samples": 432000,
+   "seconds": 9.0,
+   "wav_sha256": "bb61868372c28aad"
+  },
+  "Assets/_Game/Audio/Music/Resources/CMStings/sting-draw.ogg": {
+   "limiter_db": 0.0,
+   "samples": 379887,
+   "seconds": 7.9143,
+   "wav_sha256": "4fb036b5fc58064c"
+  },
+  "Assets/_Game/Audio/Music/Resources/CMStings/sting-hatch-brute.ogg": {
+   "limiter_db": -1.22,
+   "samples": 295220,
+   "seconds": 6.1504,
+   "wav_sha256": "1d6324678b3aca97"
+  },
+  "Assets/_Game/Audio/Music/Resources/CMStings/sting-hatch-elder.ogg": {
+   "limiter_db": -0.39,
+   "samples": 294831,
+   "seconds": 6.1423,
+   "wav_sha256": "a3798127f9fcca4f"
+  },
+  "Assets/_Game/Audio/Music/Resources/CMStings/sting-hatch-grove.ogg": {
+   "limiter_db": -0.47,
+   "samples": 290672,
+   "seconds": 6.0557,
+   "wav_sha256": "53fa17e49f070774"
+  },
+  "Assets/_Game/Audio/Music/Resources/CMStings/sting-hatch-mire.ogg": {
+   "limiter_db": 0.0,
+   "samples": 312850,
+   "seconds": 6.5177,
+   "wav_sha256": "fc578013f360952a"
+  },
+  "Assets/_Game/Audio/Music/Resources/CMStings/sting-hatch-timber.ogg": {
+   "limiter_db": -2.71,
+   "samples": 298216,
+   "seconds": 6.2128,
+   "wav_sha256": "8186a518d246ba16"
+  },
+  "Assets/_Game/Audio/Music/Resources/CMStings/sting-victory.ogg": {
+   "limiter_db": -1.22,
+   "samples": 367787,
+   "seconds": 7.6622,
+   "wav_sha256": "9900e448d53e4bf6"
+  },
+  "Assets/_Game/Audio/Resources/CMSfxScore/sb_behind_tick.ogg": {
+   "limiter_db": 0.0,
+   "samples": 10560,
+   "seconds": 0.22,
+   "wav_sha256": "ddfbdb0261b15878"
+  },
+  "Assets/_Game/Audio/Resources/CMSfxScore/sb_block_place_0.ogg": {
+   "limiter_db": 0.0,
+   "samples": 16320,
+   "seconds": 0.34,
+   "wav_sha256": "7c19e27e6306dced"
+  },
+  "Assets/_Game/Audio/Resources/CMSfxScore/sb_block_place_1.ogg": {
+   "limiter_db": 0.0,
+   "samples": 16320,
+   "seconds": 0.34,
+   "wav_sha256": "186ecff9b341c15a"
+  },
+  "Assets/_Game/Audio/Resources/CMSfxScore/sb_bridge_place.ogg": {
+   "limiter_db": 0.0,
+   "samples": 43200,
+   "seconds": 0.9,
+   "wav_sha256": "06a6c0e83adc6cfb"
+  },
+  "Assets/_Game/Audio/Resources/CMSfxScore/sb_climb_step_0.ogg": {
+   "limiter_db": 0.0,
+   "samples": 5760,
+   "seconds": 0.12,
+   "wav_sha256": "d47583263d992cbc"
+  },
+  "Assets/_Game/Audio/Resources/CMSfxScore/sb_climb_step_1.ogg": {
+   "limiter_db": 0.0,
+   "samples": 5760,
+   "seconds": 0.12,
+   "wav_sha256": "1336596359fba830"
+  },
+  "Assets/_Game/Audio/Resources/CMSfxScore/sb_dodge.ogg": {
+   "limiter_db": 0.0,
+   "samples": 16320,
+   "seconds": 0.34,
+   "wav_sha256": "5a87281e9cd3c8cf"
+  },
+  "Assets/_Game/Audio/Resources/CMSfxScore/sb_hut_level.ogg": {
+   "limiter_db": 0.0,
+   "samples": 81600,
+   "seconds": 1.7,
+   "wav_sha256": "409606b029a88c22"
+  },
+  "Assets/_Game/Audio/Resources/CMSfxScore/sb_ladder_place.ogg": {
+   "limiter_db": 0.0,
+   "samples": 24000,
+   "seconds": 0.5,
+   "wav_sha256": "027727f3faf154f6"
+  },
+  "Assets/_Game/Audio/Resources/CMSfxScore/sb_ore_bank.ogg": {
+   "limiter_db": 0.0,
+   "samples": 38400,
+   "seconds": 0.8,
+   "wav_sha256": "129302dd49c73697"
+  },
+  "Assets/_Game/Audio/Resources/CMSfxScore/sb_ore_hit_0.ogg": {
+   "limiter_db": 0.0,
+   "samples": 10560,
+   "seconds": 0.22,
+   "wav_sha256": "0e9aac553ed2266c"
+  },
+  "Assets/_Game/Audio/Resources/CMSfxScore/sb_ore_hit_1.ogg": {
+   "limiter_db": 0.0,
+   "samples": 10560,
+   "seconds": 0.22,
+   "wav_sha256": "28b47142c4d29845"
+  },
+  "Assets/_Game/Audio/Resources/CMSfxScore/sb_ore_hit_2.ogg": {
+   "limiter_db": 0.0,
+   "samples": 10560,
+   "seconds": 0.22,
+   "wav_sha256": "8a7b5fafa71d1801"
+  },
+  "Assets/_Game/Audio/Resources/CMSfxScore/sb_pit_dig.ogg": {
+   "limiter_db": 0.0,
+   "samples": 17280,
+   "seconds": 0.36,
+   "wav_sha256": "ea2215c3d85304de"
+  },
+  "Assets/_Game/Audio/Resources/CMSfxScore/sb_wall_break.ogg": {
+   "limiter_db": 0.0,
+   "samples": 52800,
+   "seconds": 1.1,
+   "wav_sha256": "c14caf530fcca0c5"
+  },
+  "Assets/_Game/Audio/Resources/CMSfxScore/sb_wall_hit_0.ogg": {
+   "limiter_db": 0.0,
+   "samples": 10560,
+   "seconds": 0.22,
+   "wav_sha256": "33171359b9e929b2"
+  },
+  "Assets/_Game/Audio/Resources/CMSfxScore/sb_wall_hit_1.ogg": {
+   "limiter_db": 0.0,
+   "samples": 10560,
+   "seconds": 0.22,
+   "wav_sha256": "2dbd155d396fc8e6"
+  },
+  "Assets/_Game/Audio/Resources/CMSfxScore/sb_wall_place_0.ogg": {
+   "limiter_db": 0.0,
+   "samples": 21600,
+   "seconds": 0.45,
+   "wav_sha256": "78b308b8385383f3"
+  },
+  "Assets/_Game/Audio/Resources/CMSfxScore/sb_wall_place_1.ogg": {
+   "limiter_db": 0.0,
+   "samples": 21600,
+   "seconds": 0.45,
+   "wav_sha256": "91c4b609063d1c41"
+  }
+ },
+ "layers": {
+  "bed": [
+   "minor",
+   "feed"
+  ],
+  "rhythm": [
+   "pulse",
+   "march",
+   "drive",
+   "heart"
+  ],
+  "theme": [
+   "minor",
+   "feed",
+   "corrupt"
+  ]
+ },
+ "motif_bars": {
+  "A": [
+   0
+  ],
+  "B": [
+   0,
+   4
+  ],
+  "C": [
+   2
+  ],
+  "D": [
+   0,
+   1
+  ]
+ },
+ "music_lufs": -20.0,
+ "plan": [
+  "A",
+  "B",
+  "C",
+  "D",
+  "B",
+  "A",
+  "D",
+  "C",
+  "A",
+  "C",
+  "B",
+  "D"
+ ],
+ "reference_state": "contested",
+ "sample_rate": 48000,
+ "section_bars": 8,
+ "section_seconds": 24.0,
+ "sections": {
+  "A": [
+   "Fm",
+   "Fm",
+   "Db",
+   "Db",
+   "Bbm",
+   "Bbm",
+   "C",
+   "C"
+  ],
+  "B": [
+   "Fm",
+   "Db",
+   "Ab",
+   "Eb",
+   "Fm",
+   "Db",
+   "Bbm",
+   "C"
+  ],
+  "C": [
+   "Db",
+   "Bbm",
+   "Fm",
+   "Fm",
+   "Db",
+   "Eb",
+   "C",
+   "C"
+  ],
+  "D": [
+   "Fm",
+   "Fm",
+   "Eb",
+   "Eb",
+   "Db",
+   "Db",
+   "C",
+   "C"
+  ]
+ },
+ "source": "Skybreak (tools/audio/skybreak/score_intro.py): F minor, 80 BPM, motif C F G Ab",
+ "states": {
+  "berserk": {
+   "bed": 0.9,
+   "rhythm": [
+    "drive",
+    0.9
+   ],
+   "theme": 1.0
+  },
+  "calm": {
+   "bed": 0.85,
+   "rhythm": [
+    "pulse",
+    0.6
+   ],
+   "theme": 0.4
+  },
+  "contested": {
+   "bed": 0.8,
+   "rhythm": [
+    "march",
+    1.0
+   ],
+   "theme": 0.8
+  },
+  "egg": {
+   "bed": 0.7,
+   "rhythm": [
+    "heart",
+    0.95
+   ],
+   "theme": 0.35
+  },
+  "final": {
+   "bed": 1.0,
+   "rhythm": [
+    "drive",
+    1.0
+   ],
+   "theme": 1.0
+  },
+  "leading": {
+   "bed": 0.9,
+   "rhythm": [
+    "march",
+    0.85
+   ],
+   "theme": 1.0
+  },
+  "rally": {
+   "bed": 1.0,
+   "rhythm": [
+    "drive",
+    0.8
+   ],
+   "theme": 1.0
+  },
+  "trailing": {
+   "bed": 1.0,
+   "rhythm": [
+    "pulse",
+    0.9
+   ],
+   "theme": 0.55
+  }
+ },
+ "sting_lufs": -16.0,
+ "tail_seconds": 2.5
+}
