@@ -30,7 +30,7 @@ namespace CriticalMass.Runtime.View.B13
         // dark soft contact shadow so the body lifts off the night ground.
         public const int HaloRings = 20, HaloSegments = 120;
         /// <summary>Halo radius in u at type scale 1 (the body's hit radius is 1.64 u; the ring sits just outside the feet).</summary>
-        public const float HaloRadius = 2.9f, HaloGlowAlpha = 0.80f, HaloShadowAlpha = 0.50f;
+        public const float HaloRadius = 2.9f, HaloGlowAlpha = 0.62f, HaloShadowAlpha = 0.50f;
         static readonly Color32 HaloShadow = new Color32(24, 35, 59, 255);
         GameObject _haloGo;
         MeshFilter _haloFilter;
