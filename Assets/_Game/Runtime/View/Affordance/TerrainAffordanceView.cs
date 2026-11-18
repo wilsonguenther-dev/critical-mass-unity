@@ -650,6 +650,7 @@ namespace CriticalMass.Runtime.View.Affordance
                 if (primary) GhostCellsDrawn = t.GhostCount;
                 return;
             }
+            if (primary) DrawLadderGhost(w, t, t.Valid);
             for (int k = 0; k < t.GhostCount; k++)
             {
                 int i = t.GhostCells[k];
@@ -661,6 +662,39 @@ namespace CriticalMass.Runtime.View.Affordance
                 if (t.Ghost == 4) GroundQuad(x, z, y + 0.006f, (float)w.Config.Abilities.DemolitionsMine.BlastRadius, CellRing, A(g, 0.5f));
             }
             if (primary || GhostCellsDrawn == 0) GhostCellsDrawn = Math.Max(GhostCellsDrawn, t.GhostCount);
+        }
+
+        /// <summary>
+        /// b14 polish: while the local Builder's wheel holds LADDER, the ghost is the chunky ladder itself (StagedBuildView,
+        /// the same mesh and A-frame the build lays) over the cell tiles: centre = the planned cells' middle, along = the
+        /// wheel's axis, length = their extent along it. No allocation.
+        /// </summary>
+        void DrawLadderGhost(World w, AffTarget t, bool ok)
+        {
+            if (!Scan.Belt || Scan.Tool != BuilderTool.Ladder || t.GhostCount <= 0) return;
+            Mechanics.StagedBuildView sv = Mechanics.StagedBuildView.Active;
+            if (sv == null) return;
+            MapDef m = w.Map;
+            double ax = Scan.ToolDx, az = Scan.ToolDz;
+            double al = Math.Sqrt(ax * ax + az * az);
+            if (al < 1e-6) return;
+            ax /= al; az /= al;
+            double sx = 0, sz = 0, lo = double.MaxValue, hi = double.MinValue;
+            for (int k = 0; k < t.GhostCount; k++)
+            {
+                int i = t.GhostCells[k];
+                double x = i % m.Width + 0.5, z = i / m.Width + 0.5;
+                sx += x; sz += z;
+                double pr = x * ax + z * az;
+                if (pr < lo) lo = pr;
+                if (pr > hi) hi = pr;
+            }
+            double cx = sx / t.GhostCount, cz = sz / t.GhostCount;
+            Vector3 c = SimSpace.ToWorld(cx, GroundHeight.At(m, cx, cz) + 0.02, cz);
+            Vector3 along = SimSpace.ToWorld(ax, 0, az);
+            if (along.sqrMagnitude < 1e-6f) return;
+            along.Normalize();
+            sv.DrawLadderGhost(w, c, along, Mathf.Max(0.5f, (float)(hi - lo + 1.0)), ok);
         }
 
         // ------------------------------------------------------------------ reactions and damage stages
