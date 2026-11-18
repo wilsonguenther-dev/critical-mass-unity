@@ -425,7 +425,9 @@ namespace CriticalMass.Runtime.View.Dressing
                 }
                 if (pd < PATH_W + 2.5 && H32(cx, cz, 211) % 100 < 7) o.Add(At("env_torch", mx + nx * 0.18, h - 0.1, mz + nz * 0.18, eyaw, "light"));
                 // b15 (W07/W12): the fence stands on the rim lip (its pivot LipSeat u out over the edge), not on the walkable rim cell.
-                else if (pd < PATH_W + 3.0 && H32(cx / 3, cz / 3, 212) % 100 < 22) o.Add(At("env_fence", e.Px + nx * LipSeat, h - 0.01, e.Pz + nz * LipSeat, eyaw, "dress_tall"));
+                // (5 cm along the edge from its start corner, so the pivot is never on the corner a land cell shares.)
+                else if (pd < PATH_W + 3.0 && H32(cx / 3, cz / 3, 212) % 100 < 22)
+                    o.Add(At("env_fence", e.Px + (e.Qx - e.Px) * 0.05 + nx * LipSeat, h - 0.01, e.Pz + (e.Qz - e.Pz) * 0.05 + nz * LipSeat, eyaw, "dress_tall"));
                 else if (H32(cx, cz, 213) % 100 < 4) o.Add(At("env_bush_berry", mx + nx * 0.12, h - 0.04, mz + nz * 0.12, eyaw, "small_tall"));
                 else if (pd > PATH_W + 3.0 && H32(cx, cz, 219) % 100 < 6)
                 {
@@ -1337,11 +1339,12 @@ namespace CriticalMass.Runtime.View.Dressing
                         SimX = anchor.x, SimZ = -anchor.z, Y = anchor.y,
                     });
                 bool district = name.StartsWith("district_", StringComparison.Ordinal);
+                bool[] kept = district ? DistrictKept(s.items) : null;
                 for (int idx = 0; idx < s.items.Length; idx++)
                 {
                     BasesItem it = s.items[idx];
                     if (it.piece == null || it.pos == null || it.pos.Length < 3) continue;
-                    if (district && !KeepDistrictItem(it.piece, idx)) continue;   // b15 W07: base density to the bible
+                    if (district && !kept[idx]) continue;   // b15 W07: base density to the bible
                     var p = anchor + siteRot * new Vector3(it.pos[0], it.pos[1], it.pos[2]);
                     Quaternion rot = Quaternion.Euler(0f, it.yaw + siteYaw, 0f);
                     Matrix4x4 m = Matrix4x4.TRS(p, rot, Vector3.one);
@@ -1368,7 +1371,18 @@ namespace CriticalMass.Runtime.View.Dressing
                             plan.DroppedBases.Add($"{name}:{it.piece} at {p.x:0.0},{-p.z:0.0}");
                             continue;
                         }
-                        if (how.Length > 0) plan.Notes.Add($"{name}:{it.piece} placed at {p.x:0.0},{-p.z:0.0}: {how}");
+                        if (how.Length > 0)
+                        {
+                            // A raised piece (a brazier on a yard wall) that had to move and now stands over open floor goes
+                            // down onto the floor: it never hovers.
+                            int pcx = (int)Math.Floor(p.x), pcz = (int)Math.Floor(-p.z);
+                            if (pcx >= 0 && pcz >= 0 && pcx < g.W && pcz < g.H && MapGrid.IsWalkableType(g.T(pcx, pcz)) && p.y - g.Hh(pcx, pcz) > 0.1)
+                            {
+                                p.y = (float)g.Hh(pcx, pcz);
+                                how += ", set down on the floor";
+                            }
+                            plan.Notes.Add($"{name}:{it.piece} placed at {p.x:0.0},{-p.z:0.0}: {how}");
+                        }
                         m = Matrix4x4.TRS(p, rot, Vector3.one);
                     }
                     // b15 decal z-fight (WORLD-AUDIT #23): a ground light pool sits 1 cm over the ground, not in its plane.
@@ -1525,6 +1539,31 @@ namespace CriticalMass.Runtime.View.Dressing
                 case "cm_light_pool": return Array.IndexOf(DistrictPoolsKept, index) >= 0;
                 default: return Array.IndexOf(DistrictItemsDropped, index) < 0;
             }
+        }
+
+        /// <summary>
+        /// KeepDistrictItem for every item, then a dress piece stacked on another (authored 0.3 u or more up) is kept only
+        /// while a kept piece under it (lower, within 0.6 u) still holds it up: thinning never leaves a crate in the air.
+        /// </summary>
+        public static bool[] DistrictKept(BasesItem[] items)
+        {
+            var kept = new bool[items.Length];
+            for (int i = 0; i < items.Length; i++) kept[i] = items[i].piece != null && KeepDistrictItem(items[i].piece, i);
+            for (int i = 0; i < items.Length; i++)
+            {
+                BasesItem a = items[i];
+                if (!kept[i] || a.pos == null || a.pos.Length < 3 || a.pos[1] < 0.3f || !a.piece.StartsWith("cm_dress_", StringComparison.Ordinal)) continue;
+                bool held = false;
+                for (int j = 0; j < items.Length && !held; j++)
+                {
+                    BasesItem b = items[j];
+                    if (j == i || !kept[j] || b.pos == null || b.pos.Length < 3 || b.pos[1] > a.pos[1] - 0.2f) continue;
+                    float dx = a.pos[0] - b.pos[0], dz = a.pos[2] - b.pos[2];
+                    held = dx * dx + dz * dz < 0.36f;
+                }
+                kept[i] = held;
+            }
+            return kept;
         }
 
         /// <summary>District layout indices left out: braziers 4 and 34 (wall), 63 to 103 (gates), gate lamps 70 and 102 (each

@@ -114,6 +114,7 @@ namespace CriticalMass.Runtime.View
             if (_depth.Length < dw * dh) _depth = new double[dw * dh];
             for (int k = 0; k < dw * dh; k++) _depth[k] = -1;
             _dx0 = dx0; _dz0 = dz0; _dw = dw; _dh = dh;
+            ResetCornerCache(x0, z0, x1, z1);   // b15 natural pits (TerrainEditMesh.Organic.cs)
             for (int cz = z0; cz < z1; cz++)
             for (int cx = x0; cx < x1; cx++)
             {

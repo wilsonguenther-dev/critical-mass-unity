@@ -344,15 +344,17 @@ namespace CriticalMass.Runtime.Tests
             Debug.Log("[IslandGeometry] bases notes: " + string.Join("; ", plan.Notes));
             Debug.Log("[IslandGeometry] bases pieces left out: " + plan.DroppedBases.Count + ": " + string.Join("; ", plan.DroppedBases));
             var authored = new Dictionary<string, int>();
-            foreach (BasesSite s in bases.sites)
+            foreach (string site in WorldDresser.BaseSites)   // the sites the world places (the file carries other layouts too)
             {
-                if (s.items == null) continue;
+                BasesSite s = bases.Site(site);
+                if (s == null || s.items == null) continue;
                 bool district = s.name.StartsWith("district_", StringComparison.Ordinal);
+                bool[] kept = district ? WorldDresser.DistrictKept(s.items) : null;
                 for (int i = 0; i < s.items.Length; i++)
                 {
                     BasesItem it = s.items[i];
                     if (it.piece == null || it.piece.Contains("_breakable_")) continue;
-                    if (district && !WorldDresser.KeepDistrictItem(it.piece, i)) continue;
+                    if (district && !kept[i]) continue;
                     authored[it.piece] = authored.TryGetValue(it.piece, out int n) ? n + 1 : 1;
                 }
             }
@@ -483,6 +485,24 @@ namespace CriticalMass.Runtime.Tests
         /// <summary>Authored floats (hovering on purpose): the hill marker and the egg.</summary>
         static bool AuthoredFloat(string piece) => piece.Contains("marker") || piece.Contains("egg");
 
+        /// <summary>True when another placement holds this one up: its pivot within 0.75 u, its foot lower and its top at
+        /// this foot (a crate on a crate; the hill's horns on the hill's own assembly, which shares one pivot).</summary>
+        static bool RestsOnAnother(WorldPlan plan, WorldKitCatalog cat, Dictionary<string, (float, float)> yr, WorldPlacement p, double foot)
+        {
+            foreach (WorldPlacement q in plan.Placements)
+            {
+                if (ReferenceEquals(q.Piece, p.Piece) && q.SimX == p.SimX && q.SimZ == p.SimZ) continue;
+                if (q.Surface || q.Cat == "sky") continue;
+                double dx = q.SimX - p.SimX, dz = q.SimZ - p.SimZ;
+                if (dx * dx + dz * dz > 0.5625) continue;
+                var (lo, hi) = YRange(cat, q.Piece, yr);
+                float sc = q.Matrix.lossyScale.y;
+                double qFoot = q.Y + lo * sc, qTop = q.Y + hi * sc;
+                if (qFoot < foot - 0.05 && qTop >= foot - 0.10) return true;
+            }
+            return false;
+        }
+
         static readonly HashSet<string> GroundSkip = new HashSet<string> { "sky", "decor", "bridge", "edge", "cliff", "water", "waterfall", "ground" };
 
         [Test]
@@ -513,7 +533,7 @@ namespace CriticalMass.Runtime.Tests
                     continue;
                 }
                 props++;
-                if (foot - g > Tol && !AuthoredFloat(p.Piece)) floats.Add($"{p.Piece} ({p.Cat}) at {p.SimX:0.0},{p.SimZ:0.0}: foot {foot - g:0.00} u over the ground");
+                if (foot - g > Tol && !AuthoredFloat(p.Piece) && !RestsOnAnother(plan, cat, yr, p, foot)) floats.Add($"{p.Piece} ({p.Cat}) at {p.SimX:0.0},{p.SimZ:0.0}: foot {foot - g:0.00} u over the ground");
             }
             Print("props checked against the ground", props, "info");
             Print($"props whose foot is more than {Tol} u over the ground", floats.Count, "== 0 (hill marker and egg are authored floats)");

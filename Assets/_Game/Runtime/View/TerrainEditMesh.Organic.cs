@@ -59,8 +59,31 @@ namespace CriticalMass.Runtime.View
             return n;
         }
 
-        /// <summary>Floor height at grid corner (vx, vz): the mean of (ground - depth) over the dug cells around it.</summary>
+        // Per-build cache of corner floors (CornerFloorRaw), corners [x0 - 1, x1 + 1] x [z0 - 1, z1 + 1]; NaN = not yet.
+        double[] _cf = new double[0];
+        int _cfx0, _cfz0, _cfw, _cfh;
+
+        void ResetCornerCache(int x0, int z0, int x1, int z1)
+        {
+            int w = x1 - x0 + 3, hh = z1 - z0 + 3;
+            if (_cf.Length < w * hh) _cf = new double[w * hh];
+            for (int k = 0; k < w * hh; k++) _cf[k] = double.NaN;
+            _cfx0 = x0 - 1; _cfz0 = z0 - 1; _cfw = w; _cfh = hh;
+        }
+
+        /// <summary>Floor height at grid corner (vx, vz), through the per-build cache.</summary>
         double CornerFloor(int vx, int vz)
+        {
+            int x = vx - _cfx0, z = vz - _cfz0;
+            if (x < 0 || z < 0 || x >= _cfw || z >= _cfh) return CornerFloorRaw(vx, vz);
+            int k = z * _cfw + x;
+            double v = _cf[k];
+            if (double.IsNaN(v)) _cf[k] = v = CornerFloorRaw(vx, vz);
+            return v;
+        }
+
+        /// <summary>Floor height at grid corner (vx, vz): the mean of (ground - depth) over the dug cells around it.</summary>
+        double CornerFloorRaw(int vx, int vz)
         {
             double sum = 0;
             int n = 0;
@@ -85,12 +108,26 @@ namespace CriticalMass.Runtime.View
             return (a * (1 - fx) + b * fx) * (1 - fz) + (d * (1 - fx) + c * fx) * fz;
         }
 
+        // The current cell's four corner floors (set once per OrganicPit): FloorIn reads them with no lookups.
+        int _fcx, _fcz;
+        double _f00, _f10, _f11, _f01;
+
+        /// <summary>FloorAt for a point inside the current cell (clamped to it): the same bilinear, from the cached corners;
+        /// on a shared edge only the two shared corners count, so both cells give the same height bit for bit.</summary>
+        double FloorIn(double x, double z)
+        {
+            double fx = x - _fcx, fz = z - _fcz;
+            if (fx < 0) fx = 0; else if (fx > 1) fx = 1;
+            if (fz < 0) fz = 0; else if (fz > 1) fz = 1;
+            return (_f00 * (1 - fx) + _f10 * fx) * (1 - fz) + (_f01 * (1 - fx) + _f11 * fx) * fz;
+        }
+
         static double VJit(double x, double z, int salt) =>
             (WorldDresser.H32((long)System.Math.Round(x * 8), (long)System.Math.Round(z * 8), 4100 + salt) % 1000u) / 1000.0;
 
         // Per-cell scratch: the rim polyline of one side (4 points) and its rows.
         readonly double[] _rx = new double[4], _rz = new double[4], _ex = new double[4], _ez = new double[4], _ix = new double[4], _iz = new double[4], _bx = new double[4], _bz = new double[4], _by = new double[4];
-        readonly double[] _fx = new double[12], _fz = new double[12];
+        readonly double[] _fx = new double[12], _fz = new double[12], _fy = new double[12];
 
         /// <summary>The natural pit for dug cell (cx, cz).</summary>
         void OrganicPit(int cx, int cz)
@@ -98,6 +135,8 @@ namespace CriticalMass.Runtime.View
             PitCells++;
             double h = H(cx, cz);
             double D = Depth(cx, cz);
+            _fcx = cx; _fcz = cz;
+            _f00 = CornerFloor(cx, cz); _f10 = CornerFloor(cx + 1, cz); _f11 = CornerFloor(cx + 1, cz + 1); _f01 = CornerFloor(cx, cz + 1);
             double yf = h - D;
             MinFloorY = Mathf.Min(MinFloorY, (float)yf);
             MaxFloorY = Mathf.Max(MaxFloorY, (float)yf);
@@ -126,12 +165,12 @@ namespace CriticalMass.Runtime.View
                     double u = k == 1 ? 0.35 : 0.65;
                     double px = vax + (vbx - vax) * u, pz = vaz + (vbz - vaz) * u;
                     double j = RimJitter * VJit(px, pz, 1);
-                    double ins = Inset(h - FloorAt(px + inx * 0.3, pz + inz * 0.3));
+                    double ins = Inset(h - FloorIn(px + inx * 0.3, pz + inz * 0.3));
                     _ex[k] = px; _ez[k] = pz;
                     _rx[k] = px + inx * j; _rz[k] = pz + inz * j;
                     _bx[k] = px + inx * (j + ins); _bz[k] = pz + inz * (j + ins);
                 }
-                for (int k = 0; k < 4; k++) _by[k] = FloorAt(_bx[k], _bz[k]);
+                for (int k = 0; k < 4; k++) _by[k] = FloorIn(_bx[k], _bz[k]);
                 for (int k = 1; k <= 2; k++) { _fx[nf] = _bx[k]; _fz[nf] = _bz[k]; nf++; }
                 RimSide(cx, cz, s, h, inx, inz);
                 double sh = Hash01(cx, cz, 900 + s);
@@ -139,11 +178,12 @@ namespace CriticalMass.Runtime.View
             }
             // Floor: a fan from the cell centre over the floor polygon (corner floor points and the rim sides' wall feet).
             Color32 floor = Jit(FloorDirt, cx, cz, 11);
-            double ccx = cx + 0.5, ccz = cz + 0.5, ccy = FloorAt(ccx, ccz);
+            double ccx = cx + 0.5, ccz = cz + 0.5, ccy = FloorIn(ccx, ccz);
+            for (int k = 0; k < nf; k++) _fy[k] = FloorIn(_fx[k], _fz[k]);
             for (int k = 0; k < nf; k++)
             {
                 int k1 = (k + 1) % nf;
-                TriSim(ccx, ccy, ccz, _fx[k], FloorAt(_fx[k], _fz[k]), _fz[k], _fx[k1], FloorAt(_fx[k1], _fz[k1]), _fz[k1], 0, 1, 0, floor);
+                TriSim(ccx, ccy, ccz, _fx[k], _fy[k], _fz[k], _fx[k1], _fy[k1], _fz[k1], 0, 1, 0, floor);
             }
             PitFloorFaces++;
             // Two stones on the floor, near the middle (inside the wall feet of a lone cell).
@@ -151,7 +191,7 @@ namespace CriticalMass.Runtime.View
             {
                 double px = cx + 0.38 + 0.24 * Hash01(cx, cz, 21 + k), pz = cz + 0.38 + 0.24 * Hash01(cx, cz, 31 + k);
                 double sz = 0.045 + 0.035 * Hash01(cx, cz, 41 + k);
-                Lump(px, FloorAt(px, pz), pz, sz, 0.04 + 0.05 * Hash01(cx, cz, 51 + k), Jit(Pebble, cx, cz, 61 + k));
+                Lump(px, FloorIn(px, pz), pz, sz, 0.04 + 0.05 * Hash01(cx, cz, 51 + k), Jit(Pebble, cx, cz, 61 + k));
                 Pebbles++;
             }
             // One spoil heap, on the rim side with the highest hash, if the ground there is untouched floor.
