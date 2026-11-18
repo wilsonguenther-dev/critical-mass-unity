@@ -147,8 +147,9 @@ namespace CriticalMass.Sim.Config
         public double LadderFallKnock = 1.2;
 
         // ---- G. bots
-        /// <summary>In narrow spots bots follow the raw next-cell step, not the blended flow.</summary>
-        public bool BotNarrowRawStep = true;
+        /// <summary>In narrow spots bots follow the raw next-cell step, not the blended flow. OFF by default: the shiver gate's
+        /// match (seed 7) had 4 hard flags with it and 0 without (sim run 44233001957, CombatFeelTests shiver-by-part).</summary>
+        public bool BotNarrowRawStep = false;
         /// <summary>Bots lead a moving target by at most this much of their wind-up (real seconds) when they chase and aim.</summary>
         public double BotLeadSeconds = 0.13;
 

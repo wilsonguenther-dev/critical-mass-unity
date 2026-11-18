@@ -715,14 +715,14 @@ namespace CriticalMass.Sim.Tests
         [Test]
         public void ShiverFlagsOfTheGateMatchByPartOfTheRule()
         {
-            string[] names = { "off", "on", "on, blended flow", "on, no stagger or knock", "on, shipped wind-ups", "on, no move slow in swings" };
+            string[] names = { "off", "on", "on, raw step in narrow spots", "on, no stagger or knock", "on, shipped wind-ups", "on, no move slow in swings" };
             for (int a = 0; a < names.Length; a++)
             {
                 GameConfig cfg = GameConfig.CreateDefault();
                 cfg.HatchSeconds = 30;
                 CombatFeelConfig f = cfg.Depth.CombatFeel;
                 f.Enabled = a != 0;
-                if (a == 2) f.BotNarrowRawStep = false;
+                if (a == 2) f.BotNarrowRawStep = true;
                 if (a == 3)
                 {
                     f.StaggerSeconds = 0;
@@ -775,9 +775,15 @@ namespace CriticalMass.Sim.Tests
         [Test]
         public void TickCostWithTheRuleOnIsWithinTheBudget()
         {
-            string[] names = { "off", "on", "on, shipped wind-ups", "on, no stagger or knock", "on, blended flow" };
+            // Four seeds, so one arm landing in a 30-body pile-up (run 44233001957: on 104 us vs 52 us the run before, same
+            // code) does not decide it; the arms of one seed step in turn.
+            string[] names = { "off", "on", "on, shipped wind-ups", "on, no stagger or knock", "on, raw step in narrow spots" };
             int n = names.Length;
             const int Warm = 7500, Ticks = 900;
+            int[] seeds = { 4242, 7, 11, 1337 };
+            var us = new double[n];
+            foreach (int seed in seeds)
+            {
             var worlds = new World[n];
             var scratch = new InputFrame[n];
             for (int a = 0; a < n; a++)
@@ -800,8 +806,8 @@ namespace CriticalMass.Sim.Tests
                     f.HeavyStaggerSeconds = 0;
                     for (int c = 0; c < 6; c++) f.Strikes[c].Knock = 0;
                 }
-                if (a == 4) f.BotNarrowRawStep = false;
-                worlds[a] = World.CreateWorld(new WorldOptions { Seed = 4242, TeamSize = 16, HumanTeam = TeamId.Azure, HumanClass = ClassId.Warrior, Config = cfg });
+                if (a == 4) f.BotNarrowRawStep = true;
+                worlds[a] = World.CreateWorld(new WorldOptions { Seed = seed, TeamSize = 16, HumanTeam = TeamId.Azure, HumanClass = ClassId.Warrior, Config = cfg });
                 scratch[a] = SimInput.EmptyInput();
             }
             for (int t = 0; t < Warm; t++)
@@ -815,20 +821,21 @@ namespace CriticalMass.Sim.Tests
                     MatchTick.Advance(worlds[a], null, scratch[a]);
                     per[a][t] = Stopwatch.GetTimestamp() - c0;
                 }
-            var us = new double[n];
             int keep = Ticks - Ticks / 50;
+            var one = new double[n];
             for (int a = 0; a < n; a++)
             {
                 long[] s = (long[])per[a].Clone();
                 Array.Sort(s);
                 long sum = 0;
                 for (int i = 0; i < keep; i++) sum += s[i];
-                us[a] = sum * 1e6 / Stopwatch.Frequency / keep;
-                int alive = 0;
-                for (int i = 0; i < worlds[a].ActorCount; i++) if (worlds[a].Actors[i].Alive) alive++;
-                Console.WriteLine("{\"item\":\"b15 tick cost arm\",\"arm\":\"" + names[a] + "\",\"usPerTick\":" + us[a].ToString("0.0") + ",\"vsOff\":" + (us[a] / us[0] - 1).ToString("0.000") +
-                                  ",\"alive\":" + alive + ",\"dodges\":" + worlds[a].Dodges.Count + "}");
+                one[a] = sum * 1e6 / Stopwatch.Frequency / keep;
+                us[a] += one[a] / seeds.Length;
+                Console.WriteLine("{\"item\":\"b15 tick cost seed\",\"seed\":" + seed + ",\"arm\":\"" + names[a] + "\",\"usPerTick\":" + one[a].ToString("0.0") + ",\"vsOff\":" + (one[a] / one[0] - 1).ToString("0.000") + "}");
             }
+            }
+            for (int a = 0; a < n; a++)
+                Console.WriteLine("{\"item\":\"b15 tick cost arm\",\"arm\":\"" + names[a] + "\",\"usPerTick\":" + us[a].ToString("0.0") + ",\"vsOff\":" + (us[a] / us[0] - 1).ToString("0.000") + ",\"seeds\":4}");
             double delta = us[1] / us[0] - 1;
             Console.WriteLine("{\"item\":\"b15 tick cost\",\"offUs\":" + us[0].ToString("0.0") + ",\"onUs\":" + us[1].ToString("0.0") + ",\"delta\":" + delta.ToString("0.000") + ",\"target\":0.05,\"limit\":0.10}");
             Assert.LessOrEqual(delta, 0.10, "sim cost on vs off");
