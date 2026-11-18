@@ -49,7 +49,7 @@ namespace CriticalMass.Net
         /// b15-zero-cost: a joiner sends its inputs in packets of this many ticks, sent when the packet's last tick is a
         /// multiple of it (so every joiner's packets cover the same ticks and the host's bundles go out in the same groups),
         /// or after (this - 1) ticks of waiting at most. 0 = by room size (<see cref="LockstepSession.TicksPerPacketFor"/>:
-        /// 2 up to 16 humans, 3 above); 1 = one packet per tick on SendEveryMs, as before b15. The relay bills every message
+        /// 2); 1 = one packet per tick on SendEveryMs, as before b15. The relay bills every message
         /// a game sends it, so this is the room's cost; it adds at most one tick to when an input reaches the host.
         /// </summary>
         public int ClientTicksPerPacket = 0;
@@ -272,9 +272,9 @@ namespace CriticalMass.Net
         private int _hashesSent;
         private long _unsentSince = -1;
 
-        /// <summary>b15-zero-cost: the default inputs-per-packet for a room of this many humans (2, or 3 above 16 humans,
-        /// where the pre-b15 joiners already sent every 2 ticks).</summary>
-        public static int TicksPerPacketFor(int humans) => humans > BigRoomHumans ? 3 : 2;
+        /// <summary>b15-zero-cost: the default inputs-per-packet for a room of this many humans: 2 (above 16 humans the pre-b15
+        /// joiners already sent about every 2 ticks; 3 there measured +2 ticks of felt delay, over the one-tick limit).</summary>
+        public static int TicksPerPacketFor(int humans) => 2;
 
         /// <summary>
         /// b15-rejoin: a session for a seat whose player dropped and came back (RoomClient after REJOINED). It builds the
@@ -322,8 +322,8 @@ namespace CriticalMass.Net
             // A big room's host sends half as often (two ticks per packet): the relay's room object sees one message per human
             // per send, and 32 humans x 33 a second would sit at its 1,000 a second soft limit.
             _sendEveryMs = setup.Humans.Length > BigRoomHumans ? Math.Max(_o.SendEveryMs, 2 * _o.SendEveryMs) : _o.SendEveryMs;
-            // b15-zero-cost: joiners pack 2 ticks a packet (3 in a big room, which sent every 2 before): the relay bills each
-            // message it receives, and a joiner's inputs are nearly all of them. The host's bundles keep their interval.
+            // b15-zero-cost: joiners pack 2 ticks a packet: the relay bills each message it receives, and a joiner's inputs
+            // are nearly all of them. The host's bundles keep their interval (and go out in the same pairs).
             _clientTicks = _o.ClientTicksPerPacket > 0 ? _o.ClientTicksPerPacket : TicksPerPacketFor(setup.Humans.Length);
             _h = setup.Humans.Length;
             _bundleSize = _h * (1 + InputCodec.Size);
@@ -616,7 +616,7 @@ namespace CriticalMass.Net
                 _rejoinLive[k] = true;
                 Buffer.BlockCopy(d, r.Pos + (count - 1) * InputCodec.Size, _lastInput[k], 0, InputCodec.Size);
             }
-            int firstNew = -1;
+            int lastNew = -1;
             for (int j = 0; j < count; j++)
             {
                 int t = first + j;
@@ -628,12 +628,14 @@ namespace CriticalMass.Net
                 Buffer.BlockCopy(d, at, _in[k], idx * InputCodec.Size, InputCodec.Size);
                 _inTick[k][idx] = t;
                 _heardInput[k] = true;
-                if (firstNew < 0) firstNew = t;
+                lastNew = t;
             }
-            // b15-zero-cost: with packed inputs the margin a bundle reports is measured when the inputs ARRIVE (how many ticks
-            // before the host needs the first new one), not when the bundle is sent: bundles now go out right after a group
-            // completes, when every slot's last group looks "just in time", so a send-time margin would grow every lead.
-            if (firstNew >= 0) _arrSlack[k] = firstNew - Stepped;
+            // b15-zero-cost: with packed inputs the margin a bundle reports is measured when the inputs ARRIVE: how many ticks
+            // before the host needs the first tick of the newest group (newest - (ticks a packet - 1)), not when the bundle
+            // is sent: bundles now go out right after a group completes, when every slot's last group looks "just in time",
+            // so a send-time margin would grow every lead. (The newest tick, not the first new one: the opening packet
+            // carries ticks 0 to lead - 1 and its tick 0 is always needed at once.)
+            if (lastNew >= 0) _arrSlack[k] = lastNew - (_clientTicks - 1) - Stepped;
             // Everything up to the last sequenced tick is no longer needed (a late input there was replaced), so the
             // acknowledgement never sticks at a hole and the client never resends stale inputs forever.
             if (_inThrough[k] < _producedThrough) _inThrough[k] = _producedThrough;

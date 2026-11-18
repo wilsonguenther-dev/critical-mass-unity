@@ -143,8 +143,8 @@ namespace CriticalMass.Net
 
         /// <summary>
         /// Messages a second the relay receives from a room in a match, from the send rules: every joiner sends one packet
-        /// per TicksPerPacket ticks; the host's bundles go out in the same groups (small rooms) or at most every 60 ms (big
-        /// rooms, where joiners' groups of 3 make it every 100 ms). preB15: one packet per tick each (two above 16 humans).
+        /// per TicksPerPacket ticks and the host's bundles go out in the same groups. preB15: one packet per tick each (a
+        /// 60 ms gate above 16 humans).
         /// ZeroCostOnlineTests checks this against measured rooms.
         /// </summary>
         public static double MatchMessagesPerSecond(int humans, bool preB15 = false)
