@@ -201,6 +201,17 @@ namespace CriticalMass.Runtime.PlayTests
             yield return PlayOut(v, start);
         }
 
+        /// <summary>b14 ladder fix: the view (and the belt's press) refuse a ladder that is no real shortcut over the rock
+        /// ("no shortcut here"); the batch 13 scan FindSpot uses does not, so a ladder spot must pass the same check along the
+        /// facing axis.</summary>
+        bool UsefulLadderAhead()
+        {
+            double f = W.Actors[0].Facing;
+            int dx = (int)Math.Round(Math.Cos(f)), dz = (int)Math.Round(Math.Sin(f));
+            return BuiltPieces.Plan(W, 0, dx, dz, BuiltPieces.Ladder) == 0
+                && CriticalMass.Runtime.View.Mechanics.LadderClimb.LastPlanIsShortcut(W, 0, dx, dz);
+        }
+
         [UnityTest]
         public IEnumerator Builder_GhostShows_AndAbilityBuildsThePiece()
         {
@@ -211,11 +222,24 @@ namespace CriticalMass.Runtime.PlayTests
             // that moved (bots now walk to the ore veins and the hut), so one spot can turn red in between. Each try prints the
             // view's verdict; the ghost colour must always equal it, and some try must be green.
             // b14: the ladder / bridge is a tool on the wheel; F (or the ability button, B on a pad) uses it.
+            // b14 ladder fix: a ladder that is no shortcut over the rock (a step round the wall's end) is refused with its reason.
+            // Checked with the belt scan along the facing axis (the live view picks its axis from the mouse aim, so it may
+            // refuse the same spot for another reason such as "face a rock wall").
+            if (FindSpot(s => s.Primary.Action == AffAction.Build && s.Primary.Valid && s.Primary.Verb.Contains("LADDER") && !UsefulLadderAhead()))
+            {
+                double f = W.Actors[0].Facing;
+                var belt = new AffordanceScan { RouteBudget = 0, Belt = true, Tool = BuilderTool.Ladder, ToolDx = (int)Math.Round(Math.Cos(f)), ToolDz = (int)Math.Round(Math.Sin(f)) };
+                belt.Scan(W, 0, false, double.NaN, double.NaN, false);
+                Debug.Log($"[Affordance] Builder useless ladder (belt scan, axis {belt.ToolDx},{belt.ToolDz}): verdict {belt.Primary.Valid} ({belt.Primary.Why}), verb {belt.Primary.Verb}");
+                Assert.IsFalse(belt.Primary.Valid, "a ladder with no shortcut is refused");
+                Assert.AreEqual(AffWords.NoShortcut, belt.Primary.Why, "the refused ladder says why");
+            }
+            else Debug.Log("[Affordance] Builder useless ladder: no such spot on this map (limit: none)");
             bool green = false;
             for (int k = 0; k < 6 && !green; k++)
             {
                 bool ladder = false;
-                Assert.IsTrue(FindSpot(s => { bool ok = s.Primary.Action == AffAction.Build && s.Primary.Valid; if (ok) ladder = s.Primary.Verb.Contains("LADDER"); return ok; }, 60, k * 6), "a cliff or gap to build across");
+                Assert.IsTrue(FindSpot(s => { bool ok = s.Primary.Action == AffAction.Build && s.Primary.Valid; if (ok) ladder = s.Primary.Verb.Contains("LADDER"); if (ok && ladder) ok = UsefulLadderAhead(); return ok; }, 60, k * 6), "a cliff or gap to build across");
                 Assert.IsTrue(BuilderToolbelt.Local != null && BuilderToolbelt.Local.Pick(W, 0, ladder ? BuilderTool.Ladder : BuilderTool.Bridge), "the matching tool on the wheel");
                 // b14 ladder fix: a ladder's prompt says what it does ("LADDER TO THE HILL" / "LADDER OVER THE WALL"), a bridge's stays "BUILD BRIDGE".
                 yield return Shows(v, ladder ? "LADDER" : "BUILD");
@@ -225,6 +249,7 @@ namespace CriticalMass.Runtime.PlayTests
             }
             Assert.Greater(v.GhostCellsDrawn, 0, "the placement ghost");
             Assert.IsTrue(green, "green when valid (tries above)");
+            Debug.Log($"[Affordance] Builder green spot: tool {BuilderToolbelt.Local.Selected}, verb {v.Scan.Primary.Verb}, ghost cells {v.GhostCellsDrawn}");
             int head = W.EventHead;
             yield return Pad(GamepadButton.East);
             _driver.StepTicks(1);
