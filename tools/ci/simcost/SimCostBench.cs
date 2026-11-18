@@ -26,6 +26,7 @@ namespace CriticalMass.Sim.Tests
             int cap = seeds16.Length * 14400 + 14400;
             var per = new long[cap];
             var grid = new byte[cap];
+            var fulls = new byte[cap]; var patches = new byte[cap];
             int nt = SimCostProbe.TopNames.Length, nn = SimCostProbe.NestNames.Length;
             bool probed = nt > 0;
             var top = probed ? new float[(long)cap * nt] : null;
@@ -43,12 +44,14 @@ namespace CriticalMass.Sim.Tests
                 SimCostProbe.Clear();
                 for (int t = 300; t < 14400 && w.Match.Phase == MatchPhase.Playing; t++)
                 {
-                    int gv = w.GridVersion;
+                    int gv = w.GridVersion, f0 = SimProfile.ClearanceFullRebuilds, p0 = SimProfile.ClearancePatches;
                     long c0 = Stopwatch.GetTimestamp();
                     MatchTick.Advance(w, null, scratch);
                     if (probed) SimCostProbe.Close();
                     long dt = Stopwatch.GetTimestamp() - c0;
                     grid[n] = (byte)Math.Min(255, w.GridVersion - gv);
+                    fulls[n] = (byte)Math.Min(255, SimProfile.ClearanceFullRebuilds - f0);
+                    patches[n] = (byte)Math.Min(255, SimProfile.ClearancePatches - p0);
                     if (probed)
                     {
                         for (int j = 0; j < nt; j++) top[(long)n * nt + j] = SimCostProbe.Top[j];
@@ -99,7 +102,7 @@ namespace CriticalMass.Sim.Tests
                 var on = new int[nn]; for (int j = 0; j < nn; j++) on[j] = j;
                 Array.Sort(on, (a, b) => nest[(long)i * nn + b].CompareTo(nest[(long)i * nn + a]));
                 for (int q = 0; q < 5 && q < nn; q++) sb.Append($" {SimCostProbe.NestNames[on[q]]}={nest[(long)i * nn + on[q]] * us:0}us/{calls[(long)i * nn + on[q]]}");
-                Console.WriteLine($"[simprobe] {tag}: HEAVIEST #{r + 1} tick-index {i} {per[i] * us:0} us grid+{grid[i]}:{sb}");
+                Console.WriteLine($"[simprobe] {tag}: HEAVIEST #{r + 1} tick-index {i} {per[i] * us:0} us grid+{grid[i]} clearance full {fulls[i]} patches {patches[i]}:{sb}");
             }
             var o2 = new int[nn]; for (int j = 0; j < nn; j++) o2[j] = j;
             Array.Sort(o2, (a, b) => nsum[b].CompareTo(nsum[a]));
