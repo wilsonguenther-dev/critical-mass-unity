@@ -141,7 +141,7 @@ namespace CriticalMass.Runtime.View
             MinFloorY = Mathf.Min(MinFloorY, (float)yf);
             MaxFloorY = Mathf.Max(MaxFloorY, (float)yf);
             int nf = 0;   // floor polygon points
-            int bestSide = -1;
+            int bestSide = -1, rimSides = 0;
             double bestHash = -1;
             // Corners in order (sim): v0 (cx, cz), v1 (cx+1, cz), v2 (cx+1, cz+1), v3 (cx, cz+1); side s runs from corner s to
             // corner s+1: 0 north (z = cz), 1 east (x = cx+1), 2 south (z = cz+1), 3 west (x = cx).
@@ -174,6 +174,7 @@ namespace CriticalMass.Runtime.View
                 for (int k = 0; k < 3; k++) _by[k] = FloorIn(_bx[k], _bz[k]);
                 _fx[nf] = _bx[1]; _fz[nf] = _bz[1]; nf++;
                 RimSide(cx, cz, s, h, inx, inz);
+                rimSides++;
                 double sh = Hash01(cx, cz, 900 + s);
                 if (sh > bestHash) { bestHash = sh; bestSide = s; }
             }
@@ -187,8 +188,10 @@ namespace CriticalMass.Runtime.View
                 TriSim(ccx, ccy, ccz, _fx[k], _fy[k], _fz[k], _fx[k1], _fy[k1], _fz[k1], 0, 1, 0, floor);
             }
             PitFloorFaces++;
-            // Two stones on the floor, near the middle (inside the wall feet of a lone cell).
-            for (int k = 0; k < 2; k++)
+            // Stones on the floor, near the middle (inside the wall feet of a lone cell): two in a cell by the rim, one in the
+            // middle of a wide dig (r4: keeps an all-dug chunk's rebuild under 5 ms).
+            int stones = rimSides > 0 ? 2 : 1;
+            for (int k = 0; k < stones; k++)
             {
                 double px = cx + 0.38 + 0.24 * Hash01(cx, cz, 21 + k), pz = cz + 0.38 + 0.24 * Hash01(cx, cz, 31 + k);
                 double sz = 0.045 + 0.035 * Hash01(cx, cz, 41 + k);
@@ -262,6 +265,9 @@ namespace CriticalMass.Runtime.View
                 int r0 = Hash01(cx, cz, 780 + side) < 0.5f ? 0 : 1;   // the root crosses the first or second segment
                 WallRow(r0, 0, h, out double ax, out double ay, out double az);
                 WallRow(r0 + 1, 1, h, out double bx, out double by, out double bz);
+                // The root's tips stay 15% in from the segment's ends (never on a cell edge or corner another cell draws).
+                double tx = (bx - ax) * 0.15, tz = (bz - az) * 0.15;
+                ax += tx; az += tz; bx -= tx; bz -= tz;
                 double ox = inx * 0.012, oz = inz * 0.012;
                 QuadSim(ax + ox, ay - 0.02, az + oz, bx + ox, by + 0.03, bz + oz, bx + ox, by - 0.0, bz + oz, ax + ox, ay - 0.05, az + oz,
                     inx * (1 - PitNormalUp), PitNormalUp, inz * (1 - PitNormalUp), Jit(Root, cx, cz, 770 + side), 0f, default);
