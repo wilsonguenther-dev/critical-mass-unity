@@ -180,6 +180,11 @@ namespace CriticalMass.Net.Replay
                     MatchTick.HandToBot(World, id);
                 }
             }
+            if ((op & ReplayInputStream.OpBotToHuman) != 0)
+            {
+                int c = _r.U8();
+                for (int i = 0; i < c; i++) MatchTick.BotToHuman(World, _r.U8());   // b15-rejoin
+            }
             for (int id = 0; id < _frames.Length; id++) _frames[id] = null;
             for (int id = 0; id < _lanes.Length && _mask >> id != 0; id++)
             {

@@ -67,6 +67,40 @@ namespace CriticalMass.Net.Relay
             }
         }
 
+        /// <summary>
+        /// b15-zero-cost: the relay's own count of today's billed requests (GET /usage; server/relay counts what its rooms
+        /// cost), or -1 when the relay cannot say (an older relay without /usage, offline). Never throws.
+        /// </summary>
+        public static async Task<double> FetchRequestsTodayAsync(string baseUrl, CancellationToken ct)
+        {
+            try
+            {
+                using (var http = new HttpClient { Timeout = TimeSpan.FromSeconds(6) })
+                {
+                    HttpResponseMessage r = await http.GetAsync(baseUrl.TrimEnd('/') + "/usage", ct).ConfigureAwait(false);
+                    if (!r.IsSuccessStatusCode) return -1;
+                    return JsonNumber(await r.Content.ReadAsStringAsync().ConfigureAwait(false), "requests");
+                }
+            }
+            catch (Exception) { return -1; }
+        }
+
+        /// <summary>The number value of "name":123 in a small flat JSON object, or -1.</summary>
+        internal static double JsonNumber(string json, string name)
+        {
+            if (json == null) return -1;
+            string k = "\"" + name + "\"";
+            int i = json.IndexOf(k, StringComparison.Ordinal);
+            if (i < 0) return -1;
+            i = json.IndexOf(':', i + k.Length);
+            if (i < 0) return -1;
+            int a = i + 1;
+            while (a < json.Length && json[a] == ' ') a++;
+            int b = a;
+            while (b < json.Length && (char.IsDigit(json[b]) || json[b] == '.')) b++;
+            return b > a && double.TryParse(json.Substring(a, b - a), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out double v) ? v : -1;
+        }
+
         /// <summary>Opens a socket to room code (as host when hostKey is set). Returns at once; Poll reports Connected or Closed.</summary>
         public static RelayTransport Connect(string baseUrl, string code, string hostKey)
         {

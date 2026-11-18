@@ -36,7 +36,7 @@ All flags: `-onlineHost`, `-onlineJoin CODE`, `-onlineCode`, `-onlineKey`, `-onl
 `-onlineLobby SECONDS` (host gives up if the room is not full and ready, default 180, exit 4), `-onlineJoinTries N`
 (joiner asks again 1.5 s apart while the room is not there yet, default 8), `-onlineChatAt TICK` and
 `-onlineChatTeam` (the scripted chat line goes to the team only), `-onlineChatText TEXT` (send a chat line; every received line is logged as ONLINE CHAT), `-onlineDropAt TICK` (drop off
-with no goodbye; the others log ONLINE TOBOT with the seat and tick), `-onlineBuild`, `-onlineHeadless`.
+with no goodbye; the others log ONLINE TOBOT with the seat and tick), `-onlineRejoinAfter MS` / `-rejoin-after MS` (b15-rejoin: after the drop, come back MS later with the same seat secret, replay the match from the host's log and take the fighter back; logs ONLINE REJOINING / ONLINE REJOINED with the time and log size, and writes the rejoined session's fingerprints to HASHLOG.rejoin; online-smoke input `drop_rejoin: TICK:MS` runs it and compares them with the host's), `-onlineBuild`, `-onlineHeadless`.
 The hash log starts with tick 0 (the world as built) and tick 1, then every 30th tick: a mismatch at 0 is a setup
 difference, at 1 the first inputs, later a simulation drift. The summary line ends with every peer's round trip.
 Exit codes: 0 ok, 2 desync, 3 room closed or host left, 4 timed out, 5 could not create or join.
