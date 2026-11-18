@@ -434,9 +434,10 @@ namespace CriticalMass.Sim.Tests
                 ", first player knock-out " + F(FirstPlayerKo) + " s, kills/min " + F(Kpm) + ", hill lead changes " + HillChanges;
         }
 
-        internal static Arm RunMatch(int seed, int teamSize, bool typesOn, int stopAfterHatchTicks = -1)
+        internal static Arm RunMatch(int seed, int teamSize, bool typesOn, int stopAfterHatchTicks = -1, Action<GameConfig> tweak = null)
         {
             GameConfig cfg = Full();
+            tweak?.Invoke(cfg);   // b15-hook: the b15 diagnosis runs the same matches with the b15 rules switched
             cfg.Depth.KaijuTypes.On = typesOn;
             World w = World.CreateWorld(new WorldOptions { Seed = seed, TeamSize = teamSize, HumanTeam = TeamId.Azure, HumanClass = ClassId.Warrior, Config = cfg });
             InputFrame scratch = SimInput.EmptyInput();

@@ -339,5 +339,33 @@ namespace CriticalMass.Sim.Tests
                     + "; walls up at the end " + CountWalls(w) + ", hut picks A/C mask " + w.HutVote.Mask[0] + "/" + w.HutVote.Mask[1]);
             }
         }
+    
+        /// <summary>Which b15 rule moves the ELDER count on KaijuTypeTests' 24 seeds (5v5 1-20, 16v16 1337 4242 7 99).</summary>
+        [Test, Explicit, Timeout(1800000)]
+        public void B15DiagElderCount()
+        {
+            var arms = new List<KeyValuePair<string, Action<GameConfig>>>
+            {
+                new KeyValuePair<string, Action<GameConfig>>("both off", c => { c.Depth.Comeback.Enabled = false; c.Depth.HutChoices.Enabled = false; }),
+                new KeyValuePair<string, Action<GameConfig>>("comeback only", c => c.Depth.HutChoices.Enabled = false),
+                new KeyValuePair<string, Action<GameConfig>>("hut choices only", c => c.Depth.Comeback.Enabled = false),
+                new KeyValuePair<string, Action<GameConfig>>("both on", c => { }),
+            };
+            int[] big = { 1337, 4242, 7, 99 };
+            foreach (var arm in arms)
+            {
+                string elders = "";
+                int n = 0;
+                for (int i = 0; i < 24; i++)
+                {
+                    int seed = i < 20 ? i + 1 : big[i - 20], size = i < 20 ? 5 : 16;
+                    KaijuTypeTests.Arm r = KaijuTypeTests.RunMatch(seed, size, true, -1, arm.Value);
+                    if (r.Type != KaijuType.Elder) continue;
+                    n++;
+                    elders += (elders.Length > 0 ? " " : "") + size + "v" + size + "/" + seed;
+                }
+                Console.WriteLine("[b15 diag elder] " + arm.Key + ": ELDER " + n + " of 24 (" + elders + ")");
+            }
+        }
     }
 }

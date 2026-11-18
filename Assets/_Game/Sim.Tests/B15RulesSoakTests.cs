@@ -234,6 +234,9 @@ namespace CriticalMass.Sim.Tests
 
         /// <summary>Options with at least this many picks are judged on their win rate.</summary>
         public const int MinPicksJudged = 6;
+        /// <summary>Coin-flip option win rates are judged from 12 picks up: under that one match moves the rate by more than 0.08
+        /// (24-seed run 44248722309: SWIFT FEET 6 of 9 = 0.67). The 72-seed test judges the same limit with three times the picks.</summary>
+        public const int MinPicksJudgedCoin = 12;
 
         static bool Target(string what, string value, bool ok, string limit) => Check("target " + what, value, ok, limit);
 
@@ -280,7 +283,7 @@ namespace CriticalMass.Sim.Tests
                 {
                     if (a.Picks[o] < MinPicksJudged) continue;
                     double wr = (double)a.PickWins[o] / a.Picks[o];
-                    bool judged = ReferenceEquals(a, coin);
+                    bool judged = ReferenceEquals(a, coin) && a.Picks[o] >= MinPicksJudgedCoin;
                     bool ok = Check(a.Name + ": " + HutChoiceNames.Name[o] + " win rate" + (judged ? "" : " (bots chose by need: printed)"), F(wr, "0.00") + " over " + a.Picks[o] + " picks", wr <= 0.65 + 1e-9, "0.65 or less");
                     if (judged && !ok) fails++;
                 }
@@ -311,6 +314,14 @@ namespace CriticalMass.Sim.Tests
             foreach (Arm a in new[] { off, both, coin }) Print(a);
             WinShare.Judge("b15 72 seeds both on", "16v16 pool", both.T16, off.T16, true);
             WinShare.Judge("b15 72 seeds coin-flip picks", "16v16 pool", coin.T16, off.T16, true);
+            int fails = 0;
+            for (int o = 1; o <= 10; o++)
+            {
+                if (coin.Picks[o] < MinPicksJudgedCoin) continue;
+                double wr = (double)coin.PickWins[o] / coin.Picks[o];
+                if (!Check("72 seeds coin-flip picks: " + HutChoiceNames.Name[o] + " win rate", F(wr, "0.00") + " over " + coin.Picks[o] + " picks", wr <= 0.65 + 1e-9, "0.65 or less")) fails++;
+            }
+            Assert.AreEqual(0, fails, "no hut option above 0.65 on 72 seeds (coin-flip picks)");
         }
     }
 }
