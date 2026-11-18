@@ -3,7 +3,7 @@ using System.Reflection;
 using CriticalMass.Net;
 using CriticalMass.Sim.Config;
 using NUnit.Framework;
-using UnityEngine;
+
 
 namespace CriticalMass.Sim.Tests.Net
 {
@@ -14,7 +14,7 @@ namespace CriticalMass.Sim.Tests.Net
     /// </summary>
     public sealed class CosmeticLookTests
     {
-        static void P(string s) => Debug.Log("[b15-look] " + s);
+        static void P(string s) => Console.WriteLine("[b15-look] " + s);
 
         /// <summary>RoomMsg.Look (internal to the Net assembly): the first byte of a look packet.</summary>
         const byte LookMsg = 28;
