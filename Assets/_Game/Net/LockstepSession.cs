@@ -271,6 +271,8 @@ namespace CriticalMass.Net
         private int[] _arrSlack;
         private int _hashesSent;
         private long _unsentSince = -1;
+        /// <summary>b15-zero-cost, host: when the oldest produced-but-unbroadcast tick was first seen (-1: none).</summary>
+        private long _hostUnsentSince = -1;
 
         /// <summary>b15-zero-cost: the default inputs-per-packet for a room of this many humans: 2 (above 16 humans the pre-b15
         /// joiners already sent about every 2 ticks; 3 there measured +2 ticks of felt delay, over the one-tick limit).</summary>
@@ -1139,7 +1141,23 @@ namespace CriticalMass.Net
                 {
                     int from = _sentBundle[0] + 1;
                     bool news = _producedThrough >= from || Status == LockstepStatus.Desynced;
-                    if (pkt == 0 && now - _lastSendTo[0] < (news ? _sendEveryMs : KeepAliveNow)) return;
+                    if (pkt == 0)
+                    {
+                        // b15-zero-cost: on a real clock the host produces one tick at a time (its own input arrives each
+                        // tick, the joiners' are already there), so a 30 ms gate broadcast every tick: the online-smoke run
+                        // of 2026-11-18 measured 29 bundles a second against 15 inputs a second from each joiner. Broadcast
+                        // the same pairs the joiners send (when the pair's last tick is produced, or after one tick of
+                        // waiting at most), so the relay receives half the host's messages too.
+                        if (news && _clientTicks > 1 && Status != LockstepStatus.Desynced)
+                        {
+                            if (_hostUnsentSince < 0) _hostUnsentSince = now;
+                            bool aligned = (_producedThrough + 1) % _clientTicks == 0;
+                            bool full = _producedThrough - from + 1 >= _clientTicks;
+                            bool waited = now - _hostUnsentSince >= (_clientTicks - 1) * _tickMs - 0.5;
+                            if (!aligned && !full && !waited) return;
+                        }
+                        else if (now - _lastSendTo[0] < (news ? _sendEveryMs : KeepAliveNow)) return;
+                    }
                     if (pkt > 0 && _producedThrough < from) return;
                     int count = Math.Max(0, Math.Min(_producedThrough - from + 1, maxPer));
                     int len = BuildBundles(from, count, -1);
@@ -1148,7 +1166,7 @@ namespace CriticalMass.Net
                     BytesSent += len;
                     PacketsSent++;
                     _lastSendTo[0] = now;
-                    if (count > 0) _sentBundle[0] = from + count - 1;
+                    if (count > 0) { _sentBundle[0] = from + count - 1; _hostUnsentSince = -1; }
                 }
                 return;
             }
