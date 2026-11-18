@@ -81,6 +81,8 @@ namespace CriticalMass.Sim.Bots
             double tdz = dz != 0 ? Math.Abs(1 / dz) : double.PositiveInfinity;
             double tmx = dx > 0 ? (cx + 1 - x0) * tdx : dx < 0 ? (x0 - cx) * tdx : double.PositiveInfinity;
             double tmz = dz > 0 ? (cz + 1 - z0) * tdz : dz < 0 ? (z0 - cz) * tdz : double.PositiveInfinity;
+            sbyte[] lift = map.Lift;   // b15 terrain height: a cell 2+ levels above the one before is not a straight walk
+            int prev = cx >= 0 && cz >= 0 && cx < W && cz < H ? cz * W + cx : -1;
             for (int guard = 0; guard < 512; guard++)
             {
                 if (cx == tx && cz == tz) return -1;
@@ -97,6 +99,8 @@ namespace CriticalMass.Sim.Bots
                 if (cx < 0 || cz < 0 || cx >= W || cz >= H) return cz * W + cx;
                 int i = cz * W + cx;
                 if (!MapGrid.IsWalkableType(map.Cells[i])) return i;
+                if (lift != null && prev >= 0 && lift[i] - lift[prev] >= 2 && map.Cells[i] != Cell.Bridge) return i;
+                prev = i;
             }
             return -1;
         }

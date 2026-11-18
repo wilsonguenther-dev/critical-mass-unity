@@ -272,6 +272,24 @@ namespace CriticalMass.Sim.Core
             int az = JsMath.FloorToInt(w.Z[id]);
             PlanCount = 0;
             if (!MapGrid.IsWalkable(map, ax, az)) return RefusedTarget;
+            // b15 terrain height: a Builder in a pit facing a ledge JumpUp or more levels above lays a 1-cell LADDER on the
+            // ledge cell (a Bridge cell is a ramp: nobody is blocked by height stepping onto it). When it goes, the cell comes
+            // back with its lift.
+            if (map.Lift != null && (kindWanted == 0 || kindWanted == Ladder) && MapGrid.InBounds(map, ax + dx, az + dz) && !OnEdge(map, ax + dx, az + dz)
+                && TerrainHeight.LedgeAbove(map, az * map.Width + ax, (az + dz) * map.Width + ax + dx, w.Config))
+            {
+                EnsurePlan(1);
+                int li = (az + dz) * map.Width + ax + dx;
+                PlanCells[0] = li;
+                PlanPrev[0] = map.Cells[li];
+                PlanCount = 1;
+                PlanKind = Ladder;
+                PlanLength = 1;
+                PlanStart = 1;
+                PlanX = ax + 0.5 + dx;
+                PlanZ = az + 0.5 + dz;
+                return 0;
+            }
             int reach = Math.Max(1, (int)cfg.ReachCells);
             int s0 = -1;
             for (int s = 1; s <= reach; s++)

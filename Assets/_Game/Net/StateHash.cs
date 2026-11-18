@@ -28,6 +28,9 @@ namespace CriticalMass.Net
             Mix(ref h, Bits(w.Match.Delivered[1].Biomass));
             byte[] cells = w.Map.Cells;
             for (int i = 0; i < cells.Length; i++) Mix(ref h, cells[i]);
+            // b15 terrain height: the lift layer is sim state (null, so not mixed, in Classic and PhysicsOnly).
+            sbyte[] lift = w.Map.Lift;
+            if (lift != null) for (int i = 0; i < lift.Length; i++) Mix(ref h, lift[i]);
             for (int i = 0; i < w.ActorCount; i++)
             {
                 Actor a = w.Actors[i];

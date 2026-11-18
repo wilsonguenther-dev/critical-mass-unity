@@ -97,6 +97,15 @@ namespace CriticalMass.Sim.Grid
         public BoundsDef Bounds;
         /// <summary>CM-31: knock-down decoration pieces. Fixed per map; world.Topple holds their state.</summary>
         public DecorationDef[] Decorations;
+        /// <summary>
+        /// b15 terrain height: integer level offset per cell on top of Height01 (+ stacked blocks, - dug pits), only on Floor and
+        /// BreakableDestroyed cells. Null unless DepthConfig.TerrainHeight is on (Full rules): every reader checks for null, so
+        /// Classic and PhysicsOnly are bit-identical. Sim state (StateHash mixes it). Not copied by WithCells (the Kaiju's
+        /// clearance map ignores height).
+        /// </summary>
+        public sbyte[] Lift;
+        /// <summary>b15: extra path cost of a 1-level and a 2-level edge (TerrainHeightConfig.PathCostStep1 / 2), set with Lift.</summary>
+        public double LiftCost1, LiftCost2;
 
         /// <summary>A copy sharing every field but <c>Cells</c> (browser <c>{ ...map, cells }</c>).</summary>
         public MapDef WithCells(byte[] cells)

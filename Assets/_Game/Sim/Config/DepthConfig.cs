@@ -36,6 +36,8 @@ namespace CriticalMass.Sim.Config
         public KaijuTypesConfig KaijuTypes = new KaijuTypesConfig();
         /// <summary>CM b13 [C]: the corruption crystal, the roll and the wild Kaiju.</summary>
         public CorruptionConfig Corruption = new CorruptionConfig();
+        /// <summary>b15: terrain height (stacked blocks, walkable pits). One switch: TerrainHeight.Enabled.</summary>
+        public TerrainHeightConfig TerrainHeight = new TerrainHeightConfig();
 
         public DepthConfig Clone()
         {
@@ -52,6 +54,7 @@ namespace CriticalMass.Sim.Config
             c.Dodge = Dodge.Clone();
             c.KaijuTypes = KaijuTypes.Clone();
             c.Corruption = Corruption.Clone();
+            c.TerrainHeight = TerrainHeight.Clone();
             return c;
         }
     }
