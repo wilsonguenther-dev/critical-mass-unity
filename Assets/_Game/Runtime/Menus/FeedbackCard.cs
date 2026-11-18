@@ -58,6 +58,11 @@ namespace CriticalMass.Runtime.Menus
         public static string FolderOverride;
         public static string Folder => FolderOverride ?? ReplayStore.Folder;
         public static string FilePath => FeedbackLog.PathIn(Folder);
+        /// <summary>Tests turn the card and the file on in the editor (off there by default, like the boot title, so test
+        /// runs never stop on the card or write into the real data folder).</summary>
+        public static bool EnabledInEditorForTests;
+        /// <summary>The card and the file run in player builds (the boot title's rule) or when a test turns them on.</summary>
+        public static bool Active => TitleScreen.ShowOnBoot || EnabledInEditorForTests;
 
         // first-fun markers (this launch)
         static FirstFun _fun;
@@ -118,6 +123,7 @@ namespace CriticalMass.Runtime.Menus
             World w = _driver != null ? _driver.World : null;
             bool human = _driver != null && w != null && w.ActorCount > 0 &&
                          HumanMatch(HumanControlGuard.ToolWorld(_driver), _driver.IsReplay, SpectatorMode.IsSpectating);
+            if (!Active) { _lastState = s; return; }
             if (s == FlowState.Match && human) TrackMatch(w);
             if (s != _lastState) OnStateChanged(_lastState, s);
             _lastState = s;
