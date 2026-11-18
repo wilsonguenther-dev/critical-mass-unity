@@ -445,14 +445,15 @@ half3 CMToonKaijuGlow(half3 color, float3 normalWS, float3 viewDirWS, float3 pos
     {
         // leafy crest: scalloped leaf patches over every upward face
         float leaf = sin(p.x * 3.1) * sin(p.z * 3.1 + p.y * 1.7);
-        pat = smoothstep(0.30, 0.55, up) * step(-0.15, leaf);
+        pat = smoothstep(0.30, 0.55, up) * step(0.30, leaf);   // b14 final look: leaf patches, not the whole top (was -0.15: lime body)
     }
     else if (kind == 2)
     {
         // back plates: a grid of separate plates (gaps between them) on the upward faces
         float2 f = frac(p.xz * 1.35);
         float edge = min(min(f.x, 1.0 - f.x), min(f.y, 1.0 - f.y));
-        pat = step(0.40, up) * step(0.11, edge);
+        float2 id = floor(p.xz * 1.35);
+        pat = step(0.40, up) * step(0.14, edge) * step(0.5, frac((id.x + id.y) * 0.5));   // b14 final look: every other plate (was all: orange body)
     }
     else if (kind == 3)
     {
@@ -473,8 +474,10 @@ half3 CMToonKaijuGlow(half3 color, float3 normalWS, float3 viewDirWS, float3 pos
     }
     half k = (half)saturate(_KaijuGlow.a);
     half3 glow = _KaijuGlow.rgb;
-    color = lerp(color, glow, (half)(pat * 0.80) * k);
-    return saturate(color + glow * (half)(rimGlow * 0.55) * k);
+    // b14 final look (seen in engine at night): pattern 0.80 -> 0.58 and fresnel 0.55 -> 0.32; at the old values the glow
+    // swallowed the body (GROVE read as a lime blob, BRUTE as solid orange).
+    color = lerp(color, glow, (half)(pat * 0.58) * k);
+    return saturate(color + glow * (half)(rimGlow * 0.32) * k);
 }
 
 // Time of day: how much of the grade a CM/Toon material skips. Characters and the Kaiju (rim strength above 0: world
