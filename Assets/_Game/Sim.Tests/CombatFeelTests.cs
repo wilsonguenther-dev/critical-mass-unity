@@ -691,20 +691,24 @@ namespace CriticalMass.Sim.Tests
             Assert.Greater(swings, 0);
         }
 
-        private static void OwnCalls(World w)
+        /// <summary>The rule's per-tick entry points. gameCalls = only where the game calls them (MendTarget for Healers, NearHome
+        /// for Builders, Narrow with BotNarrowRawStep), still for every such actor every tick; false = every call for every actor.</summary>
+        private static void OwnCalls(World w, bool gameCalls = false)
         {
             CombatFeel.RefreshLadders(w);
+            bool narrow = !gameCalls || w.Config.Depth.CombatFeel.BotNarrowRawStep;
             for (int i = 0; i < w.ActorCount; i++)
             {
                 int j = (i + 1) % w.ActorCount;
+                ClassId c = w.Actors[i].Cls;
                 CombatFeel.DamageMul(w, i, j, 1.0);
                 CombatFeel.StaggerFor(w, j, 10, out bool _, out bool _);
                 CombatFeel.SpeedScale(w, i);
                 CombatFeel.OnLadder(w, i);
-                CombatFeel.NearHome(w, i);
-                CombatFeel.Narrow(w.Map, w.X[i], w.Z[i]);
-                CombatFeel.BotReach(w, w.Actors[i].Cls, 1.5);
-                Healer.MendTarget(w, i, double.NaN, double.NaN);
+                if (!gameCalls || c == ClassId.Builder) CombatFeel.NearHome(w, i);
+                if (narrow) CombatFeel.Narrow(w.Map, w.X[i], w.Z[i]);
+                CombatFeel.BotReach(w, c, 1.5);
+                if (!gameCalls || c == ClassId.Healer) Healer.MendTarget(w, i, double.NaN, double.NaN);
             }
         }
 
@@ -837,8 +841,8 @@ namespace CriticalMass.Sim.Tests
             for (int a = 0; a < n; a++)
                 Console.WriteLine("{\"item\":\"b15 tick cost arm\",\"arm\":\"" + names[a] + "\",\"usPerTick\":" + us[a].ToString("0.0") + ",\"vsOff\":" + (us[a] / us[0] - 1).ToString("0.000") + ",\"seeds\":4}");
             double delta = us[1] / us[0] - 1;
-            // Same job: the rule's own per-tick code, every entry point called for EVERY actor EVERY tick (an upper bound: in the
-            // game DamageMul, StaggerFor and NearHome run per hit only), timed on the same world against its whole tick.
+            // Same job: the rule's own per-tick code, each entry point called for every actor of the class the game calls it for,
+            // every tick (an upper bound: in the game DamageMul, StaggerFor and NearHome run per hit only, MendTarget per press), timed on the same world against its whole tick.
             GameConfig oc = GameConfig.CreateBrowser5v5().ApplyRules(RulesProfile.Full);
             World ow = World.CreateWorld(new WorldOptions { Seed = 4242, TeamSize = 16, HumanTeam = TeamId.Azure, HumanClass = ClassId.Warrior, Config = oc });
             InputFrame os = SimInput.EmptyInput();
@@ -849,7 +853,7 @@ namespace CriticalMass.Sim.Tests
                 long c0 = Stopwatch.GetTimestamp();
                 MatchTick.Advance(ow, null, os);
                 long c1 = Stopwatch.GetTimestamp();
-                OwnCalls(ow);
+                OwnCalls(ow, true);
                 long c2 = Stopwatch.GetTimestamp();
                 tick += c1 - c0;
                 own += c2 - c1;
