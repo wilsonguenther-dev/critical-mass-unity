@@ -51,17 +51,9 @@ namespace CriticalMass.Sim.Core
         private static double ShrineKeyX = double.NaN;
         private static double ShrineKeyZ = double.NaN;
         private static double ShrineKeyR = double.NaN;
-        private static FlowField Field;
         private static readonly int[] OneCell = new int[1];
         private static readonly byte[] OneType = new byte[1];
         private static byte[] OldTypes = new byte[16];
-
-        private static FlowField ScratchField(MapDef map)
-        {
-            int n = map.Width * map.Height;
-            if (Field == null || Field.Dist.Length != n) Field = new FlowField { Dist = new double[n], Version = 0 };
-            return Field;
-        }
 
         /// <summary>Goal points for "reaches the shrine": every cell centre within ShrineInteractRange of the shrine centre.</summary>
         private static PointXZ[] ShrineRing(World w)
@@ -93,22 +85,22 @@ namespace CriticalMass.Sim.Core
             return ShrineGoals;
         }
 
-        private static bool PadReached(MapDef map, FlowField f, TeamId team)
-        {
-            PadDef p = map.Pads[(int)team];
-            int cx = JsMath.FloorToInt(p.X);
-            int cz = JsMath.FloorToInt(p.Z);
-            if (cx < 0 || cz < 0 || cx >= map.Width || cz >= map.Height) return false;
-            return double.IsFinite(f.Dist[cz * map.Width + cx]);
-        }
-
         /// <summary>True when both team pads reach the hill centre on the CURRENT grid (the soak samples this).</summary>
         public static bool PadsReachHill(MapDef map)
         {
             HillGoal[0].X = map.Hill.X;
             HillGoal[0].Z = map.Hill.Z;
-            FlowField f = FlowField.ComputeFlowField(map, HillGoal, ScratchField(map));
-            return PadReached(map, f, TeamId.Azure) && PadReached(map, f, TeamId.Crimson);
+            return PadsReached(map, HillGoal) == 3;
+        }
+
+        /// <summary>
+        /// b14 sim cost: bit 1 = the Azure pad reaches one of the goals, bit 2 = the Crimson pad (GridReach: the same yes/no
+        /// as a finite flow-field distance at the pad's cell, PadReached, without building the field).
+        /// </summary>
+        private static int PadsReached(MapDef map, PointXZ[] goals)
+        {
+            PadDef a = map.Pads[(int)TeamId.Azure], c = map.Pads[(int)TeamId.Crimson];
+            return GridReach.Reached(map, goals, a.X, a.Z, c.X, c.Z);
         }
 
         /// <summary>
@@ -116,6 +108,92 @@ namespace CriticalMass.Sim.Core
         /// the hill, and no pad that reaches the shrine ring now loses it. The tentative raw write is restored before returning.
         /// </summary>
         public static bool CellsKeepRoutes(World w, int[] idx, byte[] next, int n)
+        {
+            // b14 sim cost: the same request on the same grid (compared cell for cell; and, when the Kaiju route guard looked at the body, the same
+            // Kaiju start cell on the same clearance build) has the same verdict: answer it from the memo (an expired piece
+            // whose lift is refused retries every tick; each retry paid two flow fields and the Kaiju guard's searches).
+            int hit = RouteMemoFind(w, idx, next, n);
+            if (hit >= 0)
+            {
+                SimProfile.RouteMemoHits++;
+                return Memo[hit].Ok;
+            }
+            SimProfile.RouteProofs++;
+            Kaiju.LastGuard.Used = false;
+            bool verdict = CellsKeepRoutesUncached(w, idx, next, n);
+            RouteMemoStore(w, idx, next, n, verdict);
+            return verdict;
+        }
+
+        // ------------------------------------------------------------------------------------------ route verdict memo
+        /// <summary>
+        /// b14 sim cost: one remembered route verdict. A pure function of (the grid, compared cell for cell; the request; and,
+        /// only when the Kaiju route guard reached the body test, the guard's start cell on the Kaiju clearance grid, whose
+        /// build is identified by Kaiju.ClearEpoch). Never Sim state: a hit and a miss give the same answer, so no checksum moves.
+        /// </summary>
+        private sealed class RouteMemoEntry
+        {
+            public World W;
+            /// <summary>The whole grid the verdict was worked out on (exact compare: a raw cell write without a GridVersion bump, as
+            /// the tests paint, still misses).</summary>
+            public byte[] Grid = new byte[CriticalMass.Sim.Maps.SkybreakBasinMap.MapWidth * CriticalMass.Sim.Maps.SkybreakBasinMap.MapHeight];   // the shipped map: no allocation in play
+            public long Epoch;
+            /// <summary>What the Kaiju route guard read (Used false: the verdict did not depend on the Kaiju: pads cut, nothing narrowed, guard off).</summary>
+            public Kaiju.GuardKey Guard;
+            public int N;
+            public int[] Idx = new int[RouteMemoMaxCells];
+            public byte[] Next = new byte[RouteMemoMaxCells];
+            public bool Ok;
+        }
+
+        /// <summary>Requests with more cells than this are never memoised (a whole wall line is checked once anyway).</summary>
+        private const int RouteMemoMaxCells = 64;
+        private static readonly RouteMemoEntry[] Memo = NewMemo(8);
+        private static int MemoCursor;
+
+        private static RouteMemoEntry[] NewMemo(int k)
+        {
+            var m = new RouteMemoEntry[k];
+            for (int i = 0; i < k; i++) m[i] = new RouteMemoEntry();
+            return m;
+        }
+
+        private static int RouteMemoFind(World w, int[] idx, byte[] next, int n)
+        {
+            if (n > RouteMemoMaxCells || SimProfile.NoRouteMemo) return -1;
+            for (int e = 0; e < Memo.Length; e++)
+            {
+                RouteMemoEntry m = Memo[e];
+                if (!ReferenceEquals(m.W, w) || m.Epoch != Kaiju.ClearEpoch || m.N != n) continue;
+                bool same = true;
+                for (int k = 0; k < n && same; k++) same = m.Idx[k] == idx[k] && m.Next[k] == next[k];
+                if (!same) continue;
+                byte[] cells = w.Map.Cells;
+                if (m.Grid.Length != cells.Length || !new ReadOnlySpan<byte>(m.Grid).SequenceEqual(cells)) continue;
+                if (!m.Guard.Used || Kaiju.RouteMemoSameKaiju(w, in m.Guard)) return e;
+            }
+            return -1;
+        }
+
+        private static void RouteMemoStore(World w, int[] idx, byte[] next, int n, bool ok)
+        {
+            if (n > RouteMemoMaxCells) return;
+            RouteMemoEntry m = Memo[MemoCursor];
+            MemoCursor = (MemoCursor + 1) % Memo.Length;
+            m.W = w;
+            byte[] cells = w.Map.Cells;
+            if (m.Grid.Length != cells.Length) m.Grid = new byte[cells.Length];   // once per map size
+            Array.Copy(cells, m.Grid, cells.Length);
+            m.Epoch = Kaiju.ClearEpoch;
+            m.Guard = Kaiju.LastGuard;
+            m.N = n;
+            Array.Copy(idx, m.Idx, n);
+            Array.Copy(next, m.Next, n);
+            m.Ok = ok;
+        }
+
+        /// <summary>The route guard proper (CellsKeepRoutes without the memo).</summary>
+        private static bool CellsKeepRoutesUncached(World w, int[] idx, byte[] next, int n)
         {
             MapDef map = w.Map;
             byte[] cells = map.Cells;
@@ -132,15 +210,15 @@ namespace CriticalMass.Sim.Core
                 ok = PadsReachHill(map) && Kaiju.TentativeKeepsKaijuRoute(w, idx, next, OldTypes, n);
                 if (ok)
                 {
-                    FlowField f = FlowField.ComputeFlowField(map, ShrineRing(w), ScratchField(map));
-                    bool aAfter = PadReached(map, f, TeamId.Azure);
-                    bool cAfter = PadReached(map, f, TeamId.Crimson);
+                    int after = PadsReached(map, ShrineRing(w));
+                    bool aAfter = (after & 1) != 0;
+                    bool cAfter = (after & 2) != 0;
                     if (!aAfter || !cAfter)
                     {
                         for (int k = 0; k < n; k++) cells[idx[k]] = OldTypes[k];
-                        FlowField g = FlowField.ComputeFlowField(map, ShrineRing(w), ScratchField(map));
+                        int g = PadsReached(map, ShrineRing(w));
                         // Refuse only a NEW disconnection: a pad already cut off from the shrine is not this change's doing.
-                        if ((!aAfter && PadReached(map, g, TeamId.Azure)) || (!cAfter && PadReached(map, g, TeamId.Crimson))) ok = false;
+                        if ((!aAfter && (g & 1) != 0) || (!cAfter && (g & 2) != 0)) ok = false;
                     }
                 }
             }

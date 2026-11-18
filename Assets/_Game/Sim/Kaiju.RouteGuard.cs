@@ -26,12 +26,73 @@ namespace CriticalMass.Sim.Core
         private static int[] Queue = new int[Tent.Length];
         private static int Stamp;
 
+        /// <summary>
+        /// b14 sim cost (Terraform's route verdict memo): bumped every time RefreshClearance rebuilds or patches the clearance
+        /// grid of any World, so a remembered start cell is only compared on the very clearance bytes it was taken from.
+        /// Never Sim state.
+        /// </summary>
+        internal static long ClearEpoch;
+
+        /// <summary>
+        /// b14 sim cost: what a TentativeKeepsKaijuRoute verdict read about the Kaiju: the body point (x, z) it snapped from,
+        /// the start cell that gave on the clearance grid before the change, and the box of cells the tentative change can
+        /// alter on the clearance grid (every changed cell +- ClearReach).
+        /// </summary>
+        internal struct GuardKey
+        {
+            public bool Used;
+            public int Start;
+            public double X, Z;
+            public int Bx0, Bx1, Bz0, Bz1;
+        }
+
+        /// <summary>b14 sim cost: the key of the last TentativeKeepsKaijuRoute call (Used false = it never read the Kaiju).</summary>
+        internal static GuardKey LastGuard;
+
+        private static bool SnapAreaOutside(double x, double z, in GuardKey g)
+        {
+            int ox = JsMath.FloorToInt(x), oz = JsMath.FloorToInt(z);
+            return ox + GoalSnapRings < g.Bx0 || ox - GoalSnapRings > g.Bx1 || oz + GoalSnapRings < g.Bz0 || oz - GoalSnapRings > g.Bz1;
+        }
+
+        /// <summary>
+        /// b14 sim cost: would TentativeKeepsKaijuRoute read the same about the Kaiju now as it did for key g? Only on a
+        /// clearance grid that is already current (the caller also checks it is the very same build: ClearEpoch); no refresh
+        /// here, so nothing the Kaiju step reads is touched. Same when the body point is the same, or when the start cell is
+        /// the same and neither point's snap search reaches the cells the change can alter (then the search after the change
+        /// reads the same bytes as the one before, and both give the same start cell).
+        /// </summary>
+        internal static bool RouteMemoSameKaiju(World w, in GuardKey g)
+        {
+            KaijuNav nav = w.KaijuNav;
+            if (nav.ClearGridVersion != w.GridVersion) return false;
+            MapDef map = w.Map;
+            Kaiju kj = w.Kaiju;
+            bool out_ = w.Match.Hatched && kj.State != KaijuState.Egg;
+            double sx = out_ ? kj.X : map.Shrine.X, sz = out_ ? kj.Z : map.Shrine.Z + HatchOffsetZ;
+            if (sx == g.X && sz == g.Z) return true;
+            if (!SnapAreaOutside(sx, sz, g) || !SnapAreaOutside(g.X, g.Z, g)) return false;
+            int start = Snap(map, nav.Clear.Cells, sx, sz);
+            return (start < 0 ? int.MinValue : start) == g.Start;
+        }
+
         /// <summary>The Kaiju route guard applies: Full profile, the nav guard and the hill-siege crush rule on.</summary>
         internal static bool RouteGuardOn(World w) =>
             DepthRules.On(w, true) && Phys.On(w, w.Config.Physics.KaijuNavGuard) && Phys.On(w, w.Config.Physics.KaijuHillSiege);
 
-        /// <summary>World creation: allocate the per-world clearance build state now (no rebuild, no Sim state touched).</summary>
-        internal static void WarmClearanceBuild(World w) => ClearBuildFor(w);
+        /// <summary>
+        /// World creation: allocate the per-world clearance build state and (b14 sim cost) BUILD the Kaiju clearance grid now,
+        /// while the match loads. Before, the first full build (~7 ms of whole-map clearance tests plus the region labels) landed
+        /// on whichever tick first needed it: the hatch tick, or, with the route guard, the first pre-hatch dig or TNT crater,
+        /// stacked on that crater's own route proofs (a 20 ms tick measured on 16v16 seed 4242). The grid is a pure function of
+        /// the map (RefreshClearance is byte-identical whenever it runs) and every reader refreshes it first, so building it
+        /// early moves no Sim result; later grid changes are then patches.
+        /// </summary>
+        internal static void WarmClearanceBuild(World w)
+        {
+            ClearBuildFor(w);
+            RefreshClearance(w);
+        }
 
         private static bool PassableType(byte t) => MapGrid.IsWalkableType(t) || t == Cell.Barricade || t == Cell.LowWall;
 
@@ -109,7 +170,7 @@ namespace CriticalMass.Sim.Core
             // The clearance BEFORE the change: the Kaiju's own shadow grid, brought up to date with the tentative cells put back
             // (RefreshClearance is a pure function of the grid, byte-identical whenever it runs; the Kaiju step would run it next).
             for (int k = 0; k < n; k++) cells[idx[k]] = old[k];
-            RefreshClearance(w);
+            RefreshClearance(w, true);   // b14 sim cost: shadow cells only; region labels wait for their next reader
             for (int k = 0; k < n; k++) cells[idx[k]] = next[k];
             KaijuNav nav = w.KaijuNav;
             byte[] before = nav.Clear.Cells;
@@ -117,16 +178,30 @@ namespace CriticalMass.Sim.Core
             bool out_ = w.Match.Hatched && kj.State != KaijuState.Egg;
             double sx = out_ ? kj.X : map.Shrine.X, sz = out_ ? kj.Z : map.Shrine.Z + HatchOffsetZ;
             HillDef hill = map.Hill;
-            if (!Connected(map, before, Snap(map, before, sx, sz), Snap(map, before, hill.X, hill.Z))) return true;
-            // The clearance AFTER: a scratch copy patched around the changed cells from the tentative grid.
-            int N = before.Length, W = map.Width, H = map.Height;
-            Fit(N);
-            Array.Copy(before, Tent, N);
-            Array.Copy(nav.Squeeze, TentSq, N);
+            int start = Snap(map, before, sx, sz);
+            int W = map.Width, H = map.Height;
             double r = GridR(w), sr = w.Config.Physics.KaijuSqueezeRadius;
             int halo = w.Config.Physics.KaijuSqueezeHalo;
             bool squeeze = SqueezeOn(w);
             int reach = ClearReach(r, sr, halo);
+            // b14 sim cost: from here the verdict depends on the Kaiju; remember what it read (Terraform's route verdict memo)
+            LastGuard.Used = true;
+            LastGuard.Start = start < 0 ? int.MinValue : start;
+            LastGuard.X = sx;
+            LastGuard.Z = sz;
+            LastGuard.Bx0 = int.MaxValue; LastGuard.Bx1 = int.MinValue; LastGuard.Bz0 = int.MaxValue; LastGuard.Bz1 = int.MinValue;
+            for (int k = 0; k < n; k++)
+            {
+                int ccx = idx[k] % W, ccz = idx[k] / W;
+                LastGuard.Bx0 = Math.Min(LastGuard.Bx0, ccx - reach); LastGuard.Bx1 = Math.Max(LastGuard.Bx1, ccx + reach);
+                LastGuard.Bz0 = Math.Min(LastGuard.Bz0, ccz - reach); LastGuard.Bz1 = Math.Max(LastGuard.Bz1, ccz + reach);
+            }
+            if (!Connected(map, before, start, Snap(map, before, hill.X, hill.Z))) return true;
+            // The clearance AFTER: a scratch copy patched around the changed cells from the tentative grid.
+            int N = before.Length;
+            Fit(N);
+            Array.Copy(before, Tent, N);
+            Array.Copy(nav.Squeeze, TentSq, N);
             for (int k = 0; k < n; k++)
             {
                 int ccx = idx[k] % W, ccz = idx[k] / W;
