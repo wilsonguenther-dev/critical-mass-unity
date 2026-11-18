@@ -473,7 +473,7 @@ namespace CriticalMass.Sim.Core
             b.ThrownTick = w.Tick;
             b.BlastTick = w.Tick + Durations.T30(w.Config, cfg.FuseTicks);
             b.LandTick = Math.Min(b.BlastTick, w.Tick + Durations.T30(w.Config, cfg.FlightTicks));
-            s.TntReadyTick[id] = w.Tick + Durations.T30(w.Config, cfg.CooldownTicks);
+            s.TntReadyTick[id] = w.Tick + Durations.T30(w.Config, CombatFeel.TntCooldownTicks(w.Config)); // b15: CombatFeelConfig.TntCooldownTicks under the rule
             s.Stats.TntThrown++;
             a.AnimAction = 0;
             a.SpawnProtect = 0;
@@ -492,6 +492,7 @@ namespace CriticalMass.Sim.Core
             bool gapOk = w.Tick - w.WallChangeTick >= Durations.T30(w.Config, w.Config.Abilities.MinerTerraform.MinGapTicks); // before this blast's own breaks
             s.Stats.TntBlasts++;
             int hit = BlastActors(w, b.Owner, b.Team, bx, bz, cfg.BlastRadius, cfg.Damage);
+            if (CombatFeel.On(w)) CombatFeel.TntSelfBlast(w, b.Owner, bx, bz, cfg.BlastRadius, cfg.Damage); // b15: self-risk
             Chain(w, bx, bz, cfg.BlastRadius);
             Kaiju k = w.Kaiju;
             if (k.State != KaijuState.Egg)

@@ -222,7 +222,10 @@ namespace CriticalMass.Sim.Bots
             Followed = ok;
             Mv.X = Fs.X;
             Mv.Z = Fs.Z;
-            if (ok) BlendFlow(st, w, field, w.X[id], w.Z[id]);
+            // b15 combat feel (audit stuck hot spots 75,52 and 65,45): in a narrow spot the raw next-cell step, not the blend,
+            // which steered into void corners at diagonal bridge ends and into the hill rock ring.
+            bool raw = ok && CombatFeel.On(w) && w.Config.Depth.CombatFeel.BotNarrowRawStep && CombatFeel.Narrow(w.Map, w.X[id], w.Z[id]);
+            if (ok && !raw) BlendFlow(st, w, field, w.X[id], w.Z[id]);
             return ok;
         }
 
@@ -484,7 +487,7 @@ namespace CriticalMass.Sim.Bots
                         valid = true;
                         tx = w.X[t];
                         tz = w.Z[t];
-                        reach = cc.AttackRange + AttackSlack;
+                        reach = CombatFeel.BotReach(w, a.Cls, cc.AttackRange) + AttackSlack; // b15: the Healer keeps her stand-off
                         // DG-69: with a wind-up the bot swings at where the target will be on the contact tick.
                         int windup = w.Dur.AttackWindup[(int)a.Cls];
                         if (windup > 0)
