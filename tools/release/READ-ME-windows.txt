@@ -4,11 +4,20 @@ Critical Mass demo build @VERSION@ (work in progress) - Windows
    Do not run it from inside the zip: right-click the zip, Extract All, then open the extracted folder.
 2. Double-click CriticalMass.exe.
 3. Windows will probably say "Windows protected your PC" / "unknown publisher" because this test
-   build is not signed for Windows yet. Click "More info", then "Run anyway".
+   build is not signed for Windows yet, so Windows cannot tell who made it. Click "More info", then "Run anyway".
+4. The first launch shows a short photosensitivity warning, then a 47-second film (any key skips it after a second).
+   Flashing is gentle by default; Settings, Access, Intense flashing changes that. Gore is off by default.
 
 Controls: arrow keys + Z X C, or W A S D + J K L, or W A S D + mouse. Controllers with
 A B X Y buttons or cross / circle / square / triangle buttons work by USB or Bluetooth.
 Settings, Controls lets you switch layouts and change any key.
 
-This Windows build has only been run on a test server so far, never on a real PC.
-Please tell us what happens (it starts or not, how smooth it is, anything odd): text the team.
+After each match a small card asks how it went (optional; Skip or Esc closes it). Your answers are saved
+on this computer only, in:
+   %USERPROFILE%\AppData\LocalLow\Drivia\Critical Mass\Replays\feedback.jsonl
+Nothing is sent anywhere until you send that file yourself. If something breaks: Settings, Game,
+SAVE A PROBLEM REPORT puts one zip with the logs on your Desktop.
+
+This Windows build has only been run on test servers so far, not yet on a real PC.
+Please send the team the build number above, the feedback file, and what happened (it starts or not,
+how smooth it is, anything odd).
