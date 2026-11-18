@@ -64,8 +64,9 @@ Every arm: every fingerprint MATCHED, no late inputs, no extra waiting.
    most one tick (33 ms) longer than before to leave the joiner's computer, and the measured input delay grew by exactly
    one tick. The host reports each joiner's margin from when its newest pair ARRIVED, so the lead policy is not fooled by
    bundles that now go out right after a pair completes. `LockstepOptions.ClientTicksPerPacket`. Three ticks a packet was
-   tried for big rooms: 38% fewer messages at 32 humans but 2 to 3 ticks more delay, over the one-tick rule, so it was dropped;
-   big rooms gain only 9% (they already sent every two ticks).
+   tried for big rooms: 31% fewer messages at 32 humans than two a packet, but felt delay 4 -> 6 ticks, over the one-tick
+   rule, so it is off; big rooms gain only 9% (they already sent every two ticks). The sim gate keeps proving it
+   (`ABigRoomSendsTwoTicksAPacketBecauseThreeCostsMoreThanOneTickOfDelay`).
 2. **Each state fingerprint travels once** on WebSocket and TCP links (they never lose a packet), instead of the newest two
    in every packet. Saves 24 bytes a packet; the receiving side now files a fingerprint in a free slot, so a check still
    waiting is never pushed out. Datagram links keep repeating them.
@@ -86,10 +87,13 @@ Not changed, on purpose:
   per packet to the host, and the host one broadcast for everyone (the relay fans it out for free). Every-to-every would
   cost the same from joiners plus nothing saved on the host.
 
-**Watch item (open):** with the host's pairs, a player who REJOINED on a near-zero-latency relay (CI's local relay)
-waited for the host more than before in two runs out of three (11.7 s and 1.7 s over the last 40 s, against 0 before);
-the cross-OS rejoin over the real relay waited 188 ms (273 before). Every fingerprint matched in all of them. Not yet
-explained; `LockstepSession` host pairing is the single place to switch it off (`ClientTicksPerPacket = 1`).
+**Rejoin with pairs (found and fixed):** a player who rejoined finished the replay at the newest tick the host had
+SEQUENCED, the host's input delay ahead of the host's own stepping, and then played at that edge, so every bundle not
+sent the instant it was sequenced (with pairs: every second one) made them wait: 11.7 s and 1.7 s in two online-smoke
+runs. Now the rejoiner holds its clock at going live until the host's stepping reaches it (2 or 3 ticks), which is where
+a joiner who never left sits (`LockstepOptions.RejoinWaitsForTheHost`). Sim gate, same room with and without the hold:
+2 humans waited 1,490 ms vs 0; 8 and 32 humans 0 vs 0; live 25 / 325 / 1,200 ms after the accept
+(`ARejoinedPlayerIsLiveSoonAndDoesNotWaitOnThePairedBundles_*`).
 
 ## 4. How to host friends, three ways
 
