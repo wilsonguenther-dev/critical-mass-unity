@@ -180,7 +180,9 @@ namespace CriticalMass.Runtime.Tests
             Assert.AreEqual(tx, p.Cx);
             Assert.AreEqual(tz, p.Cz);
             Assert.AreEqual(Terraform.Dug, Terraform.Dig(w, Me, double.NaN, double.NaN));
-            Assert.AreEqual(Cell.Void, w.Map.Cells[tz * w.Map.Width + tx], "the outlined cell is the one dug");
+            // b15 terrain height (Full): a dig on ground makes a walkable 1-deep pit; without the rule the cell goes Void
+            if (w.Map.Lift != null) Assert.AreEqual(-1, w.Map.Lift[tz * w.Map.Width + tx], "the outlined cell is the one dug (a 1-deep pit)");
+            else Assert.AreEqual(Cell.Void, w.Map.Cells[tz * w.Map.Width + tx], "the outlined cell is the one dug");
 
             // Right after the dig the team cooldown refuses the next one: the target says so ("wait").
             scan.Scan(w, Me, false, double.NaN, double.NaN, false);

@@ -279,9 +279,25 @@ namespace CriticalMass.Sim.Core
             EggWindows = 0;
             BridgesCollapsed = 0;
             BridgesRepaired = 0;
-            // b15: the repaint restored every cell; every level goes back to the island's own.
-            if (w.Map.Lift != null) Array.Clear(w.Map.Lift, 0, w.Map.Lift.Length);
-            Height?.Reset();
+            // b15: the repaint restored every cell; every level goes back to the island's own. A restart honours the switch
+            // (a config turned off or on between matches drops or makes the layer; this allocates only on such a restart).
+            MapDef rm = w.Map;
+            if (TerrainHeight.Enabled(w.Config))
+            {
+                if (rm.Lift == null || rm.Lift.Length != rm.Width * rm.Height) rm.Lift = new sbyte[rm.Width * rm.Height];
+                else Array.Clear(rm.Lift, 0, rm.Lift.Length);
+                rm.LiftCost1 = w.Config.Depth.TerrainHeight.PathCostStep1;
+                rm.LiftCost2 = w.Config.Depth.TerrainHeight.PathCostStep2;
+                rm.LiftCostLadder = w.Config.Depth.TerrainHeight.PathCostLadder;
+                rm.LiftStepU = w.Config.Depth.TerrainHeight.StepU;
+                if (Height == null || Height.Level.Length < WasAlive.Length) Height = TerrainHeightState.Create(WasAlive.Length);
+                else Height.Reset();
+            }
+            else
+            {
+                rm.Lift = null;
+                Height = null;
+            }
             for (int t = 0; t < 2; t++)
             {
                 w.Match.Delivered[t].Wood = 0;
