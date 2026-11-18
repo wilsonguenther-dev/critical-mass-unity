@@ -93,8 +93,8 @@ namespace CriticalMass.Sim.Core
         /// <summary>The level an option belongs to (1..5; 0 for None).</summary>
         public static int LevelOf(HutOption o) => o == HutOption.None ? 0 : ((int)o + 1) / 2;
 
-        /// <summary>The team holds option o.</summary>
-        public static bool Has(World w, TeamId team, HutOption o) => On(w) && (w.HutVote.Mask[(int)team] & (1 << (int)o)) != 0;
+        /// <summary>The team holds option o (the mask is read first: it stays 0 while the rule is off, so the common case is one read).</summary>
+        public static bool Has(World w, TeamId team, HutOption o) => (w.HutVote.Mask[(int)team] & (1 << (int)o)) != 0 && On(w);
 
         /// <summary>The option the team chose at a level (None while undecided or with the rule off).</summary>
         public static HutOption Chosen(World w, TeamId team, int level)
@@ -142,7 +142,8 @@ namespace CriticalMass.Sim.Core
         /// </summary>
         public static double DamageScale(World w, int source, int target, DamageCause cause)
         {
-            if (!On(w)) return 1.0;
+            int[] mask = w.HutVote.Mask;
+            if ((mask[0] | mask[1]) == 0 || !On(w)) return 1.0;
             HutChoicesConfig h = w.Config.Depth.HutChoices;
             double s = 1.0;
             if (target >= 0 && target < w.ActorCount)
@@ -161,8 +162,7 @@ namespace CriticalMass.Sim.Core
         /// <summary>B13Hooks.SpeedScale: SWIFT FEET off the hill (beyond its radius + SwiftHillMargin). 1 with the rule off.</summary>
         public static double SpeedScale(World w, int id)
         {
-            if (!On(w) || id < 0 || id >= w.ActorCount) return 1.0;
-            if (!Has(w, w.Actors[id].Team, HutOption.SwiftFeet)) return 1.0;
+            if (id < 0 || id >= w.ActorCount || !Has(w, w.Actors[id].Team, HutOption.SwiftFeet)) return 1.0;
             HutChoicesConfig h = w.Config.Depth.HutChoices;
             double r = w.Config.Hill.Radius + h.SwiftHillMargin;
             double dx = w.X[id] - w.Map.Hill.X, dz = w.Z[id] - w.Map.Hill.Z;
@@ -172,7 +172,6 @@ namespace CriticalMass.Sim.Core
         /// <summary>Hill.HillSystem, equal bodies on the hill: 1 Azure owns (HILL ANCHOR), 2 Crimson owns, 0 contested.</summary>
         public static int AnchorTie(World w)
         {
-            if (!On(w)) return 0;
             bool a = Has(w, TeamId.Azure, HutOption.HillAnchor), c = Has(w, TeamId.Crimson, HutOption.HillAnchor);
             return a == c ? 0 : a ? 1 : 2;
         }
