@@ -8,7 +8,7 @@ namespace CriticalMass.Runtime.Menu
     /// <summary>
     /// The player's settings, stored in PlayerPrefs (kept between launches), read by the settings page and by any system
     /// that honours them. View side only: nothing here reaches the sim.
-    /// <para>Keys other code may read directly: cm.gore (int, GORE intensity: 2 Full = default, 1 Reduced, 0 Off; View.Effects.GoreGate is the one switch every gore path asks), cm.blood (int, legacy blood on/off: 0 maps to GORE Off), cm.shake (camera shake on/off, mirrors cm.access.shake, default off),
+    /// <para>Keys other code may read directly: cm.gore (int, GORE intensity: 2 Full, 1 Reduced, 0 Off = default (b15); View.Effects.GoreGate is the one switch every gore path asks), cm.blood (int, legacy blood on/off: 0 maps to GORE Off), cm.shake (camera shake on/off, mirrors cm.access.shake, default off),
     /// cm.damagenumbers (default 1). Volumes are linear 0..1; the AudioMixer (Resources/Audio/CMMixer) gets them as dB on
     /// the exposed parameters MasterVolume, MusicVolume and EffectsVolume. Without the mixer, master volume falls back to
     /// AudioListener.volume.</para>
@@ -184,9 +184,11 @@ namespace CriticalMass.Runtime.Menu
         }
 
         /// <summary>
-        /// GORE intensity (PlayerPrefs cm.gore; owner 2026-11-14: Full is the default, Reduced and Off are the art lead's
-        /// family-friendly options). A player who had turned the old BLOOD switch off (cm.blood 0) starts at Off. A default
-        /// is not written until changed. Read through View.Effects.GoreGate.Current; CombatFx applies a change live.
+        /// GORE intensity (PlayerPrefs cm.gore). b15 safe defaults (owner-approved 2026-11-17; the bible's tone is
+        /// "competitive chaos without gore"): OFF is the default; REDUCED and FULL stay one settings step away. Migration: the
+        /// key is written only when a player changes the setting (a default is never written), so a stored value is an
+        /// explicit choice and is kept as it is: a player who chose FULL keeps FULL. Everyone else (no key, or only the old
+        /// BLOOD switch) starts at OFF. Read through View.Effects.GoreGate.Current; CombatFx applies a change live.
         /// </summary>
         public static global::CriticalMass.Runtime.View.Effects.GoreLevel Gore
         {
@@ -197,7 +199,7 @@ namespace CriticalMass.Runtime.Menu
                     int v = PlayerPrefs.GetInt(GoreKey, 2);
                     return v <= 0 ? global::CriticalMass.Runtime.View.Effects.GoreLevel.Off : v == 1 ? global::CriticalMass.Runtime.View.Effects.GoreLevel.Reduced : global::CriticalMass.Runtime.View.Effects.GoreLevel.Full;
                 }
-                return PlayerPrefs.HasKey(BloodKey) && PlayerPrefs.GetInt(BloodKey, 1) == 0 ? global::CriticalMass.Runtime.View.Effects.GoreLevel.Off : global::CriticalMass.Runtime.View.Effects.GoreLevel.Full;
+                return global::CriticalMass.Runtime.View.Effects.GoreGate.DefaultLevel;
             }
             set { PlayerPrefs.SetInt(GoreKey, (int)value); PlayerPrefs.Save(); }
         }

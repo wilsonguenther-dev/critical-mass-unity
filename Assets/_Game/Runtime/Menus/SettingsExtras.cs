@@ -144,7 +144,7 @@ namespace CriticalMass.Runtime.Menu
                 // Big moments (screen takeovers): full, reduced (corner callouts only), off.
                 menu.Stepper(tab, 7, "BIG MOMENTS", () => View.Moments.BigMomentsSettings.Label(View.Moments.BigMomentsSettings.Mode),
                     d => View.Moments.BigMomentsSettings.Mode = View.Moments.BigMomentsSettings.Step(View.Moments.BigMomentsSettings.Mode, d)),
-                // Owner, 2026-11-14: GORE intensity (the Game tab's row, same setting): FULL default, REDUCED, OFF.
+                // Owner, 2026-11-14: GORE intensity (the Game tab's row, same setting): FULL, REDUCED, OFF (b15: OFF default).
                 menu.Stepper(tab, 8, "GORE", () => global::CriticalMass.Runtime.View.Effects.GoreGate.Label(GameSettings.Gore), d => GameSettings.Gore = global::CriticalMass.Runtime.View.Effects.GoreGate.Step(GameSettings.Gore, d)),
                 // Batch 12 item P (Travis): fog of war, ON default (Full profile only; Classic never shows it).
                 menu.Stepper(tab, 9, "FOG OF WAR", () => OnOff(FogOfWar), d => FogOfWar = !FogOfWar),
