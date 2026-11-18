@@ -44,6 +44,12 @@ namespace CriticalMass.Sim.Tests.Net
             ["FlowField.Dist"] = "a distance field: rebuilt from the hashed grid; its Version is hashed",
             ["BotFields.Dist"] = "the bots' flow fields: rebuilt from the hashed grid; Version per field is hashed",
             ["BotsState.LastTick"] = "bookkeeping of the last GetBotsState call (the view's ShiverWatch calls it between ticks too)",
+            ["WallsState.LastWhy"] = "the ghost's verdict: written only by BuilderWalls.Ghost, which the view calls every frame for the local Builder, read only by the view",
+            ["WallsState.LastFill"] = "the ghost's crater-fill flag: written and read like LastWhy, view only",
+            ["WallsState.MemoKey"] = "RouteOk's memo ring: a pure cache keyed by cell, axis, length and the hashed GridVersion; the view's ghost fills it between ticks",
+            ["WallsState.MemoVersion"] = "RouteOk's memo ring (see MemoKey)",
+            ["WallsState.MemoOk"] = "RouteOk's memo ring (see MemoKey)",
+            ["WallsState.MemoNext"] = "RouteOk's memo ring (see MemoKey)",
         };
 
         // ------------------------------------------------------------------ the generator
@@ -408,8 +414,9 @@ namespace CriticalMass.Sim.Tests.Net
             World w = Played(1800);
             for (int i = 0; i < 20; i++) StateHash.Of(w);
             const int N = 200;
+            var sw = new Stopwatch();   // made before the count: a Stopwatch is itself a 40 B object
             long before = GC.GetAllocatedBytesForCurrentThread();
-            var sw = Stopwatch.StartNew();
+            sw.Start();
             ulong x = 0;
             for (int i = 0; i < N; i++) x ^= StateHash.Of(w);
             sw.Stop();
