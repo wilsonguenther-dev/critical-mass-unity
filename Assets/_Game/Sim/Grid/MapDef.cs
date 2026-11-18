@@ -106,6 +106,8 @@ namespace CriticalMass.Sim.Grid
         public sbyte[] Lift;
         /// <summary>b15: extra path cost of a 1-level and a 2-level edge (TerrainHeightConfig.PathCostStep1 / 2), set with Lift.</summary>
         public double LiftCost1, LiftCost2;
+        /// <summary>b15: world units per lift level for the view (TerrainHeightConfig.StepU), set with Lift.</summary>
+        public double LiftStepU;
 
         /// <summary>A copy sharing every field but <c>Cells</c> (browser <c>{ ...map, cells }</c>).</summary>
         public MapDef WithCells(byte[] cells)

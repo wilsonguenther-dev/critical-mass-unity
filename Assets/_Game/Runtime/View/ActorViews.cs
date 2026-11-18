@@ -373,7 +373,7 @@ namespace CriticalMass.Runtime.View
             double x = hasFx && fx.Corpse ? fx.CorpseX : Lerp(w.PrevX[i], w.X[i], a);
             double z = hasFx && fx.Corpse ? fx.CorpseZ : Lerp(w.PrevZ[i], w.Z[i], a);
             if (_stressHill) StressPlace(map.Hill, i, ref x, ref z);
-            double h = GroundHeight(map, x, z);
+            double h = CriticalMass.Runtime.GroundHeight.Body(map, x, z);   // b15: on the pit floor / on top of a stack
             h += CriticalMass.Runtime.View.Mechanics.LadderClimb.Lift(w, x, z);   // b12-jz: up and over a built ladder's A-frame
             double faceYaw = actor.Facing;
             // online-rooms-9: online, the local fighter turns to its own fresh aim at once (view only; the sim applies it Lead ticks later).

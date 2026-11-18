@@ -201,6 +201,7 @@ namespace CriticalMass.Sim.Core
                 map.Lift = new sbyte[map.Width * map.Height];
                 map.LiftCost1 = cfg.Depth.TerrainHeight.PathCostStep1;
                 map.LiftCost2 = cfg.Depth.TerrainHeight.PathCostStep2;
+                map.LiftStepU = cfg.Depth.TerrainHeight.StepU;
                 s.Height = TerrainHeightState.Create(cap);
             }
             return s;

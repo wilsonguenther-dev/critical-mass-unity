@@ -28,13 +28,14 @@ namespace CriticalMass.Runtime.View
     public static class TerrainEdits
     {
         /// <summary>What a changed cell is drawn as.</summary>
-        public enum Kind : byte { None = 0, Pit = 1, Filled = 2, Placed = 3 }
+        public enum Kind : byte { None = 0, Pit = 1, Filled = 2, Placed = 3, Raised = 4 }
 
         static MapDef _map;
         static int _epoch = int.MinValue;
         static byte[] _pristine;
         static bool[] _touched;
         static byte[] _seen;
+        static sbyte[] _seenLift;   // b15 terrain height
         static int _seenVersion = int.MinValue;
 
         /// <summary>Bumped every time a map is captured (match start, a repaint): views rebuild every chunk.</summary>
@@ -61,6 +62,16 @@ namespace CriticalMass.Runtime.View
             return touched ? Kind.Filled : Kind.None;    // land again after it was dug
         }
 
+        /// <summary>
+        /// b15 terrain height: as Classify, then a Floor / BreakableDestroyed cell with a lift below 0 is a PIT (a walkable dug
+        /// pit at true depth) and above 0 is RAISED (stacked blocks). lift 0 = the old rule exactly.
+        /// </summary>
+        public static Kind Classify(byte pristine, byte current, bool touched, sbyte lift)
+        {
+            if (lift != 0 && CriticalMass.Sim.Core.TerrainHeight.IsLiftType(current)) return lift < 0 ? Kind.Pit : Kind.Raised;
+            return Classify(pristine, current, touched);
+        }
+
         /// <summary>Follow the world: capture a new map or a repaint, then mark cells whose land-ness changed.</summary>
         public static void Sync(World w)
         {
@@ -72,6 +83,7 @@ namespace CriticalMass.Runtime.View
                 _epoch = w.Epoch;
                 _pristine = (byte[])cells.Clone();
                 _seen = (byte[])cells.Clone();
+                _seenLift = w.Map.Lift != null ? (sbyte[])w.Map.Lift.Clone() : null;
                 _touched = new bool[cells.Length];
                 _seenVersion = w.GridVersion;
                 TouchedCount = 0;
@@ -93,6 +105,20 @@ namespace CriticalMass.Runtime.View
                 TouchedCount++;
                 grew = true;
             }
+            // b15 terrain height: a cell whose level changed is touched too (the dresser drops its ground art there).
+            sbyte[] lift = w.Map.Lift;
+            if (lift != null && _seenLift != null && _seenLift.Length == lift.Length)
+            {
+                for (int i = 0; i < lift.Length; i++)
+                {
+                    if (lift[i] == _seenLift[i]) continue;
+                    _seenLift[i] = lift[i];
+                    if (_touched[i]) continue;
+                    _touched[i] = true;
+                    TouchedCount++;
+                    grew = true;
+                }
+            }
             if (grew) Version++;
         }
 
@@ -105,7 +131,7 @@ namespace CriticalMass.Runtime.View
         public static bool Touched(MapDef map, int i) => Follows(map) && _touched[i];
 
         /// <summary>Classify cell i of a followed map (None for a map the registry does not follow).</summary>
-        public static Kind KindAt(MapDef map, int i) => Follows(map) ? Classify(_pristine[i], map.Cells[i], _touched[i]) : Kind.None;
+        public static Kind KindAt(MapDef map, int i) => Follows(map) ? Classify(_pristine[i], map.Cells[i], _touched[i], map.Lift != null ? map.Lift[i] : (sbyte)0) : Kind.None;
 
         /// <summary>The registry's arrays for a followed map (null otherwise). Read only: never write into them.</summary>
         public static bool Arrays(MapDef map, out byte[] pristine, out bool[] touched)
