@@ -39,6 +39,7 @@ namespace CriticalMass.Sim.Tests.Harness
             Mix(w.WallVersion);
             Mix(w.EventHead);
             for (int i = 0; i < w.Map.Cells.Length; i++) Mix(w.Map.Cells[i]);
+            if (w.Map.Lift != null) for (int i = 0; i < w.Map.Lift.Length; i++) Mix(w.Map.Lift[i]);   // b15 (null outside Full)
             for (int i = 0; i < w.ActorCount; i++)
             {
                 Actor a = w.Actors[i];

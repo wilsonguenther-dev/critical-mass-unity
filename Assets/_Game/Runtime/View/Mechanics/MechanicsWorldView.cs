@@ -245,6 +245,29 @@ namespace CriticalMass.Runtime.View.Mechanics
                 Vector3 c = P(p.X, p.Z, 0.02f);
                 float len = Mathf.Max(0.5f, (float)p.HalfLen * 2f);
                 float half = (float)(pc.WidthCells * 0.5) - 0.12f;
+                // b15 terrain height: a height ladder (laid on a pit ledge or the side of a stack) leans flat against the face, from
+                // the low cell's ground to the top of the cell it is laid on (the authored ladder spans flat rock, so not here).
+                if (p.Kind == BuiltPieces.Ladder && p.Count == 1 && p.Cells != null && w.Map.Lift != null && TerrainHeight.LadderGround(w, p.Cells[0], out _))
+                {
+                    int W = w.Map.Width, ci = p.Cells[0];
+                    double fx = ci % W + 0.5 - p.Dx * 0.5, fz = ci / W + 0.5 - p.Dz * 0.5;   // the face between the two cells
+                    float yLo = (float)GroundHeight.At(w.Map, fx - p.Dx * 0.5, fz - p.Dz * 0.5);
+                    float yHi = (float)GroundHeight.At(w.Map, fx + p.Dx * 0.5, fz + p.Dz * 0.5);
+                    if (yHi < yLo) { float tmp = yHi; yHi = yLo; yLo = tmp; }
+                    Vector3 foot = SimSpace.ToWorld(fx - p.Dx * 0.32, yLo, fz - p.Dz * 0.32), head = SimSpace.ToWorld(fx - p.Dx * 0.04, yHi + 0.18f, fz - p.Dz * 0.04);
+                    Vector3 rise = head - foot;
+                    float rail = rise.magnitude;
+                    Quaternion lean = Quaternion.LookRotation(rise / Mathf.Max(1e-4f, rail), along);
+                    Color32 hl = Warm(WoodLight, warn, blink), hm = Warm(WoodMid, warn, blink), hd = Warm(WoodDark, warn, blink);
+                    for (int s2 = -1; s2 <= 1; s2 += 2)
+                        _solid.Chunk((foot + head) * 0.5f + across * (0.32f * s2), lean, new Vector3(0.06f, 0.06f, rail * 0.5f), 0.02f, hl, hm, hd, Navy);
+                    int rungs = Mathf.Clamp(Mathf.RoundToInt(rail / 0.3f), 2, 10);
+                    for (int r2 = 0; r2 < rungs; r2++)
+                        _solid.Chunk(Vector3.Lerp(foot, head, (r2 + 0.5f) / rungs), lean, new Vector3(0.3f, 0.035f, 0.04f), 0.015f, hl, hm, hd, Navy);
+                    _solid.Chunk(head + Vector3.up * 0.05f, lean, new Vector3(0.09f, 0.03f, 0.09f), 0.02f, team, team, Mix(team, Navy, 0.4f), Navy);
+                    Countdown(head + Vector3.up * 0.4f, 0.42f, 0.08f, left, ringCol, blink);
+                    continue;
+                }
                 // feat/staged-building-1: the authored ladder or rope bridge model, with its construction sequence; the
                 // procedural planks below stay as the fallback when the art is missing.
                 if (_staged != null && _staged.DrawPiece(w, k, p, c, along, len, (float)pc.WidthCells, warn && blink < 0.5f && !reduceFlash,

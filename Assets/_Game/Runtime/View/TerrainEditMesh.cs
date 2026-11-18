@@ -23,6 +23,11 @@ namespace CriticalMass.Runtime.View
     /// <item>SHORT WALL / BLOCK piece (Cell.LowWall): a dressed-stone block standing on the cell, top exactly WallView.ShortTop
     /// above the ground, bevelled top, two courses with a mortar line, a dark footing band, vertical seams at each cell end,
     /// faces between two wall cells left out (they never show), so a run of blocks reads as stacked stones with seams.</item>
+    /// <item>b15 RAISED (TerrainEdits.Kind.Raised, a lift above 0): stacked dressed-stone courses, one per level (StepU each,
+    /// a mortar line and a dark footing per course, vertical seams at the cell ends), a bevelled stone cap on top; sides only
+    /// where the neighbour's top is lower, down to that top (to the cell's own ground minus PlacedDepth toward void). The
+    /// chunk view keeps drawing the ground box under it. b15 lift pits (a lift below 0) are PITs at their TRUE depth
+    /// (-lift x StepU: 0.45 / 0.9 u), so the floor is where the characters stand; void craters keep the ring depths.</item>
     /// </list>
     /// One material (CM/Toon in vertex-colour mode, the kit's own colour path; outline weight per vertex from UV4.x: pit
     /// faces carry no hull, blocks and stones the 2 px structure line from their centre via UV3). Colours are the terrain
@@ -59,6 +64,12 @@ namespace CriticalMass.Runtime.View
         // Stats of the last Build (tests and the capture print them).
         public int PitCells, PitWallFaces, PitFloorFaces, StepWallFaces, Pebbles, SpoilLumps;
         public int BlockCells, BlockSideFaces, BlockBottomFaces, ShortWallCells, ShortWallSideFaces;
+        /// <summary>b15: raised (stacked) cells and stone courses drawn in the last Build.</summary>
+        public int RaisedCells, RaisedCourses;
+
+        /// <summary>b15 terrain height: the lift layer (MapDef.Lift, or the chunk view's copy; null = no layer) and its step.</summary>
+        public sbyte[] Lift;
+        public double StepU = 0.45;
         public float MinFloorY, MaxFloorY;
 
         int _w, _h;
@@ -79,11 +90,13 @@ namespace CriticalMass.Runtime.View
             Verts.Clear(); Normals.Clear(); Outline.Clear(); Colors.Clear(); Weights.Clear(); Tris.Clear();
             PitCells = PitWallFaces = PitFloorFaces = StepWallFaces = Pebbles = SpoilLumps = 0;
             BlockCells = BlockSideFaces = BlockBottomFaces = ShortWallCells = ShortWallSideFaces = 0;
+            RaisedCells = RaisedCourses = 0;
             MinFloorY = float.MaxValue; MaxFloorY = float.MinValue;
         }
 
         /// <summary>True when cell (current type, kind) is drawn by this builder (the chunk view then skips its own box).</summary>
-        public static bool Owns(byte current, TerrainEdits.Kind kind) => kind != TerrainEdits.Kind.None || current == Cell.LowWall;
+        public static bool Owns(byte current, TerrainEdits.Kind kind) =>
+            (kind != TerrainEdits.Kind.None && kind != TerrainEdits.Kind.Raised) || current == Cell.LowWall;   // b15: under a stack the ground box stays
 
         /// <summary>
         /// Build cells [x0, x1) x [z0, z1) of a width x height map. pristine / touched may be null (no edits: only short walls).
@@ -110,6 +123,7 @@ namespace CriticalMass.Runtime.View
                 byte cur = _cells[i];
                 TerrainEdits.Kind k = KindAt(cx, cz);
                 if (k == TerrainEdits.Kind.Pit) { Pit(cx, cz); continue; }
+                if (k == TerrainEdits.Kind.Raised) { Raised(cx, cz); continue; }
                 if (k == TerrainEdits.Kind.Placed || k == TerrainEdits.Kind.Filled) Earth(cx, cz, k == TerrainEdits.Kind.Placed);
                 if (cur == Cell.LowWall) ShortWall(cx, cz);
             }
@@ -158,7 +172,7 @@ namespace CriticalMass.Runtime.View
             if (!In(cx, cz)) return TerrainEdits.Kind.None;
             int i = cz * _w + cx;
             byte p = _pr != null ? _pr[i] : _cells[i];
-            return TerrainEdits.Classify(p, _cells[i], _tc != null && _tc[i]);
+            return TerrainEdits.Classify(p, _cells[i], _tc != null && _tc[i], Lift != null ? Lift[i] : (sbyte)0);
         }
 
         double H(int cx, int cz)
@@ -180,6 +194,9 @@ namespace CriticalMass.Runtime.View
         /// <summary>Pit depth of cell (cx, cz): by the Chebyshev ring to the nearest cell that is not a pit.</summary>
         public double PitDepth(int cx, int cz)
         {
+            int l = LiftOf(cx, cz);
+            if (l < 0) return -l * StepU;   // b15: a walkable dug pit is drawn at its true depth
+
             for (int r = 1; r <= 2; r++)
             {
                 for (int dz = -r; dz <= r; dz++)
@@ -190,6 +207,15 @@ namespace CriticalMass.Runtime.View
                 }
             }
             return PitDepthMax;
+        }
+
+        /// <summary>b15: the lift of a lift-type cell (0 off the map, without the layer, or for any other cell type).</summary>
+        int LiftOf(int cx, int cz)
+        {
+            if (Lift == null || !In(cx, cz)) return 0;
+            int i = cz * _w + cx;
+            if (_cells[i] == Cell.Bridge) return Lift[i] > 0 ? Lift[i] : 0;   // a height ladder on a stack: the stack under it
+            return CriticalMass.Sim.Core.TerrainHeight.IsLiftType(_cells[i]) ? Lift[i] : 0;
         }
 
         static float Hash01(int cx, int cz, int salt) => (WorldDresser.H32(cx, cz, salt) % 1000u) / 1000f;
@@ -341,6 +367,39 @@ namespace CriticalMass.Runtime.View
             {
                 QuadSim(cx, bottom, cz, cx + 1, bottom, cz, cx + 1, bottom, cz + 1, cx, bottom, cz + 1, 0, -1, 0, Jit(RockDark, cx, cz, 403), 1f, centre);
                 BlockBottomFaces++;
+            }
+        }
+
+        /// <summary>
+        /// b15: a raised cell: lift courses of dressed stone (StepU each) with a bevelled cap; a side shows only where the
+        /// neighbour's top is lower, each course with its mortar line, footing and end seams, so a stack reads as N blocks.
+        /// </summary>
+        void Raised(int cx, int cz)
+        {
+            RaisedCells++;
+            int lift = LiftOf(cx, cz);
+            double g = H(cx, cz);
+            double top = g + lift * StepU;
+            Vector3 centre = SimSpace.ToWorld(cx + 0.5, (top + g) * 0.5, cz + 0.5);
+            BevelTop(cx, cz, top, StoneBevel, Jit(StoneTop, cx, cz, 701), Jit(StoneSide, cx, cz, 702), centre);
+            for (int s = 0; s < 4; s++)
+            {
+                int nx = cx + DX[s], nz = cz + DZ[s];
+                double nb;
+                if (KindAt(nx, nz) == TerrainEdits.Kind.Pit) nb = H(nx, nz);                      // the pit's rim wall goes on from there
+                else if (TerrainEdits.Land(Cur(nx, nz))) nb = H(nx, nz) + System.Math.Max(0, LiftOf(nx, nz)) * StepU;
+                else nb = g - PlacedDepth;                                                         // out over the void: show the block's earth
+                if (nb >= top - StoneBevel - 1e-4) continue;
+                for (int k = lift; k >= 1; k--)
+                {
+                    double c0 = g + k * StepU, c1 = g + (k - 1) * StepU;
+                    if (k == lift) c0 = top - StoneBevel;
+                    if (c1 < nb) c1 = nb;
+                    if (c0 <= c1 + 1e-4) continue;
+                    Side(cx, cz, s, c0, c1, true, centre);
+                    RaisedCourses++;
+                }
+                if (nb < g - 1e-4) { Side(cx, cz, s, g, nb, false, centre); BlockSideFaces++; }
             }
         }
 

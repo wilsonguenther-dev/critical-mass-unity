@@ -24,8 +24,37 @@ namespace CriticalMass.Runtime
             return map.Height01[cz * map.Width + cx];
         }
 
-        /// <summary>Visual ground height under sim (x, z): the island height (the dais lift joins once the dais is drawn).</summary>
-        public static double At(MapDef map, double x, double z) => IslandHeightAt(map, x, z);
+        /// <summary>
+        /// Visual ground height under sim (x, z): the island height plus, under the b15 terrain-height rule, the cell's lift
+        /// (MapDef.Lift x MapDef.LiftStepU: a stacked block raises it, a dug pit lowers it). The dais lift joins once drawn.
+        /// </summary>
+        public static double At(MapDef map, double x, double z) => IslandHeightAt(map, x, z) + LiftU(map, x, z);
+
+        /// <summary>b15: the lift of the cell under sim (x, z) in world units (0 without the layer), the cell clamped to the map.</summary>
+        public static double LiftU(MapDef map, double x, double z)
+        {
+            if (map == null || map.Lift == null) return 0;
+            double fx = Math.Floor(x);
+            double fz = Math.Floor(z);
+            int cx = !(fx >= 0) ? 0 : fx >= map.Width ? map.Width - 1 : (int)fx;
+            int cz = !(fz >= 0) ? 0 : fz >= map.Height ? map.Height - 1 : (int)fz;
+            return map.Lift[cz * map.Width + cx] * map.LiftStepU;
+        }
+
+        /// <summary>b15 view half side of a body when it reads its level (a little under the sim radius, so a toe on a ledge does not lift it).</summary>
+        public const double BodyR = 0.35;
+
+        /// <summary>
+        /// b15: where a character's feet go: the island height under it plus its LEVEL (the highest lift among the walkable cells
+        /// its body square touches, TerrainHeight.LevelAt with BodyR), so it stands on the pit floor or on top of a stack.
+        /// Exactly At's island height without the layer.
+        /// </summary>
+        public static double Body(MapDef map, double x, double z)
+        {
+            double h = IslandHeightAt(map, x, z);
+            if (map == null || map.Lift == null) return h;
+            return h + CriticalMass.Sim.Core.TerrainHeight.LevelAt(map, x, z, BodyR) * map.LiftStepU;
+        }
 
         /// <summary>
         /// The horizontal Unity plane at height h. Unity's Plane keeps n.p + distance = 0, so the plane y = h is

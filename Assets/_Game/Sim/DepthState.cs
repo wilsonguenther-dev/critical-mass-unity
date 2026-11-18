@@ -149,6 +149,8 @@ namespace CriticalMass.Sim.Core
         public int EggWindows;
         public int BridgesCollapsed;
         public int BridgesRepaired;
+        /// <summary>b15 terrain height: per-actor level, slow and climb state (null unless the rule is on; TerrainHeight.cs).</summary>
+        public TerrainHeightState Height;
 
         public static DepthState Create(GameConfig cfg, Grid.MapDef map)
         {
@@ -193,6 +195,16 @@ namespace CriticalMass.Sim.Core
             s.CoinSpotNextTick = new int[s.CoinSpots.Length];
             s.PingTicks = new int[cap * s.PingRing];
             s.PingFieldSerial = new int[s.PingFields.Length];
+            // b15 terrain height: the lift layer lives on the world's map and exists only while the rule is on (Full rules).
+            if (TerrainHeight.Enabled(cfg))
+            {
+                map.Lift = new sbyte[map.Width * map.Height];
+                map.LiftCost1 = cfg.Depth.TerrainHeight.PathCostStep1;
+                map.LiftCost2 = cfg.Depth.TerrainHeight.PathCostStep2;
+                map.LiftStepU = cfg.Depth.TerrainHeight.StepU;
+                map.LiftCostLadder = cfg.Depth.TerrainHeight.PathCostLadder;
+                s.Height = TerrainHeightState.Create(cap);
+            }
             return s;
         }
 
@@ -267,6 +279,9 @@ namespace CriticalMass.Sim.Core
             EggWindows = 0;
             BridgesCollapsed = 0;
             BridgesRepaired = 0;
+            // b15: the repaint restored every cell; every level goes back to the island's own.
+            if (w.Map.Lift != null) Array.Clear(w.Map.Lift, 0, w.Map.Lift.Length);
+            Height?.Reset();
             for (int t = 0; t < 2; t++)
             {
                 w.Match.Delivered[t].Wood = 0;

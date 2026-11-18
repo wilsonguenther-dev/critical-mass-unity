@@ -111,6 +111,8 @@ namespace CriticalMass.Runtime.View.Affordance
             NotFeeder = "cannot feed";
         /// <summary>b14: the Builder's ladder / bridge tools facing nothing they can span.</summary>
         public const string NoCliff = "face a cliff", NoGap = "face a gap";
+        /// <summary>b15 terrain height: where a ladder goes once height is in (a rock wall, a pit wall, a stack or tower side).</summary>
+        public const string NoClimbFace = "face a wall, a ledge or a stack";
         /// <summary>b12 r3: the Demolitionist's detail line while her TNT reloads (her attack is the pry bar meanwhile).</summary>
         public const string TntIn = GrenadeTuning.Name + " in";
         /// <summary>b12 r3: her prompt verbs on the attack binding: TNT ready, and the pry bar while it reloads.</summary>
@@ -197,6 +199,7 @@ namespace CriticalMass.Runtime.View.Affordance
         /// <summary>Terraform.DigRefusal(w, cx, cz) exactly, with the route proof from the cache (forced). Out of map: RefusedOutside.</summary>
         public int DigVerdict(World w, int cx, int cz)
         {
+            if (Terraform.LiftDig(w, cx, cz)) return Terraform.DigRefusal(w, cx, cz);   // b15: a level off (its own memoised proof)
             int why = Terraform.DigRefusalBeforeRoute(w, cx, cz);
             if (why != 0) return why;
             RouteKnown(w, cz * w.Map.Width + cx, true, out bool ok);
@@ -377,7 +380,7 @@ namespace CriticalMass.Runtime.View.Affordance
             else if (wait > 0) { Refuse(p, AffWords.Wait); p.WaitSeconds = WaitS(w, wait); }
             else
             {
-                int why = place ? Terraform.PlaceRefusal(w, tx, tz) : DigVerdict(w, tx, tz);
+                int why = place ? Terraform.PlaceVerdict(w, tx, tz) : DigVerdict(w, tx, tz);   // b15: PLACE stacks on a lift cell
                 if (why == 0) p.Valid = true;
                 else Refuse(p, MinerWhy(w, why, place, tx, tz));
             }
@@ -426,6 +429,8 @@ namespace CriticalMass.Runtime.View.Affordance
 
         static string MinerWhy(World w, int code, bool place, int cx, int cz)
         {
+            string hw = HeightWhy(code, w.Config);   // b15: too high / too deep / someone is standing there
+            if (hw != null) return hw;
             switch (code)
             {
                 case Terraform.RefusedOutside: return AffWords.OffMap;
@@ -439,6 +444,30 @@ namespace CriticalMass.Runtime.View.Affordance
                     return t == Cell.Void || t == Cell.Water ? AffWords.NoEdge : AffWords.NotAHole;
             }
         }
+
+        static string _hwHigh, _hwDeep;
+        static int _hwHighN = -1, _hwDeepN = -1;
+        static readonly string[] StackVerbs = { "STACK", "STACK", "STACK x2", "STACK x3", "STACK x4", "STACK x5" };
+
+        /// <summary>b15: the prompt words of the terrain-height refusals in the prompt's lower case (cached; null for other codes).</summary>
+        public static string HeightWhy(int code, GameConfig cfg)
+        {
+            switch (code)
+            {
+                case TerrainHeight.RefusedTooHigh:
+                    if (_hwHighN != cfg.Depth.TerrainHeight.MaxStack) { _hwHighN = cfg.Depth.TerrainHeight.MaxStack; _hwHigh = TerrainHeight.Word(code, cfg).ToLowerInvariant(); }
+                    return _hwHigh;
+                case TerrainHeight.RefusedTooDeep:
+                    if (_hwDeepN != cfg.Depth.TerrainHeight.MaxDepth) { _hwDeepN = cfg.Depth.TerrainHeight.MaxDepth; _hwDeep = TerrainHeight.Word(code, cfg).ToLowerInvariant(); }
+                    return _hwDeep;
+                case TerrainHeight.RefusedLevelOnly: return "level ground only";
+                case TerrainHeight.RefusedSomeone: return "someone is standing there";
+                default: return null;
+            }
+        }
+
+        /// <summary>b15: the BLOCK verb on a lift cell: "STACK", "STACK x2", "STACK x3" (the level the block would make).</summary>
+        public static string StackVerb(int level) => StackVerbs[Math.Max(0, Math.Min(StackVerbs.Length - 1, level))];
 
         /// <summary>Inside a team pad's keep-out (Barricades.PadKeepout): the base ground no terrain tool may change.</summary>
         static bool EnemyGround(World w, int cx, int cz)
@@ -635,7 +664,7 @@ namespace CriticalMass.Runtime.View.Affordance
                 if (why == 0 && w.Tick - w.WallChangeTick < Durations.T30(c, c.Abilities.MinerTerraform.MinGapTicks)) why = BuiltPieces.RefusedRate;
                 p.Count = -1;
                 if (a.StandUp > 0) Refuse(p, AffWords.GettingUp);
-                else if (plan != 0 && plan != BuiltPieces.RefusedLength && plan != BuiltPieces.RefusedOccupied) Refuse(p, t == BuilderTool.Ladder ? AffWords.NoCliff : AffWords.NoGap);
+                else if (plan != 0 && plan != BuiltPieces.RefusedLength && plan != BuiltPieces.RefusedOccupied) Refuse(p, t == BuilderTool.Ladder ? (TerrainHeight.On(w) ? AffWords.NoClimbFace : AffWords.NoCliff) : AffWords.NoGap);
                 else if (why != 0) Refuse(p, BuilderWhy(why));
                 else if (a.AbilityCd > 0) { Refuse(p, AffWords.Wait); p.WaitSeconds = a.AbilityCd; }
                 else p.Valid = true;
@@ -649,6 +678,9 @@ namespace CriticalMass.Runtime.View.Affordance
                 p.Mark = false;
                 bool has = BuilderWalls.Ghost(w, id, out int gx, out int gz, out _, out _, out _, out _, out bool ok);
                 p.Verb = has && BuilderWalls.GhostFill(w, id) ? "FILL HOLE" : "BUILD " + BuilderToolbelt.Word(t, BuilderWalls.Tier(w, a.Team));
+                // b15 terrain height: a BLOCK on ground, a stack or a pit adds one level; the verb names the level it makes.
+                if (has && !BuilderWalls.GhostFill(w, id) && w.Walls.Piece[id] == (byte)BuildPiece.Block && Terraform.LiftDig(w, gx, gz))
+                    p.Verb = StackVerb(w.Map.Lift[gz * w.Map.Width + gx] + 1);
                 if (has)
                 {
                     p.Cx = gx;
@@ -656,7 +688,11 @@ namespace CriticalMass.Runtime.View.Affordance
                     p.X = gx + 0.5;
                     p.Z = gz + 0.5;
                     if (ok) p.Valid = true;
-                    else Refuse(p, BuilderWalls.Word(BuilderWalls.GhostWhy(w, id)).ToLowerInvariant());
+                    else
+                    {
+                        int gw = BuilderWalls.GhostWhy(w, id);
+                        Refuse(p, HeightWhy(gw, w.Config) ?? BuilderWalls.Word(gw).ToLowerInvariant());   // b15 words first
+                    }
                 }
                 else Refuse(p, AffWords.Wait);
             }

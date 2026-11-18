@@ -546,6 +546,27 @@ namespace CriticalMass.Runtime.View.Affordance
             _mesh.SetColors(_c, 0, _c.Length, f);
         }
 
+        /// <summary>
+        /// b15: when ghost cell i is 2+ levels above or below the local Builder's cell next to it (a height ladder), draw the
+        /// ghost as an upright panel on the face between the two cells, from the lower ground to the higher top. False otherwise.
+        /// </summary>
+        bool FaceGhost(World w, MapDef m, int i, Color32 g)
+        {
+            if (m.Lift == null || LocalActor < 0 || LocalActor >= w.ActorCount) return false;
+            int ox = (int)Math.Floor(w.X[LocalActor]), oz = (int)Math.Floor(w.Z[LocalActor]);
+            int cx = i % m.Width, cz = i / m.Width, dx = cx - ox, dz = cz - oz;
+            if (Math.Abs(dx) + Math.Abs(dz) != 1 || !MapGrid.InBounds(m, ox, oz)) return false;
+            if (Math.Abs(m.Lift[i] - m.Lift[oz * m.Width + ox]) < 2) return false;
+            double fx = cx + 0.5 - dx * 0.5, fz = cz + 0.5 - dz * 0.5;
+            float y0 = (float)GroundHeight.At(m, ox + 0.5, oz + 0.5), y1 = (float)GroundHeight.At(m, cx + 0.5, cz + 0.5);
+            if (y1 < y0) { float tmp = y0; y0 = y1; y1 = tmp; }
+            double ax = fx - dz * 0.4, az = fz + dx * 0.4, bx = fx + dz * 0.4, bz = fz - dx * 0.4;   // across the face, 0.8 wide
+            double ix = -dx * 0.02, iz = -dz * 0.02;                                                     // a hair off the face
+            Quad(SimSpace.ToWorld(ax + ix, y0 + 0.02f, az + iz), SimSpace.ToWorld(ax + ix, y1 + 0.15f, az + iz),
+                 SimSpace.ToWorld(bx + ix, y1 + 0.15f, bz + iz), SimSpace.ToWorld(bx + ix, y0 + 0.02f, bz + iz), CellHammer, A(g, 0.8f));
+            return true;
+        }
+
         internal float CellY(MapDef m, double x, double z) => (float)GroundHeight.At(m, x, z) + GroundLift;
 
         // ------------------------------------------------------------------ markers and target
@@ -645,6 +666,8 @@ namespace CriticalMass.Runtime.View.Affordance
                 double x = i % m.Width + 0.5, z = i / m.Width + 0.5;
                 float y = t.Ghost == 4 || t.Ghost == 2 ? CellY(m, x, z) + 0.02f : meY + 0.02f;
                 int cell = t.Ghost == 4 ? CellDisc : t.Ghost == 3 ? CellHammer : CellBlock;
+                // b15 terrain height: a height ladder's ghost stands flat against the face it will lean on (pit wall, stack side)
+                if (t.Ghost == 3 && FaceGhost(w, m, i, g)) continue;
                 GroundQuad(x, z, y, 0.5f, CellTile, A(g, 0.6f));
                 GroundQuad(x, z, y + 0.005f, t.Ghost == 4 ? 0.18f : 0.32f, cell, A(g, 0.95f));
                 if (t.Ghost == 4) GroundQuad(x, z, y + 0.006f, (float)w.Config.Abilities.DemolitionsMine.BlastRadius, CellRing, A(g, 0.5f));
