@@ -30,12 +30,19 @@ namespace CriticalMass.Net
         public int PingMs;
         /// <summary>Host side: the member's HELLO arrived and its version matches.</summary>
         public bool Confirmed;
+        /// <summary>b15 profile: the member's cosmetic look for LookClass (clamped on arrival; never part of the match setup).</summary>
+        public CosmeticLook Look = CosmeticLook.Default;
+        public ClassId LookClass;
+        /// <summary>The look for the class the member has picked now (Default until a look for that class arrives).</summary>
+        public CosmeticLook LookNow => LookClass == Class ? Look : CosmeticLook.Default;
     }
 
     /// <summary>Room message numbers (lockstep uses 1 and 2).</summary>
     internal static class RoomMsg
     {
         public const int Hello = 20, State = 21, Pick = 22, Ready = 23, Reject = 24, Start = 25, Ping = 26, Pong = 27;
+        /// <summary>b15 profile, cosmetic only: client to host [class, look]; host to all [n, (peer, look) x n].</summary>
+        public const int Look = 28, Looks = 29;
         public const int NameMax = 16, BuildMax = 40, TextMax = 120;
 
         /// <summary>Display names follow the chat rules (letters, digits, space, '-' and '_'; filtered; at most 16).</summary>
@@ -105,6 +112,8 @@ namespace CriticalMass.Net
         public LockstepSession Session { get; private set; }
         /// <summary>Room and match chat (the host routes and checks every line).</summary>
         public readonly ChatChannel Chat;
+        /// <summary>b15 profile: the host's own look for a class (null = Default). Cosmetic only.</summary>
+        public Func<ClassId, CosmeticLook> LookFor;
 
         private readonly ITransport _t;
         private readonly GameConfig _cfg;
@@ -139,6 +148,13 @@ namespace CriticalMass.Net
         {
             foreach (RoomMember m in Members) if (m.Peer == peer) return m;
             return null;
+        }
+
+        /// <summary>b15 profile: the look a member shows for the class it has picked (Default for unknown peers).</summary>
+        public CosmeticLook LookOf(int peer)
+        {
+            RoomMember m = Find(peer);
+            return m != null ? m.LookNow : CosmeticLook.Default;
         }
 
         public void SetLocalPick(TeamId team, ClassId cls)
@@ -261,6 +277,18 @@ namespace CriticalMass.Net
                     Changed("");
                     return;
                 }
+                case RoomMsg.Look:
+                {
+                    // b15 profile: cosmetic only. Clamped on arrival (ids out of range or above the claimed mastery become 0).
+                    int cls = r.U8();
+                    CosmeticLook look = CosmeticLook.Read(ref r);
+                    if (r.Bad || !m.Confirmed || cls >= ClassIds.All.Count) return;
+                    if (m.LookClass == (ClassId)cls && m.Look.Equals(look)) return;
+                    m.Look = look;
+                    m.LookClass = (ClassId)cls;
+                    Changed("");
+                    return;
+                }
                 case RoomMsg.Pong:
                 {
                     int sent = r.I32();
@@ -306,6 +334,28 @@ namespace CriticalMass.Net
                 w.U8((int)m.Class);
                 w.U8(m.Ready ? 1 : 0);
                 w.I16(Math.Min(m.PingMs, 9999));
+            }
+            if (!w.Overflow) _t.Send(Peers.Broadcast, _pkt, w.Pos);
+            SendLooks(n);
+        }
+
+        /// <summary>b15 profile: every confirmed member's look for its picked class, after each State. Cosmetic only.</summary>
+        private void SendLooks(int n)
+        {
+            RoomMember me = Members[0];
+            if (LookFor != null)
+            {
+                me.Look = CosmeticLook.Clamp(LookFor(me.Class));
+                me.LookClass = me.Class;
+            }
+            var w = new WireWriter(_pkt);
+            w.U8(RoomMsg.Looks);
+            w.U8(n);
+            foreach (RoomMember m in Members)
+            {
+                if (!m.Confirmed) continue;
+                w.U8(m.Peer);
+                m.LookNow.Write(ref w);
             }
             if (!w.Overflow) _t.Send(Peers.Broadcast, _pkt, w.Pos);
         }
@@ -384,6 +434,10 @@ namespace CriticalMass.Net
         public LockstepOptions Options;
         /// <summary>Room and match chat (lines arrive from the host, already checked).</summary>
         public readonly ChatChannel Chat;
+        /// <summary>b15 profile: this player's own look for a class (null = Default). Cosmetic only.</summary>
+        public Func<ClassId, CosmeticLook> LookFor;
+        /// <summary>b15 profile: each member's look for its picked class, as the host last sent them (already clamped).</summary>
+        public readonly Dictionary<int, CosmeticLook> Looks = new Dictionary<int, CosmeticLook>();
 
         private readonly ITransport _t;
         private readonly GameConfig _cfg;
@@ -423,6 +477,22 @@ namespace CriticalMass.Net
             w.U8(RoomMsg.Pick);
             w.U8((int)team);
             w.U8((int)cls);
+            _t.Send(Peers.Host, _pkt, w.Pos);
+            SendLook(cls);
+        }
+
+        /// <summary>b15 profile: the look a member shows (Default for an unknown peer).</summary>
+        public CosmeticLook LookOf(int peer) => Looks.TryGetValue(peer, out CosmeticLook l) ? l : CosmeticLook.Default;
+
+        /// <summary>b15 profile: sends this player's look for cls to the host (cosmetic only; the host clamps it again).</summary>
+        public void SendLook(ClassId cls)
+        {
+            if (LookFor == null) return;
+            CosmeticLook look = CosmeticLook.Clamp(LookFor(cls));
+            var w = new WireWriter(_pkt);
+            w.U8(RoomMsg.Look);
+            w.U8((int)cls);
+            look.Write(ref w);
             _t.Send(Peers.Host, _pkt, w.Pos);
         }
 
@@ -508,9 +578,26 @@ namespace CriticalMass.Net
                     {
                         Phase = RoomPhase.Lobby;
                         if (_pickSet) SetPick(_team, _cls);
+                        else SendLook(Me.Class);
                         if (_ready) SetReady(true);
                     }
                     Version++;
+                    return;
+                }
+                case RoomMsg.Looks:
+                {
+                    int n = r.U8();
+                    if (r.Bad || n > MatchSetup.MaxHumans) return;
+                    var got = new Dictionary<int, CosmeticLook>(n);
+                    for (int i = 0; i < n; i++)
+                    {
+                        int peer = r.U8();
+                        CosmeticLook look = CosmeticLook.Read(ref r);
+                        if (r.Bad) return;
+                        got[peer] = look;
+                    }
+                    Looks.Clear();
+                    foreach (KeyValuePair<int, CosmeticLook> kv in got) Looks[kv.Key] = kv.Value;
                     return;
                 }
                 case RoomMsg.Ping:

@@ -42,6 +42,7 @@ namespace CriticalMass.Runtime.Hud
         HudIcon _portrait;
         VectorShape _frame;
         Text _line, _tip, _tipLabel;
+        Text _lookTitle;   // b15 profile: the killer's mastery title (cosmetic)
         float _age;
         int _tier = 2;
 
@@ -61,6 +62,7 @@ namespace CriticalMass.Runtime.Hud
             _frame = MenuUi.Shape(_card, "Portrait Frame", ShapeKind.Chamfer, 18f, 18f, 120f, 120f, CMTokens.VoidNavy.Color, 18f);
             _portrait = HudIcon.Make(_frame.transform, "Portrait", 7f, 7f, 106f, 106f);
             _line = MenuUi.Label(_card, "Line", CMTokens.Ui, UiScale.TypeHeading, CMTokens.WarmCream.Color, TextAnchor.MiddleLeft, 160f, 22f, 640f, 44f, "", 3f);
+            _lookTitle = MenuUi.Fit(MenuUi.Label(_card, "Look Title", CMTokens.Display, UiScale.TypeMin, CMTokens.ToolBrass.Color, TextAnchor.MiddleLeft, 160f, 62f, 640f, 18f, "", 2f), 12);
             _tipLabel = MenuUi.Label(_card, "Tip Label", CMTokens.Display, UiScale.TypeSmall, CMTokens.ToolBrass.Color, TextAnchor.UpperLeft, 160f, 80f, 60f, 26f, "TIP", 2f);
             _tip = MenuUi.Fit(MenuUi.Label(_card, "Tip", CMTokens.Ui, UiScale.TypeBody, CMTokens.WarmCream.Color, TextAnchor.UpperLeft, 220f, 78f, 580f, 64f, "", 2f), 21);
             _tip.horizontalOverflow = HorizontalWrapMode.Wrap;
@@ -134,6 +136,10 @@ namespace CriticalMass.Runtime.Hud
             string portrait = PortraitFor(e.Other, e.OtherTeam, e.OtherClass, kaiju);
             _portrait.Set(portrait, _tier);
             _frame.SetFill(e.Other >= 0 ? CMTokens.Team(e.OtherTeam) : CMTokens.VoidNavy.Color);
+            // b15 profile: a human killer's frame ring and title (cosmetic look; bots and the Kaiju show none)
+            CriticalMass.Net.CosmeticLook look = CriticalMass.Runtime.Progression.LookRegistry.For(e.Other);
+            CriticalMass.Runtime.Progression.LookView.Ring(_frame, e.Other >= 0 ? look.Frame : 0, CMTokens.OutlinePx, CMTokens.VoidNavy.Color);
+            HudText.Set(_lookTitle, e.Other >= 0 && look.Title > 0 ? CriticalMass.Runtime.Progression.MetaWords.Title(e.OtherClass, look.Title) : string.Empty);
             _age = 0f;
             _card.gameObject.SetActive(true);
             Animate(0f);

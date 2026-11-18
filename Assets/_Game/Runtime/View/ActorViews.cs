@@ -443,7 +443,7 @@ namespace CriticalMass.Runtime.View
             // feat/hit-feel-1 step-in plus the reaction shift, horizontally capped (fix/hit-feel-3: HitFeel.MaxViewOffset).
             m.Transform.localPosition = basePos + Anim.HitFeel.ClampOffset((hasFx ? fx.Nudge : Vector3.zero) + Anim.HitFeel.Lunge(w, i, a))
                 + JumpLift.Offset(w, map, i, a, x, z); // DG-02 jump arc
-            Material teamMat = ArtMaterials.ForTeam(m.Spec, actor.Team);
+            Material teamMat = CriticalMass.Runtime.Progression.TrimMaterials.ForActor(ArtMaterials.ForTeam(m.Spec, actor.Team), i);   // b15 profile: colour trim (fixed colours only; cached, no allocation)
             m.SetMaterial(hasFx && fx.Flash ? _fx.FlashMaterial(teamMat) : teamMat);
             // Animation pass: clips, timing, facing spring, squash and the level of detail live in Anim.ActorAnimator.
             slot.Anim.Pose(m, w, cfg, i, a, simTime, dSim, basePos, _fx, hasFx, in fx, ref _poseState);
