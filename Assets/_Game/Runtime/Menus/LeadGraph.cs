@@ -1,5 +1,6 @@
 using CriticalMass.Runtime.Game;
 using CriticalMass.Runtime.Hud.Style;
+using CriticalMass.Sim.Config;
 using CriticalMass.Sim.Core;
 using UnityEngine;
 using UnityEngine.UI;
@@ -138,10 +139,10 @@ namespace CriticalMass.Runtime.Menus
         internal static void Quad(VertexHelper vh, Vector2 p0, Vector2 p1, Vector2 p2, Vector2 p3, Color c)
         {
             int i = vh.currentVertCount;
-            vh.AddVert(p0, c, Vector2.zero);
-            vh.AddVert(p1, c, Vector2.zero);
-            vh.AddVert(p2, c, Vector2.zero);
-            vh.AddVert(p3, c, Vector2.zero);
+            vh.AddVert(p0, c, Vector4.zero);
+            vh.AddVert(p1, c, Vector4.zero);
+            vh.AddVert(p2, c, Vector4.zero);
+            vh.AddVert(p3, c, Vector4.zero);
             vh.AddTriangle(i, i + 1, i + 2);
             vh.AddTriangle(i, i + 2, i + 3);
         }
@@ -161,11 +162,11 @@ namespace CriticalMass.Runtime.Menus
         internal static void Ring(VertexHelper vh, Vector2 p, float radius, Color c, int seg)
         {
             int start = vh.currentVertCount;
-            vh.AddVert(p, c, Vector2.zero);
+            vh.AddVert(p, c, Vector4.zero);
             for (int k = 0; k <= seg; k++)
             {
                 float ang = k * Mathf.PI * 2f / seg;
-                vh.AddVert(p + new Vector2(Mathf.Cos(ang), Mathf.Sin(ang)) * radius, c, Vector2.zero);
+                vh.AddVert(p + new Vector2(Mathf.Cos(ang), Mathf.Sin(ang)) * radius, c, Vector4.zero);
                 if (k > 0) vh.AddTriangle(start, start + k, start + k + 1);
             }
         }
