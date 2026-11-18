@@ -114,17 +114,21 @@ namespace CriticalMass.Runtime.View.Art
             m.SetColor("_TeamMarker", Hex(team == TeamId.Azure ? MarkerAzure : MarkerCrimson));
             m.SetColor("_TeamMarkerDark", Hex(team == TeamId.Azure ? MarkerDarkAzure : MarkerDarkCrimson));
             // b14 polish (team read from above): characters draw their ink in a dark team colour and lay the team cloth over
-            // their top-facing fixed colours (headgear, shoulders), the same amounts for both teams.
+            // their top-facing fixed colours (headgear, shoulders). b14 final look (seen in engine, 16v16 at night): Azure lays
+            // more cloth (TeamTopTintAzure) because cyan over the warm brown hair and hats mixes toward grey while red over
+            // brown stays red: at the same share Crimson read clearly and Azure read as brown with teal ink.
             if (spec.Kind == ArtKind.Character)
             {
                 m.SetColor("_OutlineColor", Hex(TeamInk(team)));
-                m.SetFloat("_TeamTopTint", TeamTopTint);
+                m.SetFloat("_TeamTopTint", team == TeamId.Azure ? TeamTopTintAzure : TeamTopTint);
             }
             return m;
         }
 
         /// <summary>b14 polish: share of team cloth over a character's top-facing fixed colours (CMToonTeamTop).</summary>
         public const float TeamTopTint = 0.45f;
+        /// <summary>b14 final look: Azure's share (cyan over warm fixed colours greys out at 0.45; 0.65 matches Crimson's read).</summary>
+        public const float TeamTopTintAzure = 0.65f;
         /// <summary>b14 polish: a character's outline ink per team (dark, saturated, near-equal luma; the self rim still wins).</summary>
         public const string InkAzure = "#0E6178", InkCrimson = "#8A1F2B";
         public static string TeamInk(TeamId team) => team == TeamId.Azure ? InkAzure : InkCrimson;
