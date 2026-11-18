@@ -270,7 +270,7 @@ namespace CriticalMass.Sim.Tests
         /// values, keep the best total; a candidate whose cheap parts already reach the best total is cut before its 16v16 part).
         /// Deterministic (fixed seeds, fixed order). Prints every candidate, the best set and its duel matrix.
         /// </summary>
-        [Test] // TEMP-FAST: b15 pass-2 measuring run; Category("Slow") after
+        [Test, Category("Slow")]
         public void CoordinateSearchOverTheCombatNumbersPrintsTheBestSetAndItsMatrix()
         {
             var sw = Stopwatch.StartNew();
@@ -474,7 +474,7 @@ namespace CriticalMass.Sim.Tests
         /// them. The replica of SimStep used to time the systems is first proven equal to SimStep (same state hash after 900
         /// ticks). Prints one line per system; asserts only the replica (cost is judged from the lines).
         /// </summary>
-        [Test] // TEMP-FAST: b15 pass-2 measuring run; Category("Slow") after
+        [Test, Category("Slow")]
         public void PerSystemTickCostRuleOffAgainstOnOnTheSameSeeds()
         {
             {
@@ -535,7 +535,7 @@ namespace CriticalMass.Sim.Tests
         /// MovementShiverTests.NoActorOrKaijuShiversInWholeBotMatches' guarded arm (seeds 1, 7, 1337; hatch 240 and 60) with
         /// CombatFeel.Enabled off and on: if the switch-off count is far from 0 the soak is red outside this rule. Prints only.
         /// </summary>
-        [Test] // TEMP-FAST: b15 pass-2 measuring run; Category("Slow") after
+        [Test, Category("Slow")]
         public void ShiverSoakWithTheSwitchOffAgainstOn()
         {
             var totals = new int[2];

@@ -168,8 +168,8 @@ namespace CriticalMass.Sim.Tests
             al.RespawnIn = 0.01;
             DepthKit.Steps(w, 2);
             Assert.IsTrue(al.Alive);
-            Assert.AreEqual(208, al.MaxHp);
-            Assert.AreEqual(208, al.Hp);
+            Assert.AreEqual(Math.Round(wHp * 1.30), al.MaxHp, 1e-6);
+            Assert.AreEqual(Math.Round(wHp * 1.30), al.Hp, 1e-6);
         }
 
         [Test]
