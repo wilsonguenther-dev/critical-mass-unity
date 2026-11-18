@@ -38,8 +38,8 @@ namespace CriticalMass.Sim.Config
             // every row below come from CombatFeelTuneTests' coordinate search (run printed in the PR), not hand-guessing.
             new ClassConfig
             {
-                MaxHp = 160, MoveSpeed = 3.8, Radius = 0.45, AttackDamage = 21, AttackRange = 1.8, AttackArcDeg = 110,
-                AttackCooldown = 1.05, AbilityCooldown = 10, GatherSeconds = 2, CarryCapacity = 1,
+                MaxHp = 140, MoveSpeed = 3.8, Radius = 0.45, AttackDamage = 21, AttackRange = 1.8, AttackArcDeg = 110,
+                AttackCooldown = 0.90, AbilityCooldown = 10, GatherSeconds = 2, CarryCapacity = 1,
                 AttackWindupSeconds = 0.40, RecoverySeconds = 0.30, Mass = 1.6, Poise = 30,
             },
             // FARMER: long staff (2.3 u reach, narrow 60 degree thrust) that pushes the target back out of its own reach; weak up
@@ -58,12 +58,12 @@ namespace CriticalMass.Sim.Config
                 AttackCooldown = 0.65, AbilityCooldown = 12, GatherSeconds = 2, CarryCapacity = 1,
                 AttackWindupSeconds = 0.20, RecoverySeconds = 0.18, Mass = 1.1, Poise = 24,
             },
-            // DEMOLITIONS: weak pry bar (12 every 0.8 s; 10 measured 6.3 s on every class, over the 3-6 s band); her damage is the thrown TNT (telegraphed fuse, area), every
+            // DEMOLITIONS: weak pry bar (12 every 0.7 s; 10 measured 6.3 s on every class, over the 3-6 s band); her damage is the thrown TNT (telegraphed fuse, area), every
             // TntCooldownTicks instead of 150; her own blast hurts her (TntSelfShare): self-risk.
             new ClassConfig
             {
                 MaxHp = 120, MoveSpeed = 4.0, Radius = 0.45, AttackDamage = 12, AttackRange = 1.4, AttackArcDeg = 90,
-                AttackCooldown = 0.80, AbilityCooldown = 12, GatherSeconds = 2, CarryCapacity = 1,
+                AttackCooldown = 0.70, AbilityCooldown = 12, GatherSeconds = 2, CarryCapacity = 1,
                 AttackWindupSeconds = 0.23, RecoverySeconds = 0.25, Mass = 1.0, Poise = 22,
             },
             // BUILDER: hammer (26 every 0.9 s, 0.33 s wind-up; 23 measured 6.1 s on the Warrior and 2.4% of all damage in 16v16) with the biggest knockback; x1.5 within BuilderHomeRadius of his

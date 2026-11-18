@@ -197,11 +197,20 @@ namespace CriticalMass.Sim.Tests
             foreach (double t in off.Top10) offTop += t;
             offTop /= Math.Max(1, off.Top10.Count);
             double wOn = on.Damage > 0 ? on.ClassDamage[0] / on.Damage : 0, wOff = off.Damage > 0 ? off.ClassDamage[0] / off.Damage : 0;
-            Console.WriteLine("{\"item\":\"b15 balance targets\",\"top10On\":" + top10.ToString("0.000") + ",\"top10Control\":" + offTop.ToString("0.000") + ",\"top10Target\":0.45,\"top10Met\":" + (top10 <= 0.45 ? "true" : "false") +
-                              ",\"warriorShareOn\":" + wOn.ToString("0.000") + ",\"warriorShareControl\":" + wOff.ToString("0.000") + ",\"classTarget\":0.40,\"classMet\":" + (wOn <= 0.40 ? "true" : "false") + "}");
+            double dkOn = on.Kills > 0 ? on.ClassKills[(int)ClassId.Demolitions] / on.Kills : 0;
+            double kpmOn = on.Minutes > 0 ? on.Kills / on.Minutes : 0;
+            int hotMax = 0;
+            foreach (int c in on.StuckCells.Values) if (c > hotMax) hotMax = c;
+            // pass-2 targets (coordinator 2026-11-18): printed with met / not met; the stuck and stagger ones are asserted below.
+            Console.WriteLine("{\"item\":\"b15 balance targets\",\"top10On\":" + top10.ToString("0.000") + ",\"top10Control\":" + offTop.ToString("0.000") + ",\"top10Target\":0.50,\"top10Met\":" + (top10 <= 0.50 ? "true" : "false") +
+                              ",\"warriorShareOn\":" + wOn.ToString("0.000") + ",\"warriorShareControl\":" + wOff.ToString("0.000") + ",\"warriorTarget\":0.35,\"warriorMet\":" + (wOn <= 0.35 ? "true" : "false") +
+                              ",\"demoKillShareOn\":" + dkOn.ToString("0.000") + ",\"demoTarget\":0.25,\"demoMet\":" + (dkOn <= 0.25 ? "true" : "false") +
+                              ",\"killsPerMinOn\":" + kpmOn.ToString("0.00") + ",\"kpmTarget\":34,\"kpmMet\":" + (kpmOn >= 34 ? "true" : "false") +
+                              ",\"stuckMedianOn\":" + MedianI(on.Stuck) + ",\"stuckTarget\":\"< 5\",\"hottestCell\":" + hotMax + ",\"cellTarget\":\"<= 5\"}");
             if (!(top10 < offTop)) bad.Add("top-10 damage share " + top10.ToString("0.000") + " not below control " + offTop.ToString("0.000"));
             if (!(wOn < wOff)) bad.Add("Warrior damage share " + wOn.ToString("0.000") + " not below control " + wOff.ToString("0.000"));
-            if (MedianI(on.Stuck) >= 10) bad.Add("median stuck episodes " + MedianI(on.Stuck) + " >= 10");
+            if (MedianI(on.Stuck) >= 5) bad.Add("median stuck episodes " + MedianI(on.Stuck) + " >= 5");
+            if (hotMax > 5) bad.Add("a stuck cell holds " + hotMax + " episodes (> 5)");
             if (on.MaxLock / 30.0 > 0.5) bad.Add("longest stagger run " + (on.MaxLock / 30.0).ToString("0.00") + " s > 0.5 s");
             if (!(on.Healing > off.Healing)) bad.Add("Healer healing not above control");
             if (!(on.Kills > 0)) bad.Add("no kills");

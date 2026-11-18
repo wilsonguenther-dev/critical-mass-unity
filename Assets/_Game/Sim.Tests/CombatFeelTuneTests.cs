@@ -34,23 +34,25 @@ namespace CriticalMass.Sim.Tests
         private static ClassConfig Row(CombatFeelConfig f, ClassId c) => f.Classes[(int)c];
 
         // [0] of every list is the shipped value in CombatFeelConfig (the search starts there).
+        // [0] of every list is the shipped value in CombatFeelConfig (the search starts there).
         private static readonly Knob[] Knobs =
         {
-            new Knob { Name = "Warrior.AttackDamage", Set = (f, v) => Row(f, ClassId.Warrior).AttackDamage = v, Values = new[] { 21.0, 24, 19 } },
-            new Knob { Name = "Warrior.MaxHp", Set = (f, v) => Row(f, ClassId.Warrior).MaxHp = v, Values = new[] { 160.0, 140, 125 } },
-            new Knob { Name = "Warrior.AttackCooldown", Set = (f, v) => Row(f, ClassId.Warrior).AttackCooldown = v, Values = new[] { 1.05, 0.9, 0.8 } },
+            new Knob { Name = "Warrior.AttackDamage", Set = (f, v) => Row(f, ClassId.Warrior).AttackDamage = v, Values = new[] { 21.0, 22 } },
+            new Knob { Name = "Warrior.MaxHp", Set = (f, v) => Row(f, ClassId.Warrior).MaxHp = v, Values = new[] { 140.0, 135, 130 } },
+            new Knob { Name = "Warrior.AttackCooldown", Set = (f, v) => Row(f, ClassId.Warrior).AttackCooldown = v, Values = new[] { 0.9, 0.85 } },
+            new Knob { Name = "Healer.AttackDamage", Set = (f, v) => Row(f, ClassId.Healer).AttackDamage = v, Values = new[] { 18.0, 20, 22 } },
+            new Knob { Name = "Healer.AttackCooldown", Set = (f, v) => Row(f, ClassId.Healer).AttackCooldown = v, Values = new[] { 0.8, 0.7 } },
             new Knob { Name = "Farmer.AttackDamage", Set = (f, v) => Row(f, ClassId.Farmer).AttackDamage = v, Values = new[] { 20.0, 23 } },
-            new Knob { Name = "Miner.AttackDamage", Set = (f, v) => Row(f, ClassId.Miner).AttackDamage = v, Values = new[] { 14.0, 12 } },
-            new Knob { Name = "Miner.AttackCooldown", Set = (f, v) => Row(f, ClassId.Miner).AttackCooldown = v, Values = new[] { 0.65, 0.75 } },
-            new Knob { Name = "Miner.MaxHp", Set = (f, v) => Row(f, ClassId.Miner).MaxHp = v, Values = new[] { 95.0, 110 } },
-            new Knob { Name = "MinerHeavyPierce", Set = (f, v) => f.MinerHeavyPierce = v, Values = new[] { 1.4, 1.2 } },
-            new Knob { Name = "SunderDamageTaken", Set = (f, v) => f.SunderDamageTaken = v, Values = new[] { 0.15, 0.25 } },
-            new Knob { Name = "Demolitions.AttackDamage", Set = (f, v) => Row(f, ClassId.Demolitions).AttackDamage = v, Values = new[] { 12.0, 15 } },
-            new Knob { Name = "Demolitions.AttackCooldown", Set = (f, v) => Row(f, ClassId.Demolitions).AttackCooldown = v, Values = new[] { 0.8, 0.7 } },
+            new Knob { Name = "Miner.AttackDamage", Set = (f, v) => Row(f, ClassId.Miner).AttackDamage = v, Values = new[] { 14.0, 16 } },
+            new Knob { Name = "Miner.MaxHp", Set = (f, v) => Row(f, ClassId.Miner).MaxHp = v, Values = new[] { 95.0, 105 } },
+            new Knob { Name = "Demolitions.AttackDamage", Set = (f, v) => Row(f, ClassId.Demolitions).AttackDamage = v, Values = new[] { 12.0, 14 } },
+            new Knob { Name = "Demolitions.AttackCooldown", Set = (f, v) => Row(f, ClassId.Demolitions).AttackCooldown = v, Values = new[] { 0.7, 0.8 } },
             new Knob { Name = "TntDamage", Set = (f, v) => f.TntDamage = v, Values = new[] { 55.0, 46 } },
             new Knob { Name = "TntCooldownTicks", Set = (f, v) => f.TntCooldownTicks = v, Values = new[] { 120.0, 150 } },
             new Knob { Name = "Builder.AttackDamage", Set = (f, v) => Row(f, ClassId.Builder).AttackDamage = v, Values = new[] { 26.0, 22 } },
-            new Knob { Name = "Healer.AttackDamage", Set = (f, v) => Row(f, ClassId.Healer).AttackDamage = v, Values = new[] { 18.0, 15 } },
+            new Knob { Name = "MinerHeavyPierce", Set = (f, v) => f.MinerHeavyPierce = v, Values = new[] { 1.4 } },
+            new Knob { Name = "SunderDamageTaken", Set = (f, v) => f.SunderDamageTaken = v, Values = new[] { 0.15 } },
+            new Knob { Name = "Miner.AttackCooldown", Set = (f, v) => Row(f, ClassId.Miner).AttackCooldown = v, Values = new[] { 0.65 } },
         };
 
         private static void Apply(GameConfig c, double[] vals)

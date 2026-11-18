@@ -201,10 +201,11 @@ namespace CriticalMass.Sim.Tests
                         DuelResult r = RunDuel(atk, def, feel, false);
                         row.Append(def).Append('=').Append(double.IsNaN(r.Seconds) ? "never" : r.Seconds.ToString("0.00") + "s/" + r.Hits).Append(' ');
                         Console.WriteLine("{\"item\":\"b15 ttk passive\",\"arm\":\"" + arm + "\",\"attacker\":\"" + atk + "\",\"defender\":\"" + def +
-                                          "\",\"seconds\":" + S(r.Seconds) + ",\"hits\":" + r.Hits + ",\"limit\":\"2.5-6.5 (Healer row <=10)\"}");
+                                          "\",\"seconds\":" + S(r.Seconds) + ",\"hits\":" + r.Hits + ",\"limit\":\"3-6 (Healer row <=7)\"}");
                         if (!feel) continue;
-                        double hi = atk == ClassId.Healer ? 10 : 6.5;
-                        if (double.IsNaN(r.Seconds) || r.Seconds < 2.5 || r.Seconds > hi) bad.Add(atk + " on " + def + ": " + S(r.Seconds) + " s");
+                        // pass 2 (coordinator): 3-6 s; the Healer's row (support, she mends first) at most 7 s.
+                        double hi = atk == ClassId.Healer ? 7 : 6;
+                        if (double.IsNaN(r.Seconds) || r.Seconds < 3 || r.Seconds > hi + 1e-9) bad.Add(atk + " on " + def + ": " + S(r.Seconds) + " s");
                     }
                     Console.WriteLine("[ttk " + arm + "] " + atk + ": " + row);
                 }
@@ -217,6 +218,7 @@ namespace CriticalMass.Sim.Tests
                         string who = r.Winner == 0 ? Six[i].ToString() : r.Winner == 1 ? Six[j].ToString() : "none";
                         if (r.Winner == 0) wins[Six[i]]++;
                         if (r.Winner == 1) wins[Six[j]]++;
+                        if (feel && r.Winner < 0) bad.Add(Six[i] + " v " + Six[j] + ": nobody wins in 30 s");
                         Console.WriteLine("{\"item\":\"b15 ttk fight\",\"arm\":\"" + arm + "\",\"a\":\"" + Six[i] + "\",\"b\":\"" + Six[j] + "\",\"winner\":\"" + who +
                                           "\",\"seconds\":" + S(r.Seconds) + ",\"winnerHpLeft\":" + r.HpLeft.ToString("0.0") + "}");
                     }
