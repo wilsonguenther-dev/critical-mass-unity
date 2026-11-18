@@ -480,8 +480,8 @@ namespace CriticalMass.Sim.Tests
             Assert.AreEqual(12, minerOnFarmer, 1e-6);
             Assert.AreEqual(20, farmerFar, 1e-6);
             Assert.AreEqual(20 * f.FarmerCloseShare, farmerClose, 1e-6, "Farmer weak up close");
-            Assert.AreEqual(23, builderOpen, 1e-6);
-            Assert.AreEqual(23 * f.BuilderHomeMultiplier, builderHome, 1e-6, "Builder at home");
+            Assert.AreEqual(f.Classes[(int)ClassId.Builder].AttackDamage, builderOpen, 1e-6);
+            Assert.AreEqual(f.Classes[(int)ClassId.Builder].AttackDamage * f.BuilderHomeMultiplier, builderHome, 1e-6, "Builder at home");
 
             // SUNDER: the second Miner hit on the Warrior takes the bonus.
             World s = Arena(ClassId.Miner, ClassId.Warrior);

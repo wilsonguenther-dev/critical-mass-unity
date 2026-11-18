@@ -58,19 +58,19 @@ namespace CriticalMass.Sim.Config
                 AttackCooldown = 0.55, AbilityCooldown = 12, GatherSeconds = 2, CarryCapacity = 1,
                 AttackWindupSeconds = 0.20, RecoverySeconds = 0.18, Mass = 1.1, Poise = 24,
             },
-            // DEMOLITIONS: weak pry bar (10 every 0.8 s); her damage is the thrown TNT (telegraphed fuse, area), every
+            // DEMOLITIONS: weak pry bar (12 every 0.8 s; 10 measured 6.3 s on every class, over the 3-6 s band); her damage is the thrown TNT (telegraphed fuse, area), every
             // TntCooldownTicks instead of 150; her own blast hurts her (TntSelfShare): self-risk.
             new ClassConfig
             {
-                MaxHp = 120, MoveSpeed = 4.0, Radius = 0.45, AttackDamage = 10, AttackRange = 1.4, AttackArcDeg = 90,
+                MaxHp = 120, MoveSpeed = 4.0, Radius = 0.45, AttackDamage = 12, AttackRange = 1.4, AttackArcDeg = 90,
                 AttackCooldown = 0.80, AbilityCooldown = 12, GatherSeconds = 2, CarryCapacity = 1,
                 AttackWindupSeconds = 0.23, RecoverySeconds = 0.25, Mass = 1.0, Poise = 22,
             },
-            // BUILDER: hammer (23 every 0.9 s, 0.33 s wind-up) with the biggest knockback; x1.5 within BuilderHomeRadius of his
+            // BUILDER: hammer (26 every 0.9 s, 0.33 s wind-up; 23 measured 6.1 s on the Warrior and 2.4% of all damage in 16v16) with the biggest knockback; x1.5 within BuilderHomeRadius of his
             // team's walls and barricades (strong at home, weak in the open).
             new ClassConfig
             {
-                MaxHp = 120, MoveSpeed = 4.0, Radius = 0.45, AttackDamage = 23, AttackRange = 1.6, AttackArcDeg = 100,
+                MaxHp = 120, MoveSpeed = 4.0, Radius = 0.45, AttackDamage = 26, AttackRange = 1.6, AttackArcDeg = 100,
                 AttackCooldown = 0.90, AbilityCooldown = 12, GatherSeconds = 2, CarryCapacity = 1,
                 AttackWindupSeconds = 0.33, RecoverySeconds = 0.30, Mass = 1.3, Poise = 26,
             },
