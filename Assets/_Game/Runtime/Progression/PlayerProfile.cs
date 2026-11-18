@@ -46,6 +46,11 @@ namespace CriticalMass.Runtime.Progression
         public int BestMatchSkillPoints;
         public string[] RelicsFound = new string[0];
         public ClassLoadout[] Loadouts = new ClassLoadout[0];
+        /// <summary>
+        /// b15 item 3: one bit per ClassId, set once the player has done that class's first-match goal (ClassGoals). Added
+        /// inside schema 1: an older file has no field and reads as 0 (no goal done), so no migration step is needed.
+        /// </summary>
+        public int ClassGoalsDone;
 
         /// <summary>The level the skill points reach (Leveling curve).</summary>
         public int Level => Leveling.LevelFor(SkillPoints);
@@ -91,6 +96,7 @@ namespace CriticalMass.Runtime.Progression
             Losses = Math.Max(0, Losses);
             KnockOuts = Math.Max(0, KnockOuts);
             BestMatchSkillPoints = Math.Max(0, BestMatchSkillPoints);
+            ClassGoalsDone &= (1 << 6) - 1;   // b15: six classes, nothing else
             var relics = new List<string>();
             if (RelicsFound != null)
                 foreach (string r in RelicsFound)

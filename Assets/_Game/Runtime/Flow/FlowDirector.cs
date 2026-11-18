@@ -83,6 +83,8 @@ namespace CriticalMass.Runtime.Flow
         public static FlowDirector Install(GameObject game, SimDriverBehaviour driver, GameHud hud)
         {
             if (game.GetComponent<MatchStatsRecorder>() == null) game.AddComponent<MatchStatsRecorder>();
+            // b15 item 3: the first-match class goal line (match start, respawn), until the goal is done once
+            if (game.GetComponent<CriticalMass.Runtime.Onboarding.ClassGoalView>() == null) game.AddComponent<CriticalMass.Runtime.Onboarding.ClassGoalView>();
             FlowDirector d = game.GetComponent<FlowDirector>();
             if (d == null) d = game.AddComponent<FlowDirector>();
             d.Driver = driver;

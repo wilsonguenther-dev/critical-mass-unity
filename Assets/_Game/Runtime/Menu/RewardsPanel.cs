@@ -233,6 +233,12 @@ namespace CriticalMass.Runtime.Menu
 
         LevelBar _bar;
         Text _outcome, _levelUp, _unlock, _totalCoins, _totalSp;
+        // b15 item 4: the coin column, hidden while coins have no sink (DeadSystemViews.ShowCoins)
+        Text _headCoins;
+        VectorShape _totalCoinIcon;
+        readonly System.Collections.Generic.List<RewardLine> _shownLines = new System.Collections.Generic.List<RewardLine>();
+        /// <summary>The coin column is on show (tests).</summary>
+        public bool CoinColumnShown => _headCoins != null && _headCoins.gameObject.activeSelf;
         readonly Text[,] _cells = new Text[MaxRows, 4];
         readonly CanvasGroup[] _rows = new CanvasGroup[MaxRows];
         MatchRewards _r;
@@ -265,7 +271,7 @@ namespace CriticalMass.Runtime.Menu
             _bar = LevelBar.Build(t, "Level Bar", 32f, 80f, Width - 64f);
             _levelUp = MenuUi.Label(t, "Level Up", CMTokens.Display, UiScale.TypeBody, brass, TextAnchor.MiddleLeft, 32f, 164f, 260f, 30f, "", 2f);
             _unlock = MenuUi.Label(t, "Unlock", CMTokens.Ui, UiScale.TypeSmall, cream, TextAnchor.MiddleLeft, 250f, 164f, Width - 282f, 30f, "", 2f);
-            MenuUi.Label(t, "Head Coins", CMTokens.Ui, UiScale.TypeMin, stone, TextAnchor.MiddleRight, 480f, 204f, 110f, 26f, ProgressionWords.Coins, 0f);
+            _headCoins = MenuUi.Label(t, "Head Coins", CMTokens.Ui, UiScale.TypeMin, stone, TextAnchor.MiddleRight, 480f, 204f, 110f, 26f, ProgressionWords.Coins, 0f);
             MenuUi.Label(t, "Head SP", CMTokens.Ui, UiScale.TypeMin, stone, TextAnchor.MiddleRight, 600f, 204f, 128f, 26f, ProgressionWords.Sp, 0f);
             for (int i = 0; i < MaxRows; i++)
             {
@@ -282,7 +288,7 @@ namespace CriticalMass.Runtime.Menu
             rule.OutlinePx = 0f;
             rule.RimPx = 0f;
             MenuUi.Label(t, "Total", CMTokens.Display, UiScale.TypeBody, cream, TextAnchor.MiddleLeft, 32f, 552f, 200f, 40f, "TOTAL", 2f);
-            ProgressionUi.Coin(t, "Total Coin", 440f, 558f, 28f);
+            _totalCoinIcon = ProgressionUi.Coin(t, "Total Coin", 440f, 558f, 28f);
             _totalCoins = MenuUi.Label(t, "Total Coins", CMTokens.Mono, UiScale.TypeBody, brass, TextAnchor.MiddleRight, 470f, 552f, 120f, 40f, "", 2f);
             _totalSp = MenuUi.Label(t, "Total SP", CMTokens.Mono, UiScale.TypeBody, brass, TextAnchor.MiddleRight, 600f, 552f, 128f, 40f, "", 2f);
         }
@@ -297,7 +303,14 @@ namespace CriticalMass.Runtime.Menu
             HudText.Set(_outcome, r.Stats.Completed ? ProgressionWords.Outcome(r.Stats.Outcome) : string.Empty);
             HudText.Set(_levelUp, string.Empty);
             HudText.Set(_unlock, string.Empty);
-            _rowCount = Mathf.Min(MaxRows, r.Lines.Count);
+            // b15 item 4: with coins hidden, a line that paid only coins says nothing, so it is left out with its column
+            bool coins = CriticalMass.Runtime.Hud.DeadSystemViews.CoinsShown();
+            _shownLines.Clear();
+            foreach (RewardLine line in r.Lines) if (coins || line.SkillPoints > 0 || line.Coins <= 0) _shownLines.Add(line);
+            if (_headCoins != null) _headCoins.gameObject.SetActive(coins);
+            if (_totalCoinIcon != null) _totalCoinIcon.gameObject.SetActive(coins);
+            if (_totalCoins != null) _totalCoins.gameObject.SetActive(coins);
+            _rowCount = Mathf.Min(MaxRows, _shownLines.Count);
             for (int i = 0; i < MaxRows; i++)
             {
                 bool on = i < _rowCount;
@@ -307,10 +320,10 @@ namespace CriticalMass.Runtime.Menu
                     for (int k = 0; k < 4; k++) HudText.Set(_cells[i, k], string.Empty);
                     continue;
                 }
-                RewardLine l = r.Lines[i];
+                RewardLine l = _shownLines[i];
                 HudText.Set(_cells[i, 0], ProgressionWords.Source(l.Source));
                 HudText.Set(_cells[i, 1], ProgressionWords.Count(l));
-                HudText.Set(_cells[i, 2], l.Coins > 0 ? "+" + ProgressionUi.Thousands(l.Coins) : "-");
+                HudText.Set(_cells[i, 2], !coins ? string.Empty : l.Coins > 0 ? "+" + ProgressionUi.Thousands(l.Coins) : "-");
                 HudText.Set(_cells[i, 3], l.SkillPoints > 0 ? "+" + ProgressionUi.Thousands(l.SkillPoints) : "-");
             }
             HudText.Set(_totalCoins, "+" + ProgressionUi.Thousands(r.Coins));
@@ -353,17 +366,7 @@ namespace CriticalMass.Runtime.Menu
         }
 
         /// <summary>"Unlocked: HORNED HELM, SUNBURST" for the levels from..to (all classes, at most 3 names).</summary>
-        public static string UnlockLine(int from, int to)
-        {
-            var names = new List<string>();
-            for (int l = from; l <= to; l++)
-                foreach (CosmeticItem it in CosmeticItems.UnlockedAtLevel(l))
-                    if (!names.Contains(it.DisplayName)) names.Add(it.DisplayName);
-            if (names.Count == 0) return string.Empty;
-            int more = names.Count - 3;
-            string s = "Unlocked: " + string.Join(", ", names.GetRange(0, Mathf.Min(3, names.Count)));
-            return more > 0 ? s + " and " + more.ToString(CultureInfo.InvariantCulture) + " more" : s;
-        }
+        public static string UnlockLine(int from, int to) => UnlockHonesty.LevelUpLine(from, to);   // b15 item 6: real looks only
     }
 
     /// <summary>

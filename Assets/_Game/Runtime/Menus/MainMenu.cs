@@ -43,6 +43,8 @@ namespace CriticalMass.Runtime.Menus
         ClassId _shownClass = ClassId.Warrior;
         TeamId _shownTeam = TeamId.Azure;
         Text _primarySub, _rematchNote, _className, _name, _level, _xp, _coins, _record, _tip, _land;
+        /// <summary>b15 item 4: the card's coin diamond (hidden with the count while coins have no sink).</summary>
+        VectorShape _coinIcon;
         VectorShape _xpBar;
         PromptStrip _primaryGlyph, _changeGlyph;
         RawImage _stageImage, _mascot;
@@ -267,6 +269,7 @@ namespace CriticalMass.Runtime.Menus
             VectorShape coin = MenuUi.Shape(space, "Coin", ShapeKind.Diamond, CardX + 28f, CardY + 126f, 26f, 26f, Brass, 4f);
             coin.OutlinePx = 3f;
             coin.RimPx = 0f;
+            _coinIcon = coin;
             _coins = MenuUi.Fit(MenuUi.Label(space, "Coins", CMTokens.Display, UiScale.TypeButton, Cream, TextAnchor.MiddleLeft, CardX + 64f, CardY + 120f, 200f, 38f, "", 3f), 26);
             _record = MenuUi.Label(space, "Record", CMTokens.Ui, UiScale.TypeSmall, CMTokens.WithAlpha(Cream, 0.9f), TextAnchor.MiddleRight, CardX + 240f, CardY + 120f,
                 CardW - 268f, 38f, "", 2f);
@@ -369,7 +372,9 @@ namespace CriticalMass.Runtime.Menus
             _landedForMatch = GameFlow.MatchesStarted;
             _landing = r;
             _landAt = Time.unscaledTime;
-            HudText.Set(_land, "+" + r.Coins + " COINS   ·   +" + r.SkillPoints + " XP" + (r.LevelsGained > 0 ? "   ·   LEVEL UP" : ""));
+            bool coins = CriticalMass.Runtime.Hud.DeadSystemViews.CoinsShown();   // b15 item 4
+            if (!coins && r.SkillPoints <= 0) return;
+            HudText.Set(_land, (coins ? "+" + r.Coins + " COINS   ·   " : string.Empty) + "+" + r.SkillPoints + " XP" + (r.LevelsGained > 0 ? "   ·   LEVEL UP" : ""));
             _land.enabled = true;
             RefreshCard(r.CoinsBefore, r.SkillPointsBefore);
         }
@@ -387,6 +392,9 @@ namespace CriticalMass.Runtime.Menus
             _xpBar.Fill01 = lp.Fraction;
             HudText.Set(_xp, lp.IsMax ? "TOP LEVEL" : NumberCache.Int(lp.Into) + " / " + NumberCache.Int(lp.Needed) + " XP TO LEVEL " + NumberCache.Int(lp.Level + 1));
             HudText.Set(_coins, NumberCache.Int(c));
+            bool coinsOn = CriticalMass.Runtime.Hud.DeadSystemViews.CoinsShown();   // b15 item 4: coins have no sink
+            if (_coins.gameObject.activeSelf != coinsOn) _coins.gameObject.SetActive(coinsOn);
+            if (_coinIcon != null && _coinIcon.gameObject.activeSelf != coinsOn) _coinIcon.gameObject.SetActive(coinsOn);
             HudText.Set(_record, NumberCache.Int(p.MatchesPlayed) + " PLAYED   ·   " + NumberCache.Int(p.Wins) + " WON");
         }
 

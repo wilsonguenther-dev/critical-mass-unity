@@ -45,7 +45,7 @@ namespace CriticalMass.Runtime.Tests
         [Test]
         public void EveryResultsPageStaysInsideTheContentAreaAndItsPanelsNeverOverlap()
         {
-            foreach (ResultsTab tab in new[] { ResultsTab.Summary, ResultsTab.Rewards, ResultsTab.Achievements, ResultsTab.Highlights })
+            foreach (ResultsTab tab in new[] { ResultsTab.Summary, ResultsTab.Story, ResultsTab.Rewards, ResultsTab.Achievements, ResultsTab.Highlights })
             {
                 List<KeyValuePair<string, Rect>> panels = ResultsLayout.Panels(tab, RewardsPanel.Width, RewardsPanel.PanelHeight);
                 Assert.Greater(panels.Count, 0, tab.ToString());
@@ -108,7 +108,7 @@ namespace CriticalMass.Runtime.Tests
             {
                 ResultsScreen r = go.AddComponent<ResultsScreen>();
                 r.EnsureBuilt();
-                foreach (ResultsTab tab in new[] { ResultsTab.Rewards, ResultsTab.Achievements, ResultsTab.Highlights, ResultsTab.Summary })
+                foreach (ResultsTab tab in new[] { ResultsTab.Story, ResultsTab.Rewards, ResultsTab.Achievements, ResultsTab.Highlights, ResultsTab.Summary })
                 {
                     r.ShowTab(tab);
                     Assert.AreEqual(tab, r.ActiveTab);
