@@ -227,7 +227,8 @@ namespace CriticalMass.Runtime.Tests
             int v = 0;
             for (int i = 0; i < 8; i++) { v = ProfileMenuScreen.NextUnlocked(RewardKind.Frame, v, 1, 10); seen.Add(v); }
             P("frame stepper at mastery 10: " + string.Join(",", seen));
-            CollectionAssert.IsSubsetOf(seen, new[] { 0, 1, 2 });
+            foreach (int id in seen) Assert.That(id, Is.InRange(0, 2), "only frames unlocked by mastery 10");
+            CollectionAssert.AreEquivalent(new[] { 0, 1, 2 }, seen.Distinct().ToArray(), "every unlocked frame is reachable");
             Assert.AreEqual(2, ProfileMenuScreen.NextUnlocked(RewardKind.Frame, 0, -1, 10), "left wraps to the last unlocked");
             Assert.AreEqual(0, ProfileMenuScreen.NextUnlocked(RewardKind.Trim, 0, 1, 1), "nothing unlocked yet stays at stock");
         }

@@ -188,16 +188,20 @@ namespace CriticalMass.Runtime.Tests
             var store = new ProfileStore(_dir);
             PlayerProfile p = store.Load();
             p.MasteryOf(ClassId.Miner).Xp = MasteryRules.TotalFor(4);
-            Assert.IsTrue(store.Save(p));
-            string json = File.ReadAllText(store.MainPath);
-            // a hand edit: a level-20 crown frame and a title id that does not exist, on a mastery-4 Miner
-            json = json.Replace("\"Loadouts\": [", "\"Loadouts\": [ { \"Class\": \"Miner\", \"Title\": 99, \"Frame\": 4, \"Trim\": 1, \"Badge\": 2 },");
-            File.WriteAllText(store.MainPath, json);
+            ClassLoadout l0 = p.Loadout(ClassId.Miner);
+            // a hand edit on a mastery-4 Miner: a title id that does not exist, the level-20 crown frame, the level-4 trim
+            // (allowed) and the level-6 emblem; written straight to disk, past the save path's own clean-up
+            l0.Title = 99;
+            l0.Frame = 4;
+            l0.Trim = 1;
+            l0.Badge = 2;
+            File.WriteAllText(store.MainPath, JsonUtility.ToJson(p, true));
             PlayerProfile q = new ProfileStore(_dir).Load();
             ClassLoadout l = q.Loadout(ClassId.Miner);
             P($"hand edit on mastery {q.MasteryOf(ClassId.Miner).Level}: title {l.Title} frame {l.Frame} trim {l.Trim} badge {l.Badge}");
-            Assert.AreEqual(0, l.Title);
-            Assert.AreEqual(0, l.Frame);
+            Assert.AreEqual(4, q.MasteryOf(ClassId.Miner).Level);
+            Assert.AreEqual(0, l.Title, "no such title");
+            Assert.AreEqual(0, l.Frame, "the crown frame unlocks at 20");
             Assert.AreEqual(1, l.Trim, "trim 1 unlocks at 4: kept");
             Assert.AreEqual(0, l.Badge, "emblem 2 unlocks at 6: cleared on a mastery-4 class");
         }

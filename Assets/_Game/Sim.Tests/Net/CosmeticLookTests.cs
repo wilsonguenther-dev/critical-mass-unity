@@ -27,7 +27,7 @@ namespace CriticalMass.Sim.Tests.Net
                 (new CosmeticLook(0, 0, 0, 0, 1), new CosmeticLook(0, 0, 0, 0, 1)),
                 (new CosmeticLook(200, 200, 200, 200, 255), new CosmeticLook(0, 0, 0, 0, CosmeticLook.MaxMastery)),
                 (new CosmeticLook(7, 4, 5, 5, 20), new CosmeticLook(7, 4, 5, 5, 20)),
-                (new CosmeticLook(7, 4, 5, 5, 3), new CosmeticLook(2, 0, 0, 1, 3)),   // title 2 at 3, emblem 1 at 2
+                (new CosmeticLook(7, 4, 5, 5, 3), new CosmeticLook(0, 0, 0, 0, 3)),   // above the mastery: cleared, never swapped
                 (new CosmeticLook(1, 1, 1, 1, 0), new CosmeticLook(1, 0, 0, 0, 1)),   // mastery 0 is held to 1
                 (new CosmeticLook(3, 1, 1, 1, 5), new CosmeticLook(3, 1, 1, 1, 5)),
                 (new CosmeticLook(-5, -1, 999, 1, 2), new CosmeticLook(0, 0, 0, 1, 2)),
