@@ -70,6 +70,8 @@ CBUFFER_START(UnityPerMaterial)
     // (KaijuAnimator sets both through its one property block; 0 on every other material, so nothing else changes).
     half4 _KaijuGlow;
     float _KaijuPattern;
+    // b14 polish (team read from above): share of the team cloth laid over top-facing fixed (code 0) colours.
+    half _TeamTopTint;
 CBUFFER_END
 
 // Outside the per-material block (textures are not CBUFFER members; SRP Batcher compatible).
@@ -407,6 +409,17 @@ half3 CMToonFog(half3 color, float3 positionWS)
     float f = _FogAmount * saturate((_FogTop - positionWS.y) / max(1e-3, _FogTop - _FogBottom));
     if (f <= 0.0) return color;
     return lerp(color, CMTodFogColor(_FogColor.rgb, positionWS, (half)f), f);
+}
+
+// b14 polish (team read from above): a top-facing fixed-colour pixel (vertex-colour mode, code 0) mixed _TeamTopTint
+// toward the team cloth, ramping in from N.y 0.70 to 0.86 (head and helmet tops, shoulders, pack lids; never faces or
+// sides). Team channels, glows and the textured pilots are untouched.
+half3 CMToonTeamTop(half3 albedo, half4 col, float3 normalWS)
+{
+    if (_TeamTopTint <= 0.0h || _ColorMode < 0.5) return albedo;
+    if (CMToonMaskCode(col.a) != 0) return albedo;
+    half t = _TeamTopTint * (half)smoothstep(0.70, 0.86, normalWS.y);
+    return lerp(albedo, _TeamCloth.rgb, t);
 }
 
 // b14 polish: the Kaiju type glow. A soft fresnel band (wider and softer than the hard team rim, inside it) and a pattern
