@@ -26,7 +26,8 @@ namespace CriticalMass.Runtime.View.Effects
         private static (string Id, string[] Files)[] BuildTable()
         {
             var rows = new List<(string, string[])>();
-            foreach (CueDef c in SoundTable.Cues) if (c.Files.Length > 0) rows.Add((c.Id, c.Files));
+            // b15: the original Skybreak effects (sb_*, Resources CMSfxScore) are not library files
+            foreach (CueDef c in SoundTable.Cues) if (c.Files.Length > 0 && !SoundTable.IsScoreFile(c.Files[0])) rows.Add((c.Id, c.Files));
             return rows.ToArray();
         }
 

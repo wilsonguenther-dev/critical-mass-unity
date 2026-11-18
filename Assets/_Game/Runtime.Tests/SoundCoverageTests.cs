@@ -28,7 +28,12 @@ namespace CriticalMass.Runtime.Tests
             {
                 Assert.IsTrue(ids.Add(c.Id), "duplicate cue " + c.Id);
                 Assert.Greater(c.Files.Length + c.Synth.Length, 0, c.Id + " has no sound");
-                foreach (string f in c.Files) StringAssert.Contains("\"" + f + ".ogg\"", credited, c.Id + ": " + f + " is a credited CC0 file");
+                foreach (string f in c.Files)
+                {
+                    // b15: sb_* are the original Skybreak effects (Resources CMSfxScore), generated in the repo, not library files
+                    if (SoundTable.IsScoreFile(f)) Assert.IsNotNull(UnityEngine.Resources.Load<UnityEngine.AudioClip>(SoundDirector.ScoreSfxFolder + "/" + f), c.Id + ": " + f + " is under Resources/" + SoundDirector.ScoreSfxFolder);
+                    else StringAssert.Contains("\"" + f + ".ogg\"", credited, c.Id + ": " + f + " is a credited CC0 file");
+                }
                 foreach (string s in c.Synth) Assert.IsNotNull(SynthRecipes.Find(s), c.Id + ": recipe " + s);
                 if (c.Layer != null) Assert.GreaterOrEqual(SoundTable.IndexOf(c.Layer), 0, c.Id + " layer " + c.Layer);
                 if (c.FarCue != null) Assert.GreaterOrEqual(SoundTable.IndexOf(c.FarCue), 0, c.Id + " far cue " + c.FarCue);
