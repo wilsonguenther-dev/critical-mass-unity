@@ -149,7 +149,7 @@ namespace CriticalMass.Runtime.View.Atmosphere
             if (level != _builtFor) Build(level);
             WorldView wv = FindPlanOwner();
             if (wv != null && wv.Plan != _plan) CollectAnchors();
-            Camera cam = Camera.main;
+            UnityEngine.Camera cam = UnityEngine.Camera.main;
             if (cam == null || _mat == null) return;
             Vector3 focus = Focus(cam);
             float dt = Mathf.Min(Time.deltaTime, 0.1f);
@@ -170,7 +170,7 @@ namespace CriticalMass.Runtime.View.Atmosphere
             return _wv;
         }
 
-        static Vector3 Focus(Camera cam)
+        static Vector3 Focus(UnityEngine.Camera cam)
         {
             Transform t = cam.transform;
             Vector3 f = t.forward;

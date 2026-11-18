@@ -46,7 +46,7 @@ namespace CriticalMass.Runtime.View.Atmosphere
         Bloom _bloom;
         Grade _shown;
         bool _hasShown;
-        Camera _cam;
+        UnityEngine.Camera _cam;
 
         void OnEnable()
         {
@@ -78,7 +78,7 @@ namespace CriticalMass.Runtime.View.Atmosphere
             _profile = null;
         }
 
-        static void SetCameraPost(Camera cam, bool on)
+        static void SetCameraPost(UnityEngine.Camera cam, bool on)
         {
             UniversalAdditionalCameraData data = cam.GetUniversalAdditionalCameraData();
             if (data != null && data.renderPostProcessing != on) data.renderPostProcessing = on;
@@ -87,7 +87,7 @@ namespace CriticalMass.Runtime.View.Atmosphere
         void LateUpdate()
         {
             WorldLookBudgets.AirTier tier = WorldLookBudgets.For(RenderTier.Level);
-            Camera cam = Camera.main;
+            UnityEngine.Camera cam = UnityEngine.Camera.main;
             if (cam != _cam && _cam != null) SetCameraPost(_cam, false);
             _cam = cam;
             bool hdr = cam != null && cam.allowHDR && GraphicsSettings.currentRenderPipeline is UniversalRenderPipelineAsset u && u.supportsHDR;

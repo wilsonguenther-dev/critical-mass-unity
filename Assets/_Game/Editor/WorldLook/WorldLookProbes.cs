@@ -92,8 +92,8 @@ namespace CriticalMass.Editor.WorldLook
             const int W = 1920, H = 1080;
             MapDef map = d.World.Map;
             var go = new GameObject("b15 value probe camera");
-            Camera c = go.AddComponent<Camera>();
-            Camera main = Camera.main;
+            UnityEngine.Camera c = go.AddComponent<UnityEngine.Camera>();
+            UnityEngine.Camera main = UnityEngine.Camera.main;
             if (main != null) c.CopyFrom(main);
             c.fieldOfView = 35f;
             c.targetTexture = new RenderTexture(W, H, 24, RenderTextureFormat.ARGB32) { antiAliasing = 1 };
@@ -190,7 +190,7 @@ namespace CriticalMass.Editor.WorldLook
 
         static double L(Color32 c) => (0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b) / 255.0;
 
-        static Color32[] Grab(Camera c)
+        static Color32[] Grab(UnityEngine.Camera c)
         {
             RenderTexture rt = c.targetTexture;
             c.Render();
@@ -253,7 +253,7 @@ namespace CriticalMass.Editor.WorldLook
                 _sp.Add(_setPass.LastValue); _dc.Add(_draws.LastValue); _gcb.Add(_gc.LastValue); _sc.Add(_casters.LastValue); _tr.Add(_tris.LastValue);
                 if (_hatchFrame >= 0 && Time.frameCount > _hatchFrame && ms > 33.0) _over33AfterHatch++;
                 if (--_left > 0) return;
-                var cam = Camera.main;
+                var cam = UnityEngine.Camera.main;
                 var data = cam != null ? cam.GetUniversalAdditionalCameraData() : null;
                 var urp = GraphicsSettings.currentRenderPipeline as UniversalRenderPipelineAsset;
                 var lines = new List<string>
@@ -303,7 +303,7 @@ namespace CriticalMass.Editor.WorldLook
 
             void LateUpdate()
             {
-                Camera cam = Camera.main;
+                UnityEngine.Camera cam = UnityEngine.Camera.main;
                 ActorViews av = UnityEngine.Object.FindAnyObjectByType<ActorViews>();
                 float dt = Time.deltaTime;
                 if (cam != null && av != null && dt > 0f)
