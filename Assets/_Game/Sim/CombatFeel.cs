@@ -22,6 +22,9 @@ namespace CriticalMass.Sim.Core
         public int[] SlowUntil;
         /// <summary>Last tick of the Miner's SUNDER on this actor.</summary>
         public int[] SunderUntil;
+        /// <summary>The tick of the last landed melee strike on this actor and who struck it (-1 none). Read by the view only
+        /// (GroundView keeps the victim of your own hit out of the see-through dither); never read by the sim.</summary>
+        public int[] StruckTick, StruckBy;
         /// <summary>Ticks in a row this actor has been staggered (HitStunTicks above 0) and the longest such run this match.</summary>
         public int[] LockRun;
         public int MaxLockRun;
@@ -47,6 +50,8 @@ namespace CriticalMass.Sim.Core
                 ImmuneUntil = new int[cap],
                 SlowUntil = new int[cap],
                 SunderUntil = new int[cap],
+                StruckTick = new int[cap],
+                StruckBy = new int[cap],
                 LockRun = new int[cap],
                 Ladder = new byte[cells],
                 LadderCells = new int[cells],
@@ -66,6 +71,8 @@ namespace CriticalMass.Sim.Core
                 ImmuneUntil[i] = CombatFeel.NoTick;
                 SlowUntil[i] = CombatFeel.NoTick;
                 SunderUntil[i] = CombatFeel.NoTick;
+                StruckTick[i] = CombatFeel.NoTick;
+                StruckBy[i] = -1;
                 LockRun[i] = 0;
             }
             for (int k = 0; k < LadderCount; k++) Ladder[LadderCells[k]] = 0;
@@ -194,7 +201,7 @@ namespace CriticalMass.Sim.Core
             if (immune) return 0;
             bool heavy = amount >= w.Config.Class(t.Cls).Poise;
             // Armour break: a SUNDERED body (a Miner hit it in the last SunderSeconds) loses its armoured wind-up.
-            if (!heavy && t.SwingPending && f.Strikes[(int)t.Cls].ArmouredWindup && w.Tick >= s.SunderUntil[target])
+            if (!heavy && t.SwingPending && f.Strikes[(int)t.Cls].ArmouredWindup && w.Tick > s.SunderUntil[target])
             {
                 armoured = true;
                 return 0;
@@ -220,6 +227,8 @@ namespace CriticalMass.Sim.Core
             CombatFeelState s = w.Depth.Feel;
             Actor src = w.Actors[source];
             Actor t = w.Actors[target];
+            s.StruckTick[target] = w.Tick;
+            s.StruckBy[target] = source;
             Knock.Dir(w, target, srcX, srcZ, JsMath.Cos(src.SwingFacing), JsMath.Sin(src.SwingFacing), out double dx, out double dz);
             int stun = StaggerFor(w, target, amount, out bool armoured, out bool immune);
             bool onLadder = OnLadder(w, target);

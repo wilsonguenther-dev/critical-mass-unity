@@ -120,8 +120,6 @@ namespace CriticalMass.Runtime.Camera
         static readonly int FadeKeepId = Shader.PropertyToID("_CMFadeKeep");
         /// <summary>How long (real seconds) a fighter you hit stays solid inside the see-through line, and the kept sphere.</summary>
         public const float HitKeepSeconds = 0.35f, HitKeepRadius = 1.15f;
-        int _keepActor = -1, _keepHead = -1;
-        float _keepUntil;
         bool _keepSet;
         double _inputYaw = 315;
         float _sens = 1f;
@@ -620,33 +618,34 @@ namespace CriticalMass.Runtime.Camera
             ViewCull.SetFollowLine(_chest + new Vector3(0f, 0.35f, 0f), on);
         }
 
-        /// <summary>b15: scan the events since the last frame for a hit by the local seat; keep its victim solid HitKeepSeconds.</summary>
+        /// <summary>b15: the fighter the local seat struck last (CombatFeelState.StruckBy / StruckTick, sim state the view reads;
+        /// no World.Events reader) stays solid HitKeepSeconds after the strike.</summary>
         void SetHitKeep()
         {
             World w = Driver != null ? Driver.World : null;
-            if (w == null) return;
-            int me = LocalSeat.Actor;
-            if (_keepHead < 0 || w.EventHead < _keepHead || w.EventHead - _keepHead > World.EventCapacity) _keepHead = w.EventHead;
-            for (; _keepHead < w.EventHead; _keepHead++)
+            CombatFeelState fs = w != null && w.Depth != null ? w.Depth.Feel : null;
+            bool keep = false;
+            if (fs != null && CombatFeel.On(w))
             {
-                SimEvent e = w.Events[_keepHead % World.EventCapacity];
-                if (e.Type == SimEventType.Hit && e.B == me && e.A >= 0 && e.A < w.ActorCount && e.A != me)
+                int me = LocalSeat.Actor, best = -1, bestTick = CombatFeel.NoTick;
+                int window = Math.Max(1, CombatFeel.Ticks(w, HitKeepSeconds));
+                for (int i = 0; i < w.ActorCount && i < fs.StruckBy.Length; i++)
+                    if (i != me && fs.StruckBy[i] == me && fs.StruckTick[i] > bestTick && w.Tick - fs.StruckTick[i] <= window && w.Actors[i].Alive)
+                    {
+                        best = i;
+                        bestTick = fs.StruckTick[i];
+                    }
+                if (best >= 0)
                 {
-                    _keepActor = e.A;
-                    _keepUntil = Time.unscaledTime + HitKeepSeconds;
+                    double a = Driver.Alpha;
+                    double x = w.PrevX[best] + (w.X[best] - w.PrevX[best]) * a, z = w.PrevZ[best] + (w.Z[best] - w.PrevZ[best]) * a;
+                    Vector3 c = SimSpace.ToWorld(x, GroundHeight.At(w.Map, x, z) + 0.9, z);
+                    Shader.SetGlobalVector(FadeKeepId, new Vector4(c.x, c.y, c.z, HitKeepRadius));
+                    _keepSet = true;
+                    keep = true;
                 }
             }
-            bool keep = _keepActor >= 0 && _keepActor < w.ActorCount && Time.unscaledTime < _keepUntil && w.Actors[_keepActor].Alive;
-            if (keep)
-            {
-                double a = Driver.Alpha;
-                int t = _keepActor;
-                double x = w.PrevX[t] + (w.X[t] - w.PrevX[t]) * a, z = w.PrevZ[t] + (w.Z[t] - w.PrevZ[t]) * a;
-                Vector3 c = SimSpace.ToWorld(x, GroundHeight.At(w.Map, x, z) + 0.9, z);
-                Shader.SetGlobalVector(FadeKeepId, new Vector4(c.x, c.y, c.z, HitKeepRadius));
-                _keepSet = true;
-            }
-            else if (_keepSet)
+            if (!keep && _keepSet)
             {
                 Shader.SetGlobalVector(FadeKeepId, Vector4.zero);
                 _keepSet = false;
