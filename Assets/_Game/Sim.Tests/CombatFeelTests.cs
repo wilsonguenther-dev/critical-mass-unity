@@ -329,7 +329,7 @@ namespace CriticalMass.Sim.Tests
             Console.WriteLine("{\"item\":\"b15 whiff\",\"recovery\":" + a.SwingRecovery + ",\"expected\":" + (w.Dur.Recovery[0] + whiff) + ",\"cdS\":" + a.AttackCd.ToString("0.000") + "}");
             Assert.AreEqual(w.Dur.Recovery[0] + whiff, a.SwingRecovery, "whiff recovery");
             Assert.AreEqual(1, w.Depth.Feel.Whiffs);
-            Assert.Less(CombatFeel.SpeedScale(w, 0), 1, "slowed in recovery");
+            Assert.AreEqual(w.Config.Depth.CombatFeel.RecoveryMoveMultiplier, CombatFeel.SpeedScale(w, 0), 1e-9, "recovery move speed is the config's");
         }
 
         // ------------------------------------------------------------------------------------------------ B. hit reactions
@@ -719,7 +719,7 @@ namespace CriticalMass.Sim.Tests
         [Test]
         public void ShiverFlagsOfTheGateMatchByPartOfTheRule()
         {
-            string[] names = { "off", "on", "on, raw step in narrow spots", "on, no stagger or knock", "on, shipped wind-ups", "on, no move slow in swings" };
+            string[] names = { "off", "on", "on, raw step in narrow spots", "on, no stagger or knock", "on, shipped wind-ups", "on, move slow 0.6/0.55/0.6 in swings" };
             for (int a = 0; a < names.Length; a++)
             {
                 GameConfig cfg = GameConfig.CreateDefault();
@@ -744,9 +744,9 @@ namespace CriticalMass.Sim.Tests
                 }
                 if (a == 5)
                 {
-                    f.WindupMoveMultiplier = 1;
-                    f.RecoveryMoveMultiplier = 1;
-                    f.StaggerSlowMultiplier = 1;
+                    f.WindupMoveMultiplier = 0.6;
+                    f.RecoveryMoveMultiplier = 0.55;
+                    f.StaggerSlowMultiplier = 0.6;
                 }
                 World w = World.CreateWorld(new WorldOptions { Seed = 7, TeamSize = 16, HumanTeam = TeamId.Azure, HumanClass = ClassId.Warrior, Config = cfg });
                 var watch = new ShiverWatch();

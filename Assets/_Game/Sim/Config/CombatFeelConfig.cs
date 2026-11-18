@@ -100,8 +100,10 @@ namespace CriticalMass.Sim.Config
         /// <summary>An attack press this early (real seconds) before it could be accepted fires on the first tick it can.</summary>
         public double BufferSeconds = 0.20;
         /// <summary>Move speed while winding up and while recovering (no skating swings; the shipped physics value is 1.0).</summary>
-        public double WindupMoveMultiplier = 0.6;
-        public double RecoveryMoveMultiplier = 0.55;
+        /// OWNER FEEL-TEST: 1.0 (no slow) by default. At 0.6 / 0.55 (with StaggerSlowMultiplier 0.6) the bots' fight strafing
+        /// turned into back-and-forth on the hill (shiver gate: 37 hard flags at 0.6/0.55/0.6, 0 at 1/1/1, sim run 44237698220).
+        public double WindupMoveMultiplier = 1.0;
+        public double RecoveryMoveMultiplier = 1.0;
         /// <summary>Extra recovery (real seconds) after a swing that hit nothing: the whiff is punishable.</summary>
         public double WhiffRecoverySeconds = 0.15;
 
@@ -118,7 +120,7 @@ namespace CriticalMass.Sim.Config
         public double StaggerImmuneSeconds = 0.8;
         /// <summary>After a stagger the victim moves at StaggerSlowMultiplier for StaggerSlowSeconds.</summary>
         public double StaggerSlowSeconds = 0.30;
-        public double StaggerSlowMultiplier = 0.6;
+        public double StaggerSlowMultiplier = 1.0; // OWNER FEEL-TEST: 0.6 slows after a stagger (see WindupMoveMultiplier)
 
         // ---- C. class extras
         public double FarmerCloseRange = 1.2;
