@@ -14,7 +14,7 @@ namespace CriticalMass.Sim.Core
         /// <summary>Per team: the tick the team first earned RALLY credit (-1 never; the announcer's one line).</summary>
         public readonly int[] FirstTick = { -1, -1 };
         /// <summary>Per team: ticks of unbroken hill ownership (HOLD FATIGUE).</summary>
-        public readonly int[] HoldTicks = new int[2];
+        public readonly int[] HoldStreak = new int[2];
         /// <summary>The team (0 Azure, 1 Crimson) that knocked a sided Kaiju down and gets it at the get-up; -1 none (TURNCOAT).</summary>
         public int KoTeam = -1;
         /// <summary>Times the Kaiju turned this match (TURNCOAT; tests and the HUD).</summary>
@@ -29,8 +29,8 @@ namespace CriticalMass.Sim.Core
             Array.Clear(Earning, 0, 2);
             FirstTick[0] = -1;
             FirstTick[1] = -1;
-            HoldTicks[0] = 0;
-            HoldTicks[1] = 0;
+            HoldStreak[0] = 0;
+            HoldStreak[1] = 0;
             KoTeam = -1;
             Turns = 0;
         }
@@ -180,12 +180,12 @@ namespace CriticalMass.Sim.Core
             if (!On(w) || !w.Config.Depth.Comeback.HoldFatigueOn) return 1.0;
             ComebackState s = w.Rally;
             int owner = next == HillState.Azure ? 0 : next == HillState.Crimson ? 1 : -1;
-            for (int t = 0; t < 2; t++) s.HoldTicks[t] = t == owner ? s.HoldTicks[t] + 1 : 0;
+            for (int t = 0; t < 2; t++) s.HoldStreak[t] = t == owner ? s.HoldStreak[t] + 1 : 0;
             if (owner < 0) return 1.0;
             ComebackConfig k = w.Config.Depth.Comeback;
             double hz = w.Config.SimHz;
             long grace = Ticks(k.HoldGraceSeconds, hz), span = Math.Max(1L, Ticks(k.HoldSpanSeconds, hz));
-            long over = Math.Min(span, Math.Max(0L, s.HoldTicks[owner] - grace));
+            long over = Math.Min(span, Math.Max(0L, s.HoldStreak[owner] - grace));
             int min = Math.Max(0, Math.Min(1000, k.HoldMinPerMille));
             long milli = 1000 - (1000 - min) * over / span;
             return milli / 1000.0;
@@ -198,7 +198,7 @@ namespace CriticalMass.Sim.Core
             ComebackConfig k = w.Config.Depth.Comeback;
             double hz = w.Config.SimHz;
             long grace = Ticks(k.HoldGraceSeconds, hz), span = Math.Max(1L, Ticks(k.HoldSpanSeconds, hz));
-            long over = Math.Min(span, Math.Max(0L, w.Rally.HoldTicks[(int)team] - grace));
+            long over = Math.Min(span, Math.Max(0L, w.Rally.HoldStreak[(int)team] - grace));
             int min = Math.Max(0, Math.Min(1000, k.HoldMinPerMille));
             return (1000 - (1000 - min) * over / span) / 1000.0;
         }

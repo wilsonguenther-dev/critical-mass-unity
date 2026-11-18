@@ -65,8 +65,8 @@ namespace CriticalMass.Net
             {
                 Mix(ref h, w.Rally.BonusMilli[0]);
                 Mix(ref h, w.Rally.BonusMilli[1]);
-                Mix(ref h, w.Rally.HoldTicks[0]);
-                Mix(ref h, w.Rally.HoldTicks[1]);
+                Mix(ref h, w.Rally.HoldStreak[0]);
+                Mix(ref h, w.Rally.HoldStreak[1]);
                 Mix(ref h, w.Rally.KoTeam);
                 Mix(ref h, w.Rally.Turns);
             }
