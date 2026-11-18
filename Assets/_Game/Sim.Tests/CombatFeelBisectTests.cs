@@ -18,23 +18,14 @@ namespace CriticalMass.Sim.Tests
     [TestFixture]
     public sealed class CombatFeelBisectTests
     {
-        private static void Pass1Rows(CombatFeelConfig f)
-        {
-            ClassConfig wr = f.Classes[(int)ClassId.Warrior], mn = f.Classes[(int)ClassId.Miner], dm = f.Classes[(int)ClassId.Demolitions];
-            wr.AttackDamage = 27; wr.MaxHp = 160; wr.AttackCooldown = 1.05;
-            mn.AttackDamage = 12; mn.MaxHp = 120; mn.AttackCooldown = 0.55;
-            dm.AttackCooldown = 0.80;
-            f.SunderDamageTaken = 0.25;
-            f.StaggerMaxLockSeconds = 99;
-        }
-
-        private static readonly string[] ArmNames = { "current", "side-step off", "pass-1 rows, no cap", "pass-1 rows, no cap, side-step off" };
+        private static readonly string[] ArmNames = { "side-step everywhere", "side-step off", "no side-step within 6 u of the Kaiju", "no side-step near the Kaiju or on the hill" };
 
         private static void Arm(int arm, GameConfig c)
         {
             CombatFeelConfig f = c.Depth.CombatFeel;
-            if (arm >= 2) Pass1Rows(f);
-            if (arm == 1 || arm == 3) f.BotUnjam = false;
+            f.BotUnjam = arm != 1;
+            f.BotUnjamKaijuClear = arm >= 2 ? 6 : 0;
+            f.BotUnjamHillClear = arm == 3 ? 1 : -1;
         }
 
         [Test]
@@ -44,7 +35,7 @@ namespace CriticalMass.Sim.Tests
             for (int arm = 0; arm < ArmNames.Length; arm++)
             {
                 double onSum = 0;
-                int used = 0, worstLock = 0;
+                int used = 0, worstLock = 0, anyRun = 0;
                 string worstLockAt = "";
                 var kills = new double[6];
                 double allKills = 0;
@@ -60,6 +51,11 @@ namespace CriticalMass.Sim.Tests
                     int n = w.ActorCount, head = w.EventHead, offTarget = 0, offNoTarget = 0;
                     var lk = new int[n];
                     var causes = new int[n];
+                    var sx = new double[n];
+                    var sz = new double[n];
+                    var sat = new int[n];
+                    int stuck = 0;
+                    for (int i = 0; i < n; i++) sat[i] = -1;
                     SimProfile.ResetCounters();
                     for (int t = 0; t < 14400 && w.Match.Phase == MatchPhase.Playing; t++)
                     {
@@ -75,6 +71,24 @@ namespace CriticalMass.Sim.Tests
                                 if (inHill) onHill += dt;
                                 else if (k.TargetId >= 0) offTarget++;
                                 else offNoTarget++;
+                            }
+                        }
+                        for (int i = 0; i < n; i++)
+                        {
+                            Actor sa = w.Actors[i];
+                            InputFrame sf = w.Inputs[i];
+                            bool pressing = sa.Alive && sa.StandUp <= 0 && sf.MoveX * sf.MoveX + sf.MoveZ * sf.MoveZ > 0.01;
+                            double ddx = w.X[i] - sx[i], ddz = w.Z[i] - sz[i];
+                            if (!pressing || sat[i] < 0 || ddx * ddx + ddz * ddz >= 0.16)
+                            {
+                                sx[i] = w.X[i];
+                                sz[i] = w.Z[i];
+                                sat[i] = pressing ? w.Tick : -1;
+                            }
+                            else if (w.Tick - sat[i] >= 90)
+                            {
+                                stuck++;
+                                sat[i] = -1;
                             }
                         }
                         for (int i = 0; i < n; i++)
@@ -106,6 +120,7 @@ namespace CriticalMass.Sim.Tests
                             if (e.B >= 0 && e.B < n) kills[(int)w.Actors[e.B].Cls]++;
                         }
                     }
+                    if (w.Depth.Feel.MaxLockRun > anyRun) anyRun = w.Depth.Feel.MaxLockRun;
                     proofs.Add(seed + ":" + SimProfile.RouteProofs + "/" + SimProfile.RouteMemoHits);
                     if (owned > 60)
                     {
@@ -114,7 +129,7 @@ namespace CriticalMass.Sim.Tests
                     }
                     Console.WriteLine("{\"item\":\"b15 bisect match\",\"arm\":\"" + ArmNames[arm] + "\",\"seed\":" + seed + ",\"ownedS\":" + owned.ToString("0") +
                                       ",\"onShare\":" + (owned > 0 ? onHill / owned : 0).ToString("0.000") + ",\"offWithTarget\":" + (offTarget * dt).ToString("0") +
-                                      ",\"offNoTarget\":" + (offNoTarget * dt).ToString("0") + ",\"routeProofs\":" + SimProfile.RouteProofs + ",\"memoHits\":" + SimProfile.RouteMemoHits + "}");
+                                      ",\"offNoTarget\":" + (offNoTarget * dt).ToString("0") + ",\"routeProofs\":" + SimProfile.RouteProofs + ",\"memoHits\":" + SimProfile.RouteMemoHits + ",\"stuck\":" + stuck + "}");
                 }
                 int idle5 = 0;
                 int a5 = arm;
@@ -123,7 +138,7 @@ namespace CriticalMass.Sim.Tests
                 var ks = new System.Text.StringBuilder();
                 for (int c = 0; c < 6; c++) ks.Append((ClassId)c).Append('=').Append((kills[c] / Math.Max(1, allKills)).ToString("0.000")).Append(' ');
                 Console.WriteLine("{\"item\":\"b15 bisect arm\",\"arm\":\"" + ArmNames[arm] + "\",\"kaijuOnShareMean\":" + (used > 0 ? onSum / used : 0).ToString("0.000") +
-                                  ",\"seedsUsed\":" + used + ",\"routeProofs\":\"" + string.Join(" ", proofs) + "\",\"longestMeleeLockTicks\":" + worstLock +
+                                  ",\"seedsUsed\":" + used + ",\"routeProofs\":\"" + string.Join(" ", proofs) + "\",\"longestMeleeLockTicks\":" + worstLock + ",\"longestAnyStunRunTicks\":" + anyRun +
                                   ",\"worstLock\":\"" + worstLockAt + "\",\"idle5v5AzureWinsOf200\":" + idle5 + ",\"killShares\":\"" + ks + "\"}");
             }
             Assert.Pass();

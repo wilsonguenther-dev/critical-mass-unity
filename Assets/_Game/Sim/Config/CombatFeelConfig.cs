@@ -121,8 +121,15 @@ namespace CriticalMass.Sim.Config
         /// <summary>No stun-lock: a run of melee staggers (each new one landing before the last ends) never lasts longer than
         /// this (real seconds); a hit that would extend it past the cap is clipped and gives StaggerImmuneSeconds at once.</summary>
         public double StaggerMaxLockSeconds = 0.4;
+        /// <summary>Pass 3: no stun from any source (melee, Kaiju, blast) carries one unbroken stagger run past this; a stun that
+        /// lands inside a run is shortened to fit (Knock.Push). StaggerMaxLockSeconds caps the melee share inside it.</summary>
+        public double StaggerChainCapSeconds = 0.5;
         /// <summary>Bots side-step when jammed (BotSteer.Unjam). False = the FSM's own unstick only.</summary>
         public bool BotUnjam = true;
+        /// <summary>No side-step within this many u of the Kaiju (0 = no such rule).</summary>
+        public double BotUnjamKaijuClear = 0;
+        /// <summary>No side-step within the hill disc grown by this many u (negative = no such rule).</summary>
+        public double BotUnjamHillClear = -1;
         /// <summary>After a stagger the victim moves at StaggerSlowMultiplier for StaggerSlowSeconds.</summary>
         public double StaggerSlowSeconds = 0.30;
         public double StaggerSlowMultiplier = 1.0; // OWNER FEEL-TEST: 0.6 slows after a stagger (see WindupMoveMultiplier)

@@ -465,6 +465,20 @@ namespace CriticalMass.Sim.Bots
             st.JamZ[id] = z;
             st.JamTick[id] = w.Tick;
             if (ex * ex + ez * ez >= want * want) return false;
+            // b15 pass 3: no side-step against the Kaiju or on the hill disc. Side-stepping there walked the hill crowd off the disc,
+            // dragged the Kaiju's chase off the hill (KaijuHill on-disc share 0.03) and re-asked the route guard (RouteProofs).
+            CombatFeelConfig fc = w.Config.Depth.CombatFeel;
+            if (fc.BotUnjamKaijuClear > 0 && w.Match.Hatched && w.Kaiju.State != KaijuState.Egg)
+            {
+                double kx = w.Kaiju.X - x, kz = w.Kaiju.Z - z;
+                if (kx * kx + kz * kz <= fc.BotUnjamKaijuClear * fc.BotUnjamKaijuClear) return false;
+            }
+            if (fc.BotUnjamHillClear >= 0)
+            {
+                HillDef h = w.Map.Hill;
+                double hx = h.X - x, hz = h.Z - z, hr = h.R + fc.BotUnjamHillClear;
+                if (hx * hx + hz * hz <= hr * hr) return false;
+            }
             double inv = 1 / Math.Sqrt(m2);
             mx *= inv;
             mz *= inv;
