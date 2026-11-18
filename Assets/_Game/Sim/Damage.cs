@@ -137,7 +137,7 @@ namespace CriticalMass.Sim.Core
             {
                 t.Hp = 0;
                 t.Alive = false;
-                t.RespawnIn = w.Config.Respawn.DelaySeconds;
+                t.RespawnIn = Comeback.RespawnDelay(w, t.Team);   // b15-hook: the respawn curve and QUICK RETURN (exactly DelaySeconds with both b15 rules off)
                 t.Deaths++;
                 if (fromActor) w.Actors[sourceId].Kills++;
                 // Cargo is lost (no dropped orb in the demo). CM-28: what was lost is recorded for the respawn card and the toast.

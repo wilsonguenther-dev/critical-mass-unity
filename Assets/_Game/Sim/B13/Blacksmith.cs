@@ -107,6 +107,7 @@ namespace CriticalMass.Sim.Core
         public static double StatScale(World w, TeamId team)
         {
             if (!On(w)) return 1.0;
+            if (HutChoices.FlatOff(w.Config)) return 1.0; // b15 rule B: the levels give side-grades instead of the flat bump
             int l = w.Hut.Level[(int)team];
             return l <= 0 ? 1.0 : 1 + w.Config.Depth.Hut.StatPerLevel * l;
         }
@@ -115,7 +116,7 @@ namespace CriticalMass.Sim.Core
         public static double MaxHpAt(GameConfig c, ClassId cls, int level)
         {
             double b = c.Class(cls).MaxHp;
-            if (level <= 0) return b;
+            if (level <= 0 || HutChoices.FlatOff(c)) return b; // b15 rule B: no flat HP bump with the hut choices on
             return Math.Floor(b * (1 + c.Depth.Hut.StatPerLevel * level) + 0.5);
         }
 
@@ -138,10 +139,17 @@ namespace CriticalMass.Sim.Core
         public static double ChannelPhase(World w, int id)
         {
             if (ChannelVein(w, id) < 0) return -1;
-            return Math.Min(1.0, (double)w.Hut.ChannelTicks[id] / MineTicks(w.Config));
+            return Math.Min(1.0, (double)w.Hut.ChannelTicks[id] / MineTicksFor(w, w.Actors[id].Team));
         }
 
         public static int MineTicks(GameConfig c) => Math.Max(1, Durations.T30(c, c.Depth.Hut.MineTicks));
+
+        /// <summary>b15 rule B: the team's mining channel in ticks (RICH VEINS shortens it; MineTicks with the rule off).</summary>
+        public static int MineTicksFor(World w, TeamId team)
+        {
+            double s = HutChoices.MineScale(w, team);
+            return s == 1.0 ? MineTicks(w.Config) : Math.Max(1, Durations.T30(w.Config, w.Config.Depth.Hut.MineTicks * s));
+        }
 
         /// <summary>Ore actor id carries (0 when its cargo is another kind).</summary>
         public static int OreOf(Actor a) => a.Carry == CarryKind.Ore ? a.CarryAmount : 0;
@@ -328,7 +336,8 @@ namespace CriticalMass.Sim.Core
                 PadField(w, TeamId.Azure);
                 PadField(w, TeamId.Crimson);
             }
-            int need = MineTicks(w.Config);
+            // b15 rule B RICH VEINS: the team's channel is shorter (exactly MineTicks with the rule off)
+            int needAzure = MineTicksFor(w, TeamId.Azure), needCrimson = MineTicksFor(w, TeamId.Crimson);
             int cap = (int)w.Config.Depth.Hut.OreCarry;
             int top = MaxLevel(w.Config);
             int n = w.ActorCount;
@@ -363,7 +372,7 @@ namespace CriticalMass.Sim.Core
                     h.ChannelTicks[id] = 0; // a hit restarts the channel (Sources' gather rule)
                     continue;
                 }
-                if (++h.ChannelTicks[id] < need) continue;
+                if (++h.ChannelTicks[id] < (a.Team == TeamId.Azure ? needAzure : needCrimson)) continue;
                 s.Charges -= 1;
                 a.Carry = CarryKind.Ore;
                 a.CarryAmount += 1;
@@ -373,6 +382,7 @@ namespace CriticalMass.Sim.Core
                 World.PushEvent(w, SimEventType.OreMined, id, v, s.X, s.Z, a.CarryAmount, BiomassType.Ore, DamageCause.None);
                 if (a.CarryAmount >= cap || s.Charges <= 0) Cancel(h, id);
             }
+            HutChoices.VoteSystem(w);   // b15-hook: rule B, the team votes on each hut level (nothing with the rule off)
         }
     }
 

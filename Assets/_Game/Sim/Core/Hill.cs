@@ -40,10 +40,22 @@ namespace CriticalMass.Sim.Core
             if (azure == 0 && crimson == 0) next = HillState.Neutral;
             else if (azure > crimson) next = HillState.Azure;
             else if (crimson > azure) next = HillState.Crimson;
-            else next = HillState.Contested;
+            else
+            {
+                // b15 rule B HILL ANCHOR: with equal bodies on the hill, the one team holding it owns the hill (0 = contested)
+                int anchor = HutChoices.AnchorTie(w);   // b15-hook
+                next = anchor == 1 ? HillState.Azure : anchor == 2 ? HillState.Crimson : HillState.Contested;
+            }
 
+            // b15 rule A RALLY: the trailing owner's extra credit, read before this tick's seconds are added (0 with the rule off)
+            double rally = Comeback.RallyCredit(w, next, dt);   // b15-hook
             if (next == HillState.Azure) m.HillSeconds.Azure += dt;
             else if (next == HillState.Crimson) m.HillSeconds.Crimson += dt;
+            if (rally > 0)
+            {
+                if (next == HillState.Azure) m.HillSeconds.Azure += rally;
+                else m.HillSeconds.Crimson += rally;
+            }
 
             TeamId? owner = SimEnumMap.TeamOf(next);
             if (owner.HasValue)

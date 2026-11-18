@@ -471,7 +471,7 @@ namespace CriticalMass.Sim.Core
             b.FromX = w.X[id];
             b.FromZ = w.Z[id];
             b.ThrownTick = w.Tick;
-            b.BlastTick = w.Tick + Durations.T30(w.Config, cfg.FuseTicks);
+            b.BlastTick = w.Tick + Durations.T30(w.Config, cfg.FuseTicks * HutChoices.FuseScale(w, a.Team));   // b15-hook: SHORT FUSE (x 1 with the rule off)
             b.LandTick = Math.Min(b.BlastTick, w.Tick + Durations.T30(w.Config, cfg.FlightTicks));
             s.TntReadyTick[id] = w.Tick + Durations.T30(w.Config, cfg.CooldownTicks);
             s.Stats.TntThrown++;

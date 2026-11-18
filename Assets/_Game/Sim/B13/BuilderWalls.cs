@@ -625,6 +625,8 @@ namespace CriticalMass.Sim.Core
             byte cell = tall ? Cell.Barricade : Cell.LowWall;
             double hp = !tall ? b.ShortHp : Tier(w, a.Team) >= 2 ? b.TallHp2 : b.TallHp;
             double life = Durations.T30(w.Config, tall ? b.TallLifeTicks : b.ShortLifeTicks) / w.Config.SimHz;
+            double tough = HutChoices.WallScale(w, a.Team);   // b15-hook: TOUGH WALLS (exactly 1 with the rule off)
+            if (tough != 1.0) { hp *= tough; life *= tough; }
             int half = len / 2;
             int first = (cz - half * dz) * map.Width + (cx - half * dx);
             s.POwner[pieceSlot] = id;

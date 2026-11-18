@@ -18,7 +18,8 @@ namespace CriticalMass.Sim.Tests
     [TestFixture]
     public sealed class HutTests
     {
-        static GameConfig Cfg => DepthKit.Cfg();
+        // b15: these cases pin the b13 flat hut (+5% a level); the b15 hut choices are B15RulesTests'
+        static GameConfig Cfg => DepthKit.Cfg(d => d.HutChoices.Enabled = false);
 
         static void Line(string what, object value, string limit) => Console.WriteLine("[b13 H] " + what + ": " + value + " (limit " + limit + ")");
 
