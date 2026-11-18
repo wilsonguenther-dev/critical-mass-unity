@@ -669,7 +669,10 @@ namespace CriticalMass.Sim.Tests
             var levels = new Dictionary<KaijuType, string> { { KaijuType.Elder, "" }, { KaijuType.Grove, "" }, { KaijuType.Brute, "" }, { KaijuType.Timber, "" }, { KaijuType.Mire, "" } };
             for (int i = 0; i < 24; i++) { count[on[i].Type]++; levels[on[i].Type] += "L" + on[i].Level + " "; }
             // b13 r3: ELDER is reachable by real play (a balanced feed), rare: 1 to 3 of the 24 seeds.
-            Limit("ELDER hatches over the 24 seeds", count[KaijuType.Elder].ToString(), "1 to 3 (rare, reachable)", count[KaijuType.Elder] >= 1 && count[KaijuType.Elder] <= 3);
+            // b15 pass 2 re-band to 1 to 4: the comeback rule keeps matches close, so both teams feed more evenly and the
+            // balanced-feed ELDER comes up more (B15DiagElderCount, probe run 44252759630 on these 24 seeds: both b15 rules off 1,
+            // comeback only 3, hut choices only 0, both on 4). Still the rarest-or-equal type; never 0.
+            Limit("ELDER hatches over the 24 seeds", count[KaijuType.Elder].ToString(), "1 to 4 (rare, reachable)", count[KaijuType.Elder] >= 1 && count[KaijuType.Elder] <= 4);
             Print("type count over the 24 seeds (5v5 1-20, 16v16 1337 4242 7 99)", "ELDER " + count[KaijuType.Elder] + ", GROVE " + count[KaijuType.Grove] + ", BRUTE " + count[KaijuType.Brute] +
                 ", TIMBER " + count[KaijuType.Timber] + ", MIRE " + count[KaijuType.Mire], "each of the four at least 1, none over 12");
             foreach (KaijuType t in Typed)
