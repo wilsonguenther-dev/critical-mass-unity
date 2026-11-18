@@ -33,7 +33,7 @@ namespace CriticalMass.Runtime.Tests
                     Assert.Greater(r.GroundSpeed, 0.3f);
                     Assert.That(r.LeftPlant, Is.InRange(0f, 1f));
                     Assert.AreEqual(r.GroundSpeed, ActorAnimator.StrideSpeed(src, true, clip), 1e-6, "the animator strides on the measured row");
-                    Assert.AreEqual(r.LeftPlant, ActorAnimator.Plant(src, clip), 1e-6, "and syncs on its plant");
+                    Assert.AreEqual(ClipFacts.LeftPlant(clip, -1f), ActorAnimator.Plant(src, clip), 1e-6, "and syncs on the shared Knight marker");
                 }
                 // At the class's own run speed the run clip plays inside the rate clamp, so the planted foot holds
                 // (outside it the clamp lets the foot slide).
@@ -66,21 +66,26 @@ namespace CriticalMass.Runtime.Tests
         }
 
         [Test]
-        public void TheFacingSettlesInAFifthOfTheOldTimeAndWithin012Seconds()
+        public void TheFacingSettlesWithin012SecondsInsideTheFrameCap()
         {
-            foreach (double fps in new[] { 60.0, 120.0, 144.0 })
-                foreach (double turn in new[] { 30.0, 90.0, 180.0 })
-                {
-                    double yaw = 0, vel = 0, t = 0, dt = 1.0 / fps, settled = -1;
-                    while (t < 1.0)
+            foreach (double pace in new[] { 2.0, 1.0 })
+                foreach (double fps in new[] { 60.0, 120.0, 144.0 })
+                    foreach (double turn in new[] { 30.0, 90.0, 180.0 })
                     {
-                        ActorAnimator.StepFacing(ref yaw, ref vel, turn, dt);
-                        t += dt;
-                        if (Err(yaw, turn) < 2.0 && Math.Abs(vel) < 60.0) { settled = t; break; }
+                        double yaw = 0, vel = 0, t = 0, dt = pace / fps, settled = -1, worstStep = 0;
+                        while (t < 2.0)
+                        {
+                            double before = yaw;
+                            ActorAnimator.StepFacing(ref yaw, ref vel, turn, dt);
+                            worstStep = Math.Max(worstStep, Err(yaw, before));
+                            t += dt;
+                            if (Err(yaw, turn) < 2.0 && Math.Abs(vel) < 60.0) { settled = t / pace; break; }
+                        }
+                        Debug.Log($"[b15 facing] pace {pace:0}, {fps:0} fps, {turn:0} degree turn: settled in {settled:0.000} wall s, biggest frame step {worstStep:0.0} deg");
+                        Assert.Greater(settled, 0.0);
+                        if (pace >= 2.0 || turn <= 30.0) Assert.LessOrEqual(settled, 0.12 + 1e-9, $"{turn} degrees at {fps} fps, pace {pace}");
+                        if (pace >= 2.0 && fps <= 60.0) Assert.LessOrEqual(worstStep, 45.5, "no one-frame snap (TurningIsSmoothButFast)");
                     }
-                    Debug.Log($"[b15 facing] {fps:0} fps, {turn:0} degree turn: settled in {settled:0.000} s (limit 0.12)");
-                    Assert.That(settled, Is.InRange(0.0, 0.12 + 1e-9), $"{turn} degrees at {fps} fps");
-                }
         }
 
         [Test]

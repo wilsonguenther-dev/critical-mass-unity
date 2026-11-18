@@ -66,8 +66,11 @@ half3 CMTodCharacterGain(half3 c, half w)
 {
     half g = 1.0h + max(0.0h, (half)_CMTodChar.x) * w;
     c *= g;
+    // soft shoulder above 0.9 (TimeOfDayGrade.CharKnee): hue kept, strictly increasing, so bright bands stay distinct
     half m = max(c.r, max(c.g, c.b));
-    return m > 1.0h ? c / m : c;
+    const half k = 0.9h;
+    half s = k + (1.0h - k) * (1.0h - exp(-(m - k) / (1.0h - k)));
+    return m > k ? c * (s / m) : c;
 }
 
 // Rim on world solids: a hard edge on silhouettes that face the key light (moonlit edges keep shapes readable at

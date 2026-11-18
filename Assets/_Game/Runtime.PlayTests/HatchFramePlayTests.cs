@@ -19,6 +19,7 @@ namespace CriticalMass.Runtime.PlayTests
     public sealed class HatchFramePlayTests
     {
         SanityWorld _w;
+        static byte[] _sink;
 
         [TearDown]
         public void TearDown()
@@ -33,6 +34,12 @@ namespace CriticalMass.Runtime.PlayTests
             _w = new SanityWorld();
             yield return _w.Load(ClassId.Warrior);
             World w = _w.W;
+            // Control: the measure must see a known allocation (PerfSmoothTests' rule: GitHub's Linux editor reports 0
+            // here, so there the test is inconclusive, never a false pass).
+            long c0 = GC.GetAllocatedBytesForCurrentThread();
+            _sink = new byte[64 * 1024];
+            long seen = GC.GetAllocatedBytesForCurrentThread() - c0;
+            if (seen < 64 * 1024) Assert.Inconclusive($"the allocation measure saw {seen} B of a 65536 B array on this runner");
             int warmed = _w.Views.PrewarmKaiju(true);
             yield return null;
             _w.Views.PrewarmKaiju(false);

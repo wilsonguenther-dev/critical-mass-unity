@@ -237,6 +237,8 @@ namespace CriticalMass.Runtime.View.Atmosphere
 
         /// <summary>The CPU mirror of CMTodCharacter (CMTimeOfDay.hlsl) on CM/Toon's default bands (lit x 1, mid x 0.84,
         /// shadow x 0.66 mixed 12% toward Void Navy): band 0 shadow .. 2 lit; returns the lifted banded colour, linear.</summary>
+        public const float CharKnee = 0.9f;
+
         public static Color Character(Color albedo, float band, in TimeOfDayPreset p)
         {
             float b = Mathf.Clamp(band, 0f, 2f);
@@ -246,8 +248,14 @@ namespace CriticalMass.Runtime.View.Atmosphere
             Color c = b <= 1f ? Color.Lerp(sh, mid, b) : Color.Lerp(mid, lit, b - 1f);
             float g = Mathf.Max(1f, p.CharGain);
             c = new Color(c.r * g, c.g * g, c.b * g, 1f);
+            // Soft shoulder above CharKnee (hue kept, strictly increasing: a bright albedo keeps its three bands distinct
+            // instead of all three clipping to white). Same curve as CMTodCharacterGain.
             float m = Mathf.Max(c.r, Mathf.Max(c.g, c.b));
-            if (m > 1f) c = new Color(c.r / m, c.g / m, c.b / m, 1f);
+            if (m > CharKnee)
+            {
+                float s = CharKnee + (1f - CharKnee) * (1f - Mathf.Exp(-(m - CharKnee) / (1f - CharKnee)));
+                c = new Color(c.r * s / m, c.g * s / m, c.b * s / m, 1f);
+            }
             return c;
         }
 
