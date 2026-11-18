@@ -126,7 +126,8 @@ namespace CriticalMass.Runtime.View.Mechanics
             for (int k = 0; k < ps.Length; k++)
             {
                 BuiltPiece p = ps[k];
-                if (p == null || !p.Active || p.Carried || p.Kind != BuiltPieces.Ladder) continue;
+                if (p == null || !p.Active || p.Carried) continue;
+                if (p.Kind != BuiltPieces.Ladder) continue;
                 double ox = x - p.X, oz = z - p.Z;
                 double along = ox * p.Dx + oz * p.Dz;
                 double across = -ox * p.Dz + oz * p.Dx;
@@ -144,6 +145,46 @@ namespace CriticalMass.Runtime.View.Mechanics
                 faceRungs = Math.Atan2(p.Dz * s, p.Dx * s);
             }
             return any;
+        }
+
+        /// <summary>Ground heights of the bank cell before a bridge's first span cell (near) and after its last (far).</summary>
+        public static void BridgeBanks(MapDef map, BuiltPiece p, out float near, out float far)
+        {
+            double r = p.HalfLen + 0.5;
+            near = (float)GroundHeight.IslandHeightAt(map, p.X - p.Dx * r, p.Z - p.Dz * r);
+            far = (float)GroundHeight.IslandHeightAt(map, p.X + p.Dx * r, p.Z + p.Dz * r);
+        }
+
+        /// <summary>b14 bridge fix: height of a built rope bridge's deck above the cell under sim point (x, z), 0 off every
+        /// deck. The deck runs straight from the near bank's height to the far bank's (it lay flat at the void's 0, a 1.5 u
+        /// snap down off a high bank). GroundHeight.At adds it, so everything standing on the bridge follows the deck.</summary>
+        public static float BridgeLift(World w, double x, double z)
+        {
+            MapDef map = w.Map;
+            if (map == null || !(x >= 0) || !(z >= 0) || x >= map.Width || z >= map.Height) return 0f;
+            if (map.Cells[(int)z * map.Width + (int)x] != Cell.Bridge) return 0f;
+            BuiltPiece[] ps = w.Builder != null ? w.Builder.Pieces : null;
+            if (ps == null) return 0f;
+            float best = 0f;
+            for (int k = 0; k < ps.Length; k++)
+            {
+                BuiltPiece p = ps[k];
+                if (p == null || !p.Active || p.Carried || p.Kind != BuiltPieces.Bridge) continue;
+                double bo = (x - p.X) * p.Dx + (z - p.Z) * p.Dz, ba = -(x - p.X) * p.Dz + (z - p.Z) * p.Dx;
+                if (Math.Abs(bo) > p.HalfLen + 0.01 || Math.Abs(ba) > w.Config.Abilities.BuilderPieces.WidthCells * 0.5) continue;
+                BridgeBanks(map, p, out float hn, out float hf);
+                float h = BridgeDeck(bo, p.HalfLen, hn, hf) - (float)GroundHeight.IslandHeightAt(map, x, z);
+                if (h > best) best = h;
+            }
+            return best;
+        }
+
+        /// <summary>Deck height at `along` (from the span centre, toward the far bank): a straight run from near to far.</summary>
+        public static float BridgeDeck(double along, double halfLen, float near, float far)
+        {
+            double t = halfLen > 1e-6 ? (along + halfLen) / (2 * halfLen) : 0.5;
+            t = t < 0 ? 0 : t > 1 ? 1 : t;
+            return (float)(near + (far - near) * t);
         }
 
         /// <summary>The climb height under sim point (x, z): the highest active, laid ladder covering it, else 0.</summary>

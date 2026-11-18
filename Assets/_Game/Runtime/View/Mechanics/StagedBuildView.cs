@@ -280,6 +280,7 @@ namespace CriticalMass.Runtime.View.Mechanics
         {
             if (_driver == null || _driver.World == null) return;
             World w = _driver.World;
+            GroundHeight.Live = w;   // b14 bridge fix: rope-bridge decks in the view's ground height
             EnsureObserved(w);
             PiecesDrawn = 0;
             StagesDrawn = 0;
@@ -330,15 +331,23 @@ namespace CriticalMass.Runtime.View.Mechanics
             int kind = p.Kind == BuiltPieces.Bridge ? StagedBuildCore.KindBridge : StagedBuildCore.KindLadder;
             if (p.Kind == BuiltPieces.Bridge)
             {
+                // b14 bridge fix: the deck runs straight from the near bank's height to the far bank's (it lay flat at the
+                // void's 0, a 1.5 u step down off a high bank); LadderClimb.Sample lifts the fighters along the same line.
+                LadderClimb.BridgeBanks(w.Map, p, out float hNear, out float hFar);
+                float baseY = (float)GroundHeight.At(w.Map, p.X, p.Z);
+                Vector3 run = along * len + Vector3.up * (hFar - hNear);
+                float slen = run.magnitude;
+                Vector3 alongT = run / Mathf.Max(1e-4f, slen);
+                Quaternion qt = Quaternion.LookRotation(alongT, Vector3.up);
                 Vector3 size = m.Bounds.size;
-                float segLen = len / groups;
+                float segLen = slen / groups;
                 float sz = segLen / Mathf.Max(0.1f, size.z);
                 float sx = Mathf.Max(0.6f, (widthCells - 0.24f) / Mathf.Max(0.1f, size.x));
-                Vector3 start = c - along * (len * 0.5f);
+                Vector3 start = c + Vector3.up * ((hNear + hFar) * 0.5f - baseY) - alongT * (slen * 0.5f);
                 for (int j = 0; j < groups; j++)
                 {
-                    Vector3 o = start + along * (j * segLen - m.Bounds.min.z * sz);
-                    Matrix4x4 baseM = Matrix4x4.TRS(o, q, new Vector3(sx, 1f, sz));
+                    Vector3 o = start + alongT * (j * segLen - m.Bounds.min.z * sz);
+                    Matrix4x4 baseM = Matrix4x4.TRS(o, qt, new Vector3(sx, 1f, sz));
                     DrawStaged(m, mat, baseM, j * stages, groups * stages, sequencing, t, reduce, ref seq, kind);
                 }
             }
