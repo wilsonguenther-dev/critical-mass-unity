@@ -1,0 +1,562 @@
+{
+ "rig": "KaijuRig",
+ "bones": 46,
+ "meshes": {
+  "Kaiju_Hero": {
+   "built": 16704,
+   "tris": 16704,
+   "verts": 9063,
+   "not_rigid": 0,
+   "codes": {
+    "0": 38320,
+    "6": 984,
+    "2": 120,
+    "8": 516
+   },
+   "zmin": -0.01,
+   "zmax": 4.929
+  },
+  "Kaiju_LOD0": {
+   "built": 8220,
+   "tris": 8220,
+   "verts": 4627,
+   "not_rigid": 0,
+   "codes": {
+    "0": 19534,
+    "6": 648,
+    "2": 120,
+    "8": 294
+   },
+   "zmin": -0.01,
+   "zmax": 4.929
+  },
+  "Kaiju_LOD1": {
+   "built": 4958,
+   "tris": 1438,
+   "verts": 1164,
+   "not_rigid": 0,
+   "codes": {
+    "6": 154,
+    "0": 4050,
+    "8": 90
+   },
+   "zmin": 0.022,
+   "zmax": 4.891
+  },
+  "Kaiju_Shadow": {
+   "tris": 1150,
+   "verts": 655,
+   "not_rigid": 0,
+   "codes": {
+    "0": 3450
+   },
+   "zmin": 0.038,
+   "zmax": 4.87
+  },
+  "Kaiju_Grove_Hero": {
+   "built": 19540,
+   "tris": 19540,
+   "verts": 10253,
+   "not_rigid": 0,
+   "codes": {
+    "0": 41424,
+    "2": 432,
+    "6": 912,
+    "8": 336
+   },
+   "zmin": -0.01,
+   "zmax": 5.428
+  },
+  "Kaiju_Grove_LOD0": {
+   "built": 11094,
+   "tris": 8800,
+   "verts": 4850,
+   "not_rigid": 0,
+   "codes": {
+    "0": 24520,
+    "6": 408,
+    "2": 180,
+    "8": 360
+   },
+   "zmin": -0.009,
+   "zmax": 5.428
+  },
+  "Kaiju_Grove_LOD1": {
+   "built": 6932,
+   "tris": 1438,
+   "verts": 1059,
+   "not_rigid": 0,
+   "codes": {
+    "6": 100,
+    "0": 4146,
+    "8": 48
+   },
+   "zmin": 0.022,
+   "zmax": 5.482
+  },
+  "Kaiju_Grove_Shadow": {
+   "tris": 1150,
+   "verts": 665,
+   "not_rigid": 0,
+   "codes": {
+    "0": 3450
+   },
+   "zmin": 0.039,
+   "zmax": 5.456
+  },
+  "Kaiju_Brute_Hero": {
+   "built": 14416,
+   "tris": 14416,
+   "verts": 7582,
+   "not_rigid": 0,
+   "codes": {
+    "0": 29576,
+    "2": 576,
+    "6": 1920,
+    "8": 108
+   },
+   "zmin": -0.01,
+   "zmax": 5.22
+  },
+  "Kaiju_Brute_LOD0": {
+   "built": 7012,
+   "tris": 7012,
+   "verts": 3880,
+   "not_rigid": 0,
+   "codes": {
+    "0": 15068,
+    "2": 576,
+    "6": 738,
+    "8": 108
+   },
+   "zmin": -0.01,
+   "zmax": 5.22
+  },
+  "Kaiju_Brute_LOD1": {
+   "built": 3462,
+   "tris": 1438,
+   "verts": 1011,
+   "not_rigid": 0,
+   "codes": {
+    "6": 100,
+    "0": 4044,
+    "2": 102,
+    "8": 48
+   },
+   "zmin": 0.022,
+   "zmax": 5.168
+  },
+  "Kaiju_Brute_Shadow": {
+   "tris": 1024,
+   "verts": 598,
+   "not_rigid": 0,
+   "codes": {
+    "0": 3072
+   },
+   "zmin": 0.039,
+   "zmax": 5.139
+  },
+  "Kaiju_Timber_Hero": {
+   "built": 16080,
+   "tris": 16080,
+   "verts": 8396,
+   "not_rigid": 0,
+   "codes": {
+    "0": 34190,
+    "6": 912,
+    "2": 210,
+    "8": 600
+   },
+   "zmin": -0.01,
+   "zmax": 5.139
+  },
+  "Kaiju_Timber_LOD0": {
+   "built": 7964,
+   "tris": 7964,
+   "verts": 4338,
+   "not_rigid": 0,
+   "codes": {
+    "0": 17488,
+    "6": 388,
+    "2": 120,
+    "8": 360
+   },
+   "zmin": -0.01,
+   "zmax": 5.139
+  },
+  "Kaiju_Timber_LOD1": {
+   "built": 3866,
+   "tris": 1438,
+   "verts": 1005,
+   "not_rigid": 0,
+   "codes": {
+    "6": 100,
+    "0": 4122,
+    "8": 72
+   },
+   "zmin": -0.0,
+   "zmax": 5.125
+  },
+  "Kaiju_Timber_Shadow": {
+   "tris": 1150,
+   "verts": 663,
+   "not_rigid": 0,
+   "codes": {
+    "0": 3450
+   },
+   "zmin": 0.029,
+   "zmax": 5.096
+  },
+  "Kaiju_Mire_Hero": {
+   "built": 18764,
+   "tris": 18764,
+   "verts": 9780,
+   "not_rigid": 0,
+   "codes": {
+    "0": 33886,
+    "2": 3944,
+    "6": 1716,
+    "8": 728
+   },
+   "zmin": -0.01,
+   "zmax": 5.446
+  },
+  "Kaiju_Mire_LOD0": {
+   "built": 10244,
+   "tris": 8896,
+   "verts": 4846,
+   "not_rigid": 0,
+   "codes": {
+    "0": 20244,
+    "6": 1020,
+    "2": 1344,
+    "8": 252
+   },
+   "zmin": -0.009,
+   "zmax": 5.457
+  },
+  "Kaiju_Mire_LOD1": {
+   "built": 6462,
+   "tris": 1444,
+   "verts": 1034,
+   "not_rigid": 0,
+   "codes": {
+    "6": 142,
+    "0": 4122,
+    "8": 36,
+    "2": 12
+   },
+   "zmin": 0.022,
+   "zmax": 5.441
+  },
+  "Kaiju_Mire_Shadow": {
+   "tris": 702,
+   "verts": 427,
+   "not_rigid": 0,
+   "codes": {
+    "0": 2106
+   },
+   "zmin": 0.038,
+   "zmax": 5.415
+  }
+ },
+ "clips": {
+  "Berserk": [
+   1.0,
+   61.0
+  ],
+  "Flinch": [
+   1.0,
+   16.0
+  ],
+  "Idle": [
+   1.0,
+   91.0
+  ],
+  "KO": [
+   1.0,
+   61.0
+  ],
+  "Roar": [
+   1.0,
+   61.0
+  ],
+  "Slam": [
+   1.0,
+   37.0
+  ],
+  "SlamWindup": [
+   1.0,
+   31.0
+  ],
+  "Swipe": [
+   1.0,
+   37.0
+  ],
+  "Walk": [
+   1.0,
+   31.0
+  ],
+  "WalkSqueeze": [
+   1.0,
+   31.0
+  ]
+ },
+ "export": {
+  "result": [
+   "FINISHED"
+  ],
+  "bytes": 7674876
+ },
+ "roundtrip": {
+  "clips_orig": {
+   "Berserk": [
+    1.0,
+    61.0
+   ],
+   "Flinch": [
+    1.0,
+    16.0
+   ],
+   "Idle": [
+    1.0,
+    91.0
+   ],
+   "KO": [
+    1.0,
+    61.0
+   ],
+   "Roar": [
+    1.0,
+    61.0
+   ],
+   "Slam": [
+    1.0,
+    37.0
+   ],
+   "SlamWindup": [
+    1.0,
+    31.0
+   ],
+   "Swipe": [
+    1.0,
+    37.0
+   ],
+   "Walk": [
+    1.0,
+    31.0
+   ],
+   "WalkSqueeze": [
+    1.0,
+    31.0
+   ]
+  },
+  "clips_new": {
+   "Berserk": [
+    1.0,
+    61.0
+   ],
+   "Flinch": [
+    1.0,
+    16.0
+   ],
+   "Idle": [
+    1.0,
+    91.0
+   ],
+   "KO": [
+    1.0,
+    61.0
+   ],
+   "Roar": [
+    1.0,
+    61.0
+   ],
+   "Slam": [
+    1.0,
+    37.0
+   ],
+   "SlamWindup": [
+    1.0,
+    31.0
+   ],
+   "Swipe": [
+    1.0,
+    37.0
+   ],
+   "Walk": [
+    1.0,
+    31.0
+   ],
+   "WalkSqueeze": [
+    1.0,
+    31.0
+   ]
+  },
+  "anim_bone_maxdiff_m": 0.009162,
+  "rest_maxdiff": 1e-06,
+  "bones_new": 46,
+  "meshes_new": {
+   "Kaiju_Brute_Hero": {
+    "tris": 14416,
+    "groups": 45,
+    "cols": [
+     "Col"
+    ],
+    "parent": "KaijuRig"
+   },
+   "Kaiju_Brute_LOD0": {
+    "tris": 7012,
+    "groups": 45,
+    "cols": [
+     "Col"
+    ],
+    "parent": "KaijuRig"
+   },
+   "Kaiju_Brute_LOD1": {
+    "tris": 1407,
+    "groups": 45,
+    "cols": [
+     "Col"
+    ],
+    "parent": "KaijuRig"
+   },
+   "Kaiju_Brute_Shadow": {
+    "tris": 1024,
+    "groups": 43,
+    "cols": [
+     "Col"
+    ],
+    "parent": "KaijuRig"
+   },
+   "Kaiju_Grove_Hero": {
+    "tris": 19540,
+    "groups": 45,
+    "cols": [
+     "Col"
+    ],
+    "parent": "KaijuRig"
+   },
+   "Kaiju_Grove_LOD0": {
+    "tris": 8800,
+    "groups": 45,
+    "cols": [
+     "Col"
+    ],
+    "parent": "KaijuRig"
+   },
+   "Kaiju_Grove_LOD1": {
+    "tris": 1420,
+    "groups": 45,
+    "cols": [
+     "Col"
+    ],
+    "parent": "KaijuRig"
+   },
+   "Kaiju_Grove_Shadow": {
+    "tris": 1150,
+    "groups": 45,
+    "cols": [
+     "Col"
+    ],
+    "parent": "KaijuRig"
+   },
+   "Kaiju_Hero": {
+    "tris": 16704,
+    "groups": 45,
+    "cols": [
+     "Col"
+    ],
+    "parent": "KaijuRig"
+   },
+   "Kaiju_LOD0": {
+    "tris": 8220,
+    "groups": 45,
+    "cols": [
+     "Col"
+    ],
+    "parent": "KaijuRig"
+   },
+   "Kaiju_LOD1": {
+    "tris": 1396,
+    "groups": 45,
+    "cols": [
+     "Col"
+    ],
+    "parent": "KaijuRig"
+   },
+   "Kaiju_Mire_Hero": {
+    "tris": 18764,
+    "groups": 44,
+    "cols": [
+     "Col"
+    ],
+    "parent": "KaijuRig"
+   },
+   "Kaiju_Mire_LOD0": {
+    "tris": 8896,
+    "groups": 44,
+    "cols": [
+     "Col"
+    ],
+    "parent": "KaijuRig"
+   },
+   "Kaiju_Mire_LOD1": {
+    "tris": 1415,
+    "groups": 44,
+    "cols": [
+     "Col"
+    ],
+    "parent": "KaijuRig"
+   },
+   "Kaiju_Mire_Shadow": {
+    "tris": 702,
+    "groups": 38,
+    "cols": [
+     "Col"
+    ],
+    "parent": "KaijuRig"
+   },
+   "Kaiju_Shadow": {
+    "tris": 1150,
+    "groups": 40,
+    "cols": [
+     "Col"
+    ],
+    "parent": "KaijuRig"
+   },
+   "Kaiju_Timber_Hero": {
+    "tris": 16080,
+    "groups": 45,
+    "cols": [
+     "Col"
+    ],
+    "parent": "KaijuRig"
+   },
+   "Kaiju_Timber_LOD0": {
+    "tris": 7964,
+    "groups": 45,
+    "cols": [
+     "Col"
+    ],
+    "parent": "KaijuRig"
+   },
+   "Kaiju_Timber_LOD1": {
+    "tris": 1421,
+    "groups": 45,
+    "cols": [
+     "Col"
+    ],
+    "parent": "KaijuRig"
+   },
+   "Kaiju_Timber_Shadow": {
+    "tris": 1150,
+    "groups": 44,
+    "cols": [
+     "Col"
+    ],
+    "parent": "KaijuRig"
+   }
+  }
+ }
+}

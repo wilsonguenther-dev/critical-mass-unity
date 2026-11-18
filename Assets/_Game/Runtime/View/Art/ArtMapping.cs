@@ -46,6 +46,12 @@ namespace CriticalMass.Runtime.View.Art
         public string[] Meshes = new string[0];
         /// <summary>Mask codes (eighths of vertex alpha) the art must carry at least once.</summary>
         public int[] MaskCodes = new int[0];
+        /// <summary>
+        /// b15 Kaiju parts: swap-in part sets in the one FBX on the one rig. A renderer whose name holds "_" + variant + "_"
+        /// (Kaiju_Grove_LOD0) belongs to that variant; every other renderer is the default set (ELDER: Kaiju_LOD0). ModelView
+        /// draws only the active set (ModelView.SetVariant). Null: one set, everything draws as before.
+        /// </summary>
+        public string[] Variants;
         public float OutlinePx;
         /// <summary>b13 r3 integrator: metres a prop is authored sunk below its ground pivot (a rock outcrop set into the ground); 0 = feet on the ground.</summary>
         public float GroundSink;
@@ -187,6 +193,23 @@ namespace CriticalMass.Runtime.View.Art
         public const string KaijuEgg = "Kaiju_Egg";
         public const string KaijuHatchling = "Kaiju_Hatchling";
         public const string KaijuAdult = "Kaiju_Adult";
+        /// <summary>
+        /// b15 Kaiju parts (art/b15-kaiju-parts, ~/cm-art-trial/parts-kaiju): the adult is five part sets on the one 46-bone
+        /// rig, every vertex rigid on one bone. ELDER is the default set (Kaiju_Hero, _LOD0, _LOD1, _Shadow); the hatch-picked
+        /// type swaps in its own set (Kaiju_Grove_LOD0 ...): a real silhouette per type (GROVE tree canopy, BRUTE horns,
+        /// TIMBER antlers and log spines, MIRE sail and gill fronds, ELDER stone plates and crown), same clips, same height.
+        /// </summary>
+        public static readonly string[] KaijuAdultVariants = { "Grove", "Brute", "Timber", "Mire" };
+        public static string[] KaijuAdultMeshes()
+        {
+            string[] roles = { "Hero", "LOD0", "LOD1", "Shadow" };
+            var names = new string[roles.Length * (KaijuAdultVariants.Length + 1)];
+            int n = 0;
+            foreach (string r in roles) names[n++] = "Kaiju_" + r;          // Meshes[0] = Kaiju_Hero: the body measured for Height
+            foreach (string v in KaijuAdultVariants)
+                foreach (string r in roles) names[n++] = "Kaiju_" + v + "_" + r;
+            return names;
+        }
         public const string KaijuShards = "Kaiju_BerserkShards";
         public const string KaijuSpikes = "Kaiju_TelegraphSpikes";
         public const string BiomassS = "prop_biomass_plant_s";
@@ -485,9 +508,9 @@ namespace CriticalMass.Runtime.View.Art
             // Authored = KaijuDefault(GlowAzure), FaceTexture = KaijuFace, Expressions = KaijuExpressionTextures, no VertexColourFace.
             new ModelSpec { Key = KaijuAdult, AssetPath = "Assets/_Game/Art/Kaiju/Kaiju_Adult.fbx", Kind = ArtKind.Kaiju, Rigged = true,
                 Bones = KaijuAdultBones,
-                OwnClips = new[] { Idle, Walk, Roar, SlamWindup, Slam, Swipe, Berserk, KO }, Meshes = new[] { "Kaiju_Hero", "Kaiju_LOD0", "Kaiju_LOD1", "Kaiju_Shadow" },
-                MaskCodes = new[] { 0, 6 }, OutlinePx = CharacterHullPx, Authored = KaijuDefault(GlowNeutral), Height = 5.0f,
-                VertexColourFace = true, ArtYawDeg = 180f },
+                OwnClips = new[] { Idle, Walk, Roar, SlamWindup, Slam, Swipe, Berserk, KO }, Meshes = KaijuAdultMeshes(),
+                MaskCodes = new[] { 0, 2, 6, 8 }, OutlinePx = CharacterHullPx, Authored = KaijuDefault(GlowNeutral), Height = 5.0f,
+                VertexColourFace = true, ArtYawDeg = 180f, Variants = KaijuAdultVariants },
             new ModelSpec { Key = KaijuShards, AssetPath = "Assets/_Game/Art/Kaiju/Kaiju_BerserkShards.fbx", Kind = ArtKind.Kaiju,
                 Meshes = new[] { "Kaiju_BerserkShards" }, MaskCodes = new[] { 6 }, OutlinePx = 0f, Authored = KaijuDefault(GlowAzure) },
             new ModelSpec { Key = KaijuSpikes, AssetPath = "Assets/_Game/Art/Kaiju/Kaiju_TelegraphSpikes.fbx", Kind = ArtKind.Kaiju,
