@@ -307,7 +307,7 @@ namespace CriticalMass.Net.Relay
                 _dropped = true;
                 _dropDone = true;
                 Log("ONLINE DROPPED on purpose at tick " + _session.Stepped);
-                AbortLink();   // the local relay: simply never heard from again
+                AbortLink();   // the socket dies, as a crashed game's does
                 if (RejoinAfterMs >= 0 && _client != null)
                 {
                     _secret = _client.Secret;
@@ -353,6 +353,10 @@ namespace CriticalMass.Net.Relay
             if (u is FallbackTransport f) u = f.Current;
             (u as RelayTransport)?.Abort();
             (u as DirectClient)?.Abort();
+            // b15-zero-cost: the in-process relay closes the socket as the real one does when a game's connection dies (its
+            // TCP reset reaches Cloudflare): the seat's socket leaves the room. Before, it stayed, so a full 32-human room
+            // refused the rejoin ("That room is full."), which the real relay does not.
+            (u as LocalRelayTransport)?.Close();
         }
 
         /// <summary>b15-zero-cost: "ONLINE TRAFFIC ..." lines: what this peer sent and received in the lobby and in the match,
