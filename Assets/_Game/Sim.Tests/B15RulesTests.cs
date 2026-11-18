@@ -661,5 +661,129 @@ namespace CriticalMass.Sim.Tests
             Line("two worlds that differ only in one vote: state hashes", "0x" + ha.ToString("X16") + " / 0x" + hb.ToString("X16"), "different");
             Assert.AreNotEqual(ha, hb);
         }
+
+        // ------------------------------------------------------------------ pass 2 levers (each set explicitly)
+
+        static GameConfig Levers(Action<ComebackConfig> set)
+        {
+            GameConfig c = Full();
+            B15SweepTests.Bare(c);
+            set(c.Depth.Comeback);
+            return c;
+        }
+
+        [Test]
+        public void WavesBringTheKnockedOutBackOnTheTeamBeat()
+        {
+            World w = Make(Levers(k => k.WaveSeconds = 8), 63, 5);
+            double hz = w.Config.SimHz;
+            int[] at = { 100, 230, 239, 240, 1000 };
+            string got = "";
+            foreach (int t in at)
+            {
+                w.Tick = t;
+                double d = Comeback.RespawnDelay(w, TeamId.Azure);
+                long back = t + (long)Math.Round(d * hz);
+                got += (got.Length > 0 ? " " : "") + back;
+                Assert.AreEqual(0, back % 240, "back on a beat (tick " + t + ")");
+                Assert.GreaterOrEqual(d, w.Config.Respawn.DelaySeconds - 1e-9, "never sooner than the own wait");
+                Assert.Less(d, w.Config.Respawn.DelaySeconds + 8 + 1e-9);
+            }
+            Line("WAVES 8 s: knock-outs at ticks 100 / 230 / 239 / 240 / 1000 come back at", got, "multiples of 240, at least 5 s later");
+        }
+
+        [Test]
+        public void MajorityNeedsAClearLeadOfBodies()
+        {
+            World w = Make(Levers(k => k.MajorityMargin = 2), 63, 5);
+            Assert.AreEqual(HillState.Contested, Comeback.Majority(w, HillState.Azure, 3, 2));
+            Assert.AreEqual(HillState.Azure, Comeback.Majority(w, HillState.Azure, 4, 2));
+            Assert.AreEqual(HillState.Azure, Comeback.Majority(w, HillState.Azure, 1, 0), "alone on the hill owns it");
+            World off = Make(Levers(k => { }), 63, 5);
+            Assert.AreEqual(HillState.Azure, Comeback.Majority(off, HillState.Azure, 3, 2), "margin 1 = today's rule");
+            Line("MAJORITY 2: 3 v 2 / 4 v 2 / 1 v 0", "Contested / Azure / Azure", "Contested / Azure / Azure");
+        }
+
+        [Test]
+        public void HoldFatigueTiresAnUnbrokenHoldAndAChangeResetsIt()
+        {
+            World w = Make(Levers(k => { k.HoldFatigueOn = true; k.HoldGraceSeconds = 30; k.HoldSpanSeconds = 60; k.HoldMinPerMille = 500; }), 63, 5);
+            double first = 0, mid = 0, last = 0;
+            for (int t = 0; t < 30 * 120; t++)
+            {
+                double r = Comeback.HoldRate(w, HillState.Crimson);
+                if (t == 0) first = r;
+                if (t == 30 * 60) mid = r;
+                last = r;
+            }
+            double after = Comeback.HoldRate(w, HillState.Azure);
+            double back = Comeback.HoldRate(w, HillState.Crimson);
+            Line("HOLD FATIGUE 30 s + 60 s to 0.5: share at 0 s / 60 s / 120 s, then Azure takes it, then Crimson again", first + " / " + mid + " / " + last + ", " + after + ", " + back, "1 / 0.75 / 0.5, 1, 1");
+            Assert.AreEqual(1.0, first);
+            Assert.AreEqual(0.75, mid, 0.002);
+            Assert.AreEqual(0.5, last);
+            Assert.AreEqual(1.0, after);
+            Assert.AreEqual(1.0, back);
+        }
+
+        [Test]
+        public void ATurncoatKaijuGetsUpOnTheSideThatKnockedItDown()
+        {
+            World w = Make(Levers(k => k.KaijuTurncoat = true), 63, 5);
+            int crimson = DepthKit.Enemy(w, 0);
+            w.Kaiju.State = KaijuState.Azure;
+            Comeback.OnKaijuKo(w, 0);
+            Assert.AreEqual(-1, w.Rally.KoTeam, "its own side cannot claim it");
+            Comeback.OnKaijuKo(w, crimson);
+            Comeback.OnKaijuRecover(w);
+            Assert.AreEqual(KaijuState.Crimson, w.Kaiju.State);
+            Assert.AreEqual(1, w.Rally.Turns);
+            w.Kaiju.State = KaijuState.Berserk;
+            Comeback.OnKaijuKo(w, 0);
+            Comeback.OnKaijuRecover(w);
+            Assert.AreEqual(KaijuState.Berserk, w.Kaiju.State, "a berserk Kaiju never turns");
+            World off = Make(Levers(k => { }), 63, 5);
+            off.Kaiju.State = KaijuState.Azure;
+            Comeback.OnKaijuKo(off, DepthKit.Enemy(off, 0));
+            Comeback.OnKaijuRecover(off);
+            Assert.AreEqual(KaijuState.Azure, off.Kaiju.State, "lever off: unchanged");
+            Line("TURNCOAT: Azure Kaiju knocked down by Crimson gets up", "Crimson (turns 1); berserk stays berserk; off stays Azure", "same");
+        }
+
+        [Test]
+        public void ForwardReturnBringsATrailingTeamBackCloserToTheHill()
+        {
+            World w = Make(Levers(k => { k.ForwardReturnOn = true; k.ForwardShare = 0.4; }), 1, 16);
+            w.Match.HillSeconds.Azure = 0;
+            w.Match.HillSeconds.Crimson = 40;
+            int moved = 0, slots = 0;
+            double before = 0, after = 0;
+            for (int i = 0; i < w.ActorCount; i++)
+            {
+                if (w.Actors[i].Team != TeamId.Azure) continue;
+                World.SpawnPoint(w.Map, TeamId.Azure, World.TeamSlot(w, i), out double x, out double z);
+                double x0 = x, z0 = z;
+                Comeback.ForwardSpawn(w, i, 0.5, ref x, ref z);
+                slots++;
+                double d0 = Math.Sqrt((x0 - w.Map.Hill.X) * (x0 - w.Map.Hill.X) + (z0 - w.Map.Hill.Z) * (z0 - w.Map.Hill.Z));
+                double d1 = Math.Sqrt((x - w.Map.Hill.X) * (x - w.Map.Hill.X) + (z - w.Map.Hill.Z) * (z - w.Map.Hill.Z));
+                before += d0; after += d1;
+                if (d1 < d0 - 1) moved++;
+                Assert.LessOrEqual(d1, d0 + 1e-9);
+            }
+            int leader = 0;
+            for (int i = 0; i < w.ActorCount; i++)
+            {
+                if (w.Actors[i].Team != TeamId.Crimson) continue;
+                World.SpawnPoint(w.Map, TeamId.Crimson, World.TeamSlot(w, i), out double x, out double z);
+                double x0 = x;
+                Comeback.ForwardSpawn(w, i, 0.5, ref x, ref z);
+                if (x != x0) leader++;
+            }
+            Line("FORWARD RETURN 0.4, Azure 40 s behind: slots moved forward, mean distance to the hill before / after; leading team slots moved",
+                moved + " of " + slots + ", " + (before / slots).ToString("0.0") + " / " + (after / slots).ToString("0.0") + " u; " + leader, "most moved; 0");
+            Assert.Greater(moved, slots / 2);
+            Assert.AreEqual(0, leader);
+        }
     }
 }
