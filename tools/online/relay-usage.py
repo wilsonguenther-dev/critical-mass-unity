@@ -25,7 +25,7 @@ import urllib.request
 FREE = 100000
 PER_MSG = 20
 # Requests one 8-minute match costs after b15 (RelayBudget.RequestsPerMatch, ZeroCostOnlineTests prints the measured ones).
-PER_MATCH = {2: 752, 4: 1486, 8: 2954, 32: 7922}
+PER_MATCH = {2: 754, 4: 1489, 8: 2960, 32: 11847}
 
 
 def wrangler_token():

@@ -37,14 +37,33 @@ days: 11,000 to 15,000 counted, about 600 to 760 billed (under 1%). Nothing has 
 
 ## 2. What a match sent before b15, and why
 
-MEASURED_TABLE_PLACEHOLDER
+Measured by the sim gate (sim-tests run 44245987359): a real room through the game's own online code on a simulated
+relay, every message counted by kind (`Net/TrafficMeter.cs`). "Requests per match" = an 8-minute match with a 2-minute
+lobby, all players on the relay; "matches a day" = 100,000 divided by that, if nothing else used the relay that day.
+
+| Humans | Relay receives (room) | Messages per player-minute | Bytes per player-minute | Requests per match | Matches a day | Joiners' input delay |
+|---|---|---|---|---|---|---|
+| 2 | 60.0 a second -> 30.1 | 1,799 -> 902 | 119,930 -> 59,340 | 1,472 -> 754 | 67 -> 132 | 3 -> 4 ticks |
+| 4 | 120.0 -> 60.1 | 1,800 -> 902 | 123,552 -> 64,299 | 2,926 -> 1,489 | 34 -> 67 | 3 -> 4 |
+| 8 | 240.0 -> 120.2 | 1,800 -> 902 | 125,363 -> 66,779 | 5,834 -> 2,960 | 17 -> 33 | 3 -> 4 |
+| 32 | 532.8 -> 483.5 | 999 -> 907 | 92,940 -> 68,889 | 13,030 -> 11,847 | 7 -> 8 | 4 -> 5 |
+| 16 (estimate) | | | | | 8 -> 16 | |
+
+Where the messages went before b15: nearly all of them were joiners' inputs, one packet per tick (30 a second) each,
+plus the host's bundles, one per tick. 30 ticks a second times every player is the whole bill; everything else (lobby,
+chat, rejoin) was under 3%. A 32-human room was already cheaper per player because its joiners sent on a 60 ms gate.
+Every arm: every fingerprint MATCHED, no late inputs, no extra waiting.
 
 ## 3. What b15 changed (the simulation is untouched)
 
-1. **Joiners pack two ticks of input per packet** (three in rooms over 16 humans, which already sent every two). A packet
-   goes when its last tick is even (or a multiple of three), so every joiner's packets cover the same ticks; the host then
+1. **Joiners pack two ticks of input per packet.** A packet goes when its last tick is odd (ticks 0-1, 2-3, ...), so every
+   joiner's packets cover the same ticks; the host then
    completes its bundles two at a time and its broadcasts halve too, without any extra wait on the host. An input waits at
-   most one tick (33 ms) longer than before to leave the joiner's computer. `LockstepOptions.ClientTicksPerPacket`.
+   most one tick (33 ms) longer than before to leave the joiner's computer, and the measured input delay grew by exactly
+   one tick. The host reports each joiner's margin from when its newest pair ARRIVED, so the lead policy is not fooled by
+   bundles that now go out right after a pair completes. `LockstepOptions.ClientTicksPerPacket`. Three ticks a packet was
+   tried for big rooms: 38% fewer messages at 32 humans but 2 to 3 ticks more delay, over the one-tick rule, so it was dropped;
+   big rooms gain only 9% (they already sent every two ticks).
 2. **Each state fingerprint travels once** on WebSocket and TCP links (they never lose a packet), instead of the newest two
    in every packet. Saves 24 bytes a packet; the receiving side now files a fingerprint in a free slot, so a check still
    waiting is never pushed out. Datagram links keep repeating them.
@@ -59,7 +78,7 @@ Not changed, on purpose:
 - **Sending less while a player stands still or is dead.** In lockstep, the host must hear every tick's input from every
   joiner before anyone may step it. Sending nothing would make the host wait for a late input; promising the same input
   for several future ticks would delay a player's next move by those ticks. Both break the one-tick latency rule.
-- **The lobby** (ping and roster once a second, a pong per joiner): measured at LOBBY_PLACEHOLDER of a match's messages.
+- **The lobby** (ping and roster once a second, a pong per joiner): measured at about 2% of a match's messages.
 - **Chat** (at most one line per 1.5 s per player): a rounding error.
 - **Star through the host vs every-to-every.** Already the cheapest shape under this bill: each joiner sends one message
   per packet to the host, and the host one broadcast for everyone (the relay fans it out for free). Every-to-every would
@@ -116,9 +135,23 @@ UPnP (the game asking the router to forward the port itself) needs no service an
 `ZeroCostOnlineTests.CostPerPlayerMinuteStaysAtTheBaseline_{2,4,8,32}Humans` run a real room through the game's own
 online path on a simulated relay, before and after b15, and fail if, after b15:
 messages per player-minute rise more than 10% over the pinned baseline, bytes per player-minute rise more than 10% over
-theirs, the cut falls under 40% (25% for 32 humans), the in-game estimate is off by more than 15%, the joiners' felt
+theirs, the cut falls under 40% (8% for 32 humans), the in-game estimate is off by more than 15%, the joiners' felt
 input delay grows by more than one tick, or any fingerprint differs. It runs in the sim gate on every batch.
 
 ## 7. If paying is ever needed
 
-FACTS_PLACEHOLDER
+Facts, from the [Durable Objects pricing page](https://developers.cloudflare.com/durable-objects/platform/pricing/)
+and the [Workers pricing page](https://developers.cloudflare.com/workers/platform/pricing/) (checked 2026-11-17):
+
+- **The first wall is requests**: 100,000 a day free (above). The second is **awake time**: 13,000 GB-s a day free. A
+  room object is billed at 128 MB for as long as it is awake, and a room in play is always awake, so one 10-minute room
+  is about 77 GB-s: about 169 rooms a day of ANY size. For 2-player rooms the two walls are close (132 vs 169).
+- **Workers Paid is $5 a month** (minimum) and includes 1 million Durable Object requests and 400,000 GB-s a month, then
+  $0.15 per million requests and $12.50 per million GB-s. Incoming WebSocket messages still count 20 to 1.
+- So $5 a month covers about 338 eight-player matches a month (requests are the limit there; awake time would allow
+  about 5,200), and each match after that costs about $0.0014 (about $0.00044 of requests plus $0.00096 of awake time).
+  A 32-player match costs about $0.0028 once over the allowance.
+- Paying changes nothing in the game or the relay code: the same Worker, the same rooms. It is a switch on the
+  Cloudflare account (Workers & Pages, Plans). Past a free limit nothing is ever billed; it only fails.
+- When to consider it: when `tools/online/relay-usage.py` shows days above about 70% of the allowance, or players report
+  "Online rooms are full for today". Until then, the free tier plus same-network and address play cost nothing.
