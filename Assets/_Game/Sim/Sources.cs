@@ -17,9 +17,14 @@ namespace CriticalMass.Sim.Core
         public int MaxCharges;
         /// <summary>Sim ticks until the next charge grows back (0 while full).</summary>
         public int RegrowIn;
-        /// <summary>Bot route to this source, built on first use and when walls changed (Sources.EnsureField).</summary>
+        /// <summary>Bot route to this source, built on first use and when walls changed (Sources.EnsureField). b15 (W6): the
+        /// buffer itself is allocated at CreateWorld (RouteFields.Preallocate), so the first use only fills it.</summary>
         public FlowField Field;
         public int FieldWallVersion;
+        /// <summary>b15 (W6): Field has been computed at least once. Replaces the old "Field == null" first-use test now that the
+        /// buffer exists from the start; never cleared by a reset (the old Field was never nulled either), so every rebuild
+        /// decision, and with it the match, is exactly what it was.</summary>
+        public bool FieldBuilt;
     }
 
     /// <summary>
@@ -354,11 +359,12 @@ namespace CriticalMass.Sim.Core
         {
             DepthState d = w.Depth;
             SourceNode s = d.Sources[i];
-            bool fresh = s.Field == null;
+            bool fresh = !s.FieldBuilt;
             if (!fresh && s.FieldWallVersion == w.WallVersion) return s.Field;
             if (!fresh && d.FieldBuildTick == w.Tick) return s.Field;
             Goal[0] = new PointXZ(s.X, s.Z);
             s.Field = FlowField.ComputeFlowField(w.Map, Goal, s.Field, w.WallVersion);
+            s.FieldBuilt = true;
             s.FieldWallVersion = w.WallVersion;
             if (!fresh) d.FieldBuildTick = w.Tick;
             return s.Field;

@@ -114,6 +114,19 @@ namespace CriticalMass.Sim.Grid
             return top;
         }
 
+        /// <summary>
+        /// b15 (W6): FlowField buffers allocated so far in this process (by ComputeFlowField without a reusable output, or by
+        /// RouteFields.Preallocate). Counted only; nothing in the Sim reads it. One field on the 112x72 map is 64,568 B.
+        /// </summary>
+        public static int Allocations;
+
+        /// <summary>A new, unfilled field of n cells (counted in Allocations).</summary>
+        public static FlowField Allocate(int n)
+        {
+            Allocations++;
+            return new FlowField { Dist = new double[n], Version = 0 };
+        }
+
         /// <summary>Dijkstra distance from the nearest goal to every walkable cell; unwalkable or out-of-map goals are ignored; reuses output when its size matches.</summary>
         public static FlowField ComputeFlowField(MapDef map, IReadOnlyList<PointXZ> goals, FlowField output = null, int version = 0)
         {
@@ -122,7 +135,7 @@ namespace CriticalMass.Sim.Grid
             int H = map.Height;
             int n = W * H;
             byte[] cells = map.Cells;
-            FlowField field = output != null && output.Dist.Length == n ? output : new FlowField { Dist = new double[n], Version = 0 };
+            FlowField field = output != null && output.Dist.Length == n ? output : Allocate(n);
             field.Version = version;
             double[] dist = field.Dist;
             Array.Fill(dist, double.PositiveInfinity);
