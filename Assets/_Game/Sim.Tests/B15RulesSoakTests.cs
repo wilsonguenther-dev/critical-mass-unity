@@ -35,6 +35,13 @@ namespace CriticalMass.Sim.Tests
             public readonly int[] ClassKills = new int[6];
             public readonly int[] Picks = new int[11], PickWins = new int[11];
             public int Opened, Closed, Empty, Longest;
+            /// <summary>PR #226 BalanceProbe's definition on the same ticks: dead = !Alive or StandUp &gt; 0; walking = alive, not
+            /// fighting (a hit dealt or taken or a swing started in the last 1 s), moving over 0.5 u/s, carrying nothing, off the
+            /// hill (radius Map.Hill.R). ProbeWalkInWindow = probe-walking ticks that are also inside this test's walk-back window.</summary>
+            public double ProbeDeadTicks, ProbeWalkTicks, ProbeWalkInWindow, StandUpTicks;
+            /// <summary>Kaiju snowball check: sided hatches, how many the Kaiju side won, how many went to the team trailing on hill
+            /// seconds at the hatch (and how many of those it won), and the hatches with a hill leader.</summary>
+            public int Sided, SideWon, HatchWithLeader, TrailerGotIt, TrailerGotItWon, LeaderGotIt, LeaderGotItWon;
         }
 
         static string F(double v, string f = "0.000") => v.ToString(f, CultureInfo.InvariantCulture);
@@ -68,6 +75,14 @@ namespace CriticalMass.Sim.Tests
             int lastSign = 0, changes = 0, halfSign = 0, kills = 0, lastSec = 0;
             double hr = cfg.Hill.Radius + WalkHillMargin, hr2 = hr * hr, dt = SimStep.Dt(cfg);
             int cursor = w.EventHead;
+            // PR #226 BalanceProbe's dead / walking (same ticks, for the reconciliation)
+            int[] lastFight = new int[n];
+            double[] px = new double[n], pz = new double[n];
+            for (int i = 0; i < n; i++) { lastFight[i] = int.MinValue / 2; px[i] = w.X[i]; pz[i] = w.Z[i]; }
+            int fightTicks = (int)Math.Round(1.0 * cfg.SimHz);
+            double pr = w.Map.Hill.R, pr2 = pr * pr, ws2 = 0.5 * dt * 0.5 * dt;
+            bool hatchSeen = false;
+            int hatchSide = 0, hatchLead = 0;
             long t0 = Stopwatch.GetTimestamp();
             int t = 0;
             for (; t < max && w.Match.Phase != MatchPhase.Ended; t++)
@@ -93,13 +108,35 @@ namespace CriticalMass.Sim.Tests
                     }
                     else if (e.Type == SimEventType.Hit)
                     {
-                        if (e.A >= 0 && e.A < n) walking[e.A] = false;
-                        if (e.B >= 0 && e.B < n) walking[e.B] = false;
+                        if (e.A >= 0 && e.A < n) { walking[e.A] = false; lastFight[e.A] = w.Tick; }
+                        if (e.B >= 0 && e.B < n) { walking[e.B] = false; lastFight[e.B] = w.Tick; }
                     }
+                    else if (e.Type == SimEventType.AttackStart && e.A >= 0 && e.A < n) lastFight[e.A] = w.Tick;
+                }
+                if (!hatchSeen && w.Match.Hatched)
+                {
+                    hatchSeen = true;
+                    hatchSide = w.Kaiju.State == KaijuState.Azure ? 1 : w.Kaiju.State == KaijuState.Crimson ? -1 : 0;
+                    double hl = w.Match.HillSeconds.Azure - w.Match.HillSeconds.Crimson;
+                    hatchLead = hl > 0.5 ? 1 : hl < -0.5 ? -1 : 0;
                 }
                 for (int i = 0; i < n; i++)
                 {
                     Actor a = w.Actors[i];
+                    double mx = w.X[i] - px[i], mz = w.Z[i] - pz[i];
+                    px[i] = w.X[i];
+                    pz[i] = w.Z[i];
+                    bool probeWalk = false;
+                    if (!a.Alive || a.StandUp > 0)
+                    {
+                        arm.ProbeDeadTicks++;
+                        if (a.Alive) arm.StandUpTicks++;
+                    }
+                    else if (w.Tick - lastFight[i] > fightTicks)
+                    {
+                        double ox = w.X[i] - w.Map.Hill.X, oz = w.Z[i] - w.Map.Hill.Z;
+                        if (mx * mx + mz * mz > ws2 && a.CarryAmount <= 0 && ox * ox + oz * oz > pr2) { arm.ProbeWalkTicks++; probeWalk = true; }
+                    }
                     if (!a.Alive) { arm.DeadTicks++; continue; }
                     if (!walking[i]) continue;
                     double dx = w.X[i] - w.Map.Hill.X, dz = w.Z[i] - w.Map.Hill.Z;
@@ -109,6 +146,7 @@ namespace CriticalMass.Sim.Tests
                         continue;
                     }
                     arm.WalkTicks++;
+                    if (probeWalk) arm.ProbeWalkInWindow++;
                 }
                 arm.ActorTicks += n;
                 if (w.Tick % hz != 0) continue;
@@ -130,6 +168,18 @@ namespace CriticalMass.Sim.Tests
             arm.Turns += w.Rally.Turns;
             MatchResult win = w.Match.Winner;
             arm.T16.Add(win);
+            int wsg = win == MatchResult.Azure ? 1 : win == MatchResult.Crimson ? -1 : 0;
+            if (hatchSide != 0)
+            {
+                arm.Sided++;
+                if (hatchSide == wsg) arm.SideWon++;
+                if (hatchLead != 0)
+                {
+                    arm.HatchWithLeader++;
+                    if (hatchSide == -hatchLead) { arm.TrailerGotIt++; if (wsg == hatchSide) arm.TrailerGotItWon++; }
+                    else { arm.LeaderGotIt++; if (wsg == hatchSide) arm.LeaderGotItWon++; }
+                }
+            }
             double ha = w.Match.HillSeconds.Azure, hc = w.Match.HillSeconds.Crimson;
             int winSign = win == MatchResult.Azure ? 1 : win == MatchResult.Crimson ? -1 : 0;
             double decided = double.NaN;
@@ -195,6 +245,8 @@ namespace CriticalMass.Sim.Tests
         public static double BlowoutRate(Arm a) => a.Decided.Count > 0 ? (double)a.Blowouts / a.Decided.Count : 0;
         public static double DeadShare(Arm a) => a.ActorTicks > 0 ? a.DeadTicks / a.ActorTicks : 0;
         public static double DownShare(Arm a) => a.ActorTicks > 0 ? (a.DeadTicks + a.WalkTicks) / a.ActorTicks : 0;
+        /// <summary>PR #226 BalanceProbe's "time.deadwalk.all" on this arm's ticks.</summary>
+        public static double ProbeDownShare(Arm a) => a.ActorTicks > 0 ? (a.ProbeDeadTicks + a.ProbeWalkTicks) / a.ActorTicks : 0;
         public static double LeaderWins(Arm a) => a.LeaderAtHalf > 0 ? (double)a.LeaderAtHalfWon / a.LeaderAtHalf : 0;
 
         public static void Print(Arm a)

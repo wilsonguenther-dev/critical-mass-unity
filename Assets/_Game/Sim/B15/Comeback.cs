@@ -203,6 +203,36 @@ namespace CriticalMass.Sim.Core
             return (1000 - (1000 - min) * over / span) / 1000.0;
         }
 
+        /// <summary>
+        /// SimResources.ApplyDelivery (before the hatch): TRAILING FEED's allegiance scale for a delivery by team (1 = off): a
+        /// team trailing on hill seconds by more than TrailThresholdSeconds feeds x(1 + FeedTrailingPerMille / 1000).
+        /// </summary>
+        public static double FeedScale(World w, TeamId team)
+        {
+            if (!On(w)) return 1.0;
+            ComebackConfig k = w.Config.Depth.Comeback;
+            if (k.FeedTrailingPerMille <= 0 || !(Deficit(w, team) > k.TrailThresholdSeconds)) return 1.0;
+            return 1 + k.FeedTrailingPerMille / 1000.0;
+        }
+
+        /// <summary>
+        /// Hill.HillSystem, with this tick's owner: KAIJU HOLDS NOTHING's share of a second the owner scores (1 = full): the
+        /// owner's own sided Kaiju is up (not knocked out) and stands inside the hill ring (hill radius + Kaiju radius).
+        /// </summary>
+        public static double KaijuHillRate(World w, HillState next)
+        {
+            if (!On(w)) return 1.0;
+            int per = w.Config.Depth.Comeback.KaijuHillPerMille;
+            if (per >= 1000) return 1.0;
+            Kaiju kj = w.Kaiju;
+            if (kj.KoIn > 0) return 1.0;
+            if (!((next == HillState.Azure && kj.State == KaijuState.Azure) || (next == HillState.Crimson && kj.State == KaijuState.Crimson))) return 1.0;
+            double r = w.Config.Hill.Radius + w.Config.Kaiju.Radius;
+            double dx = kj.X - w.Map.Hill.X, dz = kj.Z - w.Map.Hill.Z;
+            if (dx * dx + dz * dz >= r * r) return 1.0;
+            return Math.Max(0, per) / 1000.0;
+        }
+
         /// <summary>Kaiju KO (Kaiju.Hatch DamageKaiju): TURNCOAT remembers the team that knocked a sided Kaiju down.</summary>
         public static void OnKaijuKo(World w, int sourceId)
         {

@@ -38,9 +38,10 @@ namespace CriticalMass.Sim.Config
         /// <summary>1 = linear, 2 = quadratic (slow start). Integers only.</summary>
         public int CurvePower = 1;
 
-        // Defaults = the set chosen by the pass-2 sweep (B15SweepTests rounds 1-3, confirmed on 72 seeds): TURNCOAT + HOLD FATIGUE
-        // 20/40/0.25 + FORWARD RETURN 0.4 (also when the hill is lost) + RALLY x1.5 past 5 s, cap 60 s + respawn 2 -> 5 s. WAVES and
-        // MAJORITY stay off (both made matches worse: waves 6-10 s raised blowouts to 0.46-0.67, majority 2-3 did not lower them).
+        // Defaults = the pass-2 sweep's set (B15SweepTests rounds 1-3, confirmed on 72 seeds) WITHOUT TURNCOAT (off 2026-11-20 until
+        // the owner rules on Kaiju allegiance): HOLD FATIGUE 20/40/0.25 + FORWARD RETURN 0.4 (also when the hill is lost) + RALLY
+        // x1.5 past 5 s, cap 60 s + respawn 2 -> 5 s (B15RuleSetsTests arm B). WAVES and MAJORITY stay off (both made matches
+        // worse: waves 6-10 s raised blowouts to 0.46-0.67, majority 2-3 did not lower them).
 
         // ---- b15 pass 2 levers (each its own switch; all symmetric, read only match state)
         /// <summary>WAVES: a knocked-out fighter comes back at his team's next wave (every WaveSeconds of match time, both teams
@@ -48,8 +49,22 @@ namespace CriticalMass.Sim.Config
         public double WaveSeconds = 0;
 
         /// <summary>TURNCOAT KAIJU: a sided Kaiju knocked out by the other team gets up on the side of the team that knocked it
-        /// down ("it becomes what beat it"); a neutral or berserk Kaiju never turns.</summary>
-        public bool KaijuTurncoat = true;
+        /// down ("it becomes what beat it"); a neutral or berserk Kaiju never turns. OFF by default (2026-11-20): the design
+        /// advisor holds that the team that fed it more keeps it unless it is corrupted, and the owner has not ruled; the switch
+        /// stays for that ruling (B15RuleSetsTests arm E measures it).</summary>
+        public bool KaijuTurncoat = false;
+
+        /// <summary>TRAILING FEED (arm C): while a team trails on hill seconds by more than TrailThresholdSeconds, its deliveries
+        /// to the egg count this many per mille EXTRA toward allegiance (500 = x1.5). 0 = off. Before the hatch only (allegiance
+        /// means nothing after it). The trailing team already feeds more (the bots' gambit), so B15RuleSetsTests prints whether
+        /// the team that trailed at the hatch got the Kaiju and whether the Kaiju side then won (the snowball check).</summary>
+        public int FeedTrailingPerMille = 0;
+
+        /// <summary>KAIJU HOLDS NOTHING (arm D): while a sided Kaiju is up and standing in the hill ring (hill radius plus its own
+        /// radius), its team's hill seconds count this many per mille (500 = half). 1000 = off. The Kaiju still fights for its
+        /// team; it only stops being the thing that holds the hill for it (the diagnosis: the Kaiju side owned 74-89% of the
+        /// second half because the enemy left the hill to fight it).</summary>
+        public int KaijuHillPerMille = 1000;
 
         /// <summary>HOLD FATIGUE: after HoldGraceSeconds of unbroken ownership the owner's hill seconds count less and less, down
         /// to HoldMinPerMille / 1000 after HoldSpanSeconds more; a lost, contested or empty hill resets the streak.</summary>

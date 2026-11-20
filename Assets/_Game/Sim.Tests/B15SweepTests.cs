@@ -29,6 +29,8 @@ namespace CriticalMass.Sim.Tests
             k.MajorityMargin = 1;
             k.ForwardReturnOn = false;
             k.ForwardWhenHillLost = false;
+            k.FeedTrailingPerMille = 0;
+            k.KaijuHillPerMille = 1000;
         }
 
         public static Action<GameConfig> Arm(params Action<ComebackConfig>[] levers) => c =>

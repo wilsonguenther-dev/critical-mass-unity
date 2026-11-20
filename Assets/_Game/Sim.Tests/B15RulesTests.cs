@@ -45,8 +45,10 @@ namespace CriticalMass.Sim.Tests
             var k = new ComebackConfig();
             string got = "RALLY " + k.RallyOn + " x" + (1 + k.RallyPerMille / 1000.0) + " past " + k.TrailThresholdSeconds + " s cap " + k.BonusCapSeconds + " s; respawn " + k.RespawnCurveOn + " "
                 + k.RespawnStartSeconds + " -> " + k.RespawnEndSeconds + " s p" + k.CurvePower + "; waves " + k.WaveSeconds + "; turncoat " + k.KaijuTurncoat + "; fatigue " + k.HoldFatigueOn + " "
-                + k.HoldGraceSeconds + "/" + k.HoldSpanSeconds + "/" + k.HoldMinPerMille + "; majority " + k.MajorityMargin + "; forward " + k.ForwardReturnOn + " " + k.ForwardShare + " lost " + k.ForwardWhenHillLost;
-            const string want = "RALLY True x1.5 past 5 s cap 60 s; respawn True 2 -> 5 s p1; waves 0; turncoat True; fatigue True 20/40/250; majority 1; forward True 0.4 lost True";
+                + k.HoldGraceSeconds + "/" + k.HoldSpanSeconds + "/" + k.HoldMinPerMille + "; majority " + k.MajorityMargin + "; forward " + k.ForwardReturnOn + " " + k.ForwardShare + " lost " + k.ForwardWhenHillLost
+                + "; trailing feed " + k.FeedTrailingPerMille + "; kaiju hill " + k.KaijuHillPerMille;
+            // 2026-11-20: TURNCOAT off until the owner rules on Kaiju allegiance (B15RuleSetsTests arm B is this set)
+            const string want = "RALLY True x1.5 past 5 s cap 60 s; respawn True 2 -> 5 s p1; waves 0; turncoat False; fatigue True 20/40/250; majority 1; forward True 0.4 lost True; trailing feed 0; kaiju hill 1000";
             Line("comeback defaults", got, want);
             Assert.AreEqual(want, got);
             Assert.IsTrue(k.Enabled);
@@ -772,6 +774,48 @@ namespace CriticalMass.Sim.Tests
             Comeback.OnKaijuRecover(off);
             Assert.AreEqual(KaijuState.Azure, off.Kaiju.State, "lever off: unchanged");
             Line("TURNCOAT: Azure Kaiju knocked down by Crimson gets up", "Crimson (turns 1); berserk stays berserk; off stays Azure", "same");
+        }
+
+        [Test]
+        public void TrailingFeedCountsMoreForTheTeamBehindOnly()
+        {
+            World w = Make(Levers(k => k.FeedTrailingPerMille = 500), 63, 5);
+            w.Match.HillSeconds.Azure = 0;
+            w.Match.HillSeconds.Crimson = 10;
+            Assert.AreEqual(1.5, Comeback.FeedScale(w, TeamId.Azure), 1e-12, "Azure trails by 10 s (> 5 s)");
+            Assert.AreEqual(1.0, Comeback.FeedScale(w, TeamId.Crimson), "the leader feeds at x1");
+            w.Match.HillSeconds.Crimson = 5;
+            Assert.AreEqual(1.0, Comeback.FeedScale(w, TeamId.Azure), "a 5 s gap is not trailing");
+            World off = Make(Levers(k => { }), 63, 5);
+            off.Match.HillSeconds.Crimson = 40;
+            Assert.AreEqual(1.0, Comeback.FeedScale(off, TeamId.Azure), "lever off: x1");
+            Line("TRAILING FEED x1.5: Azure 10 s behind / leader / 5 s gap / off", "1.5 / 1 / 1 / 1", "same");
+        }
+
+        [Test]
+        public void TheKaijuHoldsNothingForItsTeamWhileItStandsOnTheHill()
+        {
+            World w = Make(Levers(k => k.KaijuHillPerMille = 500), 63, 5);
+            w.Kaiju.State = KaijuState.Azure;
+            w.Kaiju.KoIn = 0;
+            w.Kaiju.X = w.Map.Hill.X;
+            w.Kaiju.Z = w.Map.Hill.Z;
+            Assert.AreEqual(0.5, Comeback.KaijuHillRate(w, HillState.Azure), 1e-12, "its own team on the hill with it: x0.5");
+            Assert.AreEqual(1.0, Comeback.KaijuHillRate(w, HillState.Crimson), "the other team scores in full");
+            w.Kaiju.KoIn = 5;
+            Assert.AreEqual(1.0, Comeback.KaijuHillRate(w, HillState.Azure), "knocked out: x1");
+            w.Kaiju.KoIn = 0;
+            w.Kaiju.X = w.Map.Hill.X + w.Config.Hill.Radius + w.Config.Kaiju.Radius + 1;
+            Assert.AreEqual(1.0, Comeback.KaijuHillRate(w, HillState.Azure), "off the hill: x1");
+            w.Kaiju.X = w.Map.Hill.X;
+            w.Kaiju.State = KaijuState.Berserk;
+            Assert.AreEqual(1.0, Comeback.KaijuHillRate(w, HillState.Azure), "a berserk Kaiju is nobody's");
+            World off = Make(Levers(k => { }), 63, 5);
+            off.Kaiju.State = KaijuState.Azure;
+            off.Kaiju.X = off.Map.Hill.X;
+            off.Kaiju.Z = off.Map.Hill.Z;
+            Assert.AreEqual(1.0, Comeback.KaijuHillRate(off, HillState.Azure), "lever off: x1");
+            Line("KAIJU HOLDS NOTHING x0.5: own team / other team / KO / off the hill / berserk / off", "0.5 / 1 / 1 / 1 / 1 / 1", "same");
         }
 
         [Test]
