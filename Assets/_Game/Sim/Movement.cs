@@ -84,6 +84,7 @@ namespace CriticalMass.Sim.Core
                         speed *= cfg.Physics.SwingMoveMultiplier;
                     speed *= Pickups.SpeedScale(w, i); // U-066 Haste (exactly 1 without it)
                     speed *= B13Hooks.SpeedScale(w, i);   // b13-hook
+                    speed *= TerrainHeight.SpeedScale(w, i); // b15: the short slow after a level change (exactly 1 without the rule)
                     tx = mx * speed;
                     tz = mz * speed;
                 }
@@ -132,6 +133,7 @@ namespace CriticalMass.Sim.Core
                 }
             }
             Collide.SeparateActors(w);
+            TerrainHeight.MovementEnd(w); // b15 terrain height: levels, slows, climb counters (no-op without the rule)
         }
 
         /// <summary>

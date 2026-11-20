@@ -546,11 +546,14 @@ namespace CriticalMass.Sim.Core
                     {
                         int i = cz * map.Width + cx;
                         byte t = map.Cells[i];
-                        if (t != Cell.Floor && t != Cell.Bridge) continue;
+                        // b15: a raised cell, or a height ladder on one (false without the height rule)
+                        bool raised = TerrainHeight.Raised(map, i) || (map.Lift != null && map.Lift[i] > 0 && t == Cell.Bridge && TerrainHeight.LadderGround(w, i, out _));
+                        if (!raised && t != Cell.Floor && t != Cell.Bridge) continue;
                         double dx = cx + 0.5 - bx;
                         double dz = cz + 0.5 - bz;
                         if (dx * dx + dz * dz > C * C + 1e-9) continue;
-                        int why = Terraform.DigRefusal(w, cx, cz);
+                        if (raised && TerrainHeight.TntCell(w, b.Owner, cx, cz)) continue;   // b15: a stack loses TntLevels levels
+                        int why = Terraform.VoidDigRefusal(w, cx, cz);
                         if (why != 0)
                         {
                             if (why == Terraform.RefusedRoute) s.Stats.RouteRefusals++;
@@ -558,6 +561,7 @@ namespace CriticalMass.Sim.Core
                             continue;
                         }
                         MapGrid.SetCell(w, cx, cz, Cell.Void);
+                        TerrainHeight.ZeroLift(map, i);   // b15: a cratered pit starts again from level 0
                         s.Stats.CellsCarved++;
                         World.PushEvent(w, SimEventType.Terraform, b.Owner, i, cx + 0.5, cz + 0.5, Terraform.Dug);
                     }

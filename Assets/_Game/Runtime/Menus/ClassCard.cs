@@ -427,7 +427,7 @@ namespace CriticalMass.Runtime.Menus
         public const string BuilderBio = "Flat cap, pencil behind the ear. Give the Builder wood and a gap, and he hands you a wall, a ladder or a bridge.";
         public const string BuilderBuild = "F uses the selected tool where the outline shows. Right click does the same.";
         public const string BuilderSwitch = "One wheel: dig, place, ladder, bridge, short wall, tall wall (hut level 2), block. The wheel or 1-7 picks.";
-        public const string BuilderStairs = "A LADDER climbs the rock wall you face (rock walls stand on the hill); a BRIDGE spans straight out from your edge.";
+        public const string BuilderStairs = "A LADDER climbs the wall, ledge or stack you face (a rock wall on the hill, a pit wall, a stack side); a BRIDGE spans straight out from your edge.";
         /// <summary>b13 r2 (owner decision: terrain belongs to the Builder and the Demolitionist): the Builder's F while the hut rule is on.</summary>
         public const string BuilderDig = "With DIG on the wheel, F digs a block of ground; with PLACE, F at an edge or a hole puts it back.";
         public const string BuilderDigSwitch = "The wheel or LB picks the next tool: dig, place, ladder, bridge.";

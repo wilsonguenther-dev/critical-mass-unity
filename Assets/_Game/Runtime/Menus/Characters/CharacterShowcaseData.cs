@@ -119,7 +119,7 @@ namespace CriticalMass.Runtime.Menus.Characters
                 {
                     S("USE TOOL", "F uses the selected tool where the outline shows. Right click does the same."),
                     S("TOOL WHEEL", "Dig, place, ladder, bridge, short wall, tall wall (hut level 2), block. The wheel or 1-7 picks one."),
-                    S("LADDERS AND BRIDGES", "A ladder climbs the rock wall you face (rock walls stand on the hill); a bridge spans straight out from your edge."),
+                    S("LADDERS AND BRIDGES", "A ladder climbs the wall, ledge or stack you face (a rock wall on the hill, a pit wall, a stack side); a bridge spans straight out from your edge."),
                     S("JUMP AND DODGE", "Jump clears gaps and short walls; a dodge dashes you out of a hit."),
                 },
             },

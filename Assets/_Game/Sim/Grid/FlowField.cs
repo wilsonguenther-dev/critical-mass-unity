@@ -174,12 +174,29 @@ namespace CriticalMass.Sim.Grid
                     {
                         // No corner cutting: both orthogonal cells must be walkable.
                         if (!MapGrid.IsWalkableType(cells[cz * W + nx]) || !MapGrid.IsWalkableType(cells[nz * W + cx])) continue;
+                        // b15 terrain height: no diagonal across a height change.
+                        if (map.Lift != null && !TerrainHeight.DiagonalLevel(map, c, ni, cz * W + nx, nz * W + cx)) continue;
                         step = Sqrt2;
+                    }
+                    else if (map.Lift != null)
+                    {
+                        // b15 terrain height: 1 or 2 levels cost extra (a step, a climb), 3 or more are closed (a ramp excepted).
+                        double extra = TerrainHeight.EdgeExtra(map, c, ni);
+                        if (extra < 0) continue;
+                        step += extra;
                     }
                     PushOrDecrease(ni, d + step);
                 }
             }
             return field;
+        }
+
+        /// <summary>b15 terrain height: the field step from cell c to neighbour n (k = neighbour slot; a, b = the diagonal's orthogonal cells) is open.</summary>
+        public static bool LiftStepOk(MapDef map, int c, int n, int k, int a, int b)
+        {
+            if (!MapGrid.IsWalkableType(map.Cells[c]) || !MapGrid.IsWalkableType(map.Cells[n])) return true;
+            if (k >= 4) return TerrainHeight.DiagonalLevel(map, c, n, a, b);
+            return TerrainHeight.EdgeExtra(map, c, n) >= 0;
         }
 
         /// <summary>Unit direction from the cell containing (x, z) toward its lowest-distance neighbour; (0, 0) and false at a goal or when no neighbour is closer.</summary>
@@ -204,6 +221,7 @@ namespace CriticalMass.Sim.Grid
                 double d = field.Dist[nz * W + nx];
                 if (!(d < best)) continue;
                 if (k >= 4 && (!MapGrid.IsWalkableType(cells[cz * W + nx]) || !MapGrid.IsWalkableType(cells[nz * W + cx]))) continue;
+                if (map.Lift != null && !LiftStepOk(map, cz * W + cx, nz * W + nx, k, cz * W + nx, nz * W + cx)) continue;   // b15
                 best = d;
                 bk = k;
             }

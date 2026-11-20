@@ -55,6 +55,8 @@ namespace CriticalMass.Runtime.View.B13
         public static int GhostCells { get; private set; }
         public static bool GhostOkShown { get; private set; }
         public static int GhostWhyShown { get; private set; }
+        /// <summary>b15: the level a BLOCK ghost would make on a lift cell (0 when the ghost is not a stack).</summary>
+        public static int StackGhostLevel { get; private set; }
         public static int CapsDrawn { get; private set; }
         public static int CracksDrawn { get; private set; }
         public static int WarnDrawn { get; private set; }
@@ -91,6 +93,7 @@ namespace CriticalMass.Runtime.View.B13
             GhostCells = CapsDrawn = CracksDrawn = WarnDrawn = 0;
             GhostOkShown = false;
             GhostWhyShown = 0;
+            StackGhostLevel = 0;
             World w = _driver != null ? _driver.World : null;
             if (w != null && w.Map != null && BuilderWalls.On(w))
             {
@@ -114,6 +117,11 @@ namespace CriticalMass.Runtime.View.B13
             GhostWhyShown = BuilderWalls.GhostWhy(w, me);
             Color32 c = ok ? GhostOk : GhostBad;
             float top = fill ? 0.05f : tall ? TallTop : ShortTop;
+            // b15 terrain height: a BLOCK on a lift cell is one more level: the ghost is that course, from today's top
+            // (GroundHeight.At includes the lift) up one step, so it shows the height the stack will have.
+            bool stack = !fill && w.Walls.Piece[me] == (byte)BuildPiece.Block && Terraform.LiftDig(w, cx, cz);
+            if (stack) top = (float)w.Map.LiftStepU;
+            StackGhostLevel = stack ? w.Map.Lift[cz * w.Map.Width + cx] + 1 : 0;
             int half = len / 2;
             for (int k = -half; k < len - half; k++)
             {

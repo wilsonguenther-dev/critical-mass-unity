@@ -373,7 +373,7 @@ namespace CriticalMass.Runtime.View
             double x = hasFx && fx.Corpse ? fx.CorpseX : Lerp(w.PrevX[i], w.X[i], a);
             double z = hasFx && fx.Corpse ? fx.CorpseZ : Lerp(w.PrevZ[i], w.Z[i], a);
             if (_stressHill) StressPlace(map.Hill, i, ref x, ref z);
-            double h = GroundHeight(map, x, z);
+            double h = CriticalMass.Runtime.GroundHeight.Body(map, x, z);   // b15: on the pit floor / on top of a stack (+ b14 bridge deck)
             // b12-jz / b14 ladder fix: up the near ladder, along the rock top, down the far ladder; on the rungs the fighter
             // faces the ladder (the wall), going up and coming down
             bool onLadder = CriticalMass.Runtime.View.Mechanics.LadderClimb.Sample(w, x, z, out float ladderLift, out bool onRungs, out double rungYaw);

@@ -208,8 +208,10 @@ namespace CriticalMass.Runtime.PlayTests
         {
             double f = W.Actors[0].Facing;
             int dx = (int)Math.Round(Math.Cos(f)), dz = (int)Math.Round(Math.Sin(f));
-            return BuiltPieces.Plan(W, 0, dx, dz, BuiltPieces.Ladder) == 0
-                && CriticalMass.Runtime.View.Mechanics.LadderClimb.LastPlanIsShortcut(W, 0, dx, dz);
+            if (BuiltPieces.Plan(W, 0, dx, dz, BuiltPieces.Ladder) != 0) return false;
+            // integrator b15: a height ladder (pit wall / stack side) is always a climb, as AffordanceCore treats it
+            if (TerrainHeight.On(W) && BuiltPieces.LastPlanCount == 1 && TerrainHeight.IsLiftType(W.Map.Cells[BuiltPieces.LastPlanCell(0)])) return true;
+            return CriticalMass.Runtime.View.Mechanics.LadderClimb.LastPlanIsShortcut(W, 0, dx, dz);
         }
 
         [UnityTest]
