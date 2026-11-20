@@ -149,16 +149,16 @@ namespace CriticalMass.Sim.Bots
                         continue;
                     }
                     double dx = w.X[id] - hill.X, dz = w.Z[id] - hill.Z, d2 = dx * dx + dz * dz;
-                    if (st.SeenDeaths[id] != a.Deaths)
+                    st.SeenDeaths[id] = a.Deaths;
+                    // v2: every hill-job bot walking in from outside the staging ring stages while the hill is lost (respawned
+                    // ones and field walkers alike: v1 staged only respawns, 0.58 of arrivals were still outnumbered by 2+).
+                    byte job = st.Job[id];
+                    if (outnumbered && st.Rally[id] == RallyNone && (job == JobHill || job == JobGuard || job == JobCalled) && d2 > near2 &&
+                        (a.AiState == AiState.ToHill || a.AiState == AiState.None))
                     {
-                        st.SeenDeaths[id] = a.Deaths;
-                        byte job = st.Job[id];
-                        if (outnumbered && (job == JobHill || job == JobGuard || job == JobCalled) && d2 > near2)
-                        {
-                            st.Rally[id] = RallyStage;
-                            st.RallySince[id] = now;
-                            st.Rallies++;
-                        }
+                        st.Rally[id] = RallyStage;
+                        st.RallySince[id] = now;
+                        st.Rallies++;
                     }
                     if (st.Rally[id] == RallyGo && d2 <= in2) st.Rally[id] = RallyNone;
                     if (st.Rally[id] != RallyStage) continue;
@@ -166,7 +166,9 @@ namespace CriticalMass.Sim.Bots
                     if (st.RallySince[id] < oldest) oldest = st.RallySince[id];
                 }
                 if (oldest == double.PositiveInfinity) continue;
-                int need = Math.Max(b.GroupMin, (int)Math.Ceiling(b.GroupShare * teamSize - 1e-9));
+                // v2: the group goes in once it can match the holders (their disc bodies minus one), at least GroupMin and at
+                // most GroupShare of the team (v1 sent groups of 4 at a hill held by 12).
+                int need = Math.Max(b.GroupMin, Math.Min(st.HillBodies[1 - t] - 1, (int)Math.Ceiling(b.GroupShare * teamSize - 1e-9)));
                 bool go = !outnumbered || staged + st.HillBodies[t] >= need || now - oldest >= b.RallySeconds;
                 bool released = false;
                 for (int id = 0; id < n; id++)

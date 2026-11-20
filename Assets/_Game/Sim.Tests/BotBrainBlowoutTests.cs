@@ -25,6 +25,7 @@ namespace CriticalMass.Sim.Tests
         {
             public string Name;
             public int Matches, Decided, Blowouts, LeaderAtHalf, LeaderAtHalfWon, Sided, SideWon, Arrivals, Outnumbered, DownFast, Shiver, Rallies, Releases;
+            public double KaijuOwnedTicks, KaijuOnDiscTicks;
             public double LeadChanges, SideShare1, SideShare2, SideHalves, OwnerBodies, ChallengerBodies, BodySamples, Us;
             public long Ticks;
             public readonly List<int> Stuck = new List<int>();
@@ -62,6 +63,12 @@ namespace CriticalMass.Sim.Tests
                 watch.Observe(w);
                 Kaiju k = w.Kaiju;
                 if (side == 0 && w.Match.Hatched) side = k.State == KaijuState.Azure ? 1 : k.State == KaijuState.Crimson ? -1 : 0;
+                if (w.Match.Hatched && (k.State == KaijuState.Azure || k.State == KaijuState.Crimson) && k.KoIn <= 0)
+                {
+                    arm.KaijuOwnedTicks++;
+                    double kx = k.X - hill.X, kz = k.Z - hill.Z;
+                    if (kx * kx + kz * kz <= hill.R * hill.R) arm.KaijuOnDiscTicks++;
+                }
                 for (; head < w.EventHead; head++)
                 {
                     SimEvent e = w.Events[head % World.EventCapacity];
@@ -186,7 +193,7 @@ namespace CriticalMass.Sim.Tests
                    ",\"kaijuSideWins\":" + F(a.SideWon / (double)Math.Max(1, a.Sided)) + ",\"arrivals\":" + a.Arrivals + ",\"arrivalsOutnumbered2\":" + F(a.Outnumbered / (double)Math.Max(1, a.Arrivals)) +
                    ",\"downWithin5s\":" + F(a.DownFast / (double)Math.Max(1, a.Arrivals)) + ",\"ownerBodiesH2\":" + (a.OwnerBodies / Math.Max(1, a.BodySamples)).ToString("0.0") +
                    ",\"challengerBodiesH2\":" + (a.ChallengerBodies / Math.Max(1, a.BodySamples)).ToString("0.0") + ",\"stuckMedian\":" + med.ToString("0.0") + ",\"shiverFlags\":" + a.Shiver +
-                   ",\"rallies\":" + a.Rallies + ",\"releases\":" + a.Releases + ",\"usPerTick\":" + (a.Us / Math.Max(1, a.Ticks)).ToString("0.0") + "}";
+                   ",\"kaijuOnDiscShare\":" + F(a.KaijuOnDiscTicks / Math.Max(1, a.KaijuOwnedTicks)) + ",\"rallies\":" + a.Rallies + ",\"releases\":" + a.Releases + ",\"usPerTick\":" + (a.Us / Math.Max(1, a.Ticks)).ToString("0.0") + "}";
         }
 
         private static void Compare(int[] seeds, string label)

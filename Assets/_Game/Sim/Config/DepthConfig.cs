@@ -73,9 +73,10 @@ namespace CriticalMass.Sim.Config
     /// the hill; everyone else stays on the hill (before: every bot left to fight it). GuardCount hill-squad bots never chase
     /// off the hill, even when the team is far ahead. Feeders keep the director's egg quota; Miners and Builders keep their
     /// class tasks and are called to the hill when it is lost by CallToHillDeficit bodies or more.</item>
-    /// <item>(b) Group up: a bot that respawns while the enemy holds the hill by RallyOutnumberedBy or more waits at
-    /// StageRadius from the hill centre and goes in with the others once the group (staged plus own bodies on the hill) is
-    /// max(GroupMin, GroupShare x team) or the oldest has waited RallySeconds.</item>
+    /// <item>(b) Group up: a hill bot walking in while the enemy holds the hill by RallyOutnumberedBy or more waits at
+    /// StageRadius from the hill centre and goes in with the others once the group (staged plus own bodies on the hill)
+    /// reaches the holders' disc bodies minus one (at least GroupMin, at most GroupShare x team) or the oldest has waited
+    /// RallySeconds.</item>
     /// <item>(c) Target choice: a visible Healer within fight range first, else the lowest-health enemy within attack reach,
     /// else the nearest; the current target keeps TargetStickScore (no flicker).</item>
     /// </list>
@@ -94,8 +95,8 @@ namespace CriticalMass.Sim.Config
         /// <summary>The staging ring: this far from the hill centre (outside the Kaiju's 13 u fight zone).</summary>
         public double StageRadius = 15;
         public int GroupMin = 3;
-        public double GroupShare = 0.25;
-        public double RallySeconds = 8;
+        public double GroupShare = 0.5;
+        public double RallySeconds = 12;
         /// <summary>A respawned bot stages only while the enemy has at least this many more bodies on the hill disc.</summary>
         public int RallyOutnumberedBy = 2;
         public bool TargetHealersFirst = true;
