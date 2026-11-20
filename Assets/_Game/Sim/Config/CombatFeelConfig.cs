@@ -129,7 +129,8 @@ namespace CriticalMass.Sim.Config
         /// <summary>Bots side-step when jammed (BotSteer.Unjam). False = the FSM's own unstick only.</summary>
         public bool BotUnjam = true;
         /// <summary>No side-step within this many u of the Kaiju (0 = no such rule).</summary>
-        public double BotUnjamKaijuClear = 0;
+        // Pass 4 default 6 (the bisect, 24 seeds, run 44836535142: see the PR).
+        public double BotUnjamKaijuClear = 6;
         /// <summary>No side-step within the hill disc grown by this many u (negative = no such rule).</summary>
         public double BotUnjamHillClear = -1;
         /// <summary>Pass 4: no side-step within this many u of the hill centre while the Kaiju is hatched (the Kaiju's fight zone,
@@ -137,7 +138,7 @@ namespace CriticalMass.Sim.Config
         public double BotUnjamHillZone = 0;
         /// <summary>Pass 4: the side-step budget: at most BotUnjamBudget side-steps per bot in any BotUnjamBudgetSeconds window
         /// (0 = unbounded). Past it the FSM's own slower unstick (StuckSeconds) takes over.</summary>
-        public int BotUnjamBudget = 0;
+        public int BotUnjamBudget = 3;   // pass 4: 3 per 6 s (unbounded: 24-seed on-disc 0.185, 3/6 s: 0.228; off: 0.278)
         public double BotUnjamBudgetSeconds = 6;
         /// <summary>After a stagger the victim moves at StaggerSlowMultiplier for StaggerSlowSeconds.</summary>
         public double StaggerSlowSeconds = 0.30;
