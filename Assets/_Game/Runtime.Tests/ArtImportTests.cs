@@ -321,5 +321,32 @@ namespace CriticalMass.Runtime.Tests
                 CollectionAssert.IsSubsetOf(need, e.Clips.Select(c => c.name).ToArray(), spec.Key + " clips");
             }
         }
+
+        /// <summary>
+        /// b15 Kaiju parts: every part set of the adult has its four meshes within the Kaiju budgets (FighterLod), every
+        /// set's LOD1 under the LOD1 budget and its shadow proxy under the Kaiju proxy budget.
+        /// </summary>
+        [Test]
+        public void EveryKaijuPartSetIsWithinTheLodBudgets()
+        {
+            ModelSpec spec = ArtMapping.Spec(ArtMapping.KaijuAdult);
+            GameObject go = Model(spec);
+            Renderer[] rs = go.GetComponentsInChildren<Renderer>(true);
+            foreach (string set in new string[] { null }.Concat(spec.Variants))
+            {
+                string pre = set == null ? "Kaiju_" : "Kaiju_" + set + "_";
+                int Tris(string role)
+                {
+                    Renderer r = rs.FirstOrDefault(x => x.name == pre + role);
+                    Assert.IsNotNull(r, pre + role);
+                    Mesh mesh = r is SkinnedMeshRenderer smr ? smr.sharedMesh : r.GetComponent<MeshFilter>().sharedMesh;
+                    return (int)(mesh.GetIndexCount(0) / 3);
+                }
+                Assert.LessOrEqual(Tris("Hero"), FighterLod.HeroMaxTriangles, pre + "Hero");
+                Assert.LessOrEqual(Tris("LOD0"), FighterLod.KaijuLod0Triangles, pre + "LOD0");
+                Assert.LessOrEqual(Tris("LOD1"), FighterLod.Lod1Triangles, pre + "LOD1");
+                Assert.LessOrEqual(Tris("Shadow"), FighterLod.KaijuShadowTriangles, pre + "Shadow");
+            }
+        }
     }
 }

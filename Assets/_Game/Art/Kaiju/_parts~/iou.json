@@ -1,0 +1,90 @@
+{
+ "px_height": {
+  "Elder": [
+   291,
+   401,
+   278,
+   308
+  ],
+  "Grove": [
+   310,
+   354,
+   243,
+   306
+  ],
+  "Brute": [
+   289,
+   364,
+   317,
+   320
+  ],
+  "Timber": [
+   285,
+   423,
+   293,
+   300
+  ],
+  "Mire": [
+   278,
+   431,
+   320,
+   301
+  ]
+ },
+ "px_area": {
+  "Elder": [
+   39577,
+   46605,
+   46268,
+   38206
+  ],
+  "Grove": [
+   40250,
+   37445,
+   37640,
+   36311
+  ],
+  "Brute": [
+   39984,
+   47770,
+   47802,
+   38005
+  ],
+  "Timber": [
+   33418,
+   38500,
+   37834,
+   31982
+  ],
+  "Mire": [
+   45712,
+   52463,
+   50541,
+   38071
+  ]
+ },
+ "iou_max": {
+  "Elder-Grove": 0.792,
+  "Elder-Timber": 0.733,
+  "Elder-Mire": 0.705,
+  "Grove-Timber": 0.771,
+  "Grove-Mire": 0.737,
+  "Brute-Elder": 0.784,
+  "Brute-Grove": 0.705,
+  "Brute-Timber": 0.699,
+  "Brute-Mire": 0.703,
+  "Mire-Timber": 0.783
+ },
+ "iou_mean": {
+  "Elder-Grove": 0.76,
+  "Elder-Timber": 0.69,
+  "Elder-Mire": 0.648,
+  "Grove-Timber": 0.704,
+  "Grove-Mire": 0.625,
+  "Brute-Elder": 0.77,
+  "Brute-Grove": 0.681,
+  "Brute-Timber": 0.65,
+  "Brute-Mire": 0.638,
+  "Mire-Timber": 0.7
+ }
+}
