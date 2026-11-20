@@ -73,6 +73,10 @@ namespace CriticalMass.Runtime.View.Dressing
         /// <summary>Environment v4 placements added by WorldDresser.Clutter (0 unless the plan was made with extraClutter), and
         /// how many bridge deck tiles it swapped to the damaged tile.</summary>
         public int ClutterCount, DamagedSpans;
+        /// <summary>b15 dead space: signposts at side-route bridge mouths, and the light hooks beside them (sim x, z, ground
+        /// y, facing x, z) the lighting layer may light; the dresser places no light there.</summary>
+        public int RouteSigns;
+        public readonly List<double[]> RouteLights = new List<double[]>();
 
         /// <summary>Order-sensitive FNV-1a 64 of every placement (piece, team, matrix to 1e-4): the determinism fingerprint.</summary>
         public string Hash()
@@ -266,11 +270,14 @@ namespace CriticalMass.Runtime.View.Dressing
             // 7. Decor.
             var skip = new HashSet<long>();
             foreach (int[] f in lfl) skip.Add(Key(f[0], f[1]));
+            int decorFrom = plan.Placements.Count;
             Decor(g, map, plan, fl, flH, wfCells, skip);
+            Calm(map, plan.Placements, decorFrom);   // b15 W07
             // 8. Knock-down decorations (CM-31): the environment kit's ruin column for a pillar.
             Decorations(g, map, plan.Placements);
             // Sky rocks, cloud puffs and the cloud floor under the arena (layout.py place, v1 kept).
             Sky(plan.Placements);
+            RouteMarks(g, plan, spans);   // b15 dead space (WORLD-AUDIT #9): side routes signposted at their bridge mouths
             // Bases kit: districts, hill, shrine; their breakables; the Sim wall cells they cover.
             if (bases != null) Bases(g, map, bases, plan, centroidOf, bodyOf);
             if (extraClutter) Clutter(g, map, plan, fl, flH, spans);
@@ -417,7 +424,10 @@ namespace CriticalMass.Runtime.View.Dressing
                     continue;
                 }
                 if (pd < PATH_W + 2.5 && H32(cx, cz, 211) % 100 < 7) o.Add(At("env_torch", mx + nx * 0.18, h - 0.1, mz + nz * 0.18, eyaw, "light"));
-                else if (pd < PATH_W + 3.0 && H32(cx / 3, cz / 3, 212) % 100 < 22) o.Add(At("env_fence", e.Px, h, e.Pz, eyaw, "dress_tall"));
+                // b15 (W07/W12): the fence stands on the rim lip (its pivot LipSeat u out over the edge), not on the walkable rim cell.
+                // (5 cm along the edge from its start corner, so the pivot is never on the corner a land cell shares.)
+                else if (pd < PATH_W + 3.0 && H32(cx / 3, cz / 3, 212) % 100 < 22)
+                    o.Add(At("env_fence", e.Px + (e.Qx - e.Px) * 0.05 + nx * LipSeat, h - 0.01, e.Pz + (e.Qz - e.Pz) * 0.05 + nz * LipSeat, eyaw, "dress_tall"));
                 else if (H32(cx, cz, 213) % 100 < 4) o.Add(At("env_bush_berry", mx + nx * 0.12, h - 0.04, mz + nz * 0.12, eyaw, "small_tall"));
                 else if (pd > PATH_W + 3.0 && H32(cx, cz, 219) % 100 < 6)
                 {
@@ -432,7 +442,8 @@ namespace CriticalMass.Runtime.View.Dressing
                 }
                 else if (pd > PATH_W + 1.5 && !occ.Contains(Key(cx, cz)) && H32(cx, cz, 220) % 100 < 7)
                 {
-                    o.Add(At(V4Trees[H32(cx, cz, 223) % 3], mx - nx * 0.3, h, mz - nz * 0.3, H32(cx, cz, 226) % 360, "tree"));
+                    // b15: an edge tree's trunk sits over the rim band (Decor's big-prop rule), not 0.3 u inside on the walkable cell.
+                    o.Add(At(V4Trees[H32(cx, cz, 223) % 3], mx + nx * 0.3, h, mz + nz * 0.3, H32(cx, cz, 226) % 360, "tree"));
                     occ.Add(Key(cx, cz));
                 }
                 if (nx + nz > 0.1)
@@ -521,7 +532,9 @@ namespace CriticalMass.Runtime.View.Dressing
                 // That tile has a missing and a snapped plank, so 14 % of the inner tiles of every span showed a hole the
                 // player walks straight over: decoration that reads as a broken, unwalkable deck. An intact deck now looks
                 // intact (the damaged piece stays in the kit, unused). DamagedSpans stays 0.
-                if (k % 3 == 1)
+                // b15 (WORLD-AUDIT #22 / W07): the hanging lanterns hung from nothing 0.3 u over the deck (26 floating, all on
+                // walkable bridge cells). Bridges are lit at their mouths instead (WorldPlan.RouteLights, the lighting hook).
+                if (HangLanterns && k % 3 == 1)
                 {
                     Vector3 X = t.Matrix.GetColumn(0), F = (Vector3)t.Matrix.GetColumn(2) * (float)TILE;
                     double w = X.magnitude;
@@ -532,6 +545,8 @@ namespace CriticalMass.Runtime.View.Dressing
                     o.Add(At("env_lantern_hang", t.SimX - fz * 1.31 * w + fx * 0.02, t.Y + 0.69, t.SimZ + fx * 1.31 * w + fz * 0.02, YawDir(fx, fz), "light"));
                 }
             }
+            Calm(map, o, 0);   // b15 W07
+            LiftDecals(o);     // b15 #23
             pl.AddRange(o);
             plan.ClutterCount = o.Count;
         }
@@ -1163,16 +1178,33 @@ namespace CriticalMass.Runtime.View.Dressing
             }
         }
 
+        /// <summary>
+        /// b15 sky rocks (WORLD-AUDIT #20 / W10): 70 rocks of three sizes, all at yaw 0 and scale 1, read as a repeated
+        /// "lollipop" pattern. Now SkyRocks rocks, stratified around the ring (one per angular slot, jittered inside it, so
+        /// they never clump), pushed out to 1.08 to 1.45 of the old ring radius and deeper (fewer large ones near the camera),
+        /// each with its own yaw, a 0.7 to 1.45 scale and a 0.75 to 1.35 vertical stretch, from five silhouettes (the three
+        /// sky rocks and the two floating chunks).
+        /// </summary>
+        public const int SkyRocks = 46;
+        static readonly string[] SkyRockPieces = { "env_sky_rock_s", "env_sky_rock_m", "env_sky_rock_l", "env_float_chunk_m", "env_float_chunk_s" };
+
         static void Sky(List<WorldPlacement> o)
         {
-            for (int k = 0; k < 70; k++)
+            for (int k = 0; k < SkyRocks; k++)
             {
-                uint hx = H32(k, 1, 17);
-                double a = (hx % 3600) / 3600.0 * 2 * Math.PI, rr = 1.0 + ((hx >> 12) % 100) / 100.0 * 0.35;
+                uint hx = H32(k, 1, 17), hy = H32(k, 3, 29);
+                double a = (k + 0.15 + 0.7 * ((hx % 1000) / 1000.0)) / SkyRocks * 2 * Math.PI;
+                double rr = 1.08 + ((hx >> 12) % 100) / 100.0 * 0.37;
                 double x = 56 + Math.Cos(a) * 62 * rr, z = 36 + Math.Sin(a) * 44 * rr;
-                string size = "sml"[(int)((hx >> 20) % 3)].ToString();
-                double y = -2.0 - ((hx >> 8) % 7);
-                o.Add(At("env_sky_rock_" + size, x, y, z, 0, "sky"));
+                string piece = SkyRockPieces[(int)((hx >> 20) % (uint)SkyRockPieces.Length)];
+                double y = -3.0 - ((hx >> 8) % 8);
+                float sc = 0.7f + (hy % 100) / 100f * 0.75f, sy = 0.75f + ((hy >> 8) % 100) / 100f * 0.6f;
+                float yaw = (hy >> 16) % 360;
+                o.Add(new WorldPlacement
+                {
+                    Piece = piece, Cat = "sky", SimX = x, SimZ = z, Y = y,
+                    Matrix = Matrix4x4.TRS(new Vector3((float)x, (float)y, (float)-z), Quaternion.Euler(0f, yaw, 0f), new Vector3(sc, sc * sy, sc)),
+                });
             }
             for (int k = 0; k < 130; k++)
             {
@@ -1186,6 +1218,94 @@ namespace CriticalMass.Runtime.View.Dressing
             for (int gz = -5; gz < 7; gz++)
                 o.Add(At("env_cloud_floor", gx * 64 + 32 - 40, -11.0, gz * 64 + 32 - 28, 0, "sky"));
         }
+
+        // ------------------------------------------------------------------------------------------- b15 routes, lip, decals
+        /// <summary>How far out over the rim a lip-standing prop's pivot sits (fences): on the 0.1 u lip, never on the rim cell.</summary>
+        public const double LipSeat = 0.08;
+        /// <summary>The old hanging deck lanterns (off since b15: they floated over walkable deck cells).</summary>
+        public static bool HangLanterns = false;
+
+        /// <summary>
+        /// b15 dead space (WORLD-AUDIT #9: 24% of the floor never visited, everyone runs B1): every bridge mouth except the
+        /// direct B1 pair gets a signpost on the rim lip beside it (pointing to the hill, the shrine and the nearest base: the
+        /// side routes read as routes; the deck's first end only), and a light hook (WorldPlan.RouteLights: sim x, z, ground y, facing x, z) on the other
+        /// side for the lighting builder. The signpost stands LipSeat u out over the rim edge, so it is never on a walkable
+        /// cell. View only: no sim change.
+        /// </summary>
+        static void RouteMarks(G g, WorldPlan plan, List<double[]> spans)
+        {
+            var pads = new List<double[]>();
+            if (g.M.Pads != null) foreach (PadDef pd in g.M.Pads) pads.Add(new[] { pd.X, pd.Z });
+            var used = new HashSet<WorldEdge>();
+            foreach (double[] sp in spans)
+            {
+                double x0 = sp[0], z0 = sp[1], x1 = sp[2], z1 = sp[3];
+                if (z0 == 37.0 && z1 == 40.0) continue;   // B1 and B1' (base to hill): the direct route needs no sign
+                for (int end = 0; end < 2; end++)
+                {
+                    double t = end == 0 ? sp[7] : sp[8];   // the deck end (bridge cells plus 0.6 u), not the span's anchor point
+                    double ex = x0 + (x1 - x0) * t, ez = z0 + (z1 - z0) * t, ox = end == 0 ? x1 : x0, oz = end == 0 ? z1 : z0;
+                    double dx = ex - ox, dz = ez - oz, ln = Math.Sqrt(dx * dx + dz * dz);
+                    if (ln < 1e-6) continue;
+                    dx /= ln; dz /= ln;   // along the deck toward this end's island
+                    WorldEdge left = null, right = null;
+                    double bl = double.MaxValue, br = double.MaxValue;
+                    foreach (WorldEdge e in plan.Rim)
+                    {
+                        if (e.Bridge || e.Diag || used.Contains(e)) continue;
+                        double mx = (e.Px + e.Qx) * 0.5, mz = (e.Pz + e.Qz) * 0.5, rx = mx - ex, rz = mz - ez;
+                        double d = Math.Sqrt(rx * rx + rz * rz);
+                        if (d < 1.6 || d > 3.4) continue;
+                        double side = rx * dz - rz * dx, score = Math.Abs(d - 2.2) + 0.001 * (e.Cx + e.Cz * 0.01);
+                        if (side > 0 && score < bl) { bl = score; left = e; }
+                        else if (side < 0 && score < br) { br = score; right = e; }
+                    }
+                    // The sign stands at the deck's first end (bridges are listed from the base or courtyard outward: where a
+                    // player chooses the route), the light hook at both ends.
+                    if (left != null && end == 0)
+                    {
+                        used.Add(left);
+                        double x = (left.Px + left.Qx) * 0.5 + left.Nx * LipSeat, z = (left.Pz + left.Qz) * 0.5 + left.Nz * LipSeat, h = left.H;
+                        double[] tb = new[] { 56.0, 40.0 };
+                        double best = double.PositiveInfinity;
+                        foreach (double[] a in pads)
+                        {
+                            double d = Math.Sqrt((a[0] - x) * (a[0] - x) + (a[1] - z) * (a[1] - z));
+                            if (d < best) { best = d; tb = a; }
+                        }
+                        plan.Placements.Add(At("env_signpost", x, h - 0.01, z, 0.0, "dress_tall"));
+                        plan.Placements.Add(At("env_sign_board_hill", x, h + 1.24, z, YawDir(56.0 - x, 40.0 - z), "dress_tall"));
+                        plan.Placements.Add(At("env_sign_board_shrine", x, h + 1.01, z, YawDir(56.0 - x, 8.0 - z), "dress_tall"));
+                        plan.Placements.Add(At("env_sign_board_base", x, h + 0.78, z, YawDir(tb[0] - x, tb[1] - z), "dress_tall"));
+                        plan.RouteSigns++;
+                    }
+                    if (right != null)
+                    {
+                        used.Add(right);
+                        plan.RouteLights.Add(new[] { (right.Px + right.Qx) * 0.5 + right.Nx * LipSeat, (right.Pz + right.Qz) * 0.5 + right.Nz * LipSeat, right.H, -dx, -dz });
+                    }
+                }
+            }
+        }
+
+        /// <summary>b15 (WORLD-AUDIT #23: 42 coplanar decals): ground decals sit 1.2 to 2.1 cm over the ground, in four
+        /// layers by cell hash, so a decal never shares a plane with the ground or with a neighbouring decal.</summary>
+        static void LiftDecals(List<WorldPlacement> o)
+        {
+            for (int i = 0; i < o.Count; i++)
+            {
+                WorldPlacement p = o[i];
+                if (p.Cat != "ground_decal") continue;
+                float lift = DecalLift + DecalLayer * (H32((int)Math.Floor(p.SimX * 2), (int)Math.Floor(p.SimZ * 2), 233) % 4);
+                p.Y += lift;
+                Matrix4x4 m = p.Matrix;
+                m.m13 += lift;
+                p.Matrix = m;
+                o[i] = p;
+            }
+        }
+
+        public const float DecalLift = 0.012f, DecalLayer = 0.003f;
 
         // ------------------------------------------------------------------------------------------- bases
         public static readonly string[] BaseSites = { "district_azure", "district_crimson", "hill", "shrine" };
@@ -1218,9 +1338,13 @@ namespace CriticalMass.Runtime.View.Dressing
                         Piece = "cm_layout_" + name, Cat = "base", Team = team, Matrix = Matrix4x4.Translate(anchor),
                         SimX = anchor.x, SimZ = -anchor.z, Y = anchor.y,
                     });
-                foreach (BasesItem it in s.items)
+                bool district = name.StartsWith("district_", StringComparison.Ordinal);
+                bool[] kept = district ? DistrictKept(s.items) : null;
+                for (int idx = 0; idx < s.items.Length; idx++)
                 {
+                    BasesItem it = s.items[idx];
                     if (it.piece == null || it.pos == null || it.pos.Length < 3) continue;
+                    if (district && !kept[idx]) continue;   // b15 W07: base density to the bible
                     var p = anchor + siteRot * new Vector3(it.pos[0], it.pos[1], it.pos[2]);
                     Quaternion rot = Quaternion.Euler(0f, it.yaw + siteYaw, 0f);
                     Matrix4x4 m = Matrix4x4.TRS(p, rot, Vector3.one);
@@ -1238,11 +1362,31 @@ namespace CriticalMass.Runtime.View.Dressing
                         centres.Add((br, c.x, -c.z));
                         continue;
                     }
-                    if (bodyOf != null && Intrudes(g, m, bodyOf(it.piece)))
+                    if (bodyOf != null)
                     {
-                        plan.DroppedBases.Add($"{name}:{it.piece} at {p.x:0.0},{-p.z:0.0}");
-                        continue;
+                        Vector3 up = anchor + new Vector3(it.pos[0], it.pos[1], it.pos[2]);
+                        string how = Settle(g, bodyOf(it.piece), ref p, ref rot, up, Quaternion.Euler(0f, it.yaw, 0f), siteYaw != 0f);
+                        if (how == null)
+                        {
+                            plan.DroppedBases.Add($"{name}:{it.piece} at {p.x:0.0},{-p.z:0.0}");
+                            continue;
+                        }
+                        if (how.Length > 0)
+                        {
+                            // A raised piece (a brazier on a yard wall) that had to move and now stands over open floor goes
+                            // down onto the floor: it never hovers.
+                            int pcx = (int)Math.Floor(p.x), pcz = (int)Math.Floor(-p.z);
+                            if (pcx >= 0 && pcz >= 0 && pcx < g.W && pcz < g.H && MapGrid.IsWalkableType(g.T(pcx, pcz)) && p.y - g.Hh(pcx, pcz) > 0.1)
+                            {
+                                p.y = (float)g.Hh(pcx, pcz);
+                                how += ", set down on the floor";
+                            }
+                            plan.Notes.Add($"{name}:{it.piece} placed at {p.x:0.0},{-p.z:0.0}: {how}");
+                        }
+                        m = Matrix4x4.TRS(p, rot, Vector3.one);
                     }
+                    // b15 decal z-fight (WORLD-AUDIT #23): a ground light pool sits 1 cm over the ground, not in its plane.
+                    if (it.piece == "cm_light_pool") { p.y += 0.01f; m = Matrix4x4.TRS(p, rot, Vector3.one); }
                     plan.Placements.Add(new WorldPlacement
                     {
                         Piece = it.piece, Cat = "base", Team = team, Matrix = m, SimX = p.x, SimZ = -p.z, Y = p.y,
@@ -1300,8 +1444,23 @@ namespace CriticalMass.Runtime.View.Dressing
             return n;
         }
 
-        /// <summary>True when a body vertex (0.3 to 2 u above the base) lies more than 0.4 u inside walkable space.</summary>
+        /// <summary>
+        /// True when a body vertex (0.3 to 2 u above the base) lies more than IntrudeMargin inside walkable space: no
+        /// non-walkable cell (wall, breakable, void) within IntrudeMargin of it, and the vertex is lower than a character
+        /// (HeadClear above the ground under it).
+        /// <para>b15 island geometry (WORLD-AUDIT #5 / W03): this used to probe four points 0.4 u away along the axes. A
+        /// corner vertex of a gate post standing on the hill ring's ONE-cell wall posts then read as "0.4 u inside walkable"
+        /// although it was 0.17 u off the wall cell (the diagonal neighbours are floor), so all 8 hill gate posts were left out;
+        /// the hill's marker diamond hovers 5.2 u up and was left out because the probe ignored height. The distance test
+        /// drops a subset of what the probe dropped (a clear disc contains the five probe points), so no piece that was placed
+        /// before is dropped now.</para>
+        /// </summary>
         public static bool Intrudes(MapDef map, Matrix4x4 m, Vector3[] body) => Intrudes(new G { M = map, W = map.Width, H = map.Height }, m, body);
+
+        /// <summary>Distance (u) a body vertex must keep from every non-walkable cell to count as standing in walkable space.</summary>
+        public const double IntrudeMargin = 0.4;
+        /// <summary>A body vertex this far above the ground under it is over every character's head (2.0 u).</summary>
+        public const double HeadClear = 2.0;
 
         static bool Intrudes(G g, Matrix4x4 m, Vector3[] body)
         {
@@ -1310,10 +1469,144 @@ namespace CriticalMass.Runtime.View.Dressing
             {
                 Vector3 v = m.MultiplyPoint3x4(v0);
                 double x = v.x, z = -v.z;
-                bool W(double dx, double dz) => MapGrid.IsWalkableType(g.T((int)Math.Floor(x + dx), (int)Math.Floor(z + dz)));
-                if (W(0, 0) && W(0.4, 0) && W(-0.4, 0) && W(0, 0.4) && W(0, -0.4)) return true;
+                int cx = (int)Math.Floor(x), cz = (int)Math.Floor(z);
+                if (cx >= 0 && cz >= 0 && cx < g.W && cz < g.H && v.y - g.Hh(cx, cz) > HeadClear) continue;
+                if (ClearOfBlocked(g, x, z, IntrudeMargin)) return true;
             }
             return false;
+        }
+
+        /// <summary>True when no non-walkable cell (as a unit square) lies within r of sim point (x, z).</summary>
+        static bool ClearOfBlocked(G g, double x, double z, double r)
+        {
+            int x0 = (int)Math.Floor(x - r), x1 = (int)Math.Floor(x + r), z0 = (int)Math.Floor(z - r), z1 = (int)Math.Floor(z + r);
+            for (int cz = z0; cz <= z1; cz++)
+            for (int cx = x0; cx <= x1; cx++)
+            {
+                if (MapGrid.IsWalkableType(g.T(cx, cz))) continue;
+                double dx = Math.Max(0, Math.Max(cx - x, x - (cx + 1))), dz = Math.Max(0, Math.Max(cz - z, z - (cz + 1)));
+                if (dx * dx + dz * dz < r * r) return false;
+            }
+            return true;
+        }
+
+        /// <summary>
+        /// b15 (W03): where a bases piece goes when its authored pose would stand in walkable space. Tried in order: the
+        /// authored pose turned with its site, the authored pose unturned (the shrine is turned 180 degrees for its breakables,
+        /// which carries its gate posts and braziers onto the open north yard; unturned they stand on the Sim's yard wall
+        /// cells by the hill bridge's gap), then the turned pose nudged up to 1 u in 8 directions. Null: nothing fits (the
+        /// piece is left out and listed in WorldPlan.DroppedBases).
+        /// </summary>
+        static string Settle(G g, Vector3[] body, ref Vector3 p, ref Quaternion rot, Vector3 unturnedP, Quaternion unturnedRot, bool turned)
+        {
+            if (!Intrudes(g, Matrix4x4.TRS(p, rot, Vector3.one), body)) return "";
+            if (turned && !Intrudes(g, Matrix4x4.TRS(unturnedP, unturnedRot, Vector3.one), body))
+            {
+                p = unturnedP;
+                rot = unturnedRot;
+                return "authored side (site turn undone for this piece)";
+            }
+            for (int ring = 1; ring <= 4; ring++)
+            for (int k = 0; k < 8; k++)
+            {
+                double a = k * Math.PI / 4, d = ring * 0.25;
+                var q = p + new Vector3((float)(Math.Cos(a) * d), 0f, (float)(Math.Sin(a) * d));
+                if (Intrudes(g, Matrix4x4.TRS(q, rot, Vector3.one), body)) continue;
+                p = q;
+                return $"nudged {d:0.00} u";
+            }
+            return null;
+        }
+
+        // ------------------------------------------------------------------------------------------- b15 density
+        /// <summary>
+        /// b15 island geometry (WORLD-AUDIT #12 / W07, art direction 2.6 and 2.7): the base districts carried a median 94 small
+        /// props and 18 to 28 lights per gameplay screen against 45 to 60 and 10 to 14. Deterministic thinning by the item's
+        /// index in the district layout (both districts list the same items in the same order, so the two bases stay mirror
+        /// images): dress clutter keeps a share per piece, the gate braziers go (the gate crystal lamps light the gates), one
+        /// of each doubled gate lamp goes, and two of the seven wall braziers go with their ground light pools. Towers,
+        /// gate posts, banners, the pad, the landmark and the weapon rack (the silhouette pieces) are never thinned.
+        /// </summary>
+        public static bool KeepDistrictItem(string piece, int index)
+        {
+            if (!ThinBases) return true;
+            switch (piece)
+            {
+                case "cm_dress_barrel": return H32(index, piece.Length, 977) % 100 < 55;
+                case "cm_dress_crate": return H32(index, piece.Length, 977) % 100 < 55;
+                case "cm_dress_crate_small": return H32(index, piece.Length, 977) % 100 < 40;
+                case "cm_dress_stakes": return H32(index, piece.Length, 977) % 100 < 67;
+                case "cm_light_pool": return Array.IndexOf(DistrictPoolsKept, index) >= 0;
+                default: return Array.IndexOf(DistrictItemsDropped, index) < 0;
+            }
+        }
+
+        /// <summary>
+        /// KeepDistrictItem for every item, then a dress piece stacked on another (authored 0.3 u or more up) is kept only
+        /// while a kept piece under it (lower, within 0.6 u) still holds it up: thinning never leaves a crate in the air.
+        /// </summary>
+        public static bool[] DistrictKept(BasesItem[] items)
+        {
+            var kept = new bool[items.Length];
+            for (int i = 0; i < items.Length; i++) kept[i] = items[i].piece != null && KeepDistrictItem(items[i].piece, i);
+            for (int i = 0; i < items.Length; i++)
+            {
+                BasesItem a = items[i];
+                if (!kept[i] || a.pos == null || a.pos.Length < 3 || a.pos[1] < 0.3f || !a.piece.StartsWith("cm_dress_", StringComparison.Ordinal)) continue;
+                bool held = false;
+                for (int j = 0; j < items.Length && !held; j++)
+                {
+                    BasesItem b = items[j];
+                    if (j == i || !kept[j] || b.pos == null || b.pos.Length < 3 || b.pos[1] > a.pos[1] - 0.2f) continue;
+                    float dx = a.pos[0] - b.pos[0], dz = a.pos[2] - b.pos[2];
+                    held = dx * dx + dz * dz < 0.36f;
+                }
+                kept[i] = held;
+            }
+            return kept;
+        }
+
+        /// <summary>District layout indices left out: braziers 4 and 34 (wall), 63 to 103 (gates), gate lamps 70 and 102 (each
+        /// 0.2 u from another lamp).</summary>
+        static readonly int[] DistrictItemsDropped = { 4, 34, 63, 71, 79, 87, 95, 103, 70, 102 };
+        /// <summary>The ground light pools of the five wall braziers kept (0, 2, 18, 46, 54; each pool is the item after it).</summary>
+        static readonly int[] DistrictPoolsKept = { 1, 3, 19, 47, 55 };
+
+        /// <summary>Small ground clutter thinned inside the base districts (and campfires dropped there).</summary>
+        static readonly HashSet<string> CalmPieces = new HashSet<string>
+        {
+            "env_grass_clump", "env_flower_clump_a", "env_flower_clump_b", "env_mushrooms", "env_moss_rocks", "env_ruin_rubble",
+            "env_edge_stones", "env_camp_sacks", "env_campfire", "env_pebbles", "env_grass_tuft", "env_flowers", "env_stump",
+            "env_bush", "env_rocks", "env_fence",
+        };
+        /// <summary>The b15 base thinning on (off: the b14 density, for the before/after measurement in IslandGeometryTests).</summary>
+        public static bool ThinBases = true;
+        /// <summary>Radius around each pad treated as the base district, and the share of calm pieces kept there.</summary>
+        public const double DistrictR = 15.0;
+        public const int CalmKeepPct = 65;
+
+        /// <summary>True when a placement made by the environment rules is left out of a base district (WORLD-AUDIT W07).</summary>
+        static bool CalmDrop(MapDef map, WorldPlacement p)
+        {
+            if (!ThinBases || !CalmPieces.Contains(p.Piece) || map.Pads == null) return false;
+            bool inBase = false;
+            foreach (PadDef pd in map.Pads)
+                if ((p.SimX - pd.X) * (p.SimX - pd.X) + (p.SimZ - pd.Z) * (p.SimZ - pd.Z) < DistrictR * DistrictR) { inBase = true; break; }
+            if (!inBase) return false;
+            if (p.Piece == "env_campfire") return true;
+            return H32((int)Math.Floor(p.SimX), (int)Math.Floor(p.SimZ), 909) % 100 >= CalmKeepPct;
+        }
+
+        /// <summary>Removes the calm-dropped placements at index >= from (the order of the rest is kept).</summary>
+        static void Calm(MapDef map, List<WorldPlacement> o, int from)
+        {
+            int w = from;
+            for (int i = from; i < o.Count; i++)
+            {
+                if (CalmDrop(map, o[i])) continue;
+                o[w++] = o[i];
+            }
+            o.RemoveRange(w, o.Count - w);
         }
     }
 }

@@ -136,6 +136,9 @@ namespace CriticalMass.Runtime.View
             _barricades = new ModelView[w.Barricades != null ? w.Barricades.Length : 0];
 
             GameObject hill = CreatePrimitive(PrimitiveType.Cube, "Hill");
+            // b15 (WORLD-AUDIT W02): the hill's zone plate was a Unity cube scaled flat (a square slab on a round dais);
+            // now a round plate with a softly uneven edge, same size (unit diameter, scaled to 2R) and same material.
+            hill.GetComponent<MeshFilter>().sharedMesh = HillDisc.Mesh;
             _hill = hill.transform;
             hill.GetComponent<Renderer>().sharedMaterial = ToonMaterials.Prop(Palette.Brass);
 

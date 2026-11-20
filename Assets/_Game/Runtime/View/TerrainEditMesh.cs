@@ -37,7 +37,7 @@ namespace CriticalMass.Runtime.View
     /// kit's (grass mid #A3C150, cliff rock #5B5E58) plus earth tones; every face takes a small per-cell value jitter.
     /// Allocation-free after warm-up (lists and scratch arrays are reused).
     /// </summary>
-    public sealed class TerrainEditMesh
+    public sealed partial class TerrainEditMesh
     {
         public const float PitDepth1 = 0.9f, PitDepthStep = 0.45f, PitDepthMax = 1.8f;
         public const float Taper = 0.07f;
@@ -127,6 +127,7 @@ namespace CriticalMass.Runtime.View
             if (_depth.Length < dw * dh) _depth = new double[dw * dh];
             for (int k = 0; k < dw * dh; k++) _depth[k] = -1;
             _dx0 = dx0; _dz0 = dz0; _dw = dw; _dh = dh;
+            ResetCornerCache(x0, z0, x1, z1);   // b15 natural pits (TerrainEditMesh.Organic.cs)
             for (int cz = z0; cz < z1; cz++)
             for (int cx = x0; cx < x1; cx++)
             {
@@ -241,6 +242,7 @@ namespace CriticalMass.Runtime.View
 
         void Pit(int cx, int cz)
         {
+            if (OrganicPits) { OrganicPit(cx, cz); return; }   // b15: natural pits (TerrainEditMesh.Organic.cs)
             PitCells++;
             double h = H(cx, cz);
             double yf = h - Depth(cx, cz);
@@ -511,7 +513,8 @@ namespace CriticalMass.Runtime.View
             double g = H(cx, cz);
             double top = g + ShortTop, bottom = g - ShortSink;
             Vector3 centre = SimSpace.ToWorld(cx + 0.5, (top + bottom) * 0.5, cz + 0.5);
-            BevelTop(cx, cz, top, StoneBevel, Jit(StoneTop, cx, cz, 501), Jit(StoneSide, cx, cz, 502), centre);
+            // b15: irregular stone tops (each corner drops and pulls in by its own hash; TerrainEditMesh.Organic.cs).
+            BevelTopStone(cx, cz, top, StoneBevel, Jit(StoneTop, cx, cz, 501), Jit(StoneSide, cx, cz, 502), centre);
             for (int s = 0; s < 4; s++)
             {
                 int nx = cx + DX[s], nz = cz + DZ[s];
@@ -556,7 +559,7 @@ namespace CriticalMass.Runtime.View
                 Color32 c;
                 if (stone)
                 {
-                    double mortar = hgt * 0.5;
+                    double mortar = hgt * StoneMortar(cx, cz, s);   // b15: the mortar line wanders per stone
                     d1 = band == 0 ? mortar - 0.0125 : band == 1 ? mortar + 0.0125 : band == 2 ? hgt - 0.08 : hgt;
                     c = band == 1 ? Seam : band == 3 ? StoneFoot : StoneSide;
                     if (band == 4) break;
@@ -579,7 +582,7 @@ namespace CriticalMass.Runtime.View
                 {
                     // The top course is two stones: a vertical joint off-centre (staggered by cell), so a row of blocks
                     // reads as laid masonry, not one long box.
-                    double uj = 0.5 + (((cx + cz + s) & 1) == 0 ? 0.14 : -0.14);
+                    double uj = 0.5 + StoneJoint(cx, cz, s);   // b15: joint offset per stone (was +-0.14)
                     SeamStrip(ax, az, bx, bz, e, uj - 0.015, ya, yb, nx, nz, c, centre);
                     SeamStrip(ax, az, bx, bz, uj - 0.015, uj + 0.015, ya, yb, nx, nz, Seam, centre);
                     SeamStrip(ax, az, bx, bz, uj + 0.015, 1 - e, ya, yb, nx, nz, Jit(c, cx + 7, cz, 650 + s), centre);
