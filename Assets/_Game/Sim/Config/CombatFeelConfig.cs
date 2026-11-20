@@ -154,11 +154,12 @@ namespace CriticalMass.Sim.Config
         public double BuilderHomeRadius = 3.5;
         public double BuilderHomeMultiplier = 1.5;
         /// <summary>TNT cooldown (ticks at 30 Hz) while the rule is on (DemolitionsTntConfig.CooldownTicks is 150).</summary>
-        public double TntCooldownTicks = 120; // OWNER FEEL-TEST: her kill share is 0.29 at 120 (DemolitionsAttackThrowTests limit 0.25); 150 is the shipped value
+        // pass 4: back to the shipped 150 (at 120, with the Warrior at 120 HP, her knock-out share was 0.309 in DemolitionsAttackThrowTests, limit 0.25).
+        public double TntCooldownTicks = 150;
         /// <summary>Share of her own TNT's blast damage the thrower takes when she stands inside its radius.</summary>
         public double TntSelfShare = 0.35;
         /// <summary>Thrown TNT blast damage while the rule is on (DemolitionsTntConfig.Damage is 55).</summary>
-        public double TntDamage = 55;
+        public double TntDamage = 50;   // pass 4: 55 -> 50 (her share, see TntCooldownTicks); Demolitions on a 120 HP Warrior is still 7 hits
         /// <summary>The Healer's mend while the rule is on (HealerConfig MendHeal 6 / MendRange 5.5).</summary>
         public double MendHeal = 10;
         public double MendRange = 6;

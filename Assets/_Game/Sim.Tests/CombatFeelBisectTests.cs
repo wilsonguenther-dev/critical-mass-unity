@@ -20,7 +20,7 @@ namespace CriticalMass.Sim.Tests
     {
         private static readonly string[] ArmNames =
         {
-            "off", "everywhere (pass 3)", "zone 15 + Kaiju 6", "bounded 2/6s + Kaiju 6", "bounded 2/6s + zone 15 + Kaiju 6", "bounded 1/4s + disc+1 + Kaiju 6",
+            "off", "everywhere (mirror-fair)", "Kaiju 6", "Kaiju 6 + bounded 4/6s", "Kaiju 6 + bounded 3/6s",
         };
 
         private static void Arm(int arm, GameConfig c)
@@ -28,10 +28,10 @@ namespace CriticalMass.Sim.Tests
             CombatFeelConfig f = c.Depth.CombatFeel;
             f.BotUnjam = arm != 0;
             f.BotUnjamKaijuClear = arm >= 2 ? 6 : 0;
-            f.BotUnjamHillClear = arm == 5 ? 1 : -1;
-            f.BotUnjamHillZone = arm == 2 || arm == 4 ? 15 : 0;
-            f.BotUnjamBudget = arm == 3 || arm == 4 ? 2 : arm == 5 ? 1 : 0;
-            f.BotUnjamBudgetSeconds = arm == 5 ? 4 : 6;
+            f.BotUnjamHillClear = -1;
+            f.BotUnjamHillZone = 0;
+            f.BotUnjamBudget = arm == 3 ? 4 : arm == 4 ? 3 : 0;
+            f.BotUnjamBudgetSeconds = 6;
         }
 
         [Test]

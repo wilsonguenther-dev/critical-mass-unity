@@ -501,11 +501,17 @@ namespace CriticalMass.Sim.Bots
             mx *= inv;
             mz *= inv;
             double best = double.NegativeInfinity, bx = 0, bz = 0;
+            // Pass 4: the tie-break is mirror-fair. It reads the team-local slot, and Crimson (the mirrored half of the map) turns
+            // the other way, so both teams make the mirror image of the same choice. The raw id parity turned both teams to the
+            // same side of their walk, which is a different side on a mirrored map: 117 of 200 5v5 wins for the team with an idle
+            // player (RulesCombined idle floor, limit under 100; 96 with no side-step), run 44834829109.
+            int slot = World.TeamSlot(w, id);
+            double mirror = a.Team == TeamId.Crimson ? -1 : 1;
             for (int s = 0; s < 2; s++)
             {
-                double side = ((id + s) & 1) == 0 ? 1 : -1;
+                double side = (((slot + s) & 1) == 0 ? 1 : -1) * mirror;
                 double px = -mz * side * 0.9 + mx * 0.3, pz = mx * side * 0.9 + mz * 0.3;
-                double score = (id + s) & 1;   // the parity tie-break, under every real difference
+                double score = (slot + s) & 1;   // the parity tie-break, under every real difference
                 // Sliding along a wall: keep the slide's side (a side-step against it would read as a reversal).
                 if (px * w.Vx[id] + pz * w.Vz[id] > 0.05) score += 5;
                 // Jammed again soon after a side-step: the same side as that one (the other way is a reversal).
