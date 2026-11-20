@@ -4,7 +4,7 @@ Every tuning field the sim reads from `GameConfig`, found by reflection (`Assets
 
 Regenerate: `tools/balance/balance-report.sh tuning-index (or the balance-report workflow, mode tuning-index)`. `TuningIndexTests` fails when a field has no row here. Paths work as `--set Path=Value` switches for the balance report.
 
-602 fields.
+622 fields.
 
 ## (top level)
 
@@ -687,3 +687,23 @@ Regenerate: `tools/balance/balance-report.sh tuning-index (or the balance-report
 | `Depth.KaijuTypes.BotsAvoidCloud` | true | bool | `Assets/_Game/Sim/Config/KaijuTypesConfig.cs` | b13 r3: bots the SHROUD would blind leave the cloud and skirt its rim unless contesting the hill (BotKaijuFeed.AvoidCloud). |
 | `Depth.KaijuTypes.FeedPlanGatherScale` | [1, 0.6, 0.8, 0.8] | double[] | `Assets/_Game/Sim/Config/KaijuTypesConfig.cs` | Per plan (0 plant, 1 meat, 2 wood, 3 water): multiplier on the bots' plant-gather utility (plan 0 = today). |
 | `Depth.Corruption.On` | false | bool | `Assets/_Game/Sim/Config/CorruptionConfig.cs` | The rule's own switch (Full profile only: systems read it through DepthRules.On). |
+| `Depth.TerrainHeight.Enabled` | true | bool | `Assets/_Game/Sim/Config/TerrainHeightConfig.cs` | The ONE switch of the rule (default on in Full rules). |
+| `Depth.TerrainHeight.MaxStack` | 3 | int | `Assets/_Game/Sim/Config/TerrainHeightConfig.cs` | Highest stack (levels above the island) and deepest pit (levels below). |
+| `Depth.TerrainHeight.MaxDepth` | 2 | int | `Assets/_Game/Sim/Config/TerrainHeightConfig.cs` |  |
+| `Depth.TerrainHeight.StepU` | 0.45 | double | `Assets/_Game/Sim/Config/TerrainHeightConfig.cs` | One level in view units (the view only; the sim works in whole levels). |
+| `Depth.TerrainHeight.WalkUp` | 1 | int | `Assets/_Game/Sim/Config/TerrainHeightConfig.cs` | Levels a grounded walker steps up without help; an airborne (jumping) actor rises this many. |
+| `Depth.TerrainHeight.JumpUp` | 2 | int | `Assets/_Game/Sim/Config/TerrainHeightConfig.cs` |  |
+| `Depth.TerrainHeight.ClimbTicks` | 15 | int | `Assets/_Game/Sim/Config/TerrainHeightConfig.cs` | CLIMB: walking into a ledge exactly JumpUp levels above for this many ticks climbs it. |
+| `Depth.TerrainHeight.StepSlowTicks` | 6 | int | `Assets/_Game/Sim/Config/TerrainHeightConfig.cs` | Slows after a level change: a 1-level step, a drop of 2 or more, a climb of 2. |
+| `Depth.TerrainHeight.StepSlowScale` | 0.7 | double | `Assets/_Game/Sim/Config/TerrainHeightConfig.cs` |  |
+| `Depth.TerrainHeight.DropSlowTicks` | 12 | int | `Assets/_Game/Sim/Config/TerrainHeightConfig.cs` |  |
+| `Depth.TerrainHeight.DropSlowScale` | 0.5 | double | `Assets/_Game/Sim/Config/TerrainHeightConfig.cs` |  |
+| `Depth.TerrainHeight.ClimbSlowTicks` | 10 | int | `Assets/_Game/Sim/Config/TerrainHeightConfig.cs` |  |
+| `Depth.TerrainHeight.ClimbSlowScale` | 0.6 | double | `Assets/_Game/Sim/Config/TerrainHeightConfig.cs` |  |
+| `Depth.TerrainHeight.PathCostStep1` | 0.5 | double | `Assets/_Game/Sim/Config/TerrainHeightConfig.cs` | Bot fields: extra cost of an edge with a 1-level and a 2-level difference (3 or more: closed). |
+| `Depth.TerrainHeight.PathCostStep2` | 3 | double | `Assets/_Game/Sim/Config/TerrainHeightConfig.cs` |  |
+| `Depth.TerrainHeight.PathCostLadder` | 1 | double | `Assets/_Game/Sim/Config/TerrainHeightConfig.cs` | Extra path cost of climbing a height ladder (a Bridge cell 1+ levels above its neighbour): about 1 cell. |
+| `Depth.TerrainHeight.TntLevels` | 2 | int | `Assets/_Game/Sim/Config/TerrainHeightConfig.cs` | TNT: levels a raised cell in CarveRadius loses (people on it drop). |
+| `Depth.TerrainHeight.KaijuSmashFrom` | 2 | int | `Assets/_Game/Sim/Config/TerrainHeightConfig.cs` | Kaiju: a cell its body overlaps at this lift or more is smashed down to SmashTo at once. |
+| `Depth.TerrainHeight.SmashTo` | 1 | int | `Assets/_Game/Sim/Config/TerrainHeightConfig.cs` |  |
+| `Depth.TerrainHeight.KaijuSmashMargin` | 0.25 | double | `Assets/_Game/Sim/Config/TerrainHeightConfig.cs` | Kaiju body overlap test: its wall collider radius (PhysicsConfig.KaijuBodyRadius) plus this margin, u. |
