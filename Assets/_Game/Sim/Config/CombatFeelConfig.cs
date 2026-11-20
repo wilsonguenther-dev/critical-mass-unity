@@ -155,8 +155,9 @@ namespace CriticalMass.Sim.Config
         public double BuilderHomeRadius = 3.5;
         public double BuilderHomeMultiplier = 1.5;
         /// <summary>TNT cooldown (ticks at 30 Hz) while the rule is on (DemolitionsTntConfig.CooldownTicks is 150).</summary>
-        // pass 4: back to the shipped 150 (at 120, with the Warrior at 120 HP, her knock-out share was 0.309 in DemolitionsAttackThrowTests, limit 0.25).
-        public double TntCooldownTicks = 150;
+        // pass 4: 120 -> 180 (with the Warrior at 120 HP her knock-out share in DemolitionsAttackThrowTests was 0.309 at 120 and
+        // 0.269 at 150 with TNT 46, limit 0.25; runs 44834829109, 44837951367). A duel still sees one throw.
+        public double TntCooldownTicks = 180;
         /// <summary>Share of her own TNT's blast damage the thrower takes when she stands inside its radius.</summary>
         public double TntSelfShare = 0.35;
         /// <summary>Thrown TNT blast damage while the rule is on (DemolitionsTntConfig.Damage is 55).</summary>

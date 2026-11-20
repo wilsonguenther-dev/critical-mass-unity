@@ -47,7 +47,7 @@ namespace CriticalMass.Sim.Tests
             new Knob { Name = "Demolitions.AttackDamage", Set = (f, v) => Row(f, ClassId.Demolitions).AttackDamage = v, Values = new[] { 12.0, 14 } },
             new Knob { Name = "Demolitions.AttackCooldown", Set = (f, v) => Row(f, ClassId.Demolitions).AttackCooldown = v, Values = new[] { 0.7, 0.8 } },
             new Knob { Name = "TntDamage", Set = (f, v) => f.TntDamage = v, Values = new[] { 46.0, 50, 55 } },
-            new Knob { Name = "TntCooldownTicks", Set = (f, v) => f.TntCooldownTicks = v, Values = new[] { 150.0, 120 } },
+            new Knob { Name = "TntCooldownTicks", Set = (f, v) => f.TntCooldownTicks = v, Values = new[] { 180.0, 150 } },
             new Knob { Name = "Builder.AttackDamage", Set = (f, v) => Row(f, ClassId.Builder).AttackDamage = v, Values = new[] { 26.0, 22 } },
             new Knob { Name = "MinerHeavyPierce", Set = (f, v) => f.MinerHeavyPierce = v, Values = new[] { 1.4 } },
             new Knob { Name = "SunderDamageTaken", Set = (f, v) => f.SunderDamageTaken = v, Values = new[] { 0.15 } },
