@@ -137,6 +137,9 @@ namespace CriticalMass.Sim.Core
             /// <summary>The whole grid the verdict was worked out on (exact compare: a raw cell write without a GridVersion bump, as
             /// the tests paint, still misses).</summary>
             public byte[] Grid = new byte[CriticalMass.Sim.Maps.SkybreakBasinMap.MapWidth * CriticalMass.Sim.Maps.SkybreakBasinMap.MapHeight];   // the shipped map: no allocation in play
+            /// <summary>integrator b15: the terrain-height layer the verdict was worked out on (the proof respects height).</summary>
+            public sbyte[] Lift = new sbyte[CriticalMass.Sim.Maps.SkybreakBasinMap.MapWidth * CriticalMass.Sim.Maps.SkybreakBasinMap.MapHeight];
+            public bool HasLift;
             public long Epoch;
             /// <summary>What the Kaiju route guard read (Used false: the verdict did not depend on the Kaiju: pads cut, nothing narrowed, guard off).</summary>
             public Kaiju.GuardKey Guard;
@@ -170,6 +173,9 @@ namespace CriticalMass.Sim.Core
                 if (!same) continue;
                 byte[] cells = w.Map.Cells;
                 if (m.Grid.Length != cells.Length || !new ReadOnlySpan<byte>(m.Grid).SequenceEqual(cells)) continue;
+                sbyte[] lift = w.Map.Lift;
+                if (m.HasLift != (lift != null)) continue;
+                if (lift != null && (m.Lift.Length != lift.Length || !new ReadOnlySpan<sbyte>(m.Lift).SequenceEqual(lift))) continue;   // integrator b15
                 if (!m.Guard.Used || Kaiju.RouteMemoSameKaiju(w, in m.Guard)) return e;
             }
             return -1;
@@ -184,6 +190,13 @@ namespace CriticalMass.Sim.Core
             byte[] cells = w.Map.Cells;
             if (m.Grid.Length != cells.Length) m.Grid = new byte[cells.Length];   // once per map size
             Array.Copy(cells, m.Grid, cells.Length);
+            sbyte[] lift = w.Map.Lift;   // integrator b15
+            m.HasLift = lift != null;
+            if (lift != null)
+            {
+                if (m.Lift.Length != lift.Length) m.Lift = new sbyte[lift.Length];   // once per map size
+                Array.Copy(lift, m.Lift, lift.Length);
+            }
             m.Epoch = Kaiju.ClearEpoch;
             m.Guard = Kaiju.LastGuard;
             m.N = n;
@@ -423,15 +436,16 @@ namespace CriticalMass.Sim.Core
                 ok = PadsReachHill(map);
                 if (ok)
                 {
-                    FlowField f = FlowField.ComputeFlowField(map, ShrineRing(w), ScratchField(map));
-                    bool aAfter = PadReached(map, f, TeamId.Azure);
-                    bool cAfter = PadReached(map, f, TeamId.Crimson);
+                    // integrator b15: #213 replaced the scratch flow fields with GridReach (now height-aware, the same yes/no)
+                    int after = PadsReached(map, ShrineRing(w));
+                    bool aAfter = (after & 1) != 0;
+                    bool cAfter = (after & 2) != 0;
                     if (!aAfter || !cAfter)
                     {
                         lift[i] = old;
                         map.Cells[i] = oldCell;
-                        FlowField g = FlowField.ComputeFlowField(map, ShrineRing(w), ScratchField(map));
-                        if ((!aAfter && PadReached(map, g, TeamId.Azure)) || (!cAfter && PadReached(map, g, TeamId.Crimson))) ok = false;
+                        int g = PadsReached(map, ShrineRing(w));
+                        if ((!aAfter && (g & 1) != 0) || (!cAfter && (g & 2) != 0)) ok = false;
                     }
                 }
             }
