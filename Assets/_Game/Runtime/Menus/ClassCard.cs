@@ -576,7 +576,7 @@ namespace CriticalMass.Runtime.Menus
 
         protected override void DoStateTransition(SelectionState state, bool instant)
         {
-            _focus = state == SelectionState.Selected || state == SelectionState.Highlighted || state == SelectionState.Pressed;
+            _focus = state == SelectionState.Selected || state == SelectionState.Pressed;   // integrator b15: hover alone never lights a second card (OnPointerEnter selects the tile, so hover still lights it)
             if (Body == null) return;
             Body.SetRim(_focus ? CMTokens.ToolBrass.Color : CMTokens.WarmCream.Color);
             float rim = _focus ? 5f : 2f;
