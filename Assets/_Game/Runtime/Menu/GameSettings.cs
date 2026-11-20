@@ -22,6 +22,9 @@ namespace CriticalMass.Runtime.Menu
         public const string MuteMusicKey = "cm.audio.muteMusic";
         public const string MuteEffectsKey = "cm.audio.muteEffects";
         public const string MuteInBackgroundKey = "cm.audio.muteInBackground";
+        /// <summary>b15: the announcer's own level (a multiplier on its voice, 0..1) and the less-sound switch.</summary>
+        public const string AnnouncerKey = "cm.audio.announcer";
+        public const string LessSoundKey = "cm.audio.lessSound";
         public const string ColourBlindTeamsKey = "cm.access.colourBlindTeams";
         public const string WidthKey = "cm.video.width";
         public const string HeightKey = "cm.video.height";
@@ -68,7 +71,7 @@ namespace CriticalMass.Runtime.Menu
         /// <summary>Every key this class writes (tests back these up and restore them).</summary>
         public static readonly string[] AllKeys =
         {
-            MasterKey, MusicKey, EffectsKey, MuteMusicKey, MuteEffectsKey, MuteInBackgroundKey, ColourBlindTeamsKey, WidthKey, HeightKey, FullScreenKey, VSyncKey, QualityKey, ShakeKey,
+            MasterKey, MusicKey, EffectsKey, MuteMusicKey, MuteEffectsKey, MuteInBackgroundKey, AnnouncerKey, LessSoundKey, ColourBlindTeamsKey, WidthKey, HeightKey, FullScreenKey, VSyncKey, QualityKey, ShakeKey,
             DamageNumbersKey, BloodKey, GoreKey, FpsCapKey, BgThrottleKey, MoveAssistKey, KeysFollowMapKey, GroundCameraKey, "cm.camera.heading", CameraViewKey, CameraManualKey, CameraSensKey, CameraFovKey, CameraInvertYKey, PrefsVersionKey,
             ShakeScaleKey, ReduceFlashingKey, ReduceMotionKey, IntroAtLaunchKey, IntroSubtitlesKey,
         };
@@ -91,6 +94,11 @@ namespace CriticalMass.Runtime.Menu
         public static bool MuteEffects { get => GetB(MuteEffectsKey, false); set { SetB(MuteEffectsKey, value); ApplyAudio(); } }
         /// <summary>Everything silent while another window has the focus (PlayerPrefs cm.audio.muteInBackground, default off).</summary>
         public static bool MuteInBackground { get => GetB(MuteInBackgroundKey, false); set { SetB(MuteInBackgroundKey, value); ApplyAudio(); } }
+        /// <summary>b15: the announcer's voice level, 0..1 on top of EFFECTS (PlayerPrefs cm.audio.announcer, default 1).</summary>
+        public static float AnnouncerVolume { get => GetF(AnnouncerKey, 1f); set => SetF(AnnouncerKey, Mathf.Clamp01(value)); }
+        /// <summary>b15: LESS SOUND (PlayerPrefs cm.audio.lessSound, default off): only your own sounds, threats and the big
+        /// moments from the crowd, no birds, and the score's rhythm stem at 60%.</summary>
+        public static bool LessSound { get => GetB(LessSoundKey, false); set => SetB(LessSoundKey, value); }
 
         /// <summary>
         /// The colour-blind team palette (blue / amber instead of cyan / coral) on HUD, rings and team text (PlayerPrefs

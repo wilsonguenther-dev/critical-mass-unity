@@ -1,0 +1,1503 @@
+{
+ "stems": {
+  "sb-A-bed-feed": {
+   "seconds": 26.5,
+   "key": "F minor",
+   "r": 0.693,
+   "r_f_minor": 0.693,
+   "lufs": -20.85,
+   "tp": -8.43,
+   "grid": {
+    "onsets": 94,
+    "on_grid": 0.363,
+    "latency_ms": -40.4,
+    "tempo": 139.7
+   },
+   "events_per_bar": 11.75,
+   "balance": {
+    "tilt_dev_db": 6.09,
+    "low": 0.533,
+    "mid": 0.464,
+    "high": 0.003
+   }
+  },
+  "sb-A-bed-minor": {
+   "seconds": 26.5,
+   "key": "F minor",
+   "r": 0.721,
+   "r_f_minor": 0.721,
+   "lufs": -20.97,
+   "tp": -7.79,
+   "grid": {
+    "onsets": 102,
+    "on_grid": 0.377,
+    "latency_ms": -88.3,
+    "tempo": 112.3
+   },
+   "events_per_bar": 12.75,
+   "balance": {
+    "tilt_dev_db": 6.08,
+    "low": 0.542,
+    "mid": 0.455,
+    "high": 0.003
+   }
+  },
+  "sb-A-rhythm-drive": {
+   "seconds": 26.5,
+   "key": "C major",
+   "r": 0.339,
+   "r_f_minor": 0.291,
+   "lufs": -20.23,
+   "tp": -5.29,
+   "grid": {
+    "onsets": 65,
+    "on_grid": 0.999,
+    "latency_ms": 23.9,
+    "tempo": 161.5
+   },
+   "events_per_bar": 8.12,
+   "balance": {
+    "tilt_dev_db": 7.25,
+    "low": 0.907,
+    "mid": 0.092,
+    "high": 0.001
+   }
+  },
+  "sb-A-rhythm-heart": {
+   "seconds": 26.5,
+   "key": "F minor",
+   "r": 0.583,
+   "r_f_minor": 0.583,
+   "lufs": -22.92,
+   "tp": -9.85,
+   "grid": {
+    "onsets": 75,
+    "on_grid": 0.96,
+    "latency_ms": 22.9,
+    "tempo": 79.5
+   },
+   "events_per_bar": 9.38,
+   "balance": {
+    "tilt_dev_db": 10.91,
+    "low": 0.965,
+    "mid": 0.034,
+    "high": 0.0
+   }
+  },
+  "sb-A-rhythm-march": {
+   "seconds": 26.5,
+   "key": "C major",
+   "r": 0.448,
+   "r_f_minor": 0.369,
+   "lufs": -24.69,
+   "tp": -5.28,
+   "grid": {
+    "onsets": 71,
+    "on_grid": 0.982,
+    "latency_ms": 22.5,
+    "tempo": 161.5
+   },
+   "events_per_bar": 8.88,
+   "balance": {
+    "tilt_dev_db": 7.55,
+    "low": 0.888,
+    "mid": 0.111,
+    "high": 0.0
+   }
+  },
+  "sb-A-rhythm-pulse": {
+   "seconds": 26.5,
+   "key": "F minor",
+   "r": 0.649,
+   "r_f_minor": 0.649,
+   "lufs": -28.91,
+   "tp": -7.95,
+   "grid": {
+    "onsets": 71,
+    "on_grid": 0.992,
+    "latency_ms": 21.5,
+    "tempo": 161.5
+   },
+   "events_per_bar": 8.88,
+   "balance": {
+    "tilt_dev_db": 5.78,
+    "low": 0.551,
+    "mid": 0.447,
+    "high": 0.002
+   }
+  },
+  "sb-A-theme-corrupt": {
+   "seconds": 26.5,
+   "key": "F major",
+   "r": 0.697,
+   "r_f_minor": 0.626,
+   "lufs": -24.94,
+   "tp": -11.01,
+   "grid": {
+    "onsets": 72,
+    "on_grid": 0.284,
+    "latency_ms": -71.9,
+    "tempo": 152.0
+   },
+   "events_per_bar": 9.0,
+   "balance": {
+    "tilt_dev_db": 8.47,
+    "low": 0.167,
+    "mid": 0.833,
+    "high": 0.0
+   }
+  },
+  "sb-A-theme-feed": {
+   "seconds": 26.5,
+   "key": "Db minor",
+   "r": 0.511,
+   "r_f_minor": 0.403,
+   "lufs": -25.45,
+   "tp": -12.3,
+   "grid": {
+    "onsets": 74,
+    "on_grid": 0.311,
+    "latency_ms": -83.7,
+    "tempo": 152.0
+   },
+   "events_per_bar": 9.25,
+   "balance": {
+    "tilt_dev_db": 13.12,
+    "low": 0.038,
+    "mid": 0.962,
+    "high": 0.0
+   }
+  },
+  "sb-A-theme-minor": {
+   "seconds": 26.5,
+   "key": "F minor",
+   "r": 0.691,
+   "r_f_minor": 0.691,
+   "lufs": -24.2,
+   "tp": -10.72,
+   "grid": {
+    "onsets": 77,
+    "on_grid": 0.292,
+    "latency_ms": -40.1,
+    "tempo": 152.0
+   },
+   "events_per_bar": 9.62,
+   "balance": {
+    "tilt_dev_db": 13.52,
+    "low": 0.029,
+    "mid": 0.971,
+    "high": 0.0
+   }
+  },
+  "sb-B-bed-feed": {
+   "seconds": 26.5,
+   "key": "F minor",
+   "r": 0.839,
+   "r_f_minor": 0.839,
+   "lufs": -21.36,
+   "tp": -7.79,
+   "grid": {
+    "onsets": 98,
+    "on_grid": 0.266,
+    "latency_ms": 69.9,
+    "tempo": 123.0
+   },
+   "events_per_bar": 12.25,
+   "balance": {
+    "tilt_dev_db": 4.56,
+    "low": 0.702,
+    "mid": 0.295,
+    "high": 0.003
+   }
+  },
+  "sb-B-bed-minor": {
+   "seconds": 26.5,
+   "key": "F minor",
+   "r": 0.857,
+   "r_f_minor": 0.857,
+   "lufs": -21.38,
+   "tp": -7.97,
+   "grid": {
+    "onsets": 99,
+    "on_grid": 0.261,
+    "latency_ms": -17.9,
+    "tempo": 112.3
+   },
+   "events_per_bar": 12.38,
+   "balance": {
+    "tilt_dev_db": 4.46,
+    "low": 0.718,
+    "mid": 0.279,
+    "high": 0.003
+   }
+  },
+  "sb-B-rhythm-drive": {
+   "seconds": 26.5,
+   "key": "C major",
+   "r": 0.403,
+   "r_f_minor": 0.296,
+   "lufs": -20.69,
+   "tp": -5.96,
+   "grid": {
+    "onsets": 65,
+    "on_grid": 0.999,
+    "latency_ms": 24.1,
+    "tempo": 161.5
+   },
+   "events_per_bar": 8.12,
+   "balance": {
+    "tilt_dev_db": 7.22,
+    "low": 0.906,
+    "mid": 0.093,
+    "high": 0.001
+   }
+  },
+  "sb-B-rhythm-heart": {
+   "seconds": 26.5,
+   "key": "F minor",
+   "r": 0.699,
+   "r_f_minor": 0.699,
+   "lufs": -23.15,
+   "tp": -8.75,
+   "grid": {
+    "onsets": 73,
+    "on_grid": 0.958,
+    "latency_ms": 23.0,
+    "tempo": 79.5
+   },
+   "events_per_bar": 9.12,
+   "balance": {
+    "tilt_dev_db": 10.76,
+    "low": 0.97,
+    "mid": 0.03,
+    "high": 0.0
+   }
+  },
+  "sb-B-rhythm-march": {
+   "seconds": 26.5,
+   "key": "Db major",
+   "r": 0.374,
+   "r_f_minor": 0.309,
+   "lufs": -24.79,
+   "tp": -5.23,
+   "grid": {
+    "onsets": 73,
+    "on_grid": 0.986,
+    "latency_ms": 22.7,
+    "tempo": 161.5
+   },
+   "events_per_bar": 9.12,
+   "balance": {
+    "tilt_dev_db": 7.47,
+    "low": 0.905,
+    "mid": 0.095,
+    "high": 0.0
+   }
+  },
+  "sb-B-rhythm-pulse": {
+   "seconds": 26.5,
+   "key": "F minor",
+   "r": 0.861,
+   "r_f_minor": 0.861,
+   "lufs": -28.65,
+   "tp": -6.89,
+   "grid": {
+    "onsets": 74,
+    "on_grid": 0.987,
+    "latency_ms": 22.0,
+    "tempo": 161.5
+   },
+   "events_per_bar": 9.25,
+   "balance": {
+    "tilt_dev_db": 5.77,
+    "low": 0.547,
+    "mid": 0.451,
+    "high": 0.002
+   }
+  },
+  "sb-B-theme-corrupt": {
+   "seconds": 26.5,
+   "key": "F major",
+   "r": 0.721,
+   "r_f_minor": 0.617,
+   "lufs": -22.77,
+   "tp": -10.69,
+   "grid": {
+    "onsets": 79,
+    "on_grid": 0.329,
+    "latency_ms": 78.7,
+    "tempo": 147.7
+   },
+   "events_per_bar": 9.88,
+   "balance": {
+    "tilt_dev_db": 8.43,
+    "low": 0.14,
+    "mid": 0.859,
+    "high": 0.0
+   }
+  },
+  "sb-B-theme-feed": {
+   "seconds": 26.5,
+   "key": "A minor",
+   "r": 0.651,
+   "r_f_minor": 0.132,
+   "lufs": -23.36,
+   "tp": -12.18,
+   "grid": {
+    "onsets": 81,
+    "on_grid": 0.335,
+    "latency_ms": 42.0,
+    "tempo": 147.7
+   },
+   "events_per_bar": 10.12,
+   "balance": {
+    "tilt_dev_db": 12.37,
+    "low": 0.037,
+    "mid": 0.963,
+    "high": 0.0
+   }
+  },
+  "sb-B-theme-minor": {
+   "seconds": 26.5,
+   "key": "Ab major",
+   "r": 0.711,
+   "r_f_minor": 0.588,
+   "lufs": -22.66,
+   "tp": -11.73,
+   "grid": {
+    "onsets": 83,
+    "on_grid": 0.308,
+    "latency_ms": 37.0,
+    "tempo": 147.7
+   },
+   "events_per_bar": 10.38,
+   "balance": {
+    "tilt_dev_db": 12.84,
+    "low": 0.044,
+    "mid": 0.956,
+    "high": 0.0
+   }
+  },
+  "sb-C-bed-feed": {
+   "seconds": 26.5,
+   "key": "F minor",
+   "r": 0.653,
+   "r_f_minor": 0.653,
+   "lufs": -21.3,
+   "tp": -7.83,
+   "grid": {
+    "onsets": 93,
+    "on_grid": 0.444,
+    "latency_ms": -84.1,
+    "tempo": 110.0
+   },
+   "events_per_bar": 11.62,
+   "balance": {
+    "tilt_dev_db": 5.69,
+    "low": 0.601,
+    "mid": 0.396,
+    "high": 0.003
+   }
+  },
+  "sb-C-bed-minor": {
+   "seconds": 26.5,
+   "key": "F minor",
+   "r": 0.698,
+   "r_f_minor": 0.698,
+   "lufs": -21.15,
+   "tp": -6.91,
+   "grid": {
+    "onsets": 95,
+    "on_grid": 0.394,
+    "latency_ms": 34.4,
+    "tempo": 112.3
+   },
+   "events_per_bar": 11.88,
+   "balance": {
+    "tilt_dev_db": 5.78,
+    "low": 0.576,
+    "mid": 0.421,
+    "high": 0.003
+   }
+  },
+  "sb-C-rhythm-drive": {
+   "seconds": 26.5,
+   "key": "C major",
+   "r": 0.351,
+   "r_f_minor": 0.325,
+   "lufs": -20.43,
+   "tp": -4.72,
+   "grid": {
+    "onsets": 65,
+    "on_grid": 0.999,
+    "latency_ms": 23.7,
+    "tempo": 161.5
+   },
+   "events_per_bar": 8.12,
+   "balance": {
+    "tilt_dev_db": 7.24,
+    "low": 0.915,
+    "mid": 0.084,
+    "high": 0.001
+   }
+  },
+  "sb-C-rhythm-heart": {
+   "seconds": 26.5,
+   "key": "F minor",
+   "r": 0.555,
+   "r_f_minor": 0.555,
+   "lufs": -23.09,
+   "tp": -7.95,
+   "grid": {
+    "onsets": 78,
+    "on_grid": 0.952,
+    "latency_ms": 23.2,
+    "tempo": 79.5
+   },
+   "events_per_bar": 9.75,
+   "balance": {
+    "tilt_dev_db": 10.89,
+    "low": 0.972,
+    "mid": 0.028,
+    "high": 0.0
+   }
+  },
+  "sb-C-rhythm-march": {
+   "seconds": 26.5,
+   "key": "C minor",
+   "r": 0.368,
+   "r_f_minor": 0.298,
+   "lufs": -25.17,
+   "tp": -6.89,
+   "grid": {
+    "onsets": 74,
+    "on_grid": 0.984,
+    "latency_ms": 22.4,
+    "tempo": 161.5
+   },
+   "events_per_bar": 9.25,
+   "balance": {
+    "tilt_dev_db": 7.32,
+    "low": 0.906,
+    "mid": 0.093,
+    "high": 0.0
+   }
+  },
+  "sb-C-rhythm-pulse": {
+   "seconds": 26.5,
+   "key": "F minor",
+   "r": 0.686,
+   "r_f_minor": 0.686,
+   "lufs": -29.07,
+   "tp": -8.68,
+   "grid": {
+    "onsets": 70,
+    "on_grid": 0.989,
+    "latency_ms": 21.6,
+    "tempo": 161.5
+   },
+   "events_per_bar": 8.75,
+   "balance": {
+    "tilt_dev_db": 5.75,
+    "low": 0.569,
+    "mid": 0.429,
+    "high": 0.002
+   }
+  },
+  "sb-C-theme-corrupt": {
+   "seconds": 26.5,
+   "key": "F major",
+   "r": 0.752,
+   "r_f_minor": 0.673,
+   "lufs": -24.85,
+   "tp": -10.35,
+   "grid": {
+    "onsets": 71,
+    "on_grid": 0.346,
+    "latency_ms": 55.7,
+    "tempo": 147.7
+   },
+   "events_per_bar": 8.88,
+   "balance": {
+    "tilt_dev_db": 8.11,
+    "low": 0.133,
+    "mid": 0.866,
+    "high": 0.0
+   }
+  },
+  "sb-C-theme-feed": {
+   "seconds": 26.5,
+   "key": "F major",
+   "r": 0.657,
+   "r_f_minor": 0.496,
+   "lufs": -25.24,
+   "tp": -11.72,
+   "grid": {
+    "onsets": 75,
+    "on_grid": 0.325,
+    "latency_ms": 50.9,
+    "tempo": 147.7
+   },
+   "events_per_bar": 9.38,
+   "balance": {
+    "tilt_dev_db": 12.74,
+    "low": 0.021,
+    "mid": 0.979,
+    "high": 0.0
+   }
+  },
+  "sb-C-theme-minor": {
+   "seconds": 26.5,
+   "key": "F minor",
+   "r": 0.704,
+   "r_f_minor": 0.704,
+   "lufs": -23.81,
+   "tp": -10.18,
+   "grid": {
+    "onsets": 67,
+    "on_grid": 0.295,
+    "latency_ms": 41.6,
+    "tempo": 152.0
+   },
+   "events_per_bar": 8.38,
+   "balance": {
+    "tilt_dev_db": 12.95,
+    "low": 0.019,
+    "mid": 0.981,
+    "high": 0.0
+   }
+  },
+  "sb-D-bed-feed": {
+   "seconds": 26.5,
+   "key": "F minor",
+   "r": 0.607,
+   "r_f_minor": 0.607,
+   "lufs": -20.77,
+   "tp": -8.38,
+   "grid": {
+    "onsets": 89,
+    "on_grid": 0.265,
+    "latency_ms": -29.7,
+    "tempo": 112.3
+   },
+   "events_per_bar": 11.12,
+   "balance": {
+    "tilt_dev_db": 7.45,
+    "low": 0.553,
+    "mid": 0.444,
+    "high": 0.003
+   }
+  },
+  "sb-D-bed-minor": {
+   "seconds": 26.5,
+   "key": "F minor",
+   "r": 0.655,
+   "r_f_minor": 0.655,
+   "lufs": -20.69,
+   "tp": -6.41,
+   "grid": {
+    "onsets": 104,
+    "on_grid": 0.316,
+    "latency_ms": -66.6,
+    "tempo": 112.3
+   },
+   "events_per_bar": 13.0,
+   "balance": {
+    "tilt_dev_db": 7.32,
+    "low": 0.541,
+    "mid": 0.456,
+    "high": 0.003
+   }
+  },
+  "sb-D-rhythm-drive": {
+   "seconds": 26.5,
+   "key": "Db major",
+   "r": 0.383,
+   "r_f_minor": 0.307,
+   "lufs": -20.62,
+   "tp": -5.37,
+   "grid": {
+    "onsets": 65,
+    "on_grid": 0.999,
+    "latency_ms": 24.6,
+    "tempo": 161.5
+   },
+   "events_per_bar": 8.12,
+   "balance": {
+    "tilt_dev_db": 7.23,
+    "low": 0.918,
+    "mid": 0.082,
+    "high": 0.0
+   }
+  },
+  "sb-D-rhythm-heart": {
+   "seconds": 26.5,
+   "key": "C minor",
+   "r": 0.513,
+   "r_f_minor": 0.469,
+   "lufs": -24.27,
+   "tp": -9.18,
+   "grid": {
+    "onsets": 74,
+    "on_grid": 0.954,
+    "latency_ms": 23.0,
+    "tempo": 79.5
+   },
+   "events_per_bar": 9.25,
+   "balance": {
+    "tilt_dev_db": 10.02,
+    "low": 0.979,
+    "mid": 0.021,
+    "high": 0.0
+   }
+  },
+  "sb-D-rhythm-march": {
+   "seconds": 26.5,
+   "key": "C minor",
+   "r": 0.522,
+   "r_f_minor": 0.315,
+   "lufs": -25.14,
+   "tp": -6.17,
+   "grid": {
+    "onsets": 70,
+    "on_grid": 0.989,
+    "latency_ms": 23.1,
+    "tempo": 161.5
+   },
+   "events_per_bar": 8.75,
+   "balance": {
+    "tilt_dev_db": 7.34,
+    "low": 0.903,
+    "mid": 0.097,
+    "high": 0.0
+   }
+  },
+  "sb-D-rhythm-pulse": {
+   "seconds": 26.5,
+   "key": "C minor",
+   "r": 0.66,
+   "r_f_minor": 0.582,
+   "lufs": -29.62,
+   "tp": -8.79,
+   "grid": {
+    "onsets": 70,
+    "on_grid": 0.99,
+    "latency_ms": 22.0,
+    "tempo": 161.5
+   },
+   "events_per_bar": 8.75,
+   "balance": {
+    "tilt_dev_db": 5.66,
+    "low": 0.545,
+    "mid": 0.453,
+    "high": 0.002
+   }
+  },
+  "sb-D-theme-corrupt": {
+   "seconds": 26.5,
+   "key": "F major",
+   "r": 0.641,
+   "r_f_minor": 0.489,
+   "lufs": -23.18,
+   "tp": -10.26,
+   "grid": {
+    "onsets": 64,
+    "on_grid": 0.374,
+    "latency_ms": 89.6,
+    "tempo": 147.7
+   },
+   "events_per_bar": 8.0,
+   "balance": {
+    "tilt_dev_db": 8.75,
+    "low": 0.171,
+    "mid": 0.829,
+    "high": 0.0
+   }
+  },
+  "sb-D-theme-feed": {
+   "seconds": 26.5,
+   "key": "A minor",
+   "r": 0.766,
+   "r_f_minor": 0.196,
+   "lufs": -24.23,
+   "tp": -11.62,
+   "grid": {
+    "onsets": 68,
+    "on_grid": 0.331,
+    "latency_ms": -24.2,
+    "tempo": 152.0
+   },
+   "events_per_bar": 8.5,
+   "balance": {
+    "tilt_dev_db": 13.77,
+    "low": 0.05,
+    "mid": 0.95,
+    "high": 0.0
+   }
+  },
+  "sb-D-theme-minor": {
+   "seconds": 26.5,
+   "key": "F minor",
+   "r": 0.687,
+   "r_f_minor": 0.687,
+   "lufs": -24.31,
+   "tp": -11.56,
+   "grid": {
+    "onsets": 67,
+    "on_grid": 0.346,
+    "latency_ms": -43.0,
+    "tempo": 152.0
+   },
+   "events_per_bar": 8.38,
+   "balance": {
+    "tilt_dev_db": 13.11,
+    "low": 0.012,
+    "mid": 0.988,
+    "high": 0.0
+   }
+  }
+ },
+ "states": {
+  "calm": {
+   "key": "F minor",
+   "r": 0.802,
+   "r_f_minor": 0.802,
+   "lufs": -21.78,
+   "tp": -7.92,
+   "grid": {
+    "onsets": 1023,
+    "on_grid": 0.873,
+    "latency_ms": 31.3,
+    "tempo": 161.5
+   },
+   "events_per_bar": 10.66,
+   "balance": {
+    "tilt_dev_db": 4.16,
+    "low": 0.567,
+    "mid": 0.43,
+    "high": 0.003
+   },
+   "ear": {
+    "windows": 96,
+    "banned": 0,
+    "top": [
+     "Music (96)"
+    ]
+   }
+  },
+  "contested": {
+   "key": "F minor",
+   "r": 0.685,
+   "r_f_minor": 0.685,
+   "lufs": -20.03,
+   "tp": -4.1,
+   "grid": {
+    "onsets": 981,
+    "on_grid": 0.92,
+    "latency_ms": 29.8,
+    "tempo": 161.5
+   },
+   "events_per_bar": 10.22,
+   "balance": {
+    "tilt_dev_db": 4.96,
+    "low": 0.631,
+    "mid": 0.367,
+    "high": 0.002
+   },
+   "ear": {
+    "windows": 96,
+    "banned": 0,
+    "top": [
+     "Music (96)"
+    ]
+   }
+  },
+  "leading": {
+   "key": "F minor",
+   "r": 0.717,
+   "r_f_minor": 0.717,
+   "lufs": -19.49,
+   "tp": -4.81,
+   "grid": {
+    "onsets": 1010,
+    "on_grid": 0.889,
+    "latency_ms": 30.2,
+    "tempo": 161.5
+   },
+   "events_per_bar": 10.52,
+   "balance": {
+    "tilt_dev_db": 4.71,
+    "low": 0.568,
+    "mid": 0.431,
+    "high": 0.002
+   },
+   "ear": {
+    "windows": 96,
+    "banned": 0,
+    "top": [
+     "Music (96)"
+    ]
+   }
+  },
+  "trailing": {
+   "key": "F minor",
+   "r": 0.803,
+   "r_f_minor": 0.803,
+   "lufs": -20.1,
+   "tp": -5.65,
+   "grid": {
+    "onsets": 1008,
+    "on_grid": 0.898,
+    "latency_ms": 30.7,
+    "tempo": 161.5
+   },
+   "events_per_bar": 10.5,
+   "balance": {
+    "tilt_dev_db": 4.12,
+    "low": 0.558,
+    "mid": 0.439,
+    "high": 0.003
+   },
+   "ear": {
+    "windows": 96,
+    "banned": 0,
+    "top": [
+     "Music (96)"
+    ]
+   }
+  },
+  "rally": {
+   "key": "F minor",
+   "r": 0.629,
+   "r_f_minor": 0.629,
+   "lufs": -17.89,
+   "tp": -3.56,
+   "grid": {
+    "onsets": 918,
+    "on_grid": 0.957,
+    "latency_ms": 30.9,
+    "tempo": 161.5
+   },
+   "events_per_bar": 9.56,
+   "balance": {
+    "tilt_dev_db": 5.03,
+    "low": 0.65,
+    "mid": 0.349,
+    "high": 0.002
+   },
+   "ear": {
+    "windows": 96,
+    "banned": 0,
+    "top": [
+     "Music (96)"
+    ]
+   }
+  },
+  "egg": {
+   "key": "F minor",
+   "r": 0.776,
+   "r_f_minor": 0.776,
+   "lufs": -21.23,
+   "tp": -6.03,
+   "grid": {
+    "onsets": 1091,
+    "on_grid": 0.708,
+    "latency_ms": 31.4,
+    "tempo": 112.3
+   },
+   "events_per_bar": 11.36,
+   "balance": {
+    "tilt_dev_db": 5.32,
+    "low": 0.746,
+    "mid": 0.253,
+    "high": 0.002
+   },
+   "ear": {
+    "windows": 96,
+    "banned": 0,
+    "top": [
+     "Music (96)"
+    ]
+   }
+  },
+  "final": {
+   "key": "F minor",
+   "r": 0.598,
+   "r_f_minor": 0.598,
+   "lufs": -17.09,
+   "tp": -2.61,
+   "grid": {
+    "onsets": 879,
+    "on_grid": 0.973,
+    "latency_ms": 30.6,
+    "tempo": 161.5
+   },
+   "events_per_bar": 9.16,
+   "balance": {
+    "tilt_dev_db": 5.33,
+    "low": 0.695,
+    "mid": 0.303,
+    "high": 0.001
+   },
+   "ear": {
+    "windows": 96,
+    "banned": 0,
+    "top": [
+     "Music (96)"
+    ]
+   }
+  },
+  "berserk": {
+   "key": "F minor",
+   "r": 0.577,
+   "r_f_minor": 0.577,
+   "lufs": -17.82,
+   "tp": -3.13,
+   "grid": {
+    "onsets": 909,
+    "on_grid": 0.957,
+    "latency_ms": 31.4,
+    "tempo": 161.5
+   },
+   "events_per_bar": 9.47,
+   "balance": {
+    "tilt_dev_db": 5.33,
+    "low": 0.689,
+    "mid": 0.309,
+    "high": 0.001
+   },
+   "ear": {
+    "windows": 96,
+    "banned": 0,
+    "top": [
+     "Music (96)"
+    ]
+   }
+  },
+  "contested+feed": {
+   "key": "F minor",
+   "r": 0.63,
+   "r_f_minor": 0.63,
+   "lufs": -20.13,
+   "tp": -4.53,
+   "grid": {
+    "onsets": 978,
+    "on_grid": 0.92,
+    "latency_ms": 29.5,
+    "tempo": 161.5
+   },
+   "events_per_bar": 10.19,
+   "balance": {
+    "tilt_dev_db": 4.87,
+    "low": 0.645,
+    "mid": 0.353,
+    "high": 0.002
+   },
+   "ear": {
+    "windows": 96,
+    "banned": 0,
+    "top": [
+     "Music (96)"
+    ]
+   }
+  },
+  "leading+feed": {
+   "key": "F minor",
+   "r": 0.656,
+   "r_f_minor": 0.656,
+   "lufs": -19.63,
+   "tp": -4.25,
+   "grid": {
+    "onsets": 1012,
+    "on_grid": 0.888,
+    "latency_ms": 30.1,
+    "tempo": 161.5
+   },
+   "events_per_bar": 10.54,
+   "balance": {
+    "tilt_dev_db": 4.73,
+    "low": 0.585,
+    "mid": 0.413,
+    "high": 0.002
+   },
+   "ear": {
+    "windows": 96,
+    "banned": 0,
+    "top": [
+     "Music (96)"
+    ]
+   }
+  },
+  "final+feed": {
+   "key": "F minor",
+   "r": 0.552,
+   "r_f_minor": 0.552,
+   "lufs": -17.15,
+   "tp": -2.94,
+   "grid": {
+    "onsets": 868,
+    "on_grid": 0.971,
+    "latency_ms": 30.6,
+    "tempo": 161.5
+   },
+   "events_per_bar": 9.04,
+   "balance": {
+    "tilt_dev_db": 5.23,
+    "low": 0.704,
+    "mid": 0.294,
+    "high": 0.001
+   },
+   "ear": {
+    "windows": 96,
+    "banned": 0,
+    "top": [
+     "Music (96)"
+    ]
+   }
+  }
+ },
+ "title": {
+  "seconds": 48.0,
+  "key": "F minor",
+  "r": 0.887,
+  "r_f_minor": 0.887,
+  "lufs": -19.98,
+  "tp": -6.96,
+  "loop_click_ratio": 0.67,
+  "balance": {
+   "tilt_dev_db": 5.73,
+   "low": 0.212,
+   "mid": 0.785,
+   "high": 0.002
+  },
+  "ear": {
+   "windows": 48,
+   "banned": 0,
+   "top": [
+    "Music (48)"
+   ]
+  }
+ },
+ "stings": {
+  "sting-defeat": {
+   "seconds": 9.0,
+   "key": "F minor",
+   "r": 0.884,
+   "r_f_minor": 0.884,
+   "lufs": -16.04,
+   "tp": -3.9,
+   "ear": {
+    "windows": 9,
+    "banned": 0,
+    "top": [
+     "Music (9)"
+    ]
+   }
+  },
+  "sting-draw": {
+   "seconds": 7.91,
+   "key": "F major",
+   "r": 0.826,
+   "r_f_minor": 0.738,
+   "lufs": -16.04,
+   "tp": -3.53,
+   "ear": {
+    "windows": 7,
+    "banned": 0,
+    "top": [
+     "Music (7)"
+    ]
+   }
+  },
+  "sting-hatch-brute": {
+   "seconds": 6.15,
+   "key": "F minor",
+   "r": 0.836,
+   "r_f_minor": 0.836,
+   "lufs": -16.06,
+   "tp": -1.7,
+   "ear": {
+    "windows": 6,
+    "banned": 0,
+    "top": [
+     "Music (6)"
+    ]
+   }
+  },
+  "sting-hatch-elder": {
+   "seconds": 6.14,
+   "key": "F minor",
+   "r": 0.886,
+   "r_f_minor": 0.886,
+   "lufs": -16.15,
+   "tp": -1.73,
+   "ear": {
+    "windows": 6,
+    "banned": 0,
+    "top": [
+     "Music (6)"
+    ]
+   }
+  },
+  "sting-hatch-grove": {
+   "seconds": 6.06,
+   "key": "F major",
+   "r": 0.831,
+   "r_f_minor": 0.455,
+   "lufs": -16.06,
+   "tp": -1.65,
+   "ear": {
+    "windows": 6,
+    "banned": 0,
+    "top": [
+     "Music (5)",
+     "Violin, fiddle (1)"
+    ]
+   }
+  },
+  "sting-hatch-mire": {
+   "seconds": 6.52,
+   "key": "F major",
+   "r": 0.688,
+   "r_f_minor": 0.685,
+   "lufs": -16.05,
+   "tp": -2.43,
+   "ear": {
+    "windows": 6,
+    "banned": 0,
+    "top": [
+     "Music (6)"
+    ]
+   }
+  },
+  "sting-hatch-timber": {
+   "seconds": 6.21,
+   "key": "F minor",
+   "r": 0.876,
+   "r_f_minor": 0.876,
+   "lufs": -16.11,
+   "tp": -1.52,
+   "ear": {
+    "windows": 6,
+    "banned": 0,
+    "top": [
+     "Music (6)"
+    ]
+   }
+  },
+  "sting-victory": {
+   "seconds": 7.66,
+   "key": "F major",
+   "r": 0.866,
+   "r_f_minor": 0.512,
+   "lufs": -16.08,
+   "tp": -1.66,
+   "ear": {
+    "windows": 7,
+    "banned": 0,
+    "top": [
+     "Music (7)"
+    ]
+   }
+  }
+ },
+ "effects": {
+  "sb_behind_tick": {
+   "seconds": 0.22,
+   "peak_dbfs": -3.39,
+   "tp": -3.36,
+   "centroid_hz": 687.0,
+   "laptop_db": -0.0,
+   "ear": {
+    "windows": 1,
+    "banned": 0,
+    "top": [
+     "Sound effect (1)"
+    ]
+   }
+  },
+  "sb_block_place_0": {
+   "seconds": 0.34,
+   "peak_dbfs": -3.49,
+   "tp": -3.48,
+   "centroid_hz": 154.0,
+   "laptop_db": -6.4,
+   "ear": {
+    "windows": 1,
+    "banned": 0,
+    "top": [
+     "Sound effect (1)"
+    ]
+   }
+  },
+  "sb_block_place_1": {
+   "seconds": 0.34,
+   "peak_dbfs": -3.36,
+   "tp": -3.36,
+   "centroid_hz": 159.0,
+   "laptop_db": -5.8,
+   "ear": {
+    "windows": 1,
+    "banned": 0,
+    "top": [
+     "Sound effect (1)"
+    ]
+   }
+  },
+  "sb_bridge_place": {
+   "seconds": 0.9,
+   "peak_dbfs": -3.67,
+   "tp": -3.66,
+   "centroid_hz": 168.0,
+   "laptop_db": -4.1,
+   "ear": {
+    "windows": 1,
+    "banned": 0,
+    "top": [
+     "Drum (1)"
+    ]
+   }
+  },
+  "sb_climb_step_0": {
+   "seconds": 0.12,
+   "peak_dbfs": -3.31,
+   "tp": -3.3,
+   "centroid_hz": 136.0,
+   "laptop_db": -7.3,
+   "ear": {
+    "windows": 1,
+    "banned": 0,
+    "top": [
+     "Sound effect (1)"
+    ]
+   }
+  },
+  "sb_climb_step_1": {
+   "seconds": 0.12,
+   "peak_dbfs": -3.47,
+   "tp": -3.47,
+   "centroid_hz": 143.0,
+   "laptop_db": -6.4,
+   "ear": {
+    "windows": 1,
+    "banned": 0,
+    "top": [
+     "Sound effect (1)"
+    ]
+   }
+  },
+  "sb_dodge": {
+   "seconds": 0.34,
+   "peak_dbfs": -4.31,
+   "tp": -4.15,
+   "centroid_hz": 2857.0,
+   "laptop_db": -0.0,
+   "ear": {
+    "windows": 1,
+    "banned": 0,
+    "top": [
+     "Sound effect (1)"
+    ]
+   }
+  },
+  "sb_hut_level": {
+   "seconds": 1.7,
+   "peak_dbfs": -3.43,
+   "tp": -3.43,
+   "centroid_hz": 370.0,
+   "laptop_db": -1.7,
+   "ear": {
+    "windows": 1,
+    "banned": 0,
+    "top": [
+     "Music (1)"
+    ]
+   }
+  },
+  "sb_ladder_place": {
+   "seconds": 0.5,
+   "peak_dbfs": -3.64,
+   "tp": -3.63,
+   "centroid_hz": 310.0,
+   "laptop_db": -0.3,
+   "ear": {
+    "windows": 1,
+    "banned": 0,
+    "top": [
+     "Sound effect (1)"
+    ]
+   }
+  },
+  "sb_ore_bank": {
+   "seconds": 0.8,
+   "peak_dbfs": -3.46,
+   "tp": -3.46,
+   "centroid_hz": 208.0,
+   "laptop_db": -5.6,
+   "ear": {
+    "windows": 1,
+    "banned": 0,
+    "top": [
+     "Music (1)"
+    ]
+   }
+  },
+  "sb_ore_hit_0": {
+   "seconds": 0.22,
+   "peak_dbfs": -3.67,
+   "tp": -3.64,
+   "centroid_hz": 136.0,
+   "laptop_db": -5.8,
+   "ear": {
+    "windows": 1,
+    "banned": 0,
+    "top": [
+     "Sound effect (1)"
+    ]
+   }
+  },
+  "sb_ore_hit_1": {
+   "seconds": 0.22,
+   "peak_dbfs": -3.44,
+   "tp": -3.42,
+   "centroid_hz": 161.0,
+   "laptop_db": -2.8,
+   "ear": {
+    "windows": 1,
+    "banned": 0,
+    "top": [
+     "Sound effect (1)"
+    ]
+   }
+  },
+  "sb_ore_hit_2": {
+   "seconds": 0.22,
+   "peak_dbfs": -3.59,
+   "tp": -3.59,
+   "centroid_hz": 144.0,
+   "laptop_db": -5.2,
+   "ear": {
+    "windows": 1,
+    "banned": 0,
+    "top": [
+     "Sound effect (1)"
+    ]
+   }
+  },
+  "sb_pit_dig": {
+   "seconds": 0.36,
+   "peak_dbfs": -3.91,
+   "tp": -3.9,
+   "centroid_hz": 409.0,
+   "laptop_db": -3.8,
+   "ear": {
+    "windows": 1,
+    "banned": 0,
+    "top": [
+     "Bang (1)"
+    ]
+   }
+  },
+  "sb_wall_break": {
+   "seconds": 1.1,
+   "peak_dbfs": -4.45,
+   "tp": -4.41,
+   "centroid_hz": 124.0,
+   "laptop_db": -11.1,
+   "ear": {
+    "windows": 1,
+    "banned": 0,
+    "top": [
+     "Music (1)"
+    ]
+   }
+  },
+  "sb_wall_hit_0": {
+   "seconds": 0.22,
+   "peak_dbfs": -3.35,
+   "tp": -3.35,
+   "centroid_hz": 247.0,
+   "laptop_db": -4.9,
+   "ear": {
+    "windows": 1,
+    "banned": 0,
+    "top": [
+     "Sound effect (1)"
+    ]
+   }
+  },
+  "sb_wall_hit_1": {
+   "seconds": 0.22,
+   "peak_dbfs": -3.61,
+   "tp": -3.6,
+   "centroid_hz": 232.0,
+   "laptop_db": -4.3,
+   "ear": {
+    "windows": 1,
+    "banned": 0,
+    "top": [
+     "Sound effect (1)"
+    ]
+   }
+  },
+  "sb_wall_place_0": {
+   "seconds": 0.45,
+   "peak_dbfs": -3.54,
+   "tp": -3.51,
+   "centroid_hz": 171.0,
+   "laptop_db": -3.3,
+   "ear": {
+    "windows": 1,
+    "banned": 0,
+    "top": [
+     "Sound effect (1)"
+    ]
+   }
+  },
+  "sb_wall_place_1": {
+   "seconds": 0.45,
+   "peak_dbfs": -3.9,
+   "tp": -3.89,
+   "centroid_hz": 175.0,
+   "laptop_db": -3.0,
+   "ear": {
+    "windows": 1,
+    "banned": 0,
+    "top": [
+     "Sound effect (1)"
+    ]
+   }
+  }
+ },
+ "joins": {
+  "joins": 108,
+  "worst_ratio": 1.1,
+  "worst": "D->A bed-feed",
+  "clicks": 0
+ },
+ "fails": [],
+ "effects_distinct": {
+  "cues": 13,
+  "closest_mfcc": [
+   {
+    "a": "sb_bridge_place",
+    "b": "sb_climb_step",
+    "mfcc_dist": 14.9,
+    "centroid_ratio": 1.24
+   },
+   {
+    "a": "sb_ore_hit",
+    "b": "sb_wall_place",
+    "mfcc_dist": 26.0,
+    "centroid_ratio": 1.26
+   },
+   {
+    "a": "sb_block_place",
+    "b": "sb_bridge_place",
+    "mfcc_dist": 34.7,
+    "centroid_ratio": 1.09
+   }
+  ]
+ },
+ "ok": true
+}

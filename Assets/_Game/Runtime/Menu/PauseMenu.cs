@@ -1330,8 +1330,11 @@ namespace CriticalMass.Runtime.Menu
                 Stepper(tab, 3, "MUTE MUSIC", () => GameSettings.MuteMusic ? "ON" : "OFF", d => GameSettings.MuteMusic = !GameSettings.MuteMusic),
                 Stepper(tab, 4, "MUTE SOUND EFFECTS", () => GameSettings.MuteEffects ? "ON" : "OFF", d => GameSettings.MuteEffects = !GameSettings.MuteEffects),
                 Stepper(tab, 5, "MUTE WHEN IN BACKGROUND", () => GameSettings.MuteInBackground ? "ON" : "OFF", d => GameSettings.MuteInBackground = !GameSettings.MuteInBackground),
+                // b15: the announcer's own level, and LESS SOUND (your own sounds, threats and big moments only; a lighter score)
+                Slider(tab, 6, "ANNOUNCER", () => GameSettings.AnnouncerVolume, v => GameSettings.AnnouncerVolume = v),
+                Stepper(tab, 7, "LESS SOUND", () => GameSettings.LessSound ? "ON" : "OFF", d => GameSettings.LessSound = !GameSettings.LessSound),
             };
-            Note(tab, 6, "Routed through the game's audio mixer (Master, Music, Effects). A mute keeps the slider's level.");
+            Note(tab, 8, "A mute keeps the slider's level. Less sound keeps your own sounds, threats and big moments.");
             ChainInTab(items);
             return tab.gameObject;
         }

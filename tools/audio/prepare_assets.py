@@ -41,22 +41,11 @@ SHA = {
 }
 
 # (output, source relative to --src, category, filter chain before loudness)
-MUSIC_ROWS = [
-    # Title: a slow, mysterious loop under the logo and the live bot match.
-    (MUSIC / "music-title.ogg", "darkshrine.ogg", ""),
-    # Match bed. The MP3 carries encoder delay: drop the leading near-silence so the loop seam is tight.
-    (MUSIC / "music-match.ogg", "battleThemeA.mp3", "silenceremove=start_periods=1:start_threshold=-60dB"),
-    # Final-minute lift: a faster, more urgent orchestral loop the director crossfades to at one minute left.
-    (MUSIC / "music-final.ogg", "determined_pursuit_loop.wav", ""),
-    # Berserk: the loop part only (the pack's opening is a one-shot intro).
-    (MUSIC / "music-berserk.ogg", "boss/boss_battle_#2_metal_loop.wav", ""),
-]
-STING_ROWS = [
-    # Stings are the first seconds of each theme, faded out, so the results screen is not drowned.
-    (STINGS / "sting-victory.ogg", "victory.wav", "atrim=0:9,afade=t=out:st=7:d=2"),
-    (STINGS / "sting-defeat.ogg", "defeat.wav", "atrim=0:9,afade=t=out:st=6.5:d=2.5"),
-    (STINGS / "sting-draw.ogg", "kj/Audio/Pizzicato jingles/jingles_PIZZI07.ogg", ""),
-]
+# b15: the music and stings are the original Skybreak score now (tools/audio/skybreak/build_game_score.py writes
+# CMMusic/music-title.ogg, CMScore/ and CMStings/). The library loops and stings this script prepared are out of the
+# build, so it prepares the UI sounds only; it must never write music again.
+MUSIC_ROWS = []
+STING_ROWS = []
 UI_ROWS = [
     (UI / "ui-hover.ogg", "tick_002.ogg"),
     (UI / "ui-step.ogg", "tick_004.ogg"),

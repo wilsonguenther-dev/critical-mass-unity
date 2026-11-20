@@ -52,6 +52,14 @@ namespace CriticalMass.Runtime.Audio.Sound
         Surface,
         /// <summary>Only when the actor is no longer alive (a launched corpse landing; jumps land through the tick decode).</summary>
         CorpseOnly,
+        /// <summary>b15: the blacksmith hut levelled (A = team): loud for your team, quieter for theirs.</summary>
+        Hut,
+        /// <summary>b15: a Miner's ore press: B &lt; 0 = refused (your own press only), else the mining hit.</summary>
+        Ore,
+        /// <summary>b15: a Builder wall or block: B &lt; 0 = refused (yours only); Value = length (1 = a block).</summary>
+        BuildWall,
+        /// <summary>b15: a deposit at a pad: ore into the hut sounds; other deposits stay with the depth HUD.</summary>
+        Bank,
     }
 
     /// <summary>One sim event type's sound: a pick rule over a cue set, or an explicit silence with its reason.</summary>
@@ -251,6 +259,22 @@ namespace CriticalMass.Runtime.Audio.Sound
             C("amb_water", null, S("amb_water"), 0.3f, 1f, 0f, 1, 0f, 5, Mid, SoundBus.Ambience, loop: true),
             C("amb_bird", null, S("amb_bird"), 0.22f, 1f, 0.1f, 1, 2f, 2, Mid, SoundBus.Ambience),
             C("amb_bird_trill", null, S("amb_bird_trill"), 0.2f, 1f, 0.1f, 1, 2f, 2, Mid, SoundBus.Ambience),
+
+            // ---- b15: the Skybreak effects (original, tuned to the score's F minor; tools/audio/skybreak, Resources CMSfxScore).
+            // Few and distinct: each its own centroid and shape (tools/audio/skybreak/ANALYZER-REPORT.md), capped and spaced.
+            C("sb_dodge", F("sb_dodge"), null, 0.45f, 1f, 0.05f, 3, 0.08f, 30, Near),
+            C("sb_wall_place", F("sb_wall_place_0", "sb_wall_place_1"), null, 0.5f, 1f, 0.03f, 2, 0.1f, 35, Mid),
+            C("sb_block_place", F("sb_block_place_0", "sb_block_place_1"), null, 0.45f, 1f, 0.03f, 2, 0.1f, 30, Mid),
+            C("sb_wall_hit", F("sb_wall_hit_0", "sb_wall_hit_1"), null, 0.45f, 1f, 0.04f, 3, 0.06f, 30, Mid),
+            C("sb_wall_break", F("sb_wall_break"), null, 0.7f, 1f, 0.03f, 2, 0.2f, 60, Far, caption: "Wall broken"),
+            C("sb_hut_level", F("sb_hut_level"), null, 0.6f, 1f, 0f, 1, 1f, 75, Ui, SoundBus.Ui, caption: "Hut levelled up"),
+            C("sb_ore_hit", F("sb_ore_hit_0", "sb_ore_hit_1", "sb_ore_hit_2"), null, 0.42f, 1f, 0.02f, 3, 0.06f, 28, Near),
+            C("sb_ore_bank", F("sb_ore_bank"), null, 0.5f, 1f, 0.02f, 2, 0.2f, 35, Mid),
+            C("sb_ladder_place", F("sb_ladder_place"), null, 0.5f, 1f, 0.04f, 2, 0.15f, 35, Mid),
+            C("sb_climb_step", F("sb_climb_step_0", "sb_climb_step_1"), null, 0.3f, 1f, 0.06f, 3, 0.05f, 10, Near),
+            C("sb_bridge_place", F("sb_bridge_place"), null, 0.55f, 1f, 0.03f, 2, 0.15f, 40, Mid),
+            C("sb_pit_dig", F("sb_pit_dig"), null, 0.45f, 1f, 0.08f, 3, 0.08f, 30, Mid),
+            C("sb_behind_tick", F("sb_behind_tick"), null, 0.35f, 1f, 0f, 1, 1.5f, 85, Ui, SoundBus.Ui, caption: "Danger behind you"),
         };
 
         /// <summary>Every sim event type. Silence rows say what covers them.</summary>
@@ -274,7 +298,7 @@ namespace CriticalMass.Runtime.Audio.Sound
             R(SimEventType.HillOwnerChange, Pick.Hill, "hill_captured", "hill_lost", "hill_contested", "hill_enter"),
             R(SimEventType.BerserkLocked, Pick.Fixed, "berserk_lock"),
             R(SimEventType.Ability, Pick.Ability, "ability_shield", "ability_farmer", "refused"),
-            R(SimEventType.Terraform, Pick.Terraform, "dig", "place_block", "refused"),
+            R(SimEventType.Terraform, Pick.Terraform, "sb_pit_dig", "place_block", "refused"),   // b15: the dig is the Skybreak pit dig
             R(SimEventType.Topple, Pick.Topple, "topple_creak"),
             R(SimEventType.ToppleHit, Pick.Fixed, "hit_stone"),
             R(SimEventType.ToppleDown, Pick.Fixed, "topple_crash"),
@@ -291,7 +315,7 @@ namespace CriticalMass.Runtime.Audio.Sound
             R(SimEventType.TntThrown, Pick.Fixed, "tnt_throw"),
             R(SimEventType.TntLanded, Pick.Fuse, "tnt_land", "fuse"),
             R(SimEventType.Explosion, Pick.Blast, "blast_near", "blast_mine"),
-            R(SimEventType.PiecePlaced, Pick.Piece, "build_ladder", "build_bridge"),
+            R(SimEventType.PiecePlaced, Pick.Piece, "sb_ladder_place", "sb_bridge_place"),   // b15: Skybreak ladder and bridge
             R(SimEventType.PieceCrumbling, Pick.Fixed, "build_warn"),
             R(SimEventType.PieceExpired, Pick.PieceEnd, "piece_expire", "piece_pickup"),
             R(SimEventType.PieceDestroyed, Pick.Fixed, "piece_break"),
@@ -313,7 +337,7 @@ namespace CriticalMass.Runtime.Audio.Sound
             Silent(SimEventType.DeliverRefused, "the depth HUD (PR #59) plays its own depth-* cue through UiSound for the local player"),
             Silent(SimEventType.Handoff, "the depth HUD (PR #59) plays its own depth-* cue through UiSound for the local player"),
             R(SimEventType.SourceGather, Pick.Fixed, "gather_done"),
-            Silent(SimEventType.BankDeposit, "the depth HUD (PR #59) plays its own depth-* cue through UiSound for the local player"),
+            R(SimEventType.BankDeposit, Pick.Bank, "sb_ore_bank"),   // b15: ore into the hut; other deposits: the depth HUD's own depth-* cue
             Silent(SimEventType.BankWithdraw, "the depth HUD (PR #59) plays its own depth-* cue through UiSound for the local player"),
             Silent(SimEventType.ClassSwitch, "the depth HUD (PR #59) plays its own depth-* cue through UiSound for the local player"),
             Silent(SimEventType.Upgrade, "the depth HUD (PR #59) plays its own depth-* cue through UiSound for the local player"),
@@ -336,11 +360,12 @@ namespace CriticalMass.Runtime.Audio.Sound
             R(SimEventType.BridgeCollapsed, Pick.Fixed, "piece_break"),
             Silent(SimEventType.BridgeRepaired, "the depth HUD (PR #59) plays its own depth-* cue through UiSound for the local player"),
             // CM b13 S0: silent until the owner item routes a cue (one route per type; SoundCoverageTests).
-            Silent(SimEventType.HutLevel, "b13 S0: silent until item H adds its cue"),
-            Silent(SimEventType.OreMined, "b13 S0: silent until item H adds its cue"),
-            Silent(SimEventType.WallBuilt, "b13 S0: silent until item B adds its cue"),
-            Silent(SimEventType.WallBroken, "b13 S0: silent until item B adds its cue"),
-            Silent(SimEventType.Dodge, "b13 S0: silent until item J adds its cue"),
+            // b15 (Skybreak sound): the five b13 events that were silent
+            R(SimEventType.HutLevel, Pick.Hut, "sb_hut_level"),
+            R(SimEventType.OreMined, Pick.Ore, "sb_ore_hit", "refused"),
+            R(SimEventType.WallBuilt, Pick.BuildWall, "sb_wall_place", "sb_block_place", "refused"),
+            R(SimEventType.WallBroken, Pick.Fixed, "sb_wall_break"),
+            R(SimEventType.Dodge, Pick.Fixed, "sb_dodge"),
             Silent(SimEventType.CorruptionRoll, "b13 S0: silent until item C adds its cue"),
             Silent(SimEventType.KaijuPower, "b13 S0: silent until item K adds its cue"),
             Silent(SimEventType.CrystalMined, "b13 S0: silent until item C adds its cue"),
@@ -387,7 +412,7 @@ namespace CriticalMass.Runtime.Audio.Sound
             (MomentId.HillCleared, "sting_takeover", null),
             (MomentId.BatteringRam, "sting_takeover", null),
             (MomentId.Overcharged, "sting_takeover", null),
-            (MomentId.Hatch, "sting_kaiju", null),
+            (MomentId.Hatch, null, "b15: the music director plays the hatched type's stinger on the beat (CMStings/sting-hatch-*)"),
             (MomentId.AllegianceTurns, "sting_kaiju", null),
             (MomentId.Berserk, "sting_kaiju", null),
             (MomentId.Quake, "sting_kaiju", null),
@@ -550,13 +575,24 @@ namespace CriticalMass.Runtime.Audio.Sound
             _index = index;
         }
 
-        /// <summary>Distinct recorded files the table uses (tests: all 42 credited Kenney sounds).</summary>
+        /// <summary>Distinct recorded library files the table uses (tests: all 42 credited Kenney sounds). b15: the original
+        /// Skybreak effects (sb_*, Resources CMSfxScore) are not library files and are listed by ScoreFiles.</summary>
         public static HashSet<string> Files()
         {
             var s = new HashSet<string>();
-            foreach (CueDef c in Cues) foreach (string f in c.Files) s.Add(f);
+            foreach (CueDef c in Cues) foreach (string f in c.Files) if (!IsScoreFile(f)) s.Add(f);
             return s;
         }
+
+        /// <summary>b15: the original Skybreak effect files the table uses (Resources CMSfxScore).</summary>
+        public static HashSet<string> ScoreFiles()
+        {
+            var s = new HashSet<string>();
+            foreach (CueDef c in Cues) foreach (string f in c.Files) if (IsScoreFile(f)) s.Add(f);
+            return s;
+        }
+
+        public static bool IsScoreFile(string f) => f != null && f.StartsWith("sb_", StringComparison.Ordinal);
 
         /// <summary>Cues with no recorded file (synth only): the list to replace with recordings later.</summary>
         public static List<string> SynthOnly()

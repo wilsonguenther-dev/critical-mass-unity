@@ -61,7 +61,7 @@ namespace CriticalMass.Runtime.Menus
             "An open-source 3D suite: every model, rig and animation built by script",
             "A local, open-licence voice model for the narration",
             "Three open-licence typefaces (SIL Open Font License 1.1)",
-            "Sound effects from public-domain (CC0) libraries, listed on the right",
+            "An original score and its effects, rendered from code for this game; sound effects from public-domain (CC0) libraries, listed on the right",
         };
 
         public const string SoundIntro = "Public domain (CC0 1.0). Credit is not required; we give it anyway.";

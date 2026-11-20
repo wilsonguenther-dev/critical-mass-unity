@@ -49,9 +49,12 @@ namespace CriticalMass.Runtime.Audio
     public enum MusicState { Silent, Title, Match, FinalMinute, Berserk, Results }
 
     /// <summary>
-    /// DG-18 music director: title, match and berserk loops with equal-power crossfades, a final-minute lift (a faster
-    /// loop, 1.5 dB louder) at one minute left, and a victory, defeat or draw sting at the match end (from the human's
-    /// side), after which the title loop returns quietly under the results. The music ducks under announcer lines and
+    /// DG-18 music director, b15 Skybreak score: ONE original score in F minor at 80 BPM, built from the intro film's
+    /// approved cue (tools/audio/skybreak). The menus play its 16-bar title loop; a match plays three layered stems (bed,
+    /// rhythm, theme) re-sequenced section by section on the bar grid and mixed by match state (ScoreMix: calm, contested,
+    /// leading, trailing, rally, egg, final minute, berserk; the Kaiju's side colours the bed and theme feed, berserk
+    /// corrupt); the hatch plays its type's stinger on the beat; a victory, defeat or draw sting ends the match (from the
+    /// human's side), after which the title loop returns quietly under the results. The final minute keeps its 1.5 dB lift. The music ducks under announcer lines and
     /// while the pause menu is open. View only: it reads the match and never writes it. Clips: Resources CMMusic/ and
     /// CMStings/ (Assets/_Game/Audio/Music, credits in Assets/_Game/Audio/Resources/CREDITS.md).
     /// <para>Public API: <see cref="SetMenuMusic"/> (game-flow menus: title music without a match),
@@ -75,7 +78,14 @@ namespace CriticalMass.Runtime.Audio
 
         public const string MusicFolder = "CMMusic/";
         public const string StingFolder = "CMStings/";
-        public static readonly string[] TrackNames = { null, "music-title", "music-match", "music-final", "music-berserk", "music-title" };
+        /// <summary>b15: one loop file is left, the Skybreak title loop (menus, under the results). Match, final minute and
+        /// berserk play the layered Skybreak score (ScoreMix, Resources CMScore/), so they have no single track.</summary>
+        public static readonly string[] TrackNames = { null, "music-title", null, null, null, "music-title" };
+        /// <summary>b15: the rally hook for the comeback rule (feat/b15-comeback-hut): true while the local player's team has
+        /// its rally on. Null (no rule) = never rally.</summary>
+        public static Func<World, bool> RallyProbe;
+        /// <summary>b15: the score's current target (tests, captures; default before the first match).</summary>
+        public static ScoreTarget CurrentScore => Instance != null ? Instance._target : default;
 
         public static MusicDirector Instance { get; private set; }
         /// <summary>Raised when the wanted music changes (old, new).</summary>
@@ -176,7 +186,260 @@ namespace CriticalMass.Runtime.Audio
             _victory = Resources.Load<AudioClip>(StingFolder + "sting-victory");
             _defeat = Resources.Load<AudioClip>(StingFolder + "sting-defeat");
             _draw = Resources.Load<AudioClip>(StingFolder + "sting-draw");
+            BuildScore();
             SceneManager.sceneLoaded += OnSceneLoaded;
+        }
+
+        // ------------------------------------------------------------------ b15: the Skybreak score (layered, bar-synced)
+
+        const int Layers = 3;
+        const double Lookahead = 1.0;
+        readonly AudioSource[,] _sSrc = new AudioSource[Layers, 2];
+        readonly int[,] _sVar = new int[Layers, 2];
+        readonly double[,] _sFadeAt = new double[Layers, 2];
+        readonly int[,] _sFadeDir = new int[Layers, 2];
+        readonly float[,] _sLevel = new float[Layers, 2];
+        readonly int[] _sCur = new int[Layers];
+        readonly float[] _sGain = new float[Layers];
+        readonly double[] _sStopAt = { double.MaxValue, double.MaxValue, double.MaxValue };
+        AudioClip[][][] _sClips;          // [section][layer][variant]
+        readonly AudioClip[] _hatchClips = new AudioClip[5];
+        AudioSource _hatch;
+        bool _scoreOk, _scoreOn, _scheduled;
+        double _dsp0, _secStart, _nextDsp, _lastDsp;
+        long _step;
+        float _scoreLevel;                // 0..1 fade of the whole score against the title loop
+        ScoreTarget _target, _pending;
+        double _pendingAt = double.MaxValue;
+        double _hatchAt = double.NaN, _hatchLen;
+        World _hatchWorld;
+        bool _hatchSeen;
+
+        void BuildScore()
+        {
+            _sClips = new AudioClip[ScoreMix.Sections.Length][][];
+            _scoreOk = true;
+            for (int s = 0; s < ScoreMix.Sections.Length; s++)
+            {
+                _sClips[s] = new AudioClip[Layers][];
+                for (int l = 0; l < Layers; l++)
+                {
+                    int n = ScoreMix.VariantNames[l].Length;
+                    _sClips[s][l] = new AudioClip[n];
+                    for (int v = 0; v < n; v++)
+                    {
+                        AudioClip c = Resources.Load<AudioClip>(ScoreMix.Folder + ScoreMix.Clip(s, (ScoreLayer)l, v));
+                        _sClips[s][l][v] = c;
+                        if (c == null) _scoreOk = false;
+                    }
+                }
+            }
+            if (!_scoreOk) Debug.LogWarning("[MusicDirector] Skybreak score stems missing under Resources/" + ScoreMix.Folder + ": the match plays without music");
+            for (int i = 0; i < _hatchClips.Length; i++) _hatchClips[i] = Resources.Load<AudioClip>(StingFolder + ScoreMix.HatchSting((KaijuType)i));
+            for (int l = 0; l < Layers; l++)
+                for (int k = 0; k < 2; k++)
+                {
+                    AudioSource s = gameObject.AddComponent<AudioSource>();
+                    s.playOnAwake = false;
+                    s.loop = false;
+                    s.spatialBlend = 0f;
+                    s.priority = 0;
+                    s.volume = 0f;
+                    s.outputAudioMixerGroup = GameSettings.MusicGroup;
+                    _sSrc[l, k] = s;
+                    _sVar[l, k] = -1;
+                }
+            _hatch = gameObject.AddComponent<AudioSource>();
+            _hatch.playOnAwake = false;
+            _hatch.loop = false;
+            _hatch.spatialBlend = 0f;
+            _hatch.priority = 1;
+            _hatch.outputAudioMixerGroup = GameSettings.MusicGroup;
+        }
+
+        bool ScoreReady()
+        {
+            if (!_scoreOk) return false;
+            bool ready = true;
+            for (int s = 0; s < _sClips.Length; s++)
+                for (int l = 0; l < Layers; l++)
+                    foreach (AudioClip c in _sClips[s][l])
+                    {
+                        if (c.loadState == AudioDataLoadState.Loaded) continue;
+                        if (c.loadState == AudioDataLoadState.Unloaded || c.loadState == AudioDataLoadState.Failed) c.LoadAudioData();
+                        ready = false;
+                    }
+            return ready;
+        }
+
+        static ScoreInputs Inputs(World w)
+        {
+            var i = new ScoreInputs { LessSound = GameSettings.LessSound };
+            if (w == null) return i;
+            MatchClock c = Match.GetMatchClock(w);
+            TeamId human = w.ActorCount > 0 ? w.Actors[LocalSeat.Actor].Team : TeamId.Azure;
+            TeamId other = human == TeamId.Azure ? TeamId.Crimson : TeamId.Azure;
+            i.HillContested = w.Match.HillState == HillState.Contested;
+            i.LeadSeconds = w.Match.HillSeconds[human] - w.Match.HillSeconds[other];
+            i.Hatched = w.Match.Hatched;
+            i.UntilHatch = c.UntilHatch;
+            i.Kaiju = w.Kaiju != null ? w.Kaiju.State : KaijuState.Egg;
+            i.Remaining = c.Remaining;
+            i.MatchSeconds = w.Config.MatchSeconds;
+            try { i.Rally = RallyProbe != null && RallyProbe(w); }
+            catch (Exception) { i.Rally = false; }
+            return i;
+        }
+
+        void StartScore(double dsp)
+        {
+            _dsp0 = dsp + 0.25;
+            _secStart = _dsp0;
+            _nextDsp = _dsp0 + ScoreMix.Section;
+            _step = 0;
+            _scheduled = false;
+            _pendingAt = double.MaxValue;
+            int sec = ScoreMix.SectionAt(0);
+            for (int l = 0; l < Layers; l++)
+            {
+                for (int k = 0; k < 2; k++) { _sSrc[l, k].Stop(); _sVar[l, k] = -1; _sFadeDir[l, k] = 0; _sLevel[l, k] = 0f; }
+                int v = _target.Variant((ScoreLayer)l);
+                AudioSource s = _sSrc[l, 0];
+                s.clip = _sClips[sec][l][v];
+                s.timeSamples = 0;
+                s.PlayScheduled(_dsp0);
+                _sVar[l, 0] = v;
+                _sLevel[l, 0] = 1f;
+                _sCur[l] = 0;
+                _sGain[l] = _target.Gain((ScoreLayer)l);
+                _sStopAt[l] = double.MaxValue;
+            }
+            _scoreOn = true;
+        }
+
+        void StopScore()
+        {
+            for (int l = 0; l < Layers; l++)
+                for (int k = 0; k < 2; k++) { _sSrc[l, k].Stop(); _sVar[l, k] = -1; _sLevel[l, k] = 0f; _sFadeDir[l, k] = 0; }
+            _hatch.Stop();
+            _hatchAt = double.NaN;
+            _scoreOn = false;
+        }
+
+        /// <summary>The conductor, once a frame: schedules the next section 1 s ahead on each layer's free source (its old
+        /// source rings out its own tail), switches a layer's form at the next bar line with a one-beat equal-power fade,
+        /// moves the layer gains at bar lines, ducks under the hatch stinger, and sets every source's volume.</summary>
+        void TickScore(World w, bool wantScore, float baseGain, float dt)
+        {
+            double now = AudioSettings.dspTime;
+            if (_scoreOn && now + 0.5 < _lastDsp) StopScore();      // the audio device restarted: start over cleanly
+            _lastDsp = now;
+            if (!_scoreOn && (!wantScore || !ScoreReady())) { _scoreLevel = 0f; return; }
+            ScoreTarget want = ScoreMix.Decide(Inputs(w));
+            if (!_scoreOn)
+            {
+                _target = _pending = want;
+                _scoreLevel = 0f;
+                StartScore(now);
+                _hatchWorld = w;
+                _hatchSeen = w != null && w.Match.Hatched;
+            }
+            _scoreLevel = Mathf.MoveTowards(_scoreLevel, wantScore ? 1f : 0f, dt / (wantScore ? CrossfadeSeconds : EndFadeSeconds));
+            if (!wantScore && _scoreLevel <= 0f) { StopScore(); return; }
+
+            // a new target takes effect at the next bar line
+            if (!want.SameAs(_pending)) { _pending = want; _pendingAt = ScoreMix.NextLine(_dsp0, ScoreMix.Bar, now); }
+            if (now >= _pendingAt) { _target = _pending; _pendingAt = double.MaxValue; }
+
+            // the next section, one second ahead, on each layer's free source
+            if (!_scheduled && now >= _nextDsp - Lookahead)
+            {
+                int sec = ScoreMix.SectionAt(_step + 1);
+                for (int l = 0; l < Layers; l++)
+                {
+                    int alt = 1 - _sCur[l];
+                    AudioSource s = _sSrc[l, alt];
+                    s.Stop();
+                    int v = _target.Variant((ScoreLayer)l);
+                    s.clip = _sClips[sec][l][v];
+                    s.timeSamples = 0;
+                    s.PlayScheduled(_nextDsp);
+                    _sVar[l, alt] = v;
+                    _sFadeDir[l, alt] = 0;
+                    _sLevel[l, alt] = 1f;
+                }
+                _scheduled = true;
+            }
+            if (_scheduled && now >= _nextDsp)
+            {
+                for (int l = 0; l < Layers; l++)
+                {
+                    int old = _sCur[l];
+                    _sCur[l] = 1 - old;
+                    // the old source keeps its level and rings out its tail (the clip ends by itself)
+                    _sStopAt[l] = double.MaxValue;
+                }
+                _step++;
+                _secStart = _nextDsp;
+                _nextDsp += ScoreMix.Section;
+                _scheduled = false;
+            }
+
+            // a form change mid-section: at the next bar line (bars 1..7), once the last section's tail has rung out
+            for (int l = 0; l < Layers; l++)
+            {
+                int cur = _sCur[l], alt = 1 - cur;
+                if (now >= _sStopAt[l]) { _sSrc[l, alt].Stop(); _sLevel[l, alt] = 0f; _sFadeDir[l, alt] = 0; _sStopAt[l] = double.MaxValue; }
+                int v = _target.Variant((ScoreLayer)l);
+                if (_scheduled || v == _sVar[l, cur] || _sStopAt[l] != double.MaxValue) continue;
+                if (now < _secStart + ScoreMix.Tail + 0.05 || _sSrc[l, alt].isPlaying) continue;
+                double at = ScoreMix.NextLine(_secStart, ScoreMix.Bar, now, 0.08);
+                if (at > _nextDsp - ScoreMix.Bar + 1e-6) continue;           // bar 8 is the next section's job
+                int sec = ScoreMix.SectionAt(_step);
+                AudioSource s = _sSrc[l, alt];
+                AudioClip c = _sClips[sec][l][v];
+                s.clip = c;
+                s.timeSamples = Mathf.Clamp((int)Math.Round((at - _secStart) * c.frequency), 0, c.samples - 1);
+                s.PlayScheduled(at);
+                _sVar[l, alt] = v;
+                _sFadeAt[l, alt] = at; _sFadeDir[l, alt] = +1;
+                _sFadeAt[l, cur] = at; _sFadeDir[l, cur] = -1;
+                _sCur[l] = alt;
+                _sStopAt[l] = at + ScoreMix.Beat + 0.05;
+            }
+
+            // the hatch: the type's stinger on the next beat, the score ducked under it
+            if (w != null && !ReferenceEquals(w, _hatchWorld)) { _hatchWorld = w; _hatchSeen = w.Match.Hatched; }
+            if (w != null && w.Match.Hatched && !_hatchSeen)
+            {
+                _hatchSeen = true;
+                KaijuType t = w.KaijuKind != null ? w.KaijuKind.Type : KaijuType.Elder;
+                AudioClip c = _hatchClips[(int)t >= 0 && (int)t < _hatchClips.Length ? (int)t : 0];
+                if (c != null)
+                {
+                    _hatchAt = ScoreMix.NextLine(_dsp0, ScoreMix.Beat, now, 0.06);
+                    _hatchLen = c.length;
+                    _hatch.Stop();
+                    _hatch.clip = c;
+                    _hatch.PlayScheduled(_hatchAt);
+                }
+            }
+            float duck = ScoreMix.HatchDuck(now, _hatchAt, _hatchLen);
+            _hatch.volume = baseGain;
+
+            // gains: toward the target, up over a beat and down over a bar and a half
+            for (int l = 0; l < Layers; l++)
+            {
+                float g = _target.Gain((ScoreLayer)l);
+                float rate = g > _sGain[l] ? dt / (float)ScoreMix.Beat : dt / 1.5f;
+                _sGain[l] = Mathf.MoveTowards(_sGain[l], g, rate);
+                for (int k = 0; k < 2; k++)
+                {
+                    float f = ScoreMix.Fade(now, _sFadeAt[l, k], ScoreMix.Beat, _sFadeDir[l, k], _sLevel[l, k]);
+                    if (_sFadeDir[l, k] != 0 && now >= _sFadeAt[l, k] + ScoreMix.Beat) { _sLevel[l, k] = _sFadeDir[l, k] > 0 ? 1f : 0f; _sFadeDir[l, k] = 0; }
+                    _sSrc[l, k].volume = baseGain * _scoreLevel * duck * _sGain[l] * f;
+                }
+            }
         }
 
         void OnDestroy()
@@ -236,6 +499,10 @@ namespace CriticalMass.Runtime.Audio
             inc.volume = x.y * g;
             outg.volume = x.x * g;
             if (x.x <= 0.001f && outg.isPlaying) outg.Stop();
+
+            // b15: the match plays the layered Skybreak score (the title loop above fades out as it comes in)
+            bool wantScore = _state == MusicState.Match || _state == MusicState.FinalMinute || _state == MusicState.Berserk;
+            TickScore(w, wantScore, g, dt);
         }
 
         void Enter(MusicState next, World w, float now)

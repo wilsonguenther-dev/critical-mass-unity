@@ -59,6 +59,49 @@ namespace CriticalMass.Runtime.Audio.Sound
         /// <summary>Arrival delay (s) of a distant blast.</summary>
         public static float Delay(float d) => d <= DelayStart ? 0f : Math.Min(MaxDelay, (d - DelayStart) / DelaySpeed);
 
+        // ---- b15: top-down screen space. The camera looks down at an angle, so "toward the camera" (below the screen
+        // centre) is where the view shows least ground and where off-screen threats come from. Sounds are placed by where
+        // they are ON SCREEN: pan by screen x, distance by screen distance (scaled to world units at the centre row, so a
+        // sound left or right of the focus keeps its old distance), and below the centre a darker, slightly quieter voice.
+
+        /// <summary>At the bottom edge (and past it) a sound's low-pass cutoff is this share of its distance cutoff ...</summary>
+        public const float BelowCutoffShare = 0.4f;
+        /// <summary>... and its level drops by this many dB (scaled linearly from the centre row).</summary>
+        public const float BelowDb = -2f;
+        /// <summary>The "behind you" tick plays at most once per this many seconds.</summary>
+        public const float BehindTickGap = 1.5f;
+
+        /// <summary>
+        /// Placement from viewport coordinates (vx, vy in 0..1, 0.5 = centre; behind the camera pass vy = -1). aspect =
+        /// width / height; unitsPerHalfHeight = world units from the centre to the top edge at the centre row's scale.
+        /// Out: pan -1..1, distance (world units), below = 0 above the centre row, 1 at the bottom edge, up to 2 past it.
+        /// </summary>
+        public static void Screen(float vx, float vy, float aspect, float unitsPerHalfHeight, out float pan, out float dist, out float below)
+        {
+            float ox = (vx - 0.5f) * 2f, oy = (vy - 0.5f) * 2f;
+            float sx = ox * aspect, d = (float)Math.Sqrt(sx * sx + oy * oy);
+            dist = d * unitsPerHalfHeight;
+            // pan by screen x, faded in over the first few units so sounds at the focus stay centred
+            float spread = dist < 4f ? dist / 4f : 1f;
+            pan = Clamp(ox * PanWidth * spread, -1f, 1f);
+            below = Clamp(-oy, 0f, 2f);
+        }
+
+        /// <summary>The distance cutoff darkened for a sound below the centre row (open above it).</summary>
+        public static float DepthCutoff(float cutoff, float below)
+        {
+            float b = Clamp(below, 0f, 1f);
+            return cutoff * (1f - (1f - BelowCutoffShare) * b);
+        }
+
+        /// <summary>The level for a sound below the centre row (1 above it, BelowDb at the bottom edge and past it).</summary>
+        public static float DepthGain(float below) => (float)Math.Pow(10.0, BelowDb * Clamp(below, 0f, 1f) / 20.0);
+
+        /// <summary>A threat past the bottom edge (off screen, toward the camera), not the player's own sound, and the last tick
+        /// long enough ago.</summary>
+        public static bool BehindYou(bool threat, bool own, float below, double now, double lastTick) =>
+            threat && !own && below > 1f && now - lastTick >= BehindTickGap;
+
         /// <summary>
         /// Voice priority: the cue's base, +40 for the player's own actions, +25 for a threat to the player (a wind-up at
         /// them, a blast or mine beside them), +20 x how loud it will be after distance.

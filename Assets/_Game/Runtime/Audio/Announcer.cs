@@ -640,6 +640,7 @@ namespace CriticalMass.Runtime.Audio
             {
                 _voice.Stop();
                 _voice.clip = line.Clip;
+                _voice.volume = GameSettings.AnnouncerVolume;   // b15: the ANNOUNCER slider (on top of EFFECTS)
                 _voice.Play();
                 MusicDirector.Duck(len);
             }
