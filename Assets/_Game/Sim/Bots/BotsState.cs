@@ -95,6 +95,15 @@ namespace CriticalMass.Sim.Bots
         public double[] SideX, SideZ;
         /// <summary>b15 pass 4: the side-step budget: the first tick of the bot's current budget window and the side-steps it started in it.</summary>
         public int[] UnjamWindowStart, UnjamCount;
+        /// <summary>b15 bot brain (TeamBrain): the job the team brain gave each bot (TeamBrain.Job*), its group-up step
+        /// (TeamBrain.Rally*) and since when, the deaths count it last saw (a respawn starts a rally), and per team index the
+        /// living bodies on the hill disc this tick.</summary>
+        public byte[] Job, Rally;
+        public double[] RallySince;
+        public int[] SeenDeaths;
+        public int[] HillBodies;
+        /// <summary>b15 bot brain: rally steps started and group releases (counters the tests print).</summary>
+        public int Rallies, Releases;
 
         /// <summary>Browser createBotsState: allocate every per-actor array at ActorCapacity (no reset).</summary>
         public static BotsState CreateBotsState(World w)
@@ -157,6 +166,11 @@ namespace CriticalMass.Sim.Bots
                 SideZ = new double[cap],
                 UnjamWindowStart = new int[cap],
                 UnjamCount = new int[cap],
+                Job = new byte[cap],
+                Rally = new byte[cap],
+                RallySince = new double[cap],
+                SeenDeaths = new int[cap],
+                HillBodies = new int[2],
             };
         }
 
@@ -219,7 +233,15 @@ namespace CriticalMass.Sim.Bots
                 st.SideZ[id] = 0;
                 st.UnjamWindowStart[id] = w.Tick;
                 st.UnjamCount[id] = 0;
+                st.Job[id] = 0;
+                st.Rally[id] = 0;
+                st.RallySince[id] = 0;
+                st.SeenDeaths[id] = id < w.ActorCount ? w.Actors[id].Deaths : 0;
             }
+            st.HillBodies[0] = 0;
+            st.HillBodies[1] = 0;
+            st.Rallies = 0;
+            st.Releases = 0;
             BotFields.ResetFields(st.Fields, w);
             BotFields.BuildAllFields(st.Fields, w);
         }

@@ -11,6 +11,8 @@ namespace CriticalMass.Sim.Bots
     /// </summary>
     public static class BotFsm
     {
+        /// <summary>b15 bot brain: the hill utility of a Miner or Builder called to a lost hill (over mining 0.82, under carrying 0.92 and a fight).</summary>
+        public const double CalledHillUtility = 0.85;
         public const double FightRange = 6, FightKeepRange = 8, UrgentRange = 3, KaijuEngageRange = 12, KaijuFightUtility = 1, CockyHillFactor = 0.3, HillUtility = 0.7, KaijuRoleHillUtility = 0.2, NearbyNodeDist = 20, UrgentFloorSeconds = 1, UnstickSeconds = 1, ProgressRadius = 1.0, ProgressSeconds = 2;
 
         private const double StuckDist2 = 0.3 * 0.3;
@@ -108,6 +110,8 @@ namespace CriticalMass.Sim.Bots
         private static void Perceive(World w, BotsState st, int id, double fightRange, BotSkillConfig sk)
         {
             bool focus = sk != null && sk.FocusCarriers;
+            bool brain = !focus && TeamBrain.On(w);   // b15 bot brain (c): healers first, then the weakest in reach, sticky
+            double brainReach = brain ? w.Config.Class(w.Actors[id].Cls).AttackRange + 0.9 : 0;
             bool seeOnly = Phys.On(w, w.Config.Physics.BotCalmSteer) && Phys.On(w, w.Config.Physics.WallsBlockHits);
             double bestScore = double.PositiveInfinity;
             Actor a = w.Actors[id];
@@ -147,7 +151,17 @@ namespace CriticalMass.Sim.Bots
                 // enemy still counts in the crowd numbers above.
                 if (seeOnly && !SegmentClear.Clear(w.Map, x, z, w.X[j], w.Z[j])) continue;
                 if (KaijuTypes.BlindBlocks(w, id, j)) continue;   // b13-hook: K's SHROUD hides a target (it still counts in the crowd)
-                if (focus)
+                if (brain)
+                {
+                    double sc = TeamBrain.TargetScore(w, st, id, j, d2, brainReach);
+                    if (sc < bestScore || (sc == bestScore && j < P.Enemy))
+                    {
+                        bestScore = sc;
+                        P.Enemy = j;
+                        P.EnemyD2 = d2;
+                    }
+                }
+                else if (focus)
                 {
                     // DG-21 Hard: carriers and hurt enemies first (BotSkill.FocusScore), lowest id on a tie.
                     double sc = BotSkill.FocusScore(w, sk, j, d2);
@@ -677,6 +691,10 @@ namespace CriticalMass.Sim.Bots
 
             bool fighting = cur == AiState.Fight;
             bool cocky = BotDirector.IsCocky(w, a.Team);
+            // b15 bot brain (a): the hill guard never chases off the hill, however far ahead the team is.
+            bool brainOn = TeamBrain.On(w);
+            byte job = brainOn ? st.Job[id] : TeamBrain.JobNone;
+            if (job == TeamBrain.JobGuard) cocky = false;
             BotSkillConfig sk = BotSkill.Profile(w, id); // DG-21: null = Normal (the browser bots)
             // b13 r3 [H]: a Miner bot under the hut rule perceives fights out to HutConfig.BotFightRange (8 u, FightKeepRange).
             Perceive(w, st, id, fighting || cocky || BotMine.WidePerception(w, st, id) ? FightKeepRange : FightRange, sk);
@@ -694,7 +712,8 @@ namespace CriticalMass.Sim.Bots
             // --- utilities ---
             double uFight = 0;
             int fightTarget = -1;
-            if (role == BotsState.RoleFightKaiju && P.KaijuHostile && P.KaijuD2 <= KaijuEngageRange * KaijuEngageRange)
+            double engage = job == TeamBrain.JobKite ? w.Config.Depth.BotBrain.KiteEngageRange : KaijuEngageRange;   // b15: a kiter goes to the Kaiju
+            if (role == BotsState.RoleFightKaiju && P.KaijuHostile && P.KaijuD2 <= engage * engage)
             {
                 // CM-19: 1.0 above LowHp (0.95 x hp never beat holdHill 0.7 + 0.25 inertia under strict gt).
                 uFight = hpFrac >= lowHp ? KaijuFightUtility : 0;
@@ -731,6 +750,7 @@ namespace CriticalMass.Sim.Bots
             }
 
             double uHill = role == BotsState.RoleKaiju ? KaijuRoleHillUtility : cocky ? HillUtility * CockyHillFactor : HillUtility;
+            if (job == TeamBrain.JobCalled) uHill = Math.Max(uHill, CalledHillUtility);   // b15 bot brain: a Miner / Builder called to a lost hill
             bool holding = cur == AiState.HoldHill ? hillD < hill.R + 2 : hillD < hill.R - 1;
             AiState hillState = holding ? AiState.HoldHill : AiState.ToHill;
 

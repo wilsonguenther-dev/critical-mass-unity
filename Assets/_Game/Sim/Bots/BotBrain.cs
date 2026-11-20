@@ -45,6 +45,7 @@ namespace CriticalMass.Sim.Bots
             if (w.Match.Phase == MatchPhase.Ended) return;
             BotFields.MaintainFields(st.Fields, w);
             BotDirector.DirectorTick(w, st);
+            TeamBrain.Tick(w, st);   // b15 bot brain: hill bodies and the group-up (no-op with the switch off)
             int period = st.ThinkPeriod;
             int n = w.ActorCount;
             int tick = w.Tick;
