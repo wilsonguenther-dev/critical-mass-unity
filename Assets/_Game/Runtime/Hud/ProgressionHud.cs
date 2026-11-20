@@ -135,7 +135,7 @@ namespace CriticalMass.Runtime.Hud
             if (_chip.localScale != want) _chip.localScale = want;
             // Integration batch 5: one coin readout in a match. The match coin counter above the minimap wins; the chip
             // shows when the match has no coin pickups.
-            bool chipOn = Mechanics.DepthHud.Instance == null || !Mechanics.DepthHud.Instance.CoinsShown;
+            bool chipOn = (Mechanics.DepthHud.Instance == null || !Mechanics.DepthHud.Instance.CoinsShown) && DeadSystemViews.CoinsShown();   // b15 item 4
             if (_chip.gameObject.activeSelf != chipOn) _chip.gameObject.SetActive(chipOn);
 
             PlacePortraitHit();

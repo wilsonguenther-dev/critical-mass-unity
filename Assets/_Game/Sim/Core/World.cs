@@ -872,6 +872,8 @@ namespace CriticalMass.Sim.Core
             InitWorld(world, opts);
             // b14-c: the Kaiju clearance build state exists from the start, so the route guard's first pre-hatch refresh allocates nothing.
             Kaiju.WarmClearanceBuild(world);
+            // b15 (W6): every lazily filled bot route field gets its buffer now, so no first use allocates mid-match (no rule change).
+            RouteFields.Preallocate(world);
             return world;
         }
 

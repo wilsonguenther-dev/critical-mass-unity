@@ -534,9 +534,11 @@ namespace CriticalMass.Runtime.Hud.Mechanics
             else if (a.Alive && DepthRead.On(w))
             {
                 bool food = (a.CarryAmount > 0 && a.Carry == CarryKind.Biomass) || a.CarryMeat > 0;
-                bool woodWater = a.CarryAmount > 0 && ((int)a.Carry == DepthEvents.CarryWood || (int)a.Carry == DepthEvents.CarryWater);
+                // b15 item 4: no BANK prompt for a water load while banked water has no spender (it still goes to the egg)
+                bool woodWater = a.CarryAmount > 0 && ((int)a.Carry == DepthEvents.CarryWood ||
+                                                       ((int)a.Carry == DepthEvents.CarryWater && DeadSystemViews.BankedWaterShown(w)));
                 ObjectiveFacts f = View.Mechanics.Objective.Facts(w, me);
-                if (f.NearBrokenBridge && a.Cls == ClassId.Builder)
+                if (f.NearBrokenBridge && a.Cls == ClassId.Builder && DeadSystemViews.BridgeRepairShown(w))   // b15 item 4
                 {
                     words = f.WoodStock >= DepthRead.RepairWood(w) ? DepthWords.RepairPrompt : DepthWords.RepairNeedWood;
                     action = "Interact";
@@ -592,6 +594,7 @@ namespace CriticalMass.Runtime.Hud.Mechanics
             bool show = on && DepthRead.SourcesOn(w) && !HudZones.Blocked(HudZone.Callout, HudPriority.Tip);   // owner walk 1: lane resident, steps back for any banner
             if (!StackFade(_stock, show, !HudZones.Blocked(HudZone.Callout, HudPriority.Tip))) return;
             TeamId t = w.Actors[me].Team;
+            LayoutStock(DeadSystemViews.BankedWaterShown(w));
             for (int k = 0; k < 3; k++)
             {
                 // first-minutes-1 (walk 1 #6): the WOOD chip shows the one team wood number (BuilderBank.Whole), the same as the
@@ -608,6 +611,30 @@ namespace CriticalMass.Runtime.Hud.Mechanics
                 _stockChip[k].localScale = new Vector3(s, s, 1f);
             }
         }
+
+        int _stockLayout = -1;
+
+        /// <summary>b15 item 4: the WATER chip hides while banked water has no spender; the other chips close up, centred.</summary>
+        void LayoutStock(bool water)
+        {
+            int key = water ? 1 : 0;
+            if (key == _stockLayout) return;
+            _stockLayout = key;
+            int n = water ? 3 : 2;
+            float used = n * HudZones.StockChipW + (n - 1) * HudZones.StockChipGap, x0 = (HudZones.StockW - used) * 0.5f;
+            int slot = 0;
+            for (int k = 0; k < 3; k++)
+            {
+                bool on = k != 1 || water;
+                if (_stockChip[k].gameObject.activeSelf != on) _stockChip[k].gameObject.SetActive(on);
+                if (!on) continue;
+                MenuUi.Place(_stockChip[k], x0 + slot * (HudZones.StockChipW + HudZones.StockChipGap), 0f, HudZones.StockChipW, 40f);
+                slot++;
+            }
+        }
+
+        /// <summary>b15 item 4 (tests): the stock chip k is on show.</summary>
+        public bool StockChipShown(int k) => k >= 0 && k < 3 && _stockChip[k] != null && _stockChip[k].gameObject.activeSelf;
 
         void TickEvent(World w, DepthWorldView view, bool on)
         {
@@ -662,7 +689,7 @@ namespace CriticalMass.Runtime.Hud.Mechanics
 
         void TickCoins(World w, DepthWorldView view, int me, UnityEngine.Camera cam, bool on, float real)
         {
-            bool show = on && DepthRead.PickupCapacity(w) > 0;
+            bool show = on && DepthRead.PickupCapacity(w) > 0 && DeadSystemViews.CoinsShown();   // b15 item 4: coins have no sink
             if (_coins.gameObject.activeSelf != show) _coins.gameObject.SetActive(show);
             if (!show) { for (int i = 0; i < Coins; i++) if (_coinFly[i].gameObject.activeSelf) _coinFly[i].gameObject.SetActive(false); return; }
             HudText.Set(_coinNum, DepthLines.Int(DepthRead.CoinsPicked(w, me)));

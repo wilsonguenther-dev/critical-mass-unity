@@ -20,6 +20,9 @@ namespace CriticalMass.Sim.Core
         /// <summary>Bot routes to each team's hut (the pad): built on first use, rebuilt when walls changed (one per tick).</summary>
         public FlowField[] PadField = new FlowField[2];
         public int[] PadFieldVersion = { -1, -1 };
+        /// <summary>b15 (W6): PadField[t] has been computed at least once (its buffer is allocated at CreateWorld by
+        /// RouteFields.Preallocate). Never cleared by a reset, exactly as the old non-null PadField was never nulled.</summary>
+        public bool[] PadFieldBuilt = new bool[2];
         public int FieldBuildTick = -1;
         public readonly PointXZ[] Goal = new PointXZ[1];
         /// <summary>The ore-vein routes were built (first HutSystem tick: no allocation later).</summary>
@@ -298,12 +301,13 @@ namespace CriticalMass.Sim.Core
         {
             HutState h = w.Hut;
             int t = (int)team;
-            bool fresh = h.PadField[t] == null;
+            bool fresh = !h.PadFieldBuilt[t];
             if (!fresh && h.PadFieldVersion[t] == w.WallVersion) return h.PadField[t];
             if (!fresh && h.FieldBuildTick == w.Tick) return h.PadField[t];
             PadDef pad = w.Map.Pads[t];
             h.Goal[0] = new PointXZ(pad.X, pad.Z);
             h.PadField[t] = FlowField.ComputeFlowField(w.Map, h.Goal, h.PadField[t], w.WallVersion);
+            h.PadFieldBuilt[t] = true;
             h.PadFieldVersion[t] = w.WallVersion;
             if (!fresh) h.FieldBuildTick = w.Tick;
             return h.PadField[t];
