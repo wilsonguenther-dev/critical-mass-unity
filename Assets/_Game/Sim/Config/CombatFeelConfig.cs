@@ -38,7 +38,8 @@ namespace CriticalMass.Sim.Config
             // every row below come from CombatFeelTuneTests' coordinate search (run printed in the PR), not hand-guessing.
             new ClassConfig
             {
-                MaxHp = 140, MoveSpeed = 3.8, Radius = 0.45, AttackDamage = 21, AttackRange = 1.8, AttackArcDeg = 110,
+                // pass 4: 140 -> 120 HP (Warrior on Warrior 6.10 s and Healer on Warrior 7.80 s were over their limits; his share of all damage 0.44).
+                MaxHp = 120, MoveSpeed = 3.8, Radius = 0.45, AttackDamage = 21, AttackRange = 1.8, AttackArcDeg = 110,
                 AttackCooldown = 0.90, AbilityCooldown = 10, GatherSeconds = 2, CarryCapacity = 1,
                 AttackWindupSeconds = 0.40, RecoverySeconds = 0.30, Mass = 1.6, Poise = 30,
             },
@@ -50,11 +51,12 @@ namespace CriticalMass.Sim.Config
                 AttackCooldown = 0.65, AbilityCooldown = 9, GatherSeconds = 1, CarryCapacity = 3,
                 AttackWindupSeconds = 0.27, RecoverySeconds = 0.22, Mass = 0.8, Poise = 20,
             },
-            // MINER: fast pick (0.20 s wind-up, 0.65 s cycle), light body (95 HP). Armour break: his hits leave SUNDER (+15% for
+            // MINER: fast pick (0.20 s wind-up, 0.65 s cycle), light body (110 HP). Armour break: his hits leave SUNDER (+15% for
             // 3 s) and pierce heavy bodies (x1.4 on Mass >= 1.3: the Warrior, the Builder); x2 on structures and walls.
+            // pass 4: 95 HP / 14 -> 110 HP / 16 (his kill share had halved against control: 0.088 vs 0.168).
             new ClassConfig
             {
-                MaxHp = 95, MoveSpeed = 4.0, Radius = 0.45, AttackDamage = 14, AttackRange = 1.5, AttackArcDeg = 90,
+                MaxHp = 110, MoveSpeed = 4.0, Radius = 0.45, AttackDamage = 16, AttackRange = 1.5, AttackArcDeg = 90,
                 AttackCooldown = 0.65, AbilityCooldown = 12, GatherSeconds = 2, CarryCapacity = 1,
                 AttackWindupSeconds = 0.20, RecoverySeconds = 0.18, Mass = 1.1, Poise = 24,
             },
@@ -130,6 +132,13 @@ namespace CriticalMass.Sim.Config
         public double BotUnjamKaijuClear = 0;
         /// <summary>No side-step within the hill disc grown by this many u (negative = no such rule).</summary>
         public double BotUnjamHillClear = -1;
+        /// <summary>Pass 4: no side-step within this many u of the hill centre while the Kaiju is hatched (the Kaiju's fight zone,
+        /// KaijuHillFightRadius 13 plus its leash; 0 = no such rule).</summary>
+        public double BotUnjamHillZone = 0;
+        /// <summary>Pass 4: the side-step budget: at most BotUnjamBudget side-steps per bot in any BotUnjamBudgetSeconds window
+        /// (0 = unbounded). Past it the FSM's own slower unstick (StuckSeconds) takes over.</summary>
+        public int BotUnjamBudget = 0;
+        public double BotUnjamBudgetSeconds = 6;
         /// <summary>After a stagger the victim moves at StaggerSlowMultiplier for StaggerSlowSeconds.</summary>
         public double StaggerSlowSeconds = 0.30;
         public double StaggerSlowMultiplier = 1.0; // OWNER FEEL-TEST: 0.6 slows after a stagger (see WindupMoveMultiplier)

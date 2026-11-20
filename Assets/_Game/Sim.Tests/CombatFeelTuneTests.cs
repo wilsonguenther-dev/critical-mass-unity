@@ -34,17 +34,16 @@ namespace CriticalMass.Sim.Tests
         private static ClassConfig Row(CombatFeelConfig f, ClassId c) => f.Classes[(int)c];
 
         // [0] of every list is the shipped value in CombatFeelConfig (the search starts there).
-        // [0] of every list is the shipped value in CombatFeelConfig (the search starts there).
         private static readonly Knob[] Knobs =
         {
             new Knob { Name = "Warrior.AttackDamage", Set = (f, v) => Row(f, ClassId.Warrior).AttackDamage = v, Values = new[] { 21.0, 22 } },
-            new Knob { Name = "Warrior.MaxHp", Set = (f, v) => Row(f, ClassId.Warrior).MaxHp = v, Values = new[] { 140.0, 135, 130 } },
+            new Knob { Name = "Warrior.MaxHp", Set = (f, v) => Row(f, ClassId.Warrior).MaxHp = v, Values = new[] { 120.0, 130, 115 } },
             new Knob { Name = "Warrior.AttackCooldown", Set = (f, v) => Row(f, ClassId.Warrior).AttackCooldown = v, Values = new[] { 0.9, 0.85 } },
             new Knob { Name = "Healer.AttackDamage", Set = (f, v) => Row(f, ClassId.Healer).AttackDamage = v, Values = new[] { 15.0, 17, 19 } },
             new Knob { Name = "Healer.AttackCooldown", Set = (f, v) => Row(f, ClassId.Healer).AttackCooldown = v, Values = new[] { 0.8, 0.7 } },
             new Knob { Name = "Farmer.AttackDamage", Set = (f, v) => Row(f, ClassId.Farmer).AttackDamage = v, Values = new[] { 20.0, 23 } },
-            new Knob { Name = "Miner.AttackDamage", Set = (f, v) => Row(f, ClassId.Miner).AttackDamage = v, Values = new[] { 14.0, 16 } },
-            new Knob { Name = "Miner.MaxHp", Set = (f, v) => Row(f, ClassId.Miner).MaxHp = v, Values = new[] { 95.0, 105 } },
+            new Knob { Name = "Miner.AttackDamage", Set = (f, v) => Row(f, ClassId.Miner).AttackDamage = v, Values = new[] { 16.0, 14, 17 } },
+            new Knob { Name = "Miner.MaxHp", Set = (f, v) => Row(f, ClassId.Miner).MaxHp = v, Values = new[] { 110.0, 100, 120 } },
             new Knob { Name = "Demolitions.AttackDamage", Set = (f, v) => Row(f, ClassId.Demolitions).AttackDamage = v, Values = new[] { 12.0, 14 } },
             new Knob { Name = "Demolitions.AttackCooldown", Set = (f, v) => Row(f, ClassId.Demolitions).AttackCooldown = v, Values = new[] { 0.7, 0.8 } },
             new Knob { Name = "TntDamage", Set = (f, v) => f.TntDamage = v, Values = new[] { 55.0, 46 } },

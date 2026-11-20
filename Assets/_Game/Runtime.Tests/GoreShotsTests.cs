@@ -10,9 +10,13 @@ namespace CriticalMass.Runtime.Tests
         [Test]
         public void EveryBloodColourCountsAsBloodRedAndTheTeamCrimsonDoesNot()
         {
-            Assert.IsTrue(GoreShots.BloodRed(FxScene.BloodLight));
-            Assert.IsTrue(GoreShots.BloodRed(FxScene.BloodMid));
-            Assert.IsTrue(GoreShots.BloodRed(FxScene.BloodDark));
+            // b15 (PR #222 routed patch): the hit tones are violet-brown now, out of the team hues: neither blood red nor Crimson-like.
+            foreach (Color32 b in new[] { FxScene.BloodLight, FxScene.BloodMid, FxScene.BloodDark })
+            {
+                Assert.IsFalse(GoreShots.BloodRed(b), b + " is out of the red band");
+                Assert.IsFalse(GoreShots.CrimsonLike(b), b + " does not read as team Crimson");
+            }
+            Assert.IsTrue(GoreShots.BloodRed(new Color32(150, 18, 34, 255)), "the old blood red still counts as blood (the measure itself)");
             var crimson = new Color32(0xFF, 0x5A, 0x5F, 0xFF);   // Palette.Crimson
             foreach (float shade in new[] { 1f, 0.8f, 0.6f, 0.45f })
             {
@@ -32,7 +36,7 @@ namespace CriticalMass.Runtime.Tests
             const int w = 100, h = 50;
             var px = new Color32[w * h];
             for (int i = 0; i < px.Length; i++) px[i] = new Color32(24, 35, 59, 255);
-            px[25 * w + 50] = FxScene.BloodMid;                     // centre: outside a 10% band
+            px[25 * w + 50] = new Color32(150, 18, 34, 255);        // a blood red at the centre: outside a 10% band
             Assert.AreEqual(0.0, GoreShots.Share(px, w, h, GoreShots.BloodRed, 0.1f));
             Assert.AreEqual(1.0 / (w * h), GoreShots.Share(px, w, h, GoreShots.BloodRed), 1e-12);
             Assert.AreEqual(1.0, GoreShots.Share(px, w, h, GoreShots.NavyEdge, 0.1f));

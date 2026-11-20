@@ -93,6 +93,8 @@ namespace CriticalMass.Sim.Bots
         /// <summary>b15: side-steps started this match (a counter the tests print).</summary>
         public int Unjams;
         public double[] SideX, SideZ;
+        /// <summary>b15 pass 4: the side-step budget: the first tick of the bot's current budget window and the side-steps it started in it.</summary>
+        public int[] UnjamWindowStart, UnjamCount;
 
         /// <summary>Browser createBotsState: allocate every per-actor array at ActorCapacity (no reset).</summary>
         public static BotsState CreateBotsState(World w)
@@ -153,6 +155,8 @@ namespace CriticalMass.Sim.Bots
                 SideUntil = new int[cap],
                 SideX = new double[cap],
                 SideZ = new double[cap],
+                UnjamWindowStart = new int[cap],
+                UnjamCount = new int[cap],
             };
         }
 
@@ -213,6 +217,8 @@ namespace CriticalMass.Sim.Bots
                 st.Unjams = 0;
                 st.SideX[id] = 0;
                 st.SideZ[id] = 0;
+                st.UnjamWindowStart[id] = w.Tick;
+                st.UnjamCount[id] = 0;
             }
             BotFields.ResetFields(st.Fields, w);
             BotFields.BuildAllFields(st.Fields, w);

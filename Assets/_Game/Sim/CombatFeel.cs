@@ -340,10 +340,19 @@ namespace CriticalMass.Sim.Core
         public static void BeginMovement(World w)
         {
             CombatFeelState s = w.Depth.Feel;
+            int capTicks = Ticks(w, Cfg(w).StaggerChainCapSeconds);
             for (int i = 0; i < w.ActorCount; i++)
             {
                 Actor a = w.Actors[i];
-                if (a.Alive && a.HitStunTicks > 0)
+                // b15 pass 4: the chain cap is a hard stop. Movement counts a stun down only on grounded ticks (an airborne body,
+                // a dodge step or a fall keeps it), so a knock-up inside a run carried it to 25 ticks (0.83 s, run 44253108383)
+                // although Knock.Push had clipped every stun to the room left. A run that has had capTicks stunned ticks ends here.
+                if (a.Alive && a.HitStunTicks > 0 && capTicks > 0 && s.LockRun[i] >= capTicks)
+                {
+                    a.HitStunTicks = 0;
+                    s.LockRun[i] = 0;
+                }
+                else if (a.Alive && a.HitStunTicks > 0)
                 {
                     int r = ++s.LockRun[i];
                     if (r > s.MaxLockRun) s.MaxLockRun = r;

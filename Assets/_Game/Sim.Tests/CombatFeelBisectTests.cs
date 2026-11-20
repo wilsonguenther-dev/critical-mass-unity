@@ -18,24 +18,33 @@ namespace CriticalMass.Sim.Tests
     [TestFixture]
     public sealed class CombatFeelBisectTests
     {
-        private static readonly string[] ArmNames = { "side-step everywhere", "side-step off", "no side-step within 6 u of the Kaiju", "no side-step near the Kaiju or on the hill" };
+        private static readonly string[] ArmNames =
+        {
+            "off", "everywhere (pass 3)", "zone 15 + Kaiju 6", "bounded 2/6s + Kaiju 6", "bounded 2/6s + zone 15 + Kaiju 6", "bounded 1/4s + disc+1 + Kaiju 6",
+        };
 
         private static void Arm(int arm, GameConfig c)
         {
             CombatFeelConfig f = c.Depth.CombatFeel;
-            f.BotUnjam = arm != 1;
+            f.BotUnjam = arm != 0;
             f.BotUnjamKaijuClear = arm >= 2 ? 6 : 0;
-            f.BotUnjamHillClear = arm == 3 ? 1 : -1;
+            f.BotUnjamHillClear = arm == 5 ? 1 : -1;
+            f.BotUnjamHillZone = arm == 2 || arm == 4 ? 15 : 0;
+            f.BotUnjamBudget = arm == 3 || arm == 4 ? 2 : arm == 5 ? 1 : 0;
+            f.BotUnjamBudgetSeconds = arm == 5 ? 4 : 6;
         }
 
         [Test]
         public void Pass2RegressionsPerArm()
         {
-            int[] seeds = { 1337, 4242, 7, 99, 2024, 31337 };
+            int[] seeds = WinShare.Seeds16;
             for (int arm = 0; arm < ArmNames.Length; arm++)
             {
-                double onSum = 0;
-                int used = 0, worstLock = 0, anyRun = 0;
+                double onSum = 0, onSum24 = 0;
+                int used = 0, used24 = 0, worstLock = 0, anyRun = 0, maxProofs = 0, proofs1337 = 0;
+                var stuckList = new List<int>();
+                var stuckCells = new Dictionary<int, int>();
+                var zone = new int[5];   // side-step starts: on the disc, ring band (<= 13 u), <= 20 u, beyond, within 6 u of the Kaiju
                 string worstLockAt = "";
                 var kills = new double[6];
                 double allKills = 0;
@@ -56,6 +65,8 @@ namespace CriticalMass.Sim.Tests
                     var sat = new int[n];
                     int stuck = 0;
                     for (int i = 0; i < n; i++) sat[i] = -1;
+                    var side0 = new int[n];
+                    BotsState bst = BotBrain.GetBotsState(w);
                     SimProfile.ResetCounters();
                     for (int t = 0; t < 14400 && w.Match.Phase == MatchPhase.Playing; t++)
                     {
@@ -88,7 +99,20 @@ namespace CriticalMass.Sim.Tests
                             else if (w.Tick - sat[i] >= 90)
                             {
                                 stuck++;
-                                sat[i] = -1;
+                                int cell = (int)Math.Floor(w.X[i]) * 1000 + (int)Math.Floor(w.Z[i]);
+                                stuckCells.TryGetValue(cell, out int sc);
+                                stuckCells[cell] = sc + 1;
+                                sat[i] = w.Tick;
+                            }
+                            if (bst.SideUntil[i] != side0[i])
+                            {
+                                side0[i] = bst.SideUntil[i];
+                                if (side0[i] > 0)
+                                {
+                                    double hx2 = w.X[i] - hill.X, hz2 = w.Z[i] - hill.Z, d2 = hx2 * hx2 + hz2 * hz2;
+                                    zone[d2 <= hill.R * hill.R ? 0 : d2 <= 169 ? 1 : d2 <= 400 ? 2 : 3]++;
+                                    if (w.Match.Hatched && Math.Abs(w.Kaiju.X - w.X[i]) + Math.Abs(w.Kaiju.Z - w.Z[i]) < 6) zone[4]++;
+                                }
                             }
                         }
                         for (int i = 0; i < n; i++)
@@ -121,11 +145,20 @@ namespace CriticalMass.Sim.Tests
                         }
                     }
                     if (w.Depth.Feel.MaxLockRun > anyRun) anyRun = w.Depth.Feel.MaxLockRun;
-                    proofs.Add(seed + ":" + SimProfile.RouteProofs + "/" + SimProfile.RouteMemoHits);
+                    if (seed == 1337 || SimProfile.RouteProofs > 150) proofs.Add(seed + ":" + SimProfile.RouteProofs + "/" + SimProfile.RouteMemoHits);
+                    if (seed == 1337) proofs1337 = (int)SimProfile.RouteProofs;
+                    if (SimProfile.RouteProofs > maxProofs) maxProofs = (int)SimProfile.RouteProofs;
+                    stuckList.Add(stuck);
+                    bool order = Array.IndexOf(WinShare.OrderSeeds16, seed) >= 0;
                     if (owned > 60)
                     {
-                        used++;
-                        onSum += onHill / owned;
+                        if (order)
+                        {
+                            used++;
+                            onSum += onHill / owned;
+                        }
+                        used24++;
+                        onSum24 += onHill / owned;
                     }
                     Console.WriteLine("{\"item\":\"b15 bisect match\",\"arm\":\"" + ArmNames[arm] + "\",\"seed\":" + seed + ",\"ownedS\":" + owned.ToString("0") +
                                       ",\"onShare\":" + (owned > 0 ? onHill / owned : 0).ToString("0.000") + ",\"offWithTarget\":" + (offTarget * dt).ToString("0") +
@@ -137,7 +170,13 @@ namespace CriticalMass.Sim.Tests
                     if (OutcomeRunner.RunOutcomeMatch(s, 5, HumanMode.Passive, c => { c.ApplyRules(RulesProfile.Full); Arm(a5, c); }).Winner == MatchResult.Azure) idle5++;
                 var ks = new System.Text.StringBuilder();
                 for (int c = 0; c < 6; c++) ks.Append((ClassId)c).Append('=').Append((kills[c] / Math.Max(1, allKills)).ToString("0.000")).Append(' ');
+                stuckList.Sort();
+                int hot = 0;
+                foreach (int v in stuckCells.Values) if (v > hot) hot = v;
+                double med = stuckList.Count % 2 == 1 ? stuckList[stuckList.Count / 2] : (stuckList[stuckList.Count / 2 - 1] + stuckList[stuckList.Count / 2]) / 2.0;
                 Console.WriteLine("{\"item\":\"b15 bisect arm\",\"arm\":\"" + ArmNames[arm] + "\",\"kaijuOnShareMean\":" + (used > 0 ? onSum / used : 0).ToString("0.000") +
+                                  ",\"onShare24\":" + (used24 > 0 ? onSum24 / used24 : 0).ToString("0.000") + ",\"seeds24Used\":" + used24 + ",\"proofs1337\":" + proofs1337 + ",\"maxProofs\":" + maxProofs +
+                                  ",\"stuckMedian\":" + med.ToString("0.0") + ",\"hotCell\":" + hot + ",\"sideStepZones\":\"disc " + zone[0] + " band " + zone[1] + " near " + zone[2] + " far " + zone[3] + " kaiju6 " + zone[4] + "\"" +
                                   ",\"seedsUsed\":" + used + ",\"routeProofs\":\"" + string.Join(" ", proofs) + "\",\"longestMeleeLockTicks\":" + worstLock + ",\"longestAnyStunRunTicks\":" + anyRun +
                                   ",\"worstLock\":\"" + worstLockAt + "\",\"idle5v5AzureWinsOf200\":" + idle5 + ",\"killShares\":\"" + ks + "\"}");
             }

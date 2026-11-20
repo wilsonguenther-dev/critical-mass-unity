@@ -479,6 +479,24 @@ namespace CriticalMass.Sim.Bots
                 double hx = h.X - x, hz = h.Z - z, hr = h.R + fc.BotUnjamHillClear;
                 if (hx * hx + hz * hz <= hr * hr) return false;
             }
+            if (fc.BotUnjamHillZone > 0 && w.Match.Hatched && w.Kaiju.State != KaijuState.Egg)
+            {
+                HillDef h = w.Map.Hill;
+                double hx = h.X - x, hz = h.Z - z;
+                if (hx * hx + hz * hz <= fc.BotUnjamHillZone * fc.BotUnjamHillZone) return false;
+            }
+            // Pass 4: bounded. A bot that has used its budget in the current window is left to the FSM's own unstick.
+            if (fc.BotUnjamBudget > 0)
+            {
+                int win = CombatFeel.Ticks(w, fc.BotUnjamBudgetSeconds);
+                if (w.Tick - st.UnjamWindowStart[id] >= win)
+                {
+                    st.UnjamWindowStart[id] = w.Tick;
+                    st.UnjamCount[id] = 0;
+                }
+                if (st.UnjamCount[id] >= fc.BotUnjamBudget) return false;
+                st.UnjamCount[id]++;
+            }
             double inv = 1 / Math.Sqrt(m2);
             mx *= inv;
             mz *= inv;
