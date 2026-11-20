@@ -58,6 +58,16 @@ namespace CriticalMass.Runtime.View.Atmosphere
         public Color Background;
         /// <summary>Night life intensities 0..1: fireflies, lantern halos and light pools, creature glow spots.</summary>
         public float Fireflies, LightPools, CreatureGlow;
+        /// <summary>b15 world look (audit V-VAL-DAY / V-NIGHT): the GROUND grade, applied by the ground shaders only
+        /// (CM/WorldGround, CM/ToonGround) on top of the key/shade grade: luma contrast compressed toward
+        /// TimeOfDayGrade.GroundPivot by GroundContrast (0 none .. 1 flat), saturation x GroundSaturation, value x GroundValue.
+        /// It brings the cream paving and the dark seams toward the grass value (bible 2.5: grass tones within 6%) and puts
+        /// the ground a value band under the fighters (art direction 2.4: characters are the brightest layer).</summary>
+        public float GroundValue, GroundContrast, GroundSaturation;
+        /// <summary>b15 world look: the CHARACTER lift (CM/Toon materials with a rim: fighters and the Kaiju). CharFill lifts
+        /// the shadow and mid bands toward the lit band (0 none .. 1 all lit; three tones stay distinct below 1), CharGain
+        /// multiplies the banded colour (hue kept: a channel that would pass 1 scales the whole colour down instead).</summary>
+        public float CharGain, CharFill;
 
         /// <summary>Every number and colour channel is finite and in its documented range (EditMode test).</summary>
         public bool IsComplete(out string problem)
@@ -72,6 +82,11 @@ namespace CriticalMass.Runtime.View.Atmosphere
             foreach (float f in new[] { CharacterLift, RimStrength, FogMix, VoidAmount, Stars, Moon, Fireflies, LightPools, CreatureGlow })
                 if (!Finite(f) || f < 0f || f > 1f) { problem = "amount out of 0..1: " + f; return false; }
             if (!Finite(GlowBoost) || GlowBoost < 0f || GlowBoost > 3f) { problem = "glow boost " + GlowBoost; return false; }
+            if (!Finite(GroundValue) || GroundValue < 0.3f || GroundValue > 1.5f) { problem = "ground value " + GroundValue; return false; }
+            if (!Finite(GroundContrast) || GroundContrast < 0f || GroundContrast > 1f) { problem = "ground contrast " + GroundContrast; return false; }
+            if (!Finite(GroundSaturation) || GroundSaturation < 0f || GroundSaturation > 2f) { problem = "ground saturation " + GroundSaturation; return false; }
+            if (!Finite(CharGain) || CharGain < 1f || CharGain > 2f) { problem = "character gain " + CharGain; return false; }
+            if (!Finite(CharFill) || CharFill < 0f || CharFill > 0.9f) { problem = "character fill " + CharFill; return false; }
             return true;
         }
 
@@ -102,7 +117,14 @@ namespace CriticalMass.Runtime.View.Atmosphere
             Stars = 0f, Moon = 0f, GlowBoost = 0f,
             Background = Hex(CriticalMass.Sim.Config.Palette.SkyTop),
             Fireflies = 0f, LightPools = 0f, CreatureGlow = 0f,
+            // b15 world look (owner approved: Day is the default): the ground a band down, the fighters a band up.
+            GroundValue = DayGroundValue, GroundContrast = DayGroundContrast, GroundSaturation = DayGroundSaturation,
+            CharGain = DayCharGain, CharFill = DayCharFill,
         };
+
+        /// <summary>b15 world look: the Day value numbers in one place (WORLD-AUDIT #1; measured with
+        /// Editor/WorldLook/WorldValueProbe, target fighter body luma minus ground behind >= +0.12 at the gameplay camera).</summary>
+        public const float DayGroundValue = 0.62f, DayGroundContrast = 0.62f, DayGroundSaturation = 0.85f, DayCharGain = 1.35f, DayCharFill = 0.55f;
 
         /// <summary>Golden hour: a low sun from the screen's left (long shadows to the lower right), the lit band only a
         /// little warmer and no darker (a darker dusk walked the paving into the pickups' and markers' lightness and
@@ -119,6 +141,7 @@ namespace CriticalMass.Runtime.View.Atmosphere
             Stars = 0.3f, Moon = 0.55f, GlowBoost = 0.6f,
             Background = Hex("#C48A8E"),
             Fireflies = 0.45f, LightPools = 0.6f, CreatureGlow = 0.5f,
+            GroundValue = 0.6f, GroundContrast = 0.6f, GroundSaturation = 0.88f, CharGain = 1.35f, CharFill = 0.55f,
         };
 
         /// <summary>Cool moonlight from the screen's upper right, a dark world with the fighters, the Kaiju, crystals,
@@ -135,6 +158,8 @@ namespace CriticalMass.Runtime.View.Atmosphere
             Stars = 1f, Moon = 1f, GlowBoost = 1.2f,
             Background = Hex("#0E1430"),
             Fireflies = 1f, LightPools = 1f, CreatureGlow = 1f,
+            // Night rules (ART-DIRECTION section 10): fighter body luma at least +0.15 over the ground behind it.
+            GroundValue = 0.72f, GroundContrast = 0.5f, GroundSaturation = 0.85f, CharGain = 1.35f, CharFill = 0.55f,
         };
 
         public static readonly TimeOfDayPreset[] All = { Day, Dusk, Night };
@@ -167,6 +192,9 @@ namespace CriticalMass.Runtime.View.Atmosphere
                 Background = Color.Lerp(a.Background, b.Background, t),
                 Fireflies = Mathf.Lerp(a.Fireflies, b.Fireflies, t), LightPools = Mathf.Lerp(a.LightPools, b.LightPools, t),
                 CreatureGlow = Mathf.Lerp(a.CreatureGlow, b.CreatureGlow, t),
+                GroundValue = Mathf.Lerp(a.GroundValue, b.GroundValue, t), GroundContrast = Mathf.Lerp(a.GroundContrast, b.GroundContrast, t),
+                GroundSaturation = Mathf.Lerp(a.GroundSaturation, b.GroundSaturation, t),
+                CharGain = Mathf.Lerp(a.CharGain, b.CharGain, t), CharFill = Mathf.Lerp(a.CharFill, b.CharFill, t),
             };
         }
     }
@@ -185,6 +213,57 @@ namespace CriticalMass.Runtime.View.Atmosphere
             float Ch(float c, float shade, float key, float amb) => c * Mathf.Lerp(Mathf.Lerp(shade, key, b), 1f, l) + amb * (1f - l);
             return new Color(Ch(linear.r, p.Shade.r, p.Key.r, p.Ambient.r), Ch(linear.g, p.Shade.g, p.Key.g, p.Ambient.g),
                 Ch(linear.b, p.Shade.b, p.Key.b, p.Ambient.b), 1f);
+        }
+
+        /// <summary>b15: the linear luma the ground grade compresses toward (between the bible's mid and dark grass, linear).</summary>
+        public const float GroundPivot = 0.42f;
+
+        public static float Luma(Color c) => 0.2126f * c.r + 0.7152f * c.g + 0.0722f * c.b;
+
+        /// <summary>The CPU mirror of CMTodGroundGrade (CMTimeOfDay.hlsl): linear in, linear out, applied to the ground colour
+        /// before its shadow and the key grade.</summary>
+        public static Color Ground(Color c, in TimeOfDayPreset p)
+        {
+            float l = Luma(c);
+            if (l <= 1e-5f) return c;
+            float l2 = Mathf.Max(0f, GroundPivot + (l - GroundPivot) * (1f - Mathf.Clamp01(p.GroundContrast)));
+            float k = l2 / l;
+            Color c1 = new Color(c.r * k, c.g * k, c.b * k, 1f);
+            Color grey = new Color(l2, l2, l2, 1f);
+            Color c2 = Color.LerpUnclamped(grey, c1, p.GroundSaturation);
+            float v = p.GroundValue;
+            return new Color(Mathf.Max(0f, c2.r) * v, Mathf.Max(0f, c2.g) * v, Mathf.Max(0f, c2.b) * v, 1f);
+        }
+
+        /// <summary>The CPU mirror of CMTodCharacter (CMTimeOfDay.hlsl) on CM/Toon's default bands (lit x 1, mid x 0.84,
+        /// shadow x 0.66 mixed 12% toward Void Navy): band 0 shadow .. 2 lit; returns the lifted banded colour, linear.</summary>
+        public const float CharKnee = 0.9f;
+
+        public static Color Character(Color albedo, float band, in TimeOfDayPreset p)
+        {
+            float b = Mathf.Clamp(band, 0f, 2f);
+            b += (2f - b) * Mathf.Clamp01(p.CharFill);
+            Color navy = new Color(0.0080f, 0.0168f, 0.0437f, 1f);   // #18233B linear
+            Color lit = albedo, mid = albedo * 0.84f, sh = Color.Lerp(albedo * 0.66f, navy, 0.12f);
+            Color c = b <= 1f ? Color.Lerp(sh, mid, b) : Color.Lerp(mid, lit, b - 1f);
+            float g = Mathf.Max(1f, p.CharGain);
+            c = new Color(c.r * g, c.g * g, c.b * g, 1f);
+            // Soft shoulder above CharKnee (hue kept, strictly increasing: a bright albedo keeps its three bands distinct
+            // instead of all three clipping to white). Same curve as CMTodCharacterGain.
+            float m = Mathf.Max(c.r, Mathf.Max(c.g, c.b));
+            if (m > CharKnee)
+            {
+                float s = CharKnee + (1f - CharKnee) * (1f - Mathf.Exp(-(m - CharKnee) / (1f - CharKnee)));
+                c = new Color(c.r * s / m, c.g * s / m, c.b * s / m, 1f);
+            }
+            return c;
+        }
+
+        /// <summary>Display (sRGB-encoded) Rec. 709 luma of a linear colour: the number the audit's value test reads.</summary>
+        public static float DisplayLuma(Color linear)
+        {
+            Color s = linear.gamma;
+            return 0.2126f * Mathf.Clamp01(s.r) + 0.7152f * Mathf.Clamp01(s.g) + 0.0722f * Mathf.Clamp01(s.b);
         }
 
         /// <summary>OKLab of a linear colour.</summary>
@@ -213,7 +292,20 @@ namespace CriticalMass.Runtime.View.Atmosphere
     /// <summary>The time-of-day choice, stored in PlayerPrefs (default Day), read by the director every frame.</summary>
     public static class TimeOfDaySettings
     {
-        public const string Key = "cm.map.timeOfDay";
+        /// <summary>b15 world look (owner: open on DAY): the key moved to ".v2" so a Night stored by an older build or a
+        /// capture tool (the 2026-11-18 audit Editor opened on Night) no longer overrides the Day default; the player's
+        /// choice from now on is kept as before.</summary>
+        public const string Key = "cm.map.timeOfDay.v2";
+        /// <summary>The retired key (read by nothing; RetireOldKey deletes it once).</summary>
+        public const string OldKey = "cm.map.timeOfDay";
+
+        /// <summary>Deletes the retired key (one PlayerPrefs call when present; pure otherwise).</summary>
+        public static bool RetireOldKey()
+        {
+            if (!PlayerPrefs.HasKey(OldKey)) return false;
+            PlayerPrefs.DeleteKey(OldKey);
+            return true;
+        }
         public static event Action Changed;
 
         public static TimeOfDayChoice Choice
@@ -274,8 +366,12 @@ namespace CriticalMass.Runtime.View.Atmosphere
     public sealed class TimeOfDayDirector : MonoBehaviour
     {
         public const float BlendSeconds = 0.8f;
-        /// <summary>Where the moon sits on screen (viewport) and its angular radius (degrees).</summary>
+        /// <summary>Where the moon sits on screen (viewport) when the camera looks at the island centre, and its angular
+        /// radius (degrees). b15 world look (audit W09: the moon was pinned to the screen): the moon is a WORLD point
+        /// MoonDistance units out along that ray from the centred gameplay camera, so it slides slower than the islands
+        /// when the camera follows a fighter (parallax: it reads as far behind the island, not as a sticker on the lens).</summary>
         public static readonly Vector2 MoonViewport = new Vector2(0.22f, 0.70f);
+        public const float MoonDistance = 240f, MoonCameraDistance = 23.4f;
         public const float MoonRadiusDeg = 3.0f;
 
         /// <summary>Captures and tests force a time here (null = the player's choice).</summary>
@@ -285,7 +381,8 @@ namespace CriticalMass.Runtime.View.Atmosphere
         public static readonly int KeyId = Shader.PropertyToID("_CMTodKey"), ShadeId = Shader.PropertyToID("_CMTodShade"),
             AmbientId = Shader.PropertyToID("_CMTodAmbient"), RimId = Shader.PropertyToID("_CMTodRim"), FogId = Shader.PropertyToID("_CMTodFog"),
             VoidId = Shader.PropertyToID("_CMTodVoid"), SkyId = Shader.PropertyToID("_CMTodSky"), MoonId = Shader.PropertyToID("_CMTodMoon"),
-            AmbientLifeId = Shader.PropertyToID("_CMAmbient");
+            AmbientLifeId = Shader.PropertyToID("_CMAmbient"),
+            GroundGradeId = Shader.PropertyToID("_CMTodGround"), CharacterId = Shader.PropertyToID("_CMTodChar");
 
         public TimeOfDay Target { get; private set; }
         public TimeOfDayPreset Shown { get; private set; }
@@ -302,7 +399,19 @@ namespace CriticalMass.Runtime.View.Atmosphere
         bool _started;
         CriticalMass.Sim.Core.World _world;
 
-        void OnEnable() => Current = this;
+        void OnEnable()
+        {
+            Current = this;
+            TimeOfDaySettings.RetireOldKey();
+        }
+
+        Vector3 _moonAnchor;
+        bool _moonAnchorSet;
+
+        /// <summary>The moon's world point for a camera rotation and the island centre (pure; tests): the centred gameplay
+        /// camera's ray through MoonViewport, MoonDistance out. viewportDir is that ray's direction at the camera's rotation.</summary>
+        public static Vector3 MoonAnchor(Vector3 islandCentre, Vector3 cameraForward, Vector3 viewportDir) =>
+            islandCentre - cameraForward.normalized * MoonCameraDistance + viewportDir.normalized * MoonDistance;
 
         void OnDisable()
         {
@@ -313,7 +422,7 @@ namespace CriticalMass.Runtime.View.Atmosphere
         /// <summary>Every global back to 0, which the shaders read as Day.</summary>
         public static void ClearGlobals()
         {
-            foreach (int id in new[] { KeyId, ShadeId, AmbientId, RimId, FogId, VoidId, SkyId, MoonId, ZenithId }) Shader.SetGlobalVector(id, Vector4.zero);
+            foreach (int id in new[] { KeyId, ShadeId, AmbientId, RimId, FogId, VoidId, SkyId, MoonId, ZenithId, GroundGradeId, CharacterId }) Shader.SetGlobalVector(id, Vector4.zero);
             Shader.SetGlobalVector(AmbientLifeId, new Vector4(1f, 0f, 0f, 0f));
         }
 
@@ -345,7 +454,7 @@ namespace CriticalMass.Runtime.View.Atmosphere
             }
             TimeOfDay want = Wanted();
             bool newWorld = _driver != null && _driver.World != _world;
-            if (newWorld) _world = _driver.World;
+            if (newWorld) { _world = _driver.World; _moonAnchorSet = false; }
             if (!_started || want != Target)
             {
                 _from = _started ? Shown : TimeOfDayPresets.For(want);
@@ -376,12 +485,24 @@ namespace CriticalMass.Runtime.View.Atmosphere
             Shader.SetGlobalVector(ZenithId, new Vector4(zen.r, zen.g, zen.b, 1f));
             float motion = CriticalMass.Runtime.Menu.GameSettings.ReducedMotion ? 0.35f : 1f;
             Shader.SetGlobalVector(AmbientLifeId, new Vector4(motion, p.Fireflies, p.LightPools, p.CreatureGlow));
+            // b15 world look: ground grade (x value - 1, y contrast compression, z saturation - 1, w pivot) and the
+            // character lift (x gain - 1, y band fill). All zero is the old look (editor tools, tests before the director).
+            Shader.SetGlobalVector(GroundGradeId, GroundGradeVector(p));
+            Shader.SetGlobalVector(CharacterId, new Vector4(p.CharGain - 1f, p.CharFill, 0f, 0f));
 
             UnityEngine.Camera cam = UnityEngine.Camera.main;
             if (cam != null)
             {
                 if (cam.clearFlags == CameraClearFlags.SolidColor) cam.backgroundColor = p.Background;
-                Vector3 md = cam.ViewportPointToRay(new Vector3(MoonViewport.x, MoonViewport.y, 0f)).direction.normalized;
+                if (!_moonAnchorSet)
+                {
+                    Vector3 centre = Vector3.zero;
+                    if (_driver != null && _driver.World != null && _driver.World.Map != null)
+                        centre = SimSpace.ToWorld(_driver.World.Map.Width * 0.5, 0, _driver.World.Map.Height * 0.5);
+                    _moonAnchor = MoonAnchor(centre, cam.transform.forward, cam.ViewportPointToRay(new Vector3(MoonViewport.x, MoonViewport.y, 0f)).direction);
+                    _moonAnchorSet = true;
+                }
+                Vector3 md = (_moonAnchor - cam.transform.position).normalized;
                 Shader.SetGlobalVector(MoonId, new Vector4(md.x, md.y, md.z, Mathf.Cos(MoonRadiusDeg * Mathf.Deg2Rad)));
             }
 
@@ -394,6 +515,10 @@ namespace CriticalMass.Runtime.View.Atmosphere
                 _sun.color = new Color(Mathf.Clamp01(p.Key.r), Mathf.Clamp01(p.Key.g), Mathf.Clamp01(p.Key.b), 1f).gamma;
             }
         }
+
+        /// <summary>The _CMTodGround vector of a preset (pure; tests): zero for the identity grade.</summary>
+        public static Vector4 GroundGradeVector(in TimeOfDayPreset p) =>
+            new Vector4(p.GroundValue - 1f, p.GroundContrast, p.GroundSaturation - 1f, TimeOfDayGrade.GroundPivot);
 
         static Light FindSun()
         {

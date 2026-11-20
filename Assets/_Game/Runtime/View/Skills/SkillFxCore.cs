@@ -56,7 +56,8 @@ namespace CriticalMass.Runtime.View.Skills
         static readonly Color32 RootLight = new Color32(150, 118, 76, 255), RootMid = new Color32(112, 84, 52, 255), RootDark = new Color32(74, 54, 34, 255);
         static readonly Color32 VineLight = new Color32(150, 214, 92, 255), VineMid = new Color32(92, 168, 62, 255), VineDark = new Color32(52, 110, 44, 255);
         static readonly Color32 DirtLight = new Color32(140, 106, 72, 255), Dirt = new Color32(107, 79, 53, 255), DirtDark = new Color32(76, 55, 37, 255);
-        static readonly Color32 HealGreen = new Color32(170, 240, 120, 255), SparkWhite = new Color32(255, 246, 214, 255), SparkGold = new Color32(255, 214, 72, 255);
+        static readonly Color32 HealGreen = Mechanics.MechanicsWorldView.HealMint,   // b15: the heal mint, not the Biomass lime
+             SparkWhite = new Color32(255, 246, 214, 255), SparkGold = new Color32(255, 214, 72, 255);
         static readonly Color32 TntLight = new Color32(232, 96, 80, 255), TntRed = new Color32(200, 53, 46, 255), TntDark = new Color32(132, 30, 28, 255);
 
         public static Color32 TeamColor(TeamId t) => t == TeamId.Azure ? FxScene.AzureC : FxScene.CrimsonC;

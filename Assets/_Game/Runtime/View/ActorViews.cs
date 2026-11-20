@@ -712,6 +712,54 @@ namespace CriticalMass.Runtime.View
             if (m != null) m.SetActive(on);
         }
 
+        /// <summary>
+        /// b15 world look, item 5 (WORLD-AUDIT "post-hatch spikes": 3.5 and 24 MB, 40+ ms frames on the hatch): the hatchling
+        /// and adult are inactive until the hatch, so nothing before it ever drew them: their pipeline states, their glow x
+        /// expression materials (ArtMaterials.ForGlow builds and caches each on first use, and loads its face atlas) and
+        /// their first pose all landed on the hatch frame. FirstRunWarm's wide render calls this with on = true just before
+        /// it renders (both stages shown at the egg, every glow x face material built, each worn once so the renderers'
+        /// material arrays exist) and with on = false right after; the next Sync puts the real stage back. View only.
+        /// Returns the materials it built or found (tests, the warm log).
+        /// </summary>
+        public int PrewarmKaiju(bool on)
+        {
+            if (!on)
+            {
+                _kaijuPrewarm = false;
+                SetActive(_hatchling, false);
+                SetActive(_adult, false);
+                return 0;
+            }
+            _kaijuPrewarm = true;
+            int n = 0;
+            var glows = new[] { ArtMapping.GlowNeutral, ArtMapping.GlowAzure, ArtMapping.GlowCrimson, ArtMapping.GlowBerserk };
+            var faces = (KaijuExpression[])Enum.GetValues(typeof(KaijuExpression));
+            Vector3 at = _egg != null ? _egg.Transform.localPosition : Vector3.zero;
+            foreach (ModelView m in new[] { _hatchling, _adult })
+            {
+                if (m == null) continue;
+                m.Transform.localPosition = at;
+                m.SetActive(true);
+                foreach (string g in glows)
+                    foreach (KaijuExpression f in faces)
+                    {
+                        Material mat = ArtMaterials.ForGlow(m.Spec, g, f);
+                        if (mat == null) continue;
+                        m.SetMaterial(mat);
+                        n++;
+                    }
+                m.SetMaterial(ArtMaterials.ForGlow(m.Spec, ArtMapping.GlowNeutral, KaijuExpression.Neutral));
+            }
+            foreach (ModelView m in new[] { _shards, _spikes })
+                if (m != null)
+                    foreach (string g in glows) { if (ArtMaterials.ForGlow(m.Spec, g) != null) n++; }
+            return n;
+        }
+
+        bool _kaijuPrewarm;
+        /// <summary>True between PrewarmKaiju(true) and PrewarmKaiju(false).</summary>
+        public bool KaijuPrewarming => _kaijuPrewarm;
+
         /// <summary>Height of the grid view's block above the ground at a sim point (GridChunkMeshView.CellBox: walls and intact breakables 1.5 u).</summary>
         private static double RaisedTop(MapDef map, double x, double z)
         {

@@ -29,8 +29,8 @@ Material:
     - _ColorMode: 1
     - _ExtrudePx: 11
     - _FogAmount: 1
-    - _FogBottom: -11
-    - _FogTop: -3.5
+    - _FogBottom: -9
+    - _FogTop: -2
     - _LitMultiplier: 1
     - _LitThreshold: 0.35
     - _MidMultiplier: 0.84
