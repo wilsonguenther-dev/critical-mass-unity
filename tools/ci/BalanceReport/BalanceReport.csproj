@@ -1,0 +1,31 @@
+<!-- b15 tools (balance report): the headless balance-report command. No Unity: it compiles CriticalMass.Sim and CriticalMass.Net
+     the way the Sim gate does (tools/ci/Sim, tools/ci/Net) and links the balance harness files from Sim.Tests/Harness (they also
+     compile inside Unity's test assembly, where their tests run). Run from the repo root via tools/balance/balance-report.sh.
+     Unity never sees this file: it lives outside Assets/. -->
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <RollForward>Major</RollForward>
+    <AssemblyName>balance-report</AssemblyName>
+    <RootNamespace>CriticalMass.Balance</RootNamespace>
+    <LangVersion>9.0</LangVersion>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <DefineConstants>$(DefineConstants);$(CmDefines)</DefineConstants>
+    <NoWarn>$(NoWarn);1591;0618</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Program.cs" />
+    <Compile Include="../../../Assets/_Game/Sim.Tests/Harness/BalanceProbe.cs" Link="Harness/BalanceProbe.cs" />
+    <Compile Include="../../../Assets/_Game/Sim.Tests/Harness/BalanceStats.cs" Link="Harness/BalanceStats.cs" />
+    <Compile Include="../../../Assets/_Game/Sim.Tests/Harness/TuningIndex.cs" Link="Harness/TuningIndex.cs" />
+    <Compile Include="../../../Assets/_Game/Sim.Tests/Harness/WinShare.cs" Link="Harness/WinShare.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Sim/Sim.csproj" />
+    <ProjectReference Include="../Net/Net.csproj" />
+  </ItemGroup>
+</Project>

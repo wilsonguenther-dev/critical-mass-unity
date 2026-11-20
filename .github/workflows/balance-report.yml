@@ -1,0 +1,116 @@
+# b15 tools: the balance report on a GitHub runner (ubuntu-latest, free standard runner, no secrets, no Unity). Bot matches or a
+# compare are re-simulated headless by tools/balance/balance-report.sh; the report (Markdown + JSON + CSV) is the artifact.
+# Manual: Actions > balance-report > Run workflow (the workflow must be on the default branch for the button; until then the
+# push trigger below runs it: push any commit to a ci/balance/** branch and it compares integration/batch-13-cand1 with that
+# commit at 24 seeds and reports it at 72).
+#   gh workflow run balance-report.yml -f ref=origin/integration/batch-13-cand1 -f seeds=24
+#   gh workflow run balance-report.yml -f mode=compare -f base=origin/integration/batch-13-cand1 -f head=feat/b15-comeback-hut
+#   gh workflow run balance-report.yml -f mode=compare -f base= -f head="Depth.Hut.On=false"
+name: balance-report
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "report (one ref), compare (base vs head) or tuning-index"
+        type: choice
+        options: [report, compare, tuning-index]
+        default: report
+      ref:
+        description: "report: the commit to measure (branch, tag or sha; empty = the branch this runs on)"
+        type: string
+        default: ''
+      seeds:
+        description: "bot matches (16v16, the WinShare pool first)"
+        type: choice
+        options: ['24', '72']
+        default: '24'
+      switches:
+        description: "report: switches on top of the rules, e.g. Depth.Hut.On=false;Classes[0].MaxHp=170"
+        type: string
+        default: ''
+      base:
+        description: "compare: a ref, or switches (Path=Value;...), empty = the game as checked out"
+        type: string
+        default: ''
+      head:
+        description: "compare: a ref, or switches"
+        type: string
+        default: ''
+  push:
+    branches: ['ci/balance/**']
+permissions:
+  contents: read
+concurrency:
+  group: balance-report-${{ github.ref }}-${{ inputs.mode || 'push' }}
+  cancel-in-progress: false
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        seeds: ${{ github.event_name == 'push' && fromJSON('["24","72"]') || fromJSON(format('["{0}"]', inputs.seeds)) }}
+    timeout-minutes: ${{ matrix.seeds == '72' && 60 || 25 }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: false
+          fetch-depth: 0   # compare and report on other refs need their commits
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Balance report
+        shell: bash
+        env:
+          # push (self-check): 24 seeds = compare integration/batch-13-cand1 (measured in a worktree) with this commit; 72 = report
+          MODE: ${{ inputs.mode || (matrix.seeds == '24' && 'compare' || 'report') }}
+          REF: ${{ inputs.ref }}
+          SEEDS: ${{ matrix.seeds }}
+          SWITCHES: ${{ inputs.switches }}
+          BASE: ${{ github.event_name == 'push' && 'origin/integration/batch-13-cand1' || inputs.base }}
+          HEAD: ${{ inputs.head }}
+        run: |
+          set -o pipefail
+          start=$(date +%s)
+          out="Temp/balance/report-${SEEDS}"
+          sets=()
+          IFS=';' read -ra parts <<< "${SWITCHES}"
+          for p in "${parts[@]}"; do [[ -n "${p// }" ]] && sets+=(--set "$p"); done
+          case "$MODE" in
+            tuning-index)
+              tools/balance/balance-report.sh tuning-index --out "$out/TUNING-INDEX.md" ;;
+            compare)
+              tools/balance/balance-report.sh compare --base "$BASE" --head "$HEAD" --seeds "$SEEDS" --out "$out" ;;
+            *)
+              tools/balance/balance-report.sh tuning-index --out "$out/TUNING-INDEX.md"
+              if [[ -n "$REF" ]]; then
+                git rev-parse --verify --quiet "$REF^{commit}" >/dev/null || git fetch --quiet origin "$REF"
+                tools/balance/balance-report.sh run --ref "$REF" --seeds "$SEEDS" ${sets[@]+"${sets[@]}"} --out "$out"
+              else
+                tools/balance/balance-report.sh run --seeds "$SEEDS" ${sets[@]+"${sets[@]}"} --label "${GITHUB_REF_NAME}" --out "$out"
+              fi ;;
+          esac
+          rc=$?
+          echo "BALANCE_MINUTES=$(( ( $(date +%s) - start + 59 ) / 60 ))" >> "$GITHUB_ENV"
+          exit $rc
+      - name: Summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "### balance-report (${{ matrix.seeds }} seeds), step time about ${BALANCE_MINUTES:-?} min"
+            for f in Temp/balance/report-${{ matrix.seeds }}/balance-report.md Temp/balance/report-${{ matrix.seeds }}/balance-compare.md; do
+              if [[ -f "$f" ]]; then sed -n '1,/^## Time per class/p' "$f" | head -80; fi
+            done
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: balance-report-${{ matrix.seeds }}
+          path: |
+            Temp/balance/report-${{ matrix.seeds }}/
+            Temp/balance/base-report/
+            Temp/balance/head-report/
+            Temp/balance/build.log
+          if-no-files-found: warn
+          retention-days: 30
