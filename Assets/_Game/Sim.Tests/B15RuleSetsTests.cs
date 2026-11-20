@@ -156,5 +156,19 @@ namespace CriticalMass.Sim.Tests
 
         [Test, Explicit, Timeout(3500000)]
         public void B15RuleSetsRoundTwo() => Measure(Brain, SetsRound2(), " r2");
+
+        /// <summary>Round 3 (run 44836594576: D0 met 4 of 5 at 24 and 72 seeds, dead/walking 0.285 the one miss; a 2-4 s respawn
+        /// alone reached 0.279): D0 with shorter respawn curves.</summary>
+        public static List<KeyValuePair<string, Action<GameConfig>>> SetsRound3() => new List<KeyValuePair<string, Action<GameConfig>>>
+        {
+            S("D0 B+kaiju hill x0", SetB, KaijuHill(0)),
+            S("D0 2-4 s", SetB, KaijuHill(0), B15SweepTests.Curve(2, 4)),
+            S("D0 2-4.5 s", SetB, KaijuHill(0), B15SweepTests.Curve(2, 4.5)),
+            S("D0 1.5-5 s", SetB, KaijuHill(0), B15SweepTests.Curve(1.5, 5)),
+            S("D0 1.5-4.5 s", SetB, KaijuHill(0), B15SweepTests.Curve(1.5, 4.5)),
+        };
+
+        [Test, Explicit, Timeout(3500000)]
+        public void B15RuleSetsRoundThree() => Measure(Brain, SetsRound3(), " r3");
     }
 }
