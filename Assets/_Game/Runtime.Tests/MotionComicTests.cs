@@ -152,10 +152,10 @@ namespace CriticalMass.Runtime.Tests
         }
 
         [Test]
-        public void SkipNeedsADeliberatePressAfterOneAndAHalfSeconds()
+        public void SkipNeedsADeliberatePressAfterOneSecond()
         {
-            Assert.AreEqual(1.5f, Table().skipPromptAfter, 1e-4f, "the table's skip lock is 1.5 s");
-            Assert.AreEqual(1.5f, SkipGate.LockSeconds, 1e-4f);
+            Assert.AreEqual(1.0f, Table().skipPromptAfter, 1e-4f, "the table's skip lock is 1 s (b15)");
+            Assert.AreEqual(1.0f, SkipGate.LockSeconds, 1e-4f, "b15: any key skips after 1 s");
 
             // A key held from the first frame (the Enter that chose WATCH INTRO) never skips, however long it is held.
             var held = new SkipGate();
@@ -169,23 +169,23 @@ namespace CriticalMass.Runtime.Tests
             t = 0;
             Assert.IsFalse(Run(g, ref t, 0.3, false));
             Assert.IsFalse(Run(g, ref t, 0.4, true), "a tap at 0.3 s does not skip");
-            Assert.IsFalse(Run(g, ref t, 1.2, false));
-            Assert.IsFalse(Run(g, ref t, 1.8, true), "a press at 1.2 s held through the lock does not skip");
-            Assert.IsFalse(Run(g, ref t, 2.0, false));
+            Assert.IsFalse(Run(g, ref t, 0.8, false));
+            Assert.IsFalse(Run(g, ref t, 1.4, true), "a press at 0.8 s held through the lock does not skip");
+            Assert.IsFalse(Run(g, ref t, 1.6, false));
             Assert.IsTrue(g.Update(t, true), "a fresh press after the lock skips on its frame");
 
             // Frame 0 and the frame the lock ends.
             var g0 = new SkipGate();
             Assert.IsFalse(g0.Update(0.0, true), "frame 0 never skips");
             var g1 = new SkipGate();
-            g1.Update(1.49, false);
-            Assert.IsTrue(g1.Update(1.5, true), "a press on the frame the lock ends skips");
+            g1.Update(0.99, false);
+            Assert.IsTrue(g1.Update(1.0, true), "a press on the frame the lock ends skips");
 
             Assert.AreEqual(0f, MotionComic.SkipPromptAlpha(0.0, SkipGate.LockSeconds));
-            Assert.AreEqual(0f, MotionComic.SkipPromptAlpha(1.49, SkipGate.LockSeconds), "no skip prompt before skipping works");
-            Assert.Greater(MotionComic.SkipPromptAlpha(1.9, SkipGate.LockSeconds), 0.99f, "the prompt is up once skipping works");
-            Assert.IsFalse(new SkipGate().PromptOn(1.4));
-            Assert.IsTrue(new SkipGate().PromptOn(1.5));
+            Assert.AreEqual(0f, MotionComic.SkipPromptAlpha(0.99, SkipGate.LockSeconds), "no skip prompt before skipping works");
+            Assert.Greater(MotionComic.SkipPromptAlpha(1.4, SkipGate.LockSeconds), 0.99f, "the prompt is up once skipping works");
+            Assert.IsFalse(new SkipGate().PromptOn(0.9));
+            Assert.IsTrue(new SkipGate().PromptOn(1.0));
         }
 
         static readonly float[] Aspects = { 4f / 3f, 3024f / 1964f, 16f / 10f, 16f / 9f, 21f / 9f };
@@ -349,31 +349,31 @@ namespace CriticalMass.Runtime.Tests
         }
 
         [Test]
-        public void IntroPlaysAtEveryLaunchUnlessSettingsTurnItOff()
+        public void IntroPlaysOnTheFirstLaunchOnlyUnlessEveryLaunchIsOn()
         {
             bool had = PlayerPrefs.HasKey(CriticalMass.Runtime.Menu.GameSettings.IntroAtLaunchKey);
-            int saved = PlayerPrefs.GetInt(CriticalMass.Runtime.Menu.GameSettings.IntroAtLaunchKey, 1);
-            int seenOld = PlayerPrefs.GetInt("cm.story.seen", 0);
+            int saved = PlayerPrefs.GetInt(CriticalMass.Runtime.Menu.GameSettings.IntroAtLaunchKey, 0);
             try
             {
+                // b15 safe defaults (owner-approved 2026-11-17): first launch only; WATCH INTRO replays it from the menu.
                 PlayerPrefs.DeleteKey(CriticalMass.Runtime.Menu.GameSettings.IntroAtLaunchKey);
-                Assert.IsTrue(CriticalMass.Runtime.Menu.GameSettings.IntroAtLaunch, "PLAY INTRO AT LAUNCH defaults to on");
-                PlayerPrefs.SetInt("cm.story.seen", 1);   // the owner's profile from earlier builds
-                PlayerPrefs.SetInt(StoryIntro.SeenKey, 1);
+                Assert.IsFalse(CriticalMass.Runtime.Menu.GameSettings.IntroAtLaunch, "PLAY INTRO AT EVERY LAUNCH defaults to off");
                 var title = CriticalMass.Runtime.Flow.FlowState.Title;
-                Assert.IsTrue(StoryIntro.ShouldPlayAtLaunch(true, true, title, false, CriticalMass.Runtime.Menu.GameSettings.IntroAtLaunch),
-                    "a seen flag from an earlier build no longer stops it");
-                Assert.IsFalse(StoryIntro.ShouldPlayAtLaunch(true, true, title, false, false), "Settings turned it off");
-                Assert.IsFalse(StoryIntro.ShouldPlayAtLaunch(true, true, title, true, true), "never in autoplay");
-                Assert.IsFalse(StoryIntro.ShouldPlayAtLaunch(true, true, CriticalMass.Runtime.Flow.FlowState.Match, false, true), "never into a match");
-                Assert.IsFalse(StoryIntro.ShouldPlayAtLaunch(true, false, title, false, true), "not in the editor or batch runs");
+                bool every = CriticalMass.Runtime.Menu.GameSettings.IntroAtLaunch;
+                Assert.IsTrue(StoryIntro.ShouldPlayAtLaunch(true, true, title, false, every, false), "first launch: not seen yet, it plays");
+                Assert.IsFalse(StoryIntro.ShouldPlayAtLaunch(true, true, title, false, every, true), "seen once: not again at launch");
+                Assert.IsTrue(StoryIntro.ShouldPlayAtLaunch(true, true, title, false, true, true), "every launch on: plays though seen");
+                Assert.IsFalse(StoryIntro.ShouldPlayAtLaunch(true, true, title, true, true, false), "never in autoplay");
+                Assert.IsFalse(StoryIntro.ShouldPlayAtLaunch(true, true, CriticalMass.Runtime.Flow.FlowState.Match, false, true, false), "never into a match");
+                Assert.IsFalse(StoryIntro.ShouldPlayAtLaunch(true, false, title, false, true, false), "not in the editor or batch runs");
                 CollectionAssert.Contains(CriticalMass.Runtime.Menu.GameSettings.AllKeys, CriticalMass.Runtime.Menu.GameSettings.IntroAtLaunchKey);
+                Assert.AreEqual("cm.story.seen.v2", StoryIntro.SeenKey, "the seen flag every earlier build set at the end of the film");
+                TestContext.WriteLine("intro launch rule: first launch plays, second does not, every-launch setting default=" + every);
             }
             finally
             {
                 if (had) PlayerPrefs.SetInt(CriticalMass.Runtime.Menu.GameSettings.IntroAtLaunchKey, saved);
                 else PlayerPrefs.DeleteKey(CriticalMass.Runtime.Menu.GameSettings.IntroAtLaunchKey);
-                PlayerPrefs.SetInt("cm.story.seen", seenOld);
             }
         }
 

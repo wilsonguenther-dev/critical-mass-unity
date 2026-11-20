@@ -125,7 +125,7 @@ namespace CriticalMass.Runtime.PlayTests
             Item("CLEAN HUD   (H)").Stepped(1);
             Item("SUBTITLES").Stepped(1);
             Item("UI SCALE").Stepped(1);
-            Item("REDUCE FLASHING").Stepped(1);
+            Item("INTENSE FLASHING").Stepped(1);
             MenuItem shake = Item("CAMERA SHAKE");
             shake.Stepped(1);
             shake.Stepped(1);
@@ -134,7 +134,7 @@ namespace CriticalMass.Runtime.PlayTests
             Assert.AreEqual(1, PlayerPrefs.GetInt(SettingsExtras.CleanHudKey));
             Assert.AreEqual(0, PlayerPrefs.GetInt(SettingsExtras.SubtitlesKey));
             Assert.AreEqual(110, PlayerPrefs.GetInt(SettingsExtras.UiScaleKey));
-            Assert.AreEqual(1, PlayerPrefs.GetInt(SettingsExtras.ReduceFlashingKey));
+            Assert.AreEqual(1, PlayerPrefs.GetInt(SettingsExtras.IntenseFlashingKey));
             Assert.AreEqual(10, PlayerPrefs.GetInt(SettingsExtras.ShakeAmountKey), "two steps of 5");
             _menu.Resume();
             yield return null;
@@ -145,15 +145,16 @@ namespace CriticalMass.Runtime.PlayTests
             Assert.IsTrue(SettingsExtras.CleanHud);
             Assert.IsFalse(SettingsExtras.Subtitles);
             Assert.AreEqual(110, SettingsExtras.UiScalePercent);
-            Assert.IsTrue(SettingsExtras.ReduceFlashing);
+            Assert.IsTrue(SettingsExtras.IntenseFlashing);
             Assert.AreEqual(10, SettingsExtras.ShakeAmount);
             _menu.Pause();
             yield return null;
             _menu.ShowSettings((PauseMenu.Tab)4);
             yield return null;
             Assert.AreEqual("110%", Item("UI SCALE").Value.text);
-            Item("REDUCE FLASHING").Stepped(1);
-            Assert.IsFalse(SettingsExtras.ReduceFlashing, "and toggles back");
+            Item("INTENSE FLASHING").Stepped(1);
+            Assert.IsFalse(SettingsExtras.IntenseFlashing, "and toggles back");
+            Assert.IsTrue(SettingsExtras.ReduceFlashing, "back to the safe look");
             Item("Reset Access").Submitted();
             Assert.IsFalse(SettingsExtras.HideNames);
             Assert.AreEqual(0, SettingsExtras.ShakeAmount);

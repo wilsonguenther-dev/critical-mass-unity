@@ -208,7 +208,10 @@ namespace CriticalMass.Runtime.Tests
             {
                 PlayerPrefs.DeleteKey(CriticalMass.Runtime.Menu.GameSettings.GoreKey);
                 PlayerPrefs.DeleteKey(BloodSetting.Key);
-                Assert.IsTrue(BloodSetting.Enabled, "blood defaults to on");
+                Assert.IsFalse(BloodSetting.Enabled, "b15 safe defaults: gore, and so blood, defaults to off");
+                PlayerPrefs.SetInt(CriticalMass.Runtime.Menu.GameSettings.GoreKey, 2);
+                Assert.IsTrue(BloodSetting.Enabled, "an explicit FULL turns blood on");
+                PlayerPrefs.DeleteKey(CriticalMass.Runtime.Menu.GameSettings.GoreKey);
                 PlayerPrefs.SetInt(BloodSetting.Key, 0);
                 Assert.IsFalse(BloodSetting.Enabled);
 

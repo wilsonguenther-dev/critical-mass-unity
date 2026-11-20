@@ -284,11 +284,12 @@ namespace CriticalMass.Runtime.Menus
     /// <para>Since the motion-comic rebuild (2026-11-12) the intro plays the shot table Resources "Story/motion-comic" through
     /// <see cref="MotionComicPlayer"/> (12 shots, about 48 s, the bible's own art). Since story intro 2 (2026-11-13): it
     /// streams its textures in shot order (the film opens from navy as soon as the first shot is in, no hitch), skips only
-    /// after 1.5 s and only on a deliberate press of Space, Enter, Esc, a click or A / B / Start (<see cref="SkipGate"/>; mouse
-    /// movement, other keys and a key held from before never skip) with a "SPACE  SKIP" prompt from 1.5 s, quiets the
+    /// after 1 s (b15; was 1.5 s) on a deliberate press of ANY key, mouse button or controller button (<see cref="SkipGate"/>,
+    /// <see cref="SkipAnyKeyDown"/>; mouse movement and a key held from before never skip) with an "ANY KEY  SKIP" prompt
+    /// from 1 s, quiets the
     /// backdrop match and beds the music under the narration while it plays, and ends by dissolving into the screen it was
     /// started from (on first launch, the title: the film's logo lands where the title's logo sits). It plays once on first
-    /// launch (key <see cref="SeenKey"/>, new for this version so players of earlier builds see it once too), and from WATCH
+    /// launch (key <see cref="SeenKey"/>; b15: first launch only again unless PLAY INTRO AT EVERY LAUNCH is on), and from WATCH
     /// INTRO on the title, on the home screen and in the Codex. The five-card path below stays as the fallback when the
     /// table or its layers are missing. The same player runs the title's attract loop (<see cref="PlayAttract"/>, narration off,
     /// any input returns to the title) and Codex lore vignettes (<see cref="PlayLore"/>).</para>
@@ -343,8 +344,9 @@ namespace CriticalMass.Runtime.Menus
         float _outroT;
         MotionComicPlayer _comic;
         McTable _table;
-        static readonly string SkipComicKeyboard = "SPACE   SKIP";
-        static readonly string SkipComicPad = "A   SKIP";
+        // b15: any key skips (after the 1 s lock), so the prompt says so.
+        static readonly string SkipComicKeyboard = "ANY KEY   SKIP";
+        static readonly string SkipComicPad = "ANY BUTTON   SKIP";
         /// <summary>The open from navy once the first shot has streamed in.</summary>
         public const float ComicOpenSeconds = 0.35f;
         /// <summary>The dissolve into the screen underneath at the end of the intro.</summary>
@@ -405,19 +407,24 @@ namespace CriticalMass.Runtime.Menus
         {
             // Sequenced by the game flow (DG-01): on the boot's title (before the title, before the first-time card, which
             // waits for the title to go), never on a reload into a match, results or the menu, never in autoplay.
-            // Owner, 2026-11-13: at EVERY launch, not only the first (the old once-only flag "cm.story.seen" was already set by
-            // earlier builds, so the owner never saw this film); Settings > Game > PLAY INTRO AT LAUNCH turns it off.
+            // b15 safe defaults (blind-spot audit F3/O4, owner-approved 2026-11-17): the 47 s film plays on the FIRST launch
+            // only (SeenKey, set when it ends or is skipped), then from WATCH INTRO on the title, the home screen and the Codex;
+            // Settings > Game > PLAY INTRO AT EVERY LAUNCH (default off) brings back the owner's 2026-11-13 every-launch rule.
             // Once per launch: going back to the title later (a scene reload in the Title state) does not replay it.
             if (_launchPlayed) return;
             bool titleOnBoot = TitleScreen.ShowOnBoot || (LaunchRuleInEditorForTests && GameFlow.Enabled);
             // intro-film-2: a build-verification run (-introCapture DIR) always plays the intro, whatever the saved setting.
             bool capture = IntroFilmCapture.Requested;
-            if (ShouldPlayAtLaunch(PlayOnFirstLaunch || capture, titleOnBoot, GameFlow.State, GameFlow.Autoplay && !capture,
-                    GameSettings.IntroAtLaunch || capture))
-            {
-                _launchPlayed = true;
-                Play();
-            }
+            bool autoplay = GameFlow.Autoplay && !capture;
+            bool play = ShouldPlayAtLaunch(PlayOnFirstLaunch || capture, titleOnBoot, GameFlow.State, autoplay,
+                GameSettings.IntroAtLaunch || capture, PlayerPrefs.GetInt(SeenKey, 0) != 0 && !capture);
+            // b15: the one-time photosensitivity notice comes first (before the film's flashes), once per profile.
+            bool notice = PhotosensitivityNotice.ShouldShow(titleOnBoot, GameFlow.State, autoplay, capture, PhotosensitivityNotice.Seen,
+                Environment.GetCommandLineArgs());
+            if (!play && !notice) return;
+            _launchPlayed = true;
+            if (notice) PhotosensitivityNotice.Show(gameObject, play ? (Action)(() => Play()) : null);
+            else Play();
         }
 
         static bool _launchPlayed;
@@ -429,9 +436,10 @@ namespace CriticalMass.Runtime.Menus
         /// <summary>Tests only: forget that this launch already played the intro (domain reload is off).</summary>
         public static void ResetLaunchForTests() => _launchPlayed = false;
 
-        /// <summary>The launch rule: the boot's title, not autoplay, the setting on (seen flags no longer matter).</summary>
-        public static bool ShouldPlayAtLaunch(bool enabled, bool titleOnBoot, FlowState state, bool autoplay, bool settingOn) =>
-            enabled && titleOnBoot && state == FlowState.Title && !autoplay && settingOn;
+        /// <summary>The launch rule (b15): the boot's title, not autoplay, and either the first launch (the film not yet seen)
+        /// or PLAY INTRO AT EVERY LAUNCH on.</summary>
+        public static bool ShouldPlayAtLaunch(bool enabled, bool titleOnBoot, FlowState state, bool autoplay, bool everyLaunch, bool seen) =>
+            enabled && titleOnBoot && state == FlowState.Title && !autoplay && (everyLaunch || !seen);
 
         // ---- static API ----
 
@@ -604,7 +612,7 @@ namespace CriticalMass.Runtime.Menus
                 if (!ok) EndPlay(false, true);
                 return;
             }
-            bool skipKey = SkipKeyDown();
+            bool skipKey = SkipAnyKeyDown();
             if (_film.State != IntroFilmPlayer.FilmState.Playing)
             {
                 _gate.Update(0.0, skipKey);   // preparing: black, the clock and the skip lock wait for the first frame
@@ -646,7 +654,7 @@ namespace CriticalMass.Runtime.Menus
         {
             float dt = Mathf.Min((float)MaxFrameDt, Time.unscaledDeltaTime);
             _comic.Pump();
-            bool skipKey = SkipKeyDown();
+            bool skipKey = SkipAnyKeyDown();
             if (_outro)
             {
                 // The film has finished and dissolves into the screen underneath, which stays frozen until the dissolve ends;
@@ -723,6 +731,25 @@ namespace CriticalMass.Runtime.Menus
         }
 
         static bool Held(ButtonControl b) => b != null && (b.isPressed || b.wasPressedThisFrame);
+
+        /// <summary>
+        /// b15: any key, any mouse button or any controller button is down this frame (never mouse movement). The intro and the
+        /// photosensitivity notice skip on it through <see cref="SkipGate"/> (after its 1 s lock, a fresh press only).
+        /// Allocation-free: the keyboard's anyKey and a fixed list of controller buttons.
+        /// </summary>
+        public static bool SkipAnyKeyDown()
+        {
+            Keyboard kb = Keyboard.current;
+            if (kb != null && (kb.anyKey.isPressed || kb.anyKey.wasPressedThisFrame)) return true;
+            Mouse m = Mouse.current;
+            if (m != null && (Held(m.leftButton) || Held(m.rightButton) || Held(m.middleButton))) return true;
+            Gamepad p = Gamepad.current;
+            if (p == null) return false;
+            return Held(p.buttonSouth) || Held(p.buttonEast) || Held(p.buttonWest) || Held(p.buttonNorth) || Held(p.startButton) ||
+                   Held(p.selectButton) || Held(p.leftShoulder) || Held(p.rightShoulder) || Held(p.leftTrigger) || Held(p.rightTrigger) ||
+                   Held(p.leftStickButton) || Held(p.rightStickButton) || Held(p.dpad.up) || Held(p.dpad.down) || Held(p.dpad.left) ||
+                   Held(p.dpad.right);
+        }
 
         /// <summary>Any keyboard key, mouse button or controller button pressed this frame (mouse movement does not skip).</summary>
         public static bool AnyKeyPressed()

@@ -213,6 +213,9 @@ namespace CriticalMass.Runtime.Tests
                 // feat/b15-profile-mastery: the class-mastery tally decodes its own role events (Death, heals, deliveries,
                 // bank, pieces, explosions, terraform, purify) that carry no WorldForce; view side, read once per tick
                 "Progression/RoleTally.cs",
+                // b15 safe defaults: the feedback card reads the local player's own Hit and Deliver events once, for the
+                // time-to-first-fun markers (no WorldForce, nothing drawn)
+                "Menus/FeedbackCard.cs",
             };
             var readers = Directory.GetFiles(root, "*.cs", SearchOption.AllDirectories)
                 .Where(f => Regex.IsMatch(File.ReadAllText(f), @"\.EventHead\b"))

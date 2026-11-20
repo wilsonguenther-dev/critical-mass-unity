@@ -391,8 +391,9 @@ namespace CriticalMass.Runtime.View.Moments
                 _captureFrame = Time.frameCount;
                 _freeze.texture = _freezeRt;
             }
-            _flashOk = Has(L, MomentLayers.Flash) && _flashes.TryFlash(_clock);
-            _invertOk = Has(L, MomentLayers.Invert) && _captureFrame >= 0 && _look.Invert && _flashes.TryFlash(_clock);   // the invert frame is the frozen picture
+            // b15 safe defaults: the director's own 3-a-second cap plus, by default, the one budget every full-screen and edge
+            // flash shares (FlashSafety, WCAG 2.3.1); the invert frame is the frozen picture and plays only with intense flashing.
+            FlashSafety.DecideMoment(L, _look, _flashes, _clock, Time.unscaledTimeAsDouble, _captureFrame >= 0, out _flashOk, out _invertOk);
 
             bool grade = Has(L, MomentLayers.Grade) && _liveMat != null;
             _grade.gameObject.SetActive(grade);
