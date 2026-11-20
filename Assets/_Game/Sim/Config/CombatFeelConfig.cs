@@ -129,7 +129,8 @@ namespace CriticalMass.Sim.Config
         /// <summary>Bots side-step when jammed (BotSteer.Unjam). False = the FSM's own unstick only.</summary>
         public bool BotUnjam = true;
         /// <summary>No side-step within this many u of the Kaiju (0 = no such rule).</summary>
-        public double BotUnjamKaijuClear = 0;
+        // Pass 4 default 6 (the bisect, 24 seeds, run 44836535142: see the PR).
+        public double BotUnjamKaijuClear = 6;
         /// <summary>No side-step within the hill disc grown by this many u (negative = no such rule).</summary>
         public double BotUnjamHillClear = -1;
         /// <summary>Pass 4: no side-step within this many u of the hill centre while the Kaiju is hatched (the Kaiju's fight zone,
@@ -137,7 +138,7 @@ namespace CriticalMass.Sim.Config
         public double BotUnjamHillZone = 0;
         /// <summary>Pass 4: the side-step budget: at most BotUnjamBudget side-steps per bot in any BotUnjamBudgetSeconds window
         /// (0 = unbounded). Past it the FSM's own slower unstick (StuckSeconds) takes over.</summary>
-        public int BotUnjamBudget = 0;
+        public int BotUnjamBudget = 3;   // pass 4: 3 per 6 s (unbounded: 24-seed on-disc 0.185, 3/6 s: 0.228; off: 0.278)
         public double BotUnjamBudgetSeconds = 6;
         /// <summary>After a stagger the victim moves at StaggerSlowMultiplier for StaggerSlowSeconds.</summary>
         public double StaggerSlowSeconds = 0.30;
@@ -154,11 +155,12 @@ namespace CriticalMass.Sim.Config
         public double BuilderHomeRadius = 3.5;
         public double BuilderHomeMultiplier = 1.5;
         /// <summary>TNT cooldown (ticks at 30 Hz) while the rule is on (DemolitionsTntConfig.CooldownTicks is 150).</summary>
-        public double TntCooldownTicks = 120; // OWNER FEEL-TEST: her kill share is 0.29 at 120 (DemolitionsAttackThrowTests limit 0.25); 150 is the shipped value
+        // pass 4: back to the shipped 150 (at 120, with the Warrior at 120 HP, her knock-out share was 0.309 in DemolitionsAttackThrowTests, limit 0.25).
+        public double TntCooldownTicks = 150;
         /// <summary>Share of her own TNT's blast damage the thrower takes when she stands inside its radius.</summary>
         public double TntSelfShare = 0.35;
         /// <summary>Thrown TNT blast damage while the rule is on (DemolitionsTntConfig.Damage is 55).</summary>
-        public double TntDamage = 55;
+        public double TntDamage = 46;   // pass 4: 55 -> 46 (her share, see TntCooldownTicks: 0.259 at 50, run 44837670714)
         /// <summary>The Healer's mend while the rule is on (HealerConfig MendHeal 6 / MendRange 5.5).</summary>
         public double MendHeal = 10;
         public double MendRange = 6;
