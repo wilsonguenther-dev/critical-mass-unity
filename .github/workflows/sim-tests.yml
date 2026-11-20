@@ -86,5 +86,6 @@ jobs:
             Temp/ci/sim-results.xml
             Temp/ci/sim-build.log
             Temp/ci/*.cs
+            Temp/balance/TUNING-INDEX.md
           if-no-files-found: ignore
           retention-days: 7

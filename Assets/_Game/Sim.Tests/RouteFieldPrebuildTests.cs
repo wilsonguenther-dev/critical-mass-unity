@@ -68,9 +68,9 @@ namespace CriticalMass.Sim.Tests
                 for (; t < 14400 && w.Match.Phase == MatchPhase.Playing; t++)
                 {
                     MatchTick.Advance(w, null, scratch);
-                    if (t % 600 == 599 && k < hs.Length) hs[k++] = StateHash.Of(w) ^ MatchHash.Of(w);
+                    if (t % 600 == 599 && k < hs.Length) hs[k++] = MatchHash.Of(w);   // integrator b15: #218's full StateHash sees the buffer itself (null in the lazy arm, allocated and unbuilt here), which is the point of this PR, not a match change
                 }
-                if (k < hs.Length) hs[k] = StateHash.Of(w) ^ MatchHash.Of(w);
+                if (k < hs.Length) hs[k] = MatchHash.Of(w);
                 made = FlowField.Allocations - a0;
                 played = t;
                 return hs;

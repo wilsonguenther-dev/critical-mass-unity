@@ -9,6 +9,10 @@
 //   KaijuNav.Region: clearance regions: rebuilt with the shadow grid
 //   KaijuNav.RegionQueue: flood-fill scratch for Region
 //   KaijuNav.Squeeze: squeeze cells: rebuilt with the shadow grid
+//   TerrainHeightState.MemoKey: KeepsRoutes' memo ring: a pure cache keyed by cell, next lift and the hashed GridVersion (every lift write bumps it)
+//   TerrainHeightState.MemoNext: KeepsRoutes' memo ring (see MemoKey)
+//   TerrainHeightState.MemoOk: KeepsRoutes' memo ring (see MemoKey)
+//   TerrainHeightState.MemoVersion: KeepsRoutes' memo ring (see MemoKey)
 //   WallsState.LastFill: the ghost's crater-fill flag: written and read like LastWhy, view only
 //   WallsState.LastWhy: the ghost's verdict: written only by BuilderWalls.Ghost, which the view calls every frame for the local Builder, read only by the view
 //   WallsState.MemoKey: RouteOk's memo ring: a pure cache keyed by cell, axis, length and the hashed GridVersion; the view's ghost fills it between ticks
@@ -392,6 +396,7 @@ namespace CriticalMass.Net
             A(ref h, o.Gathered);
             M(ref h, o.HandoffUnits);
             M(ref h, o.Handoffs);
+            H_TerrainHeightState(ref h, o.Height);
             M(ref h, o.NextEventTick);
             M(ref h, o.NextPowerTick);
             A(ref h, o.OrderBy);
@@ -591,6 +596,7 @@ namespace CriticalMass.Net
                     }
                 }
             }
+            A(ref h, o.PadFieldBuilt);
             A(ref h, o.PadFieldVersion);
             A(ref h, o.PrevHp);
             M(ref h, o.Warm ? 1 : 2);
@@ -740,6 +746,11 @@ namespace CriticalMass.Net
             M(ref h, o.Height);
             A(ref h, o.Height01);
             H_HillDef(ref h, o.Hill);
+            A(ref h, o.Lift);
+            D(ref h, o.LiftCost1);
+            D(ref h, o.LiftCost2);
+            D(ref h, o.LiftCostLadder);
+            D(ref h, o.LiftStepU);
             {
                 var a19 = o.Pads;
                 if (a19 == null) M(ref h, -1);
@@ -997,6 +1008,31 @@ namespace CriticalMass.Net
             M(ref h, o.WallsBroken);
         }
 
+        private static void H_TerrainHeightState(ref ulong h, global::CriticalMass.Sim.Core.TerrainHeightState o)
+        {
+            if (o == null) { M(ref h, 0x4E554C4CL); return; }
+            A(ref h, o.Climb);
+            A(ref h, o.ClimbHit);
+            M(ref h, o.Climbs);
+            M(ref h, o.Deepened);
+            M(ref h, o.Drops);
+            M(ref h, o.LaddersLost);
+            A(ref h, o.Level);
+            M(ref h, o.Lowered);
+            // MemoKey: not hashed (see the header)
+            // MemoNext: not hashed (see the header)
+            // MemoOk: not hashed (see the header)
+            // MemoVersion: not hashed (see the header)
+            M(ref h, o.PitLadders);
+            M(ref h, o.RouteRefusals);
+            A(ref h, o.SlowKind);
+            A(ref h, o.SlowTicks);
+            M(ref h, o.Smashed);
+            M(ref h, o.Stacks);
+            M(ref h, o.Steps);
+            M(ref h, o.TntLowered);
+        }
+
         private static void H_Pickup(ref ulong h, global::CriticalMass.Sim.Core.Pickup o)
         {
             if (o == null) { M(ref h, 0x4E554C4CL); return; }
@@ -1023,6 +1059,7 @@ namespace CriticalMass.Net
             if (o == null) { M(ref h, 0x4E554C4CL); return; }
             M(ref h, o.Charges);
             H_FlowField(ref h, o.Field);
+            M(ref h, o.FieldBuilt ? 1 : 2);
             M(ref h, o.FieldWallVersion);
             M(ref h, o.Id);
             M(ref h, (long)o.Kind);

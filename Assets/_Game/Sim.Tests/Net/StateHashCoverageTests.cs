@@ -50,6 +50,11 @@ namespace CriticalMass.Sim.Tests.Net
             ["WallsState.MemoVersion"] = "RouteOk's memo ring (see MemoKey)",
             ["WallsState.MemoOk"] = "RouteOk's memo ring (see MemoKey)",
             ["WallsState.MemoNext"] = "RouteOk's memo ring (see MemoKey)",
+            // integrator b15 (#211 x #218): terrain height's route-proof memo, the same kind of pure cache as WallsState's
+            ["TerrainHeightState.MemoKey"] = "KeepsRoutes' memo ring: a pure cache keyed by cell, next lift and the hashed GridVersion (every lift write bumps it)",
+            ["TerrainHeightState.MemoVersion"] = "KeepsRoutes' memo ring (see MemoKey)",
+            ["TerrainHeightState.MemoOk"] = "KeepsRoutes' memo ring (see MemoKey)",
+            ["TerrainHeightState.MemoNext"] = "KeepsRoutes' memo ring (see MemoKey)",
         };
 
         // ------------------------------------------------------------------ the generator
