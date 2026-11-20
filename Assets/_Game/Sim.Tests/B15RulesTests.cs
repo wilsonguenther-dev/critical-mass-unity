@@ -779,7 +779,7 @@ namespace CriticalMass.Sim.Tests
         [Test]
         public void TrailingFeedCountsMoreForTheTeamBehindOnly()
         {
-            World w = Make(Levers(k => k.FeedTrailingPerMille = 500), 63, 5);
+            World w = Make(Levers(k => { k.FeedTrailingPerMille = 500; k.TrailThresholdSeconds = 5; }), 63, 5);
             w.Match.HillSeconds.Azure = 0;
             w.Match.HillSeconds.Crimson = 10;
             Assert.AreEqual(1.5, Comeback.FeedScale(w, TeamId.Azure), 1e-12, "Azure trails by 10 s (> 5 s)");
