@@ -199,7 +199,7 @@ namespace CriticalMass.Runtime.Hud
             if (_ach == null && _log != null && _log.Driver != null)
             {
                 bool tool = SimDriverBehaviour.CaptureMode || _log.Driver.HumanAutopilot || Application.isBatchMode;
-                Use(new Achievements(tool ? (IAchievementStore)new MemoryAchievementStore() : new PlayerPrefsAchievementStore()) { LocalActor = local });
+                Use(new Achievements(tool ? (IAchievementStore)new MemoryAchievementStore() : new ProfileAchievementStore()) { LocalActor = local });   // b15 profile v2: achievements live in the profile
             }
             Subscribe();
             FeedUi.Refresh(Canvas);

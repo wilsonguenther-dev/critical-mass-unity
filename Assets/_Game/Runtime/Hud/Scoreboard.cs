@@ -60,6 +60,9 @@ namespace CriticalMass.Runtime.Hud
             public int Index;
             public int Actor = -1;
             public bool Own, Dim, Styled;
+            /// <summary>b15 profile: the player's mastery frame ring on the badge, and the cached label with its title.</summary>
+            public VectorShape Frame;
+            public string LabelBase, LabelTitle, Label;
         }
 
         sealed class Table
@@ -117,6 +120,10 @@ namespace CriticalMass.Runtime.Hud
                 row.Plate.OutlinePx = 0f;
                 row.Plate.RimPx = 0f;
                 row.Badge = HudIcon.Make(row.Rt, "Badge", 12f, 2f, 32f, 32f);
+                row.Frame = MenuUi.Shape(row.Rt, "Look Frame", ShapeKind.Circle, 10f, 0f, 36f, 36f, new Color(0f, 0f, 0f, 0f), 0f);   // b15 profile
+                row.Frame.RimPx = 0f;
+                row.Frame.OutlinePx = 0f;
+                row.Frame.gameObject.SetActive(false);
                 for (int p = 0; p < 3; p++)
                 {
                     row.Pips[p] = MenuUi.Shape(row.Rt, "Level Pip " + p, ShapeKind.Diamond, 13f + p * 11f, RowH - 9f, 8f, 9f, CMTokens.MeterEmpty.Color, 2f);
@@ -247,7 +254,20 @@ namespace CriticalMass.Runtime.Hud
             }
             row.Badge.Set(UiIcons.Portrait[cls, (int)s.Team], _tier);   // b14 final look: the rebuilt portraits, as the HUD and class cards (was the class glyph)
             // Mechanics depth (U-067): named bots with their play style ("THORN  BRAWLER"); the class word without names.
-            HudText.SetOneLine(row.Cells[0], View.Mechanics.DepthNames.RowLabel(s.Id, own, KillWords.You, KillWords.ClassUpper[cls]), 21, 13);
+            // b15 profile: a human's mastery title after the name and the frame ring on the badge (cosmetic, from the lobby / profile)
+            CriticalMass.Net.CosmeticLook look = CriticalMass.Runtime.Progression.LookRegistry.For(s.Id);
+            string labelBase = View.Mechanics.DepthNames.RowLabel(s.Id, own, KillWords.You, KillWords.ClassUpper[cls]);
+            string title = look.Title > 0 ? CriticalMass.Runtime.Progression.MetaWords.Title(s.Cls, look.Title) : null;
+            if (!ReferenceEquals(labelBase, row.LabelBase) || !ReferenceEquals(title, row.LabelTitle) || row.Label == null)
+            {
+                row.LabelBase = labelBase;
+                row.LabelTitle = title;
+                row.Label = title != null ? labelBase + "  " + title : labelBase;
+            }
+            HudText.SetOneLine(row.Cells[0], row.Label, 21, 13);
+            bool framed = look.Frame > 0;
+            if (row.Frame.gameObject.activeSelf != framed) row.Frame.gameObject.SetActive(framed);
+            if (framed) CriticalMass.Runtime.Progression.LookView.Ring(row.Frame, look.Frame, 0f, new Color(0f, 0f, 0f, 0f));
             World w = _world;
             bool levels = w != null && View.Mechanics.DepthRead.StationsOn(w);
             int lvl = levels ? View.Mechanics.DepthRead.Level(w, s.Team, s.Cls) : 0, max = levels ? View.Mechanics.DepthRead.MaxLevel(w) : 0;

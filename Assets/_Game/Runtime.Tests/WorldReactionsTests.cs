@@ -210,6 +210,9 @@ namespace CriticalMass.Runtime.Tests
                 // b15 item 3: the first-match class goal decodes only its own goal events (DeliverBiomass, BankDeposit,
                 // PiecePlaced, WallBuilt, HealLanded, Death, Explosion, Respawn), most of which carry no WorldForce
                 "Onboarding/ClassGoals.cs",
+                // feat/b15-profile-mastery: the class-mastery tally decodes its own role events (Death, heals, deliveries,
+                // bank, pieces, explosions, terraform, purify) that carry no WorldForce; view side, read once per tick
+                "Progression/RoleTally.cs",
             };
             var readers = Directory.GetFiles(root, "*.cs", SearchOption.AllDirectories)
                 .Where(f => Regex.IsMatch(File.ReadAllText(f), @"\.EventHead\b"))

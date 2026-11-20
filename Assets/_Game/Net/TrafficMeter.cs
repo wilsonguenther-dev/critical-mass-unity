@@ -12,7 +12,7 @@ namespace CriticalMass.Net
         Bundles,
         /// <summary>3: the match log fed to a rejoining player (lockstep MsgLog).</summary>
         RejoinLog,
-        /// <summary>20 to 29: the room (hello, roster, pick, ready, start, ping, pong, rejoin).</summary>
+        /// <summary>20 to 29 and 40 to 49: the room (hello, roster, pick, ready, start, ping, pong, rejoin; 40/41 cosmetic looks).</summary>
         Room,
         /// <summary>30 to 39: chat.</summary>
         Chat,
@@ -39,7 +39,7 @@ namespace CriticalMass.Net
             if (t == 1) return TrafficKind.Inputs;
             if (t == 2) return TrafficKind.Bundles;
             if (t == 3) return TrafficKind.RejoinLog;
-            if (t >= 20 && t < 30) return TrafficKind.Room;
+            if ((t >= 20 && t < 30) || (t >= 40 && t < 50)) return TrafficKind.Room;   // integrator b15: 40/41 = profile looks
             if (t >= 30 && t < 40) return TrafficKind.Chat;
             return TrafficKind.Other;
         }

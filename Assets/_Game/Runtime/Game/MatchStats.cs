@@ -447,6 +447,14 @@ namespace CriticalMass.Runtime.Game
         }
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-        static void ResetOnPlay() => Current = null;
+        static void ResetOnPlay()
+        {
+            Current = null;
+            // integrator b15: the profile's match history (feat/b15-profile-mastery) takes the results screen's turning point
+            CriticalMass.Runtime.Progression.MetaHooks.TurningPoint = TurningPointNow;
+        }
+
+        /// <summary>The turning-point sentence of the match being recorded (null when no match is recorded).</summary>
+        public static string TurningPointNow(World w) => Current != null && w != null ? Current.Summarize(w).TurningPoint : null;
     }
 }

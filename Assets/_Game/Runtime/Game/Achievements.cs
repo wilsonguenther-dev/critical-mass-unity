@@ -39,6 +39,25 @@ namespace CriticalMass.Runtime.Game
         public void Flush() => PlayerPrefs.Save();
     }
 
+    /// <summary>
+    /// b15 profile v2: the achievements live in the versioned profile (PlayerProfile.Achievements), not in PlayerPrefs.
+    /// Set stamps the unlock time from the system clock; Flush saves the profile (match end only).
+    /// </summary>
+    public sealed class ProfileAchievementStore : IAchievementStore
+    {
+        public bool Has(string id) => CriticalMass.Runtime.Progression.Profile.Current.HasAchievement(id);
+
+        public void Set(string id)
+        {
+            CriticalMass.Runtime.Progression.AchievementRecord r = CriticalMass.Runtime.Progression.Profile.Current.Achievement(id);
+            if (r.Unlocked) return;
+            r.Unlocked = true;
+            r.UnlockedUtc = CriticalMass.Runtime.Progression.MatchHistory.Stamp(DateTime.UtcNow);
+        }
+
+        public void Flush() => CriticalMass.Runtime.Progression.Profile.Commit();
+    }
+
     /// <summary>In-memory store for tests, captures and autopilot runs (nothing reaches the player's save).</summary>
     public sealed class MemoryAchievementStore : IAchievementStore
     {
@@ -62,6 +81,30 @@ namespace CriticalMass.Runtime.Game
         public const int CleanSweepKnockouts = 3;
         public const int OnARollStreak = 5;
         public const int FullHarvestUnits = 10;
+
+        /// <summary>b15 profile: the number each achievement counts toward (1 = done or not), for honest progress bars.</summary>
+        public static readonly int[] Target = { 1, (int)HillHolderSeconds, 1, 1, CleanSweepKnockouts, OnARollStreak, 1, FullHarvestUnits, 1, 1 };
+
+        /// <summary>True when the target is counted within one match (the bar shows the best single match).</summary>
+        public static bool InOneMatch(int index) => index == HillHolder || index == CleanSweep || index == OnARoll || index == FullHarvest;
+
+        /// <summary>
+        /// b15 profile: can this achievement be earned in a game with this config? Biomass ones need a class that may feed
+        /// the egg; the rest need what every match has (the hill, knock-outs, the Kaiju, a result). The profile hides the
+        /// ones that cannot be earned instead of showing a bar that never moves.
+        /// </summary>
+        public static bool Earnable(int index, GameConfig cfg)
+        {
+            if (index < 0 || index >= All.Length) return false;
+            if (index == FirstFeeding || index == FullHarvest || index == Kingmaker)
+            {
+                bool[] may = cfg?.Depth?.Roles?.MayFeed;
+                if (may == null) return true;
+                foreach (bool b in may) if (b) return true;
+                return false;
+            }
+            return true;
+        }
 
         /// <summary>Every achievement in display order (index = the constants above). Built-in words; no words-pack file yet.</summary>
         public static readonly AchievementDef[] All =
@@ -96,6 +139,25 @@ namespace CriticalMass.Runtime.Game
         int _nemesis = KillSource.Unknown;
         int _streak;
         bool _anyKnockout;
+        int _hillThisMatch, _bestStreak, _bestBlow;
+
+        /// <summary>b15 profile: this match's progress toward an achievement's Target (capped at it).</summary>
+        public int MatchProgress(int index)
+        {
+            if (index < 0 || index >= All.Length) return 0;
+            int v;
+            switch (index)
+            {
+                case HillHolder: v = _hillThisMatch; break;
+                case CleanSweep: v = _bestBlow; break;
+                case OnARoll: v = _bestStreak; break;
+                case FullHarvest: v = _biomassThisMatch; break;
+                case FirstFeeding: v = _biomassThisMatch > 0 ? 1 : 0; break;
+                default: v = _earnedThisMatch[index] ? 1 : 0; break;
+            }
+            if (_earnedThisMatch[index]) v = Math.Max(v, Target[index]);
+            return Math.Min(v, Target[index]);
+        }
 
         public Achievements(IAchievementStore store)
         {
@@ -127,11 +189,13 @@ namespace CriticalMass.Runtime.Game
             _nemesis = KillSource.Unknown;
             _streak = 0;
             _anyKnockout = false;
+            _hillThisMatch = _bestStreak = _bestBlow = 0;
         }
 
         /// <summary>Per-frame state the event stream does not carry: the local actor's hill seconds (Actor.HillSeconds).</summary>
         public void Sample(double localHillSeconds)
         {
+            if (double.IsFinite(localHillSeconds) && localHillSeconds > _hillThisMatch) _hillThisMatch = (int)Math.Min(localHillSeconds, int.MaxValue);
             if (localHillSeconds >= HillHolderSeconds) Earn(HillHolder);
         }
 
@@ -181,8 +245,10 @@ namespace CriticalMass.Runtime.Game
             }
             if (e.Other != LocalActor) return;
             if (first) Earn(OpeningBlow);
+            if (e.Blow > _bestBlow) _bestBlow = e.Blow;
             if (e.Blow >= CleanSweepKnockouts) Earn(CleanSweep);
             _streak++;
+            if (_streak > _bestStreak) _bestStreak = _streak;
             if (_streak >= OnARollStreak) Earn(OnARoll);
             if (_nemesis >= 0 && e.Actor == _nemesis)
             {

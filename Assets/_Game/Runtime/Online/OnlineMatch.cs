@@ -124,7 +124,7 @@ namespace CriticalMass.Runtime.Online
             Direct = keep;
             Transport = t;
             Code = code;
-            Host = new RoomHost(t, GameConfig.CreateDefault(), name, OnlineConfig.Build);
+            Host = new RoomHost(t, GameConfig.CreateDefault(), name, OnlineConfig.Build) { LookFor = CriticalMass.Runtime.Progression.LookRegistry.Local };   // b15 profile: cosmetic look, outside the sim
             if (Direct != null)
             {
                 try { _beacon = new LanBeacon(Direct.Port, code, name, 1, OnlineConfig.Build); } catch (Exception) { _beacon = null; }
@@ -139,7 +139,7 @@ namespace CriticalMass.Runtime.Online
             Leave();
             Transport = t;
             Code = code;
-            Client = new RoomClient(t, GameConfig.CreateDefault(), name, OnlineConfig.Build);
+            Client = new RoomClient(t, GameConfig.CreateDefault(), name, OnlineConfig.Build) { LookFor = CriticalMass.Runtime.Progression.LookRegistry.Local };   // b15 profile
             Client.Started = Begin;
             _joinName = name;
             _joinTries = 0;
@@ -181,7 +181,7 @@ namespace CriticalMass.Runtime.Online
                 Transport?.Close();
                 RelayTransport t = RelayTransport.Connect(OnlineConfig.RelayUrl, Code, null);
                 Transport = t;
-                Client = new RoomClient(t, GameConfig.CreateDefault(), _joinName, OnlineConfig.Build) { Started = Begin };
+                Client = new RoomClient(t, GameConfig.CreateDefault(), _joinName, OnlineConfig.Build) { Started = Begin, LookFor = CriticalMass.Runtime.Progression.LookRegistry.Local };
             }
             catch (RoomException) { /* keeps the closed client and its error */ }
         }
