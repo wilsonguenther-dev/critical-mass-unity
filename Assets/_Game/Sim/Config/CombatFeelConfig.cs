@@ -160,7 +160,7 @@ namespace CriticalMass.Sim.Config
         /// <summary>Share of her own TNT's blast damage the thrower takes when she stands inside its radius.</summary>
         public double TntSelfShare = 0.35;
         /// <summary>Thrown TNT blast damage while the rule is on (DemolitionsTntConfig.Damage is 55).</summary>
-        public double TntDamage = 50;   // pass 4: 55 -> 50 (her share, see TntCooldownTicks); Demolitions on a 120 HP Warrior is still 7 hits
+        public double TntDamage = 46;   // pass 4: 55 -> 46 (her share, see TntCooldownTicks: 0.259 at 50, run 44837670714)
         /// <summary>The Healer's mend while the rule is on (HealerConfig MendHeal 6 / MendRange 5.5).</summary>
         public double MendHeal = 10;
         public double MendRange = 6;
