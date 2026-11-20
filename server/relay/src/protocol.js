@@ -36,6 +36,10 @@ export const REASON = {
 };
 
 export const PROTOCOL_VERSION = 1;
+// b15-zero-cost: the free plan's daily Durable Object requests and the 20:1 rate for incoming WebSocket messages
+// (https://developers.cloudflare.com/durable-objects/platform/pricing/, checked 2026-11-17).
+export const FREE_REQUESTS_PER_DAY = 100000;
+export const MESSAGES_PER_REQUEST = 20;
 export const MAX_PEERS = 32;
 export const MAX_FRAME = 1300;          // bytes; the game never sends more than 1200 of payload
 export const RATE_PER_SEC = 90;         // sustained messages per second per socket (the game sends 30 to 35)
