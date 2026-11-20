@@ -229,7 +229,7 @@ namespace CriticalMass.Sim.Core
             if (!((next == HillState.Azure && kj.State == KaijuState.Azure) || (next == HillState.Crimson && kj.State == KaijuState.Crimson))) return 1.0;
             double r = w.Config.Hill.Radius + w.Config.Kaiju.Radius;
             double dx = kj.X - w.Map.Hill.X, dz = kj.Z - w.Map.Hill.Z;
-            if (dx * dx + dz * dz >= r * r) return 1.0;
+            if (!w.Config.Depth.Comeback.KaijuHillAnywhere && dx * dx + dz * dz >= r * r) return 1.0;
             return Math.Max(0, per) / 1000.0;
         }
 

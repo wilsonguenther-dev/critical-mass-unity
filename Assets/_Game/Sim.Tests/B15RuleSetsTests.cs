@@ -60,16 +60,39 @@ namespace CriticalMass.Sim.Tests
         public static Action<ComebackConfig> TrailingFeed(int perMille) => k => k.FeedTrailingPerMille = perMille;
         public static Action<ComebackConfig> KaijuHill(int perMille) => k => k.KaijuHillPerMille = perMille;
 
+        public static readonly Action<ComebackConfig> Anywhere = k => k.KaijuHillAnywhere = true;
+        /// <summary>A GameConfig-level tweak (not a comeback lever): the Kaiju's HP per team member (400 today).</summary>
+        public static Action<GameConfig> KaijuHp(double perMember) => c => c.Kaiju.HpPerTeamMember = perMember;
+
+        static KeyValuePair<string, Action<GameConfig>> S(string name, params Action<ComebackConfig>[] levers) => S2(name, null, levers);
+        static KeyValuePair<string, Action<GameConfig>> S2(string name, Action<GameConfig> extra, params Action<ComebackConfig>[] levers) =>
+            new KeyValuePair<string, Action<GameConfig>>(name, c => { B15SweepTests.Arm(levers)(c); extra?.Invoke(c); });
+
         /// <summary>The arms, in report order (the both-off control is run separately).</summary>
-        public static List<KeyValuePair<string, Action<ComebackConfig>[]>> Sets() => new List<KeyValuePair<string, Action<ComebackConfig>[]>>
+        public static List<KeyValuePair<string, Action<GameConfig>>> Sets() => new List<KeyValuePair<string, Action<GameConfig>>>
         {
-            new KeyValuePair<string, Action<ComebackConfig>[]>("A all levers off", new Action<ComebackConfig>[0]),
-            new KeyValuePair<string, Action<ComebackConfig>[]>("B fatigue+forward+rally+2-5 s", new[] { SetB }),
-            new KeyValuePair<string, Action<ComebackConfig>[]>("C B+trailing feed x1.5", new[] { SetB, TrailingFeed(500) }),
-            new KeyValuePair<string, Action<ComebackConfig>[]>("D B+kaiju hill x0.5", new[] { SetB, KaijuHill(500) }),
-            new KeyValuePair<string, Action<ComebackConfig>[]>("D' B+kaiju hill x0.25", new[] { SetB, KaijuHill(250) }),
-            new KeyValuePair<string, Action<ComebackConfig>[]>("C+D B+feed x1.5+kaiju hill x0.5", new[] { SetB, TrailingFeed(500), KaijuHill(500) }),
-            new KeyValuePair<string, Action<ComebackConfig>[]>("E B+turncoat (shipped 6ef45146)", new[] { SetB, B15SweepTests.Turncoat }),
+            S("A all levers off"),
+            S("B fatigue+forward+rally+2-5 s", SetB),
+            S("C B+trailing feed x1.5", SetB, TrailingFeed(500)),
+            S("D B+kaiju hill x0.5", SetB, KaijuHill(500)),
+            S("D' B+kaiju hill x0.25", SetB, KaijuHill(250)),
+            S("C+D B+feed x1.5+kaiju hill x0.5", SetB, TrailingFeed(500), KaijuHill(500)),
+            S("E B+turncoat (shipped 6ef45146)", SetB, B15SweepTests.Turncoat),
+        };
+
+        /// <summary>Round 2 (run 44834953494 showed the Kaiju side winning 62-67 of 67 sided matches without TURNCOAT, so the
+        /// lead at the half does not decide; these weaken the Kaiju's hold on the result harder, and two push dead/walking).</summary>
+        public static List<KeyValuePair<string, Action<GameConfig>>> SetsRound2() => new List<KeyValuePair<string, Action<GameConfig>>>
+        {
+            S("B fatigue+forward+rally+2-5 s", SetB),
+            S("D0 B+kaiju hill x0", SetB, KaijuHill(0)),
+            S("DA B+kaiju side x0.5 anywhere", SetB, KaijuHill(500), Anywhere),
+            S("DA' B+kaiju side x0.75 anywhere", SetB, KaijuHill(750), Anywhere),
+            S2("DH B+kaiju HP 250", KaijuHp(250), SetB),
+            S2("DH' B+kaiju HP 250+kaiju hill x0.25", KaijuHp(250), SetB, KaijuHill(250)),
+            S("D'4 B(2-4 s)+kaiju hill x0.25", SetB, KaijuHill(250), B15SweepTests.Curve(2, 4)),
+            S("D'f B(forward 0.6)+kaiju hill x0.25", SetB, KaijuHill(250), B15SweepTests.Forward(0.6)),
+            S2("DX B(2-4 s, forward 0.6)+kaiju HP 250+kaiju hill x0.25", KaijuHp(250), SetB, KaijuHill(250), B15SweepTests.Curve(2, 4), B15SweepTests.Forward(0.6)),
         };
 
         static string Line(B15RulesSoakTests.Arm a, B15RulesSoakTests.Arm off)
@@ -100,20 +123,22 @@ namespace CriticalMass.Sim.Tests
         }
 
         /// <summary>Runs every set at 24 seeds, prints, then continues the same arms to 72 seeds and prints again.</summary>
-        public static void Measure(string brain)
+        public static void Measure(string brain) => Measure(brain, Sets(), "");
+
+        public static void Measure(string brain, List<KeyValuePair<string, Action<GameConfig>>> sets, string round)
         {
             Action<GameConfig> withBrain = c => { if (!string.IsNullOrEmpty(brain)) SetSwitch(c, brain); };
-            string tag = "[b15 sets" + (string.IsNullOrEmpty(brain) ? "" : " brain " + brain) + "] ";
+            string tag = "[b15 sets" + round + (string.IsNullOrEmpty(brain) ? "" : " brain " + brain) + "] ";
             int[] seeds = B15SweepTests.Seeds72();
             var off = new B15RulesSoakTests.Arm { Name = "control both off", Comeback = false, Choices = false, Tweak = withBrain };
             var arms = new List<B15RulesSoakTests.Arm>();
-            foreach (var kv in Sets())
+            foreach (var kv in sets)
             {
-                Action<ComebackConfig>[] levers = kv.Value;
+                Action<GameConfig> set = kv.Value;
                 arms.Add(new B15RulesSoakTests.Arm
                 {
                     Name = kv.Key, Comeback = true, Choices = true,
-                    Tweak = c => { withBrain(c); B15SweepTests.Arm(levers)(c); },
+                    Tweak = c => { withBrain(c); set(c); },
                 });
             }
             for (int stage = 0; stage < 2; stage++)
@@ -128,5 +153,8 @@ namespace CriticalMass.Sim.Tests
 
         [Test, Explicit, Timeout(3500000)]
         public void B15RuleSetsAgainstTheTargetsAt24Then72Seeds() => Measure(Brain);
+
+        [Test, Explicit, Timeout(3500000)]
+        public void B15RuleSetsRoundTwo() => Measure(Brain, SetsRound2(), " r2");
     }
 }

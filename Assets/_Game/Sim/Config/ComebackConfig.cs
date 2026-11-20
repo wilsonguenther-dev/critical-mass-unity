@@ -65,6 +65,8 @@ namespace CriticalMass.Sim.Config
         /// team; it only stops being the thing that holds the hill for it (the diagnosis: the Kaiju side owned 74-89% of the
         /// second half because the enemy left the hill to fight it).</summary>
         public int KaijuHillPerMille = 1000;
+        /// <summary>KAIJU HOLDS NOTHING applies wherever the sided Kaiju is while it is up (not only while it stands on the hill).</summary>
+        public bool KaijuHillAnywhere = false;
 
         /// <summary>HOLD FATIGUE: after HoldGraceSeconds of unbroken ownership the owner's hill seconds count less and less, down
         /// to HoldMinPerMille / 1000 after HoldSpanSeconds more; a lost, contested or empty hill resets the streak.</summary>
