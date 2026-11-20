@@ -24,6 +24,9 @@ on:
       ticks:
         description: "ticks to play"
         default: '1800'
+      drop_rejoin:
+        description: "b15-rejoin: TICK:MS = the joiner drops with no goodbye at TICK, comes back MS later, replays the match and takes its fighter back; its rejoined fingerprints must MATCH the host's ('' = off)"
+        default: ''
       crossplay_mode:
         description: "b12-w: run .github/workflows/crossplay.yml instead of the local pair (none | players | console | mixed | mac_host_external)"
         type: choice
@@ -80,12 +83,20 @@ jobs:
           for i in $(seq 1 60); do [ -s out/code.txt ] && break; sleep 1; done
           CODE=$(cat out/code.txt)
           echo "room code $CODE"
-          dotnet $P -join "$CODE" -relay $R -ticks $T -name Joiner -team crimson -class Miner -hash-log out/join.txt -timeout 600 > out/join.log 2>&1
+          DR="${{ inputs.drop_rejoin || '' }}"
+          DROP=""; RJ=0
+          if [ -n "$DR" ]; then DROP="-drop-at ${DR%%:*} -rejoin-after ${DR##*:}"; RJ=1; fi
+          dotnet $P -join "$CODE" -relay $R -ticks $T -name Joiner -team crimson -class Miner -hash-log out/join.txt -timeout 600 $DROP > out/join.log 2>&1
           JC=$?
           wait $HP; HC=$?
           cat out/host.log out/join.log
           echo "host exit $HC, joiner exit $JC"
-          python3 tools/online/compare-hashes.py out/host.txt out/join.txt --min $(( T / 30 - 2 ))
+          python3 tools/online/compare-hashes.py out/host.txt out/join.txt --min $(( T / 30 - 2 )) || exit 1
+          if [ $RJ -eq 1 ]; then
+            D=${DR%%:*}
+            # b15-rejoin: the rejoined session (replayed from tick 0, then live) against the host, past the drop.
+            python3 tools/online/compare-hashes.py out/host.txt out/join.txt.rejoin --min $(( (T - D) / 30 - 4 )) --from $(( D + 60 )) || exit 1
+          fi
           [ $HC -eq 0 ] && [ $JC -eq 0 ]
       - uses: actions/upload-artifact@v4
         if: always()
@@ -152,7 +163,10 @@ jobs:
           if [ "${{ matrix.role }}" = host ]; then
             dotnet $P -host -code "$CODE" -key "$(cat "$RUNNER_TEMP/room-key.txt")" -relay "$RELAY" -humans 2 -ticks $T -hash-log hashes.txt -lobby 540 -timeout 1800 2>&1 | tee peer.log
           else
-            dotnet $P -join "$CODE" -relay "$RELAY" -ticks $T -team crimson -hash-log hashes.txt -timeout 1800 -join-tries 80 2>&1 | tee peer.log
+            DR="${{ inputs.drop_rejoin || '' }}"
+            DROP=""
+            if [ -n "$DR" ]; then DROP="-drop-at ${DR%%:*} -rejoin-after ${DR##*:}"; fi
+            dotnet $P -join "$CODE" -relay "$RELAY" -ticks $T -team crimson -hash-log hashes.txt -timeout 1800 -join-tries 80 $DROP 2>&1 | tee peer.log
           fi
           exit ${PIPESTATUS[0]}
       - uses: actions/upload-artifact@v4
@@ -161,6 +175,7 @@ jobs:
           name: 'hashes-${{ matrix.role }}'
           path: |
             hashes.txt
+            hashes.txt.rejoin
             peer.log
   cross-os-compare:
     needs: cross-os
@@ -174,6 +189,13 @@ jobs:
           set +e
           python3 tools/online/crossplay-check.py hashes-host/peer.log hashes-join/peer.log --names host,join
           python3 tools/online/compare-hashes.py hashes-host/hashes.txt hashes-join/hashes.txt --min $(( ${{ inputs.ticks || '1800' }} / 30 - 2 )) || exit 1
+          DR="${{ inputs.drop_rejoin || '' }}"
+          if [ -n "$DR" ]; then
+            T="${{ inputs.ticks || '1800' }}"; D=${DR%%:*}
+            grep -E "ONLINE (DROPPED|REJOINING|REJOINED|TOHUMAN|TOBOT)" hashes-join/peer.log hashes-host/peer.log || true
+            # b15-rejoin: Windows host vs the macOS joiner's rejoined session, past the drop.
+            python3 tools/online/compare-hashes.py hashes-host/hashes.txt hashes-join/hashes.txt.rejoin --min $(( (T - D) / 30 - 4 )) --from $(( D + 60 )) || exit 1
+          fi
 
   # b12-w: Windows player against Mac player (and the other cross-play modes), see crossplay.yml.
   crossplay:

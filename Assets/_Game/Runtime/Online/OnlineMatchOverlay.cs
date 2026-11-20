@@ -100,10 +100,16 @@ namespace CriticalMass.Runtime.Online
                             "), so it cannot go on fairly. This is a bug on our side, not your connection.");
                         break;
                     case LockstepStatus.HostLeft:
-                        Show("MATCH ENDED", _session.IsHost
+                    {
+                        // b15-rejoin: the room cannot go on without its host (the relay closes it), so the match ends here
+                        // for everyone, and the match so far is saved as a replay now (30 s or more), not at the next match.
+                        bool saved = _session.World != null && _session.World.Tick >= CriticalMass.Runtime.Replay.ReplayCapture.MinAbandonedSeconds * 30;
+                        if (_session.World != null) CriticalMass.Runtime.Replay.ReplayCapture.End(_session.World, false);
+                        Show("MATCH ENDED", (_session.IsHost
                             ? (_session.ClosedReason ?? "The connection to the room was lost.")
-                            : "The host left the match or lost their connection.");
+                            : "The host left the match or lost their connection.") + (saved ? " The match so far is saved in Replays." : ""));
                         break;
+                    }
                 }
             }
             bool waiting = st == LockstepStatus.Running && _session.WaitingMs > 500;

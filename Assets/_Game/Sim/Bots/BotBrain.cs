@@ -23,6 +23,10 @@ namespace CriticalMass.Sim.Bots
             return States.TryGetValue(w, out BotsState st) && BotsState.HumanDriven(st, w);
         }
 
+        /// <summary>b15-rejoin: the bot state of `world` if a bot ever thought in it, without creating or touching it (the
+        /// state fingerprint reads it; reading must never change a world).</summary>
+        public static bool TryGetBotsState(World w, out BotsState st) => States.TryGetValue(w, out st);
+
         public static BotsState GetBotsState(World w)
         {
             BotsState st;

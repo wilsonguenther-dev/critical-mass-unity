@@ -5,9 +5,10 @@ namespace CriticalMass.Sim.Tests
     public class SimVersionTests
     {
         [Test]
-        public void SchemaIsOne()
+        public void SchemaIsAtLeastTwo()
         {
-            Assert.AreEqual(1, SimVersion.Schema);
+            // b15-rejoin: the schema now follows the rules (Net/SimVersionTests pins RulesDigest and says when to bump).
+            Assert.GreaterOrEqual(SimVersion.Schema, 2);
         }
     }
 }
