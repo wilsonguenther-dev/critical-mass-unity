@@ -39,24 +39,26 @@ namespace CriticalMass.Sim.Config
             new ClassConfig
             {
                 // pass 4: 140 -> 120 HP (Warrior on Warrior 6.10 s and Healer on Warrior 7.80 s were over their limits; his share of all damage 0.44).
-                MaxHp = 120, MoveSpeed = 3.8, Radius = 0.45, AttackDamage = 21, AttackRange = 1.8, AttackArcDeg = 110,
+                // pass 4b: 120 -> 115 HP, the tune search BEST (slow run 44841109806: total 9.40 -> 3.04, Demolitions gate 0.257 -> 0.224).
+                MaxHp = 115, MoveSpeed = 3.8, Radius = 0.45, AttackDamage = 21, AttackRange = 1.8, AttackArcDeg = 110,
                 AttackCooldown = 0.90, AbilityCooldown = 10, GatherSeconds = 2, CarryCapacity = 1,
                 AttackWindupSeconds = 0.40, RecoverySeconds = 0.30, Mass = 1.6, Poise = 30,
             },
             // FARMER: long staff (2.3 u reach, narrow 60 degree thrust) that pushes the target back out of its own reach; weak up
-            // close (FarmerCloseShare inside FarmerCloseRange). 20 every 0.65 s.
+            // close (FarmerCloseShare inside FarmerCloseRange). 23 every 0.65 s (pass 4b: 20 -> 23, tune search BEST).
             new ClassConfig
             {
-                MaxHp = 100, MoveSpeed = 4.2, Radius = 0.4, AttackDamage = 20, AttackRange = 2.3, AttackArcDeg = 60,
+                MaxHp = 100, MoveSpeed = 4.2, Radius = 0.4, AttackDamage = 23, AttackRange = 2.3, AttackArcDeg = 60,
                 AttackCooldown = 0.65, AbilityCooldown = 9, GatherSeconds = 1, CarryCapacity = 3,
                 AttackWindupSeconds = 0.27, RecoverySeconds = 0.22, Mass = 0.8, Poise = 20,
             },
             // MINER: fast pick (0.20 s wind-up, 0.65 s cycle), light body (110 HP). Armour break: his hits leave SUNDER (+15% for
             // 3 s) and pierce heavy bodies (x1.4 on Mass >= 1.3: the Warrior, the Builder); x2 on structures and walls.
-            // pass 4: 95 HP / 14 -> 110 HP / 16 (his kill share had halved against control: 0.088 vs 0.168).
+            // pass 4: 95 HP / 14 -> 110 HP / 16 (his kill share had halved against control: 0.088 vs 0.168); pass 4b: 100 HP / 17
+            // (tune search BEST; kill share 0.091 on vs 0.069 control in run 44841109806).
             new ClassConfig
             {
-                MaxHp = 110, MoveSpeed = 4.0, Radius = 0.45, AttackDamage = 16, AttackRange = 1.5, AttackArcDeg = 90,
+                MaxHp = 100, MoveSpeed = 4.0, Radius = 0.45, AttackDamage = 17, AttackRange = 1.5, AttackArcDeg = 90,
                 AttackCooldown = 0.65, AbilityCooldown = 12, GatherSeconds = 2, CarryCapacity = 1,
                 AttackWindupSeconds = 0.20, RecoverySeconds = 0.18, Mass = 1.1, Poise = 24,
             },
