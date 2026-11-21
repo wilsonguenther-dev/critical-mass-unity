@@ -35,6 +35,7 @@ overlay() {
   local wt="$1"
   mkdir -p "$wt/tools/ci/BalanceReport" "$wt/tools/balance" "$wt/docs/balance" "$wt/Assets/_Game/Sim.Tests/Harness"
   cp "$ROOT/tools/ci/BalanceReport/Program.cs" "$ROOT/tools/ci/BalanceReport/BalanceReport.csproj" "$wt/tools/ci/BalanceReport/"
+  [[ -f "$ROOT/tools/ci/BalanceReport/AuditProbe.cs" ]] && cp "$ROOT/tools/ci/BalanceReport/AuditProbe.cs" "$wt/tools/ci/BalanceReport/"   # b16 probe only
   cp "$ROOT"/Assets/_Game/Sim.Tests/Harness/{BalanceProbe,BalanceStats,TuningIndex,WinShare}.cs "$wt/Assets/_Game/Sim.Tests/Harness/"
   cp "$ROOT/docs/balance/TARGETS.json" "$wt/docs/balance/"
 }
