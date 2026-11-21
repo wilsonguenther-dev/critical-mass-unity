@@ -732,6 +732,7 @@ namespace CriticalMass.Sim.Core
                 gx = w.X[t];
                 gz = w.Z[t];
                 stop = kc.MeleeRange * ChaseStop;
+                KeepOffOwnHill(w, ref gx, ref gz, ref stop);   // b16-hook: never chase onto the hill its own team holds
             }
             else if (k.State == KaijuState.Neutral)
             {

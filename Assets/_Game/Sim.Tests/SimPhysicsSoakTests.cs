@@ -106,7 +106,9 @@ namespace CriticalMass.Sim.Tests
                     // (RallyStage, up to RallySeconds) is holding on purpose, not stuck (slow run 44857709950 flagged seed 101's
                     // ring at (70.7, 38.5), 15 u from the hill, at every difficulty). Every other bot is judged as before.
                     bool staging = BotBrain.TryGetBotsState(w, out BotsState bst) && bst.Rally != null && id < bst.Rally.Length && bst.Rally[id] == TeamBrain.RallyStage;
-                    bool travelling = a.StandUp <= 0 && Travelling(a.AiState) && !windingUp && !staging;
+                    // b16: a bot past the hill cap stands on the approach (TeamBrain.JobIntercept) on purpose.
+                    bool intercepting = w.Mech != null && w.Mech.Surplus != null && id < w.Mech.Surplus.Length && w.Mech.Surplus[id] != 0;
+                    bool travelling = a.StandUp <= 0 && Travelling(a.AiState) && !windingUp && !staging && !intercepting;
                     double dx = x - anchorX[id];
                     double dz = z - anchorZ[id];
                     if (!travelling || a.AiState != anchorState[id] || dx * dx + dz * dz >= StuckRadius * StuckRadius)

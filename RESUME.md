@@ -11,6 +11,10 @@ Branch `feat/b16-mechanics-fixes`, draft PR #232 into `integration/batch-15-cand
 - Open: SimTickCostTests trimmed 0.546 > 0.52 (median 61.5 us vs ~34.5 us on sibling branches) -> r3 prints per-switch cost
   (`[b16 tick cost]`). Fix, then re-pin ONCE: SimVersion schema 6 + digest, SimPhysicsSoakTests Full goldens,
   B15RulesTests / CombatFeelTests "switches off" hash (0xC0D8429C9458B5F1 at r2), StateHash.Generated from artifact.
-- Then: remove the diagnosis test, probe branch `ci/balance/b16-mech-r1` (files staged in the session scratchpad: AuditProbe.cs with
+- r3 result: the cost is the intercept behaviour (cap off 53 us, bots stay 55 us, all on 80 us). r4 (ade18a5d) spreads
+  intercepts on 3 stand-off tiers; r4 runs: sim all 44930367452, unity-ci tests 44930370904, probe balance 44930392810
+  (branch ci/balance/b16-mech-r1, worktree ~/cm-wt-b16-probe). r5 = re-pin once + sim fast + unity-ci all; r6 = online-smoke
+  cross_os + drop_rejoin.
+- Then: remove the diagnosis test (done), probe branch `ci/balance/b16-mech-r1` (files staged in the session scratchpad: AuditProbe.cs with
   empty-frame idle + offHillHits + b16 counters by reflection, b16-arms.sh, balance-report.yml; also needs audit-mech-r1's
   Program.cs/csproj probe hooks), slow suite, unity-ci, one cross-play smoke with drop+rejoin, docs/balance reports.

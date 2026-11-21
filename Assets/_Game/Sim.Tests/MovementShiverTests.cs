@@ -655,7 +655,7 @@ namespace CriticalMass.Sim.Tests
                                       ",\"touching\":" + touching + ",\"siegeStand\":\"" + w.KaijuNav.StandCx + "," + w.KaijuNav.StandCz +
                                       "\",\"onHillS\":" + onHill.ToString("F1") + "}");
                 }
-                bool idleCase = k.TargetId < 0 && isOwned && !inHill && k.MeleeCd <= 0; // clawing is not idle
+                bool idleCase = k.TargetId < 0 && isOwned && !inHill && k.MeleeCd <= 0 && !Kaiju.AtIdlePost(w, k.X, k.Z); // clawing is not idle; b16: nor its rim post
                 if (idleCase && !double.IsNaN(ax) && (k.X - ax) * (k.X - ax) + (k.Z - az) * (k.Z - az) <= 0.3 * 0.3)
                 {
                     still += dt;

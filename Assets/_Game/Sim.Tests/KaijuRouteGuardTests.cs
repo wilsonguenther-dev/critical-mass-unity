@@ -104,7 +104,8 @@ namespace CriticalMass.Sim.Tests
                         Actor a = w.Actors[i];
                         enemies = a.Alive && (k.State == KaijuState.Berserk || (k.State == KaijuState.Azure) == (a.Team == TeamId.Crimson));
                     }
-                bool idle = up && enemies && k.TargetId < 0 && k.MeleeWindupIn <= 0 && ex * ex + ez * ez > hill.R * hill.R;
+                bool idle = up && enemies && k.TargetId < 0 && k.MeleeWindupIn <= 0 && ex * ex + ez * ez > hill.R * hill.R
+                            && !Kaiju.AtIdlePost(w, k.X, k.Z);   // b16: the rim post is where it waits on purpose
                 run = idle ? run + dt : 0;
                 if (run > worst) { worst = run; where = "ending " + w.Match.Time.ToString("F0") + " s at (" + k.X.ToString("F1") + ", " + k.Z.ToString("F1") + "), body reaches the hill " + Kaiju.BodyReachesHillFrom(w, k.X, k.Z); }
             }
