@@ -106,7 +106,7 @@ the owner (admin rights); the kit runs unchanged under such a user (`CM_REMOTE_U
 
 ## Remove it from the Air
 
-What this adds on the Air, all under `~/cm-remote`: `sim/` (the synced tree and its build output, about 60 MB),
+What this adds on the Air, all under `~/cm-remote`: `sim/` (the synced tree and its build output, about 17 MB),
 `bin/air-sim-job.sh`, `bin/air-sim-weights.tsv`, and short-lived `runs/<id>/` folders. From the main Mac:
 
 ```
