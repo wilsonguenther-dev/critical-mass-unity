@@ -86,7 +86,7 @@ namespace CriticalMass.Sim.Config
     /// </summary>
     public sealed class BotBrainConfig
     {
-        public bool Enabled = false;
+        public bool Enabled = true;   // b15 integrator: ON by default in Full (TeamBrain.On keeps Classic and PhysicsOnly off)
         /// <summary>Kite squad size at 10 living bots or fewer, and above that.</summary>
         public int KiteSquad = 2, KiteSquadLarge = 3;
         /// <summary>A kiter needs this share of its HP when it is picked.</summary>
