@@ -240,8 +240,9 @@ namespace CriticalMass.Sim.Tests
             Assert.AreEqual(seeds.Length, on.Matches);
         }
 
-        // b15 wave two: a sized multi-seed check runs past Unity EditMode's 180 s default (unity-ci 44857982412); the sim-tests run takes a few minutes
-        [Test, Timeout(900000)]
+        // b15 wave two: 48 whole 16v16 matches; Unity EditMode ran it 2256 s (unity-ci 44862751989), so it is a slow-suite check
+        // (sim-tests --suite slow runs it with the same limits; it passed the fast sim gate 44857640742 before the move)
+        [Test, Category("Slow"), Timeout(3000000)]
         public void TwentyFourSeedsBrainOffAgainstOn() => Compare(WinShare.Seeds16, "24 (WinShare.Seeds16)", true);
 
         [Test, Category("Slow")]
