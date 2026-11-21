@@ -26,7 +26,30 @@ namespace CriticalMass.Runtime.Tests
                 Assert.Less(HealFx.MoteAlpha(m, m * 0.12f + 0.01f), 0.2f, "faded in, no pop");
             }
             Assert.GreaterOrEqual(HealFx.Motes, 3, "a few motes, not one sprite");
-            Assert.Less(HealFx.MoteRadius(0.5f, 1f), 0.3f, "motes stay small");
+        }
+
+        /// <summary>r2 (Editor review round 2): the round-1 motes (4 x 0.11..0.16 u, alpha 0.9) were lost at the gameplay
+        /// camera in a fight. Fewer, larger, brighter, orbiting outside the torso, plus a ground ring pulse.</summary>
+        [Test]
+        public void MotesReadAtGameplayDistanceWithoutCoveringTheFighter()
+        {
+            float r = HealFx.MoteRadius(0.1f, 0f), rMax = HealFx.MoteRadius(0.5f, 1f);
+            Debug.Log($"[b15 heal r2] motes {HealFx.Motes} (limit <= 3), radius {r:0.00}..{rMax:0.00} (limit 0.18..0.40, was 0.11..0.16), peak alpha {HealFx.PeakAlpha:0.00} (limit >= 0.95), orbit {HealFx.OrbitStart:0.00}..{HealFx.OrbitEnd:0.00} (limit start >= 0.40: outside the torso)");
+            Assert.LessOrEqual(HealFx.Motes, 3, "fewer");
+            Assert.GreaterOrEqual(r, 0.18f, "larger");
+            Assert.LessOrEqual(rMax, 0.40f, "never a blob over the fighter");
+            Assert.GreaterOrEqual(HealFx.PeakAlpha, 0.95f, "brighter");
+            Assert.GreaterOrEqual(HealFx.OrbitStart, 0.40f, "they orbit outside the body");
+            HealFx.RingPulse(0.05f, out float r0, out float a0);
+            HealFx.RingPulse(HealFx.RingLife * 0.5f, out float r1, out float a1);
+            HealFx.RingPulse(HealFx.RingLife, out _, out float aEnd);
+            Debug.Log($"[b15 heal r2] ground ring: r {r0:0.00} -> {r1:0.00} (limit grows past 0.8 u), alpha {a0:0.00} -> {a1:0.00} -> {aEnd:0.00}");
+            Assert.Greater(a0, 0.8f, "the ring pulse is visible");
+            Assert.Greater(r1, 0.8f, "it spreads past the fighter's feet");
+            Assert.AreEqual(0f, aEnd);
+            string mech = File.ReadAllText(Path.Combine(Application.dataPath, "_Game", "Runtime", "View", "Mechanics", "MechanicsWorldView.cs"));
+            StringAssert.Contains("HealFx.RingPulse(age, out float rr, out float ra);", mech);
+            StringAssert.Contains("SwingTelegraph.SurfaceLift(", mech, "the ring sits on the walking surface (over the hill paving)");
         }
 
         [Test]

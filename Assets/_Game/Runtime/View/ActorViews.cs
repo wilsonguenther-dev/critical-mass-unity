@@ -248,7 +248,11 @@ namespace CriticalMass.Runtime.View
         /// render. Spring bones, carried cargo, death launch and weapon trails register an Anim.IPostPoseListener with
         /// Anim.PostPoseHooks and ride the bones from their own files.
         /// </summary>
-        public static void PostPose(int actor, ModelView mv, in Anim.ActorPoseState s) => Anim.PostPoseHooks.Dispatch(actor, mv, in s);
+        public static void PostPose(int actor, ModelView mv, in Anim.ActorPoseState s)
+        {
+            CriticalMass.Runtime.View.Effects.SwingCue.Record(actor, mv);   // b15 view polish r2: the wind-up cue rides the weapon arm
+            Anim.PostPoseHooks.Dispatch(actor, mv, in s);
+        }
 
         /// <summary>The animator of actor i (tests and the capture report), or null.</summary>
         public Anim.ActorAnimator AnimatorOf(int i) => _actors != null && i >= 0 && i < _actors.Length ? _actors[i].Anim : null;

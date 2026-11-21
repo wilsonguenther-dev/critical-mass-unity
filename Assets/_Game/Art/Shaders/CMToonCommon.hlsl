@@ -70,6 +70,10 @@ CBUFFER_START(UnityPerMaterial)
     // (KaijuAnimator sets both through its one property block; 0 on every other material, so nothing else changes).
     half4 _KaijuGlow;
     float _KaijuPattern;
+    // b15 view polish r2 (Kaiju identity): the Kaiju's tone (rgb a linear tint, a a saturation multiplier about the luma).
+    // a above 0 marks a Kaiju (KaijuAnimator sets it hatched or not; 0 on every other material, so nothing else changes):
+    // its body skips the character band fill and gain and takes half the time-of-day grade (CM_KAIJU_TOD_SHARE).
+    half4 _KaijuTone;
     // b14 polish (team read from above): share of the team cloth laid over top-facing fixed (code 0) colours.
     half _TeamTopTint;
 CBUFFER_END
@@ -437,6 +441,27 @@ float CMToonKaijuHash(float3 c)
 
 // b15 view polish: the parts models' fresnel weight (KaijuTypeLook.PartsFresnel mirrors it; a test reads both).
 #define CM_KAIJU_PARTS_FRESNEL 0.50
+// b15 view polish r2 (Editor review round 2: the round-1 lift washed the Kaiju pale, 8..47% of body pixels clipped, and
+// at Night they stayed as bright as Day). The Kaiju takes this share of the time-of-day grade (KaijuTypeLook.TodShare)
+// and its toned albedo never passes CM_KAIJU_TONE_MAX in any channel (KaijuTypeLook.ToneMax), so no band can clip.
+#define CM_KAIJU_TOD_SHARE 0.5
+#define CM_KAIJU_TONE_MAX 0.92
+
+// 1 on a Kaiju (_KaijuTone.a above 0), else 0.
+half CMToonKaijuW() { return step(0.001h, _KaijuTone.a); }
+
+// The Kaiju's identity tone (KaijuTypeLook.Tone mirrors it): saturation about the linear luma, a tint, then a hue-kept
+// cap at CM_KAIJU_TONE_MAX. Fixed colours only (vertex code 0): the team plates, crystals and glows keep their colour,
+// so the side still reads. Identity off a Kaiju.
+half3 CMToonKaijuTone(half3 albedo, half4 col)
+{
+    if (_KaijuTone.a <= 0.0h) return albedo;
+    if (_ColorMode > 0.5 && CMToonMaskCode(col.a) != 0) return albedo;
+    half l = dot(albedo, half3(0.2126h, 0.7152h, 0.0722h));
+    half3 c = max(0.0h, l + (albedo - l) * _KaijuTone.a) * _KaijuTone.rgb;
+    half m = max(c.r, max(c.g, c.b));
+    return m > (half)CM_KAIJU_TONE_MAX ? c * ((half)CM_KAIJU_TONE_MAX / m) : c;
+}
 
 half3 CMToonKaijuGlow(half3 color, float3 normalWS, float3 viewDirWS, float3 positionWS)
 {
@@ -489,7 +514,8 @@ half3 CMToonKaijuGlow(half3 color, float3 normalWS, float3 viewDirWS, float3 pos
     // separates the silhouette from the cream hill paving; the painted-pattern models keep the b14 0.32.
     half fw = kind == 0 ? (half)CM_KAIJU_PARTS_FRESNEL : 0.32h;
     rimGlow = kind == 0 ? smoothstep(0.22, 0.70, fres) : rimGlow;
-    return saturate(color + glow * (half)(rimGlow * fw) * k);
+    // b15 view polish r2: the edge leans TOWARD the type hue (was added on top: the added glow clipped the lit band)
+    return lerp(color, glow, (half)(rimGlow * fw) * k);
 }
 
 // Time of day: how much of the grade a CM/Toon material skips. Characters and the Kaiju (rim strength above 0: world

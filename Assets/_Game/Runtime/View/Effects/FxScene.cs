@@ -765,7 +765,7 @@ namespace CriticalMass.Runtime.View.Effects
             }
 
             DrawKaijuState(w, ground, air, now);
-            DrawSwingTelegraphs(w, ground);
+            DrawSwingTelegraphs(w, ground, air, camRight, camUp);
             DrawShields(w, air, now);
             BuildBoomGround(now, ground);
 
@@ -1097,8 +1097,12 @@ namespace CriticalMass.Runtime.View.Effects
         /// orange-edged when the local fighter is inside an enemy's wedge (tier 1: "this one is coming at you"). Drawn only
         /// while CombatFeel is on (with it off the 0.10 s wind-ups are too short to read).
         /// </summary>
-        private void DrawSwingTelegraphs(World w, FxMeshBuilder ground)
+        /// <summary>b15 view polish r2: on-attacker wind-up cues drawn this frame (tests, capture logs).</summary>
+        public int SwingCuesDrawn { get; private set; }
+
+        private void DrawSwingTelegraphs(World w, FxMeshBuilder ground, FxMeshBuilder air, Vector3 camRight, Vector3 camUp)
         {
+            SwingCuesDrawn = 0;
             if (!CombatFeel.On(w.Config)) return;
             Vector3 gr = Vector3.right, gu = Vector3.forward;
             int me = LocalSeat.Actor;
@@ -1112,7 +1116,10 @@ namespace CriticalMass.Runtime.View.Effects
                 float reach = (float)cc.AttackRange, half = (float)(cc.AttackArcDeg * 0.5 * Math.PI / 180);
                 float p = Mathf.Clamp01((float)((a.SwingWindup - left + Alpha) / a.SwingWindup));
                 double x = w.PrevX[i] + (w.X[i] - w.PrevX[i]) * Alpha, z = w.PrevZ[i] + (w.Z[i] - w.PrevZ[i]) * Alpha;
-                Vector3 c = W(x, Ground(x, z) + 0.035, z);
+                // b15 view polish r2: (c) the wedge is secondary and sits on the local walking surface (over the hill
+                // paving on the hill; it was 0.035 over the world ground, under the raised paving)
+                bool hasHill = _map.Hill != null;
+                Vector3 c = W(x, Ground(x, z) + SwingTelegraph.SurfaceLift(x, z, hasHill ? _map.Hill.X : 0, hasHill ? _map.Hill.Z : 0, hasHill), z);
                 float ang = -(float)a.SwingFacing; // sim (cos f, sin f) is world (cos f, -sin f)
                 bool atMe = false;
                 if (me >= 0 && me < w.ActorCount && me != i && w.Actors[me].Alive && w.Actors[me].Team != a.Team)
@@ -1138,6 +1145,40 @@ namespace CriticalMass.Runtime.View.Effects
                 }
                 ground.Ring(c, gr, gu, reach - SwingTelegraph.InkW, reach + 0.02f, ang - half, ang + half, seg, A(Navy, st.InkA));
                 ground.Ring(c, gr, gu, reach - SwingTelegraph.EdgeW, reach, ang - half, ang + half, seg, A(st.Lead, st.EdgeA));
+
+                // b15 view polish r2: the primary cues ON THE ATTACKER (air layer, depth-tested: over ground and paving).
+                double tickWall = 1.0 / (_cfg.SimHz * Math.Max(1e-3, PaceNow));
+                float windupS = (float)(a.SwingWindup * tickWall), sinceS = (float)((a.SwingWindup - left + Alpha) * tickWall);
+                bool reduced = FeelGate.ReduceFlashing;
+                float k = SwingTelegraph.CueAlpha(SwingTelegraph.Strength(p, windupS), reduced) * (atMe ? 1f : 0.85f);
+                Vector3 feet = W(x, Ground(x, z) + SwingTelegraph.SurfaceLift(x, z, hasHill ? _map.Hill.X : 0, hasHill ? _map.Hill.Z : 0, hasHill) - SwingTelegraph.GroundLift, z);
+                // (b) a thin bright arc at chest height along the swing path, outside the body; a navy ink under it for the
+                // pale paving; a brighter head sweeps along it with the wind-up (left to right in the swing's direction)
+                float arcR = SwingTelegraph.ArcRadius(reach, (float)cc.Radius);
+                Vector3 chest = feet + Vector3.up * SwingTelegraph.ArcHeight;
+                air.Ring(chest, gr, gu, arcR - SwingTelegraph.ArcInkWidth * 0.5f, arcR + SwingTelegraph.ArcInkWidth * 0.5f, ang - half, ang + half, seg, A(Navy, 0.7f * k));
+                air.Ring(chest, gr, gu, arcR - SwingTelegraph.ArcWidth * 0.5f, arcR + SwingTelegraph.ArcWidth * 0.5f, ang - half, ang + half, seg, A(st.Lead, k));
+                float head = ang - half + 2f * half * p, hw = Mathf.Min(half, 0.22f);
+                air.Ring(chest, gr, gu, arcR - SwingTelegraph.ArcWidth, arcR + SwingTelegraph.ArcWidth, Mathf.Max(ang - half, head - hw), head, 4, A(SparkWhite, k));
+                // (a) the weapon arm: a streak from the elbow through the hand and on along the weapon, and a glint at the
+                // hand (a start flash in full flashing; a steady glow capped under reduced flashing)
+                if (!SwingCue.TryArm(i, out Vector3 hand, out Vector3 elbow))
+                {
+                    Vector3 fwd = new Vector3(Mathf.Cos(ang), 0f, Mathf.Sin(ang));
+                    hand = chest + fwd * ((float)cc.Radius + 0.15f);
+                    elbow = feet + Vector3.up * 1.3f;
+                }
+                Vector3 along = hand - elbow;
+                if (along.sqrMagnitude < 1e-6f) along = Vector3.up * 0.3f;
+                Vector3 tip = hand + along.normalized * SwingTelegraph.WeaponExtend;
+                Vector3 camFwd = Vector3.Cross(camRight, camUp);
+                Vector3 side = Vector3.Cross(tip - elbow, camFwd);
+                side = side.sqrMagnitude > 1e-8f ? side.normalized : camRight;
+                air.Add = 120;
+                air.Quad((elbow + tip) * 0.5f, side * (SwingTelegraph.ArmWidth * 0.5f), (tip - elbow) * 0.5f, A(SparkMid, 0.75f * k), A(SparkHot, k));
+                air.SoftMote(hand, camRight, camUp, SwingTelegraph.GlintRadius * SwingTelegraph.GlintScale(sinceS, reduced), 12, A(SparkHot, k));
+                air.Add = 0;
+                SwingCuesDrawn++;
             }
         }
 

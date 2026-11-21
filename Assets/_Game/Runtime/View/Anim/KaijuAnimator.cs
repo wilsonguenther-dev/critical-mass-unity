@@ -418,6 +418,9 @@ namespace CriticalMass.Runtime.View.Anim
             else _lookKeyB = key;
             if (_typeBlock == null) _typeBlock = new MaterialPropertyBlock();
             _typeBlock.Clear();
+            // b15 view polish r2: an unhatched Kaiju is still a Kaiju to CM/Toon (_KaijuTone.a above 0: no character gain,
+            // half the time-of-day grade), with the identity tone
+            if (key == 0) _typeBlock.SetVector(KaijuTypeLook.ToneProperty, KaijuTypeLook.ToneVector(KaijuType.Elder));
             if (key != 0)
             {
                 // b15 Kaiju parts: a model with part sets carries the type in its geometry and palette (bark, horns, logs,
@@ -436,22 +439,16 @@ namespace CriticalMass.Runtime.View.Anim
                 // it the character lift at all (ArtMapping.KaijuRim). With the rim on, the world look's character lift is THE
                 // one lift path; the uniform parts lift is gone, and only a palette VALUE correction stays for the two dark
                 // palettes (BRUTE's brown hide, MIRE's slate): KaijuTypeLook.PaletteValue, identity for ELDER, GROVE, TIMBER.
-                if (parts)
-                {
-                    Vector3 v = KaijuTypeLook.PaletteValue(type);
-                    if (v != Vector3.one)
-                    {
-                        _typeBlock.SetFloat("_LitMultiplier", v.x);
-                        _typeBlock.SetVector("_MidRatio", new Vector4(v.y, v.y, v.y, 1f));
-                        _typeBlock.SetVector("_ShadowRatio", new Vector4(v.z, v.z, v.z, 1f));
-                    }
-                }
-                else
+                // b15 view polish r2 (Editor review round 2): that palette value lift washed BRUTE and MIRE pale (28..47% of
+                // body pixels clipped). Gone: each type's identity is its tone (KaijuTypeLook.Tone, _KaijuTone, set below
+                // for every state), at a mid value that never clips.
+                if (!parts)
                 {
                     Vector4 body = KaijuTypeLook.BodyRatio(type);
                     _typeBlock.SetVector("_MidRatio", body);
                     _typeBlock.SetVector("_ShadowRatio", body);
                 }
+                _typeBlock.SetVector(KaijuTypeLook.ToneProperty, KaijuTypeLook.ToneVector(type));
                 Color g = ArtMaterials.Hex(KaijuTypeLook.GlowHex(type));
                 g.a = KaijuTypeLook.GlowStrength;
                 _typeBlock.SetColor("_KaijuGlow", g);
@@ -467,8 +464,7 @@ namespace CriticalMass.Runtime.View.Anim
             for (int i = 0; i < rs.Length; i++)
             {
                 if (rs[i] == null) continue;
-                if (key == 0) rs[i].SetPropertyBlock(null);
-                else rs[i].SetPropertyBlock(_typeBlock);
+                rs[i].SetPropertyBlock(_typeBlock);
             }
         }
 
@@ -799,19 +795,38 @@ namespace CriticalMass.Runtime.View.Anim
         // GROVE leaf green crest, BRUTE amber back plates, TIMBER pale bark bands, MIRE blue-violet mist spots, ELDER gold spine.
         // Hues stay off both team hues (Azure cyan, Crimson red) and the corruption purple #8E3FD1.
         public const float LitLift = 1.22f, MidLift = 1.38f, ShadowLift = 1.55f, GlowStrength = 0.85f;
-        /// <summary>
-        /// b15 view polish (Editor review item 1): the palette VALUE of a parts model (x lit band multiplier, y mid ratio,
-        /// z shadow ratio; one scalar per band so the hue is kept, the darker bands lifted more so the light parts do not
-        /// clip). Only the two dark palettes move: BRUTE (hide #5C4B47) and MIRE (hide #6E7EA4) read -0.18 / -0.12 against
-        /// the hill at Day/Dusk after the world-look lift. Bands stay distinct (KaijuHillValueTests): lit / mid band at most 0.90 and mid / shadow at most 0.82 (CM/Toon
-        /// defaults 0.84 / 0.69).
-        /// Replaces the uniform b15 parts lift (PartsLitLift 1.10 / 1.19 / 1.27): one lift path, the world look's.
-        /// </summary>
-        public static readonly Vector3 BruteValue = new Vector3(1.80f, 1.90f, 2.20f), MireValue = new Vector3(1.45f, 1.50f, 1.65f);
         /// <summary>b15 view polish: the fresnel weight of a parts model's type glow (CM_KAIJU_PARTS_FRESNEL in
         /// CMToonCommon.hlsl; the painted-pattern models keep 0.32).</summary>
         public const float PartsFresnel = 0.50f;
-        public static Vector3 PaletteValue(KaijuType t) => t == KaijuType.Brute ? BruteValue : t == KaijuType.Mire ? MireValue : Vector3.one;
+
+        // b15 view polish r2 (Editor review round 2): the round-1 value lift (palette x 1.8..2.2 plus the character gain)
+        // washed the Kaiju pale and clipped it (MIRE 35..47% of body pixels, BRUTE pale pink) and they stayed Day-bright at
+        // Night. Now each type keeps a saturated identity colour at a mid value: CMToonKaijuTone (saturation about the
+        // linear luma, a linear tint, a hue-kept cap), no character band fill or gain, half the time-of-day grade.
+        // Separation from the pale hill comes from the edge (fresnel, team rim, outline) and the contact shadow instead.
+        public const string ToneProperty = "_KaijuTone";
+        /// <summary>CM_KAIJU_TOD_SHARE: the share of the time-of-day grade the Kaiju takes (1 = the world's).</summary>
+        public const float TodShare = 0.5f;
+        /// <summary>CM_KAIJU_TONE_MAX: no toned channel passes this (no band can clip).</summary>
+        public const float ToneMax = 0.92f;
+        /// <summary>BRUTE a rich warm brown-red (hide #5C4B47 -> about #793E31), MIRE a deep blue-violet (#6E7EA4 -> about
+        /// #6D65B0); ELDER, GROVE (its green as is) and TIMBER keep their palette.</summary>
+        public static readonly Vector3 BruteTint = new Vector3(1.30f, 0.80f, 0.72f), MireTint = new Vector3(1.30f, 0.63f, 0.90f);
+        public const float BruteSaturation = 2.4f, MireSaturation = 1.7f;
+        public static Vector3 ToneTint(KaijuType t) => t == KaijuType.Brute ? BruteTint : t == KaijuType.Mire ? MireTint : Vector3.one;
+        public static float ToneSaturation(KaijuType t) => t == KaijuType.Brute ? BruteSaturation : t == KaijuType.Mire ? MireSaturation : 1f;
+        public static Vector4 ToneVector(KaijuType t) { Vector3 v = ToneTint(t); return new Vector4(v.x, v.y, v.z, ToneSaturation(t)); }
+
+        /// <summary>CMToonKaijuTone on a linear albedo (tests mirror the shader with it).</summary>
+        public static Color Tone(Color linear, KaijuType t)
+        {
+            Vector3 k = ToneTint(t);
+            float s = ToneSaturation(t), l = 0.2126f * linear.r + 0.7152f * linear.g + 0.0722f * linear.b;
+            var c = new Color(Mathf.Max(0f, l + (linear.r - l) * s) * k.x, Mathf.Max(0f, l + (linear.g - l) * s) * k.y,
+                Mathf.Max(0f, l + (linear.b - l) * s) * k.z, 1f);
+            float m = Mathf.Max(c.r, Mathf.Max(c.g, c.b));
+            return m > ToneMax ? new Color(c.r * ToneMax / m, c.g * ToneMax / m, c.b * ToneMax / m, 1f) : c;
+        }
         /// <summary>b15 Kaiju parts: the adult's part set for a type (ModelSpec.Variants); null = the default ELDER set.</summary>
         public static string Variant(KaijuType t) =>
             t == KaijuType.Grove ? "Grove" : t == KaijuType.Brute ? "Brute" : t == KaijuType.Timber ? "Timber" : t == KaijuType.Mire ? "Mire" : null;

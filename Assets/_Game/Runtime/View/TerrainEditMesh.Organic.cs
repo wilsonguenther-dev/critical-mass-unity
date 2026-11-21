@@ -33,6 +33,14 @@ namespace CriticalMass.Runtime.View
         public const int MaxTrisPerPitCell = 180;
 
         static readonly Color32 Clay = C(186, 135, 90), Root = C(92, 64, 42);
+        // b15 view polish r2 (Editor review round 2): a dug cell was hard to see from the gameplay camera (the lifted earth
+        // tones sat near the grass value, so the pit read as a flat patch). A pit's floor and inner walls are now a clear
+        // value step DARKER than the ground (never near-black: the floor keeps about a third of the grass luma), and a thin
+        // FRESH-EARTH lip (lighter, warm) rims the cut, so the edge reads as "a hole was dug here" (PitReadabilityTests).
+        public static readonly Color32 PitFloor = C(92, 68, 46), PitTopsoil = C(98, 68, 44), PitClay = C(124, 90, 60), PitRock = C(100, 98, 92);
+        public static readonly Color32 FreshEarth = C(196, 146, 92), FreshEarthDark = C(170, 124, 78);
+        /// <summary>The grass the pit is cut into (the lip used to be this colour).</summary>
+        public static Color32 GroundGrass => Grass;
 
         /// <summary>Wall run (u) from the rim in to the floor for a pit `depth` deep.</summary>
         public static double Inset(double depth) => System.Math.Min(0.3, 0.33 * depth);
@@ -179,7 +187,7 @@ namespace CriticalMass.Runtime.View
                 if (sh > bestHash) { bestHash = sh; bestSide = s; }
             }
             // Floor: a fan from the cell centre over the floor polygon (corner floor points and the rim sides' wall feet).
-            Color32 floor = Jit(FloorDirt, cx, cz, 11);
+            Color32 floor = Jit(PitFloor, cx, cz, 11);   // b15 view polish r2: darker than the ground (was FloorDirt)
             double ccx = cx + 0.5, ccz = cz + 0.5, ccy = FloorIn(ccx, ccz);
             for (int k = 0; k < nf; k++) _fy[k] = FloorIn(_fx[k], _fz[k]);
             for (int k = 0; k < nf; k++)
@@ -239,7 +247,8 @@ namespace CriticalMass.Runtime.View
         void RimSide(int cx, int cz, int side, double h, double inx, double inz)
         {
             PitWallFaces++;
-            Color32 grass = Jit(Grass, cx, cz, 701), grassDark = Jit(GrassDark, cx, cz, 702);
+            // b15 view polish r2: the lip top and its front are fresh earth (were grass), the bands below darker
+            Color32 grass = Jit(FreshEarth, cx, cz, 701), grassDark = Jit(FreshEarthDark, cx, cz, 702);
             for (int k = 0; k < 2; k++)
             {
                 int k1 = k + 1;
@@ -252,7 +261,7 @@ namespace CriticalMass.Runtime.View
                     WallRow(k, band, h, out double ax, out double ay, out double az);
                     WallRow(k1, band, h, out double bx, out double by, out double bz);
                     double ya = band == 0 ? h : RowY(k, band - 1, h), yb = band == 0 ? h : RowY(k1, band - 1, h);
-                    Color32 c = band == 0 ? grassDark : band == 1 ? Jit(Topsoil, cx, cz, 710 + side) : band == 2 ? Jit(Clay, cx, cz, 720 + side) : Jit(RockLight, cx, cz, 730 + side);
+                    Color32 c = band == 0 ? grassDark : band == 1 ? Jit(PitTopsoil, cx, cz, 710 + side) : band == 2 ? Jit(PitClay, cx, cz, 720 + side) : Jit(PitRock, cx, cz, 730 + side);
                     // Shading normal: the face's own, leaned toward up (PitNormalUp) so every wall of a pit takes the lit band.
                     double fnx = inx * (1 - PitNormalUp), fny = PitNormalUp, fnz = inz * (1 - PitNormalUp);
                     QuadSim(prevAx, ya, prevAz, prevBx, yb, prevBz, bx, by, bz, ax, ay, az, fnx, fny, fnz, c, 0f, default);

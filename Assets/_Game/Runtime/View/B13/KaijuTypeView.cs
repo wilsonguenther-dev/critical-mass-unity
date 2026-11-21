@@ -35,7 +35,9 @@ namespace CriticalMass.Runtime.View.B13
         public const int HaloRings = 29, HaloSegments = 120;
         /// <summary>Halo radius in u at type scale 1 (the body's hit radius is 1.64 u; the ring sits just outside the feet).</summary>
         public const float HaloRadius = 2.9f, HaloGlowAlpha = 0.62f, HaloShadowAlpha = ContactAlpha;
-        public const float ContactAlpha = 0.70f, ContactPlateau = 0.60f, ContactReach = 1.45f;
+        // b15 view polish r2: darker and larger (was 0.70 / 0.60 / 1.45): with the Kaiju at a mid value, separation from
+        // the pale hill comes from this disc, the fresnel edge and the outline (KaijuSilhouetteTests)
+        public const float ContactAlpha = 0.85f, ContactPlateau = 0.75f, ContactReach = 1.80f;
 
         /// <summary>The contact shadow's alpha at r (in halo radii): ContactAlpha to ContactPlateau, a smooth fade to 0 at ContactReach.</summary>
         public static float ContactShadowAlpha(float r) =>
