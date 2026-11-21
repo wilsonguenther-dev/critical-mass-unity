@@ -404,6 +404,19 @@ namespace CriticalMass.Sim.Core
             return 0;
         }
 
+        /// <summary>b16 CANCEL (read by the view's input layer between ticks): would a cancel press do something for actor id
+        /// now (a feint during its wind-up, or a hit-cancel in the recovery after a landed hit, its one use not spent)?</summary>
+        public static bool CancelWindow(World w, int id)
+        {
+            if (w == null || id < 0 || id >= w.ActorCount || !On(w) || !Cfg(w).CancelEnabled) return false;
+            Actor a = w.Actors[id];
+            CombatFeelState s = w.Depth.Feel;
+            if (!a.Alive || a.StandUp > 0 || s.CancelUsed[id] == a.SwingTick) return false;
+            int contact = a.SwingTick + a.SwingWindup;
+            if (a.SwingPending) return w.Tick < contact && w.Tick >= s.FeintLockUntil[id];
+            return s.LandedSwing[id] == a.SwingTick && w.Tick > contact && w.Tick < contact + a.SwingRecovery;
+        }
+
         /// <summary>b16 CANCEL: true while actor id is in the short fixed recovery after a feint (no swing, no dodge).</summary>
         public static bool FeintRecovering(World w, int id)
         {

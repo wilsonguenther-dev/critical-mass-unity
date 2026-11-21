@@ -16,7 +16,7 @@ namespace CriticalMass.Runtime.View.Mechanics
         /// <summary>Glints and streaks are drawn only this close to the local player (sim units).</summary>
         public const double NearUnits = 20;
         /// <summary>Burst kinds.</summary>
-        public const int BurstPulse = 0, BurstPurify = 1, BurstDrop = 2, BurstDodge = 3, BurstMine = 4;
+        public const int BurstPulse = 0, BurstPurify = 1, BurstDrop = 2, BurstDodge = 3, BurstMine = 4, /* b16 */ BurstFeint = 5;
         /// <summary>Without a sim stun (no HitStun event on this base) a slam hit plays this short stagger, wall seconds.</summary>
         public const double FallbackStaggerWall = 0.3;
 
@@ -153,6 +153,14 @@ namespace CriticalMass.Runtime.View.Mechanics
                 if (code == MechEvents.HitStunCode) { OnStun(w, e, now); continue; }
                 if (code == MechEvents.AttackContactCode) { AddGlint(w, e.A, e.X, e.Z, Facing(w, e.A), now, true); continue; }
                 if (code == MechEvents.AttackCancelCode) { CancelGlints(e.A); continue; }
+                // b16 CANCEL: a feint drops the attacker's glints the same tick (the wind-up cue already went with SwingPending)
+                // and leaves a small collapsing flick at its feet; a hit-cancel only drops the glints.
+                if (e.Type == SimEventType.Feint)
+                {
+                    CancelGlints(e.A);
+                    if (e.Value == 1 && Near(w, e.A)) AddBurst(e.X, e.Z, 0.9, now, BurstFeint, TeamOf(w, e.A));
+                    continue;
+                }
                 if (code == MechEvents.SlamDodgedCode) { if (e.A == LocalActor) MarkDodge(w, now); continue; }
                 if (code == MechEvents.DropPopCode) { AddBurst(e.X, e.Z, 0.6, now, BurstDrop, TeamId.Azure); continue; }
                 if (code == MechEvents.KnockbackCode) { OnKnock(w, e, now); continue; }

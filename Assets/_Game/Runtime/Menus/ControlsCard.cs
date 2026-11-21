@@ -69,6 +69,7 @@ namespace CriticalMass.Runtime.Menus
         {
             var l = new List<string> { "Move", "Aim", "Lock facing (hold)", "Attack", "Class ability", "Jump" };
             if (RowIndex("Dodge") >= 0) l.Add("Dodge");
+            if (RowIndex("Cancel attack (feint)") >= 0) l.Add("Cancel attack (feint)");   // b16 CANCEL (test feature)
             l.AddRange(new[] { "Interact / carry", "Build / mine", "Next tool", "Ping wheel", "Scoreboard", "Full map", "Base station", "Pause menu" });
             return l.ToArray();
         }
