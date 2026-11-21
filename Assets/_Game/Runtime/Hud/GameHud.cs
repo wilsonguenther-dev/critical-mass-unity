@@ -732,7 +732,19 @@ namespace CriticalMass.Runtime.Hud
             _hillBar.Fill01 = s.HillShareAzure;
             _medallionHalf.gameObject.SetActive(s.Hill == HillState.Contested);
             _medallion.SetFill(HillColour(s.Hill));
-            HudText.Set(_hillWord, HillWord(s.Hill));
+            // b15 D0: the owner's own Kaiju stands on the hill, so the owner scores nothing; the word says so from each side's
+            // point of view (words, not colour alone: brass ink is a second cue)
+            if (s.KaijuBlocksHill >= 0)
+            {
+                bool ours = s.HasPlayer && (int)s.Team == s.KaijuBlocksHill;
+                HudText.Set(_hillWord, ours ? ComebackNames.KaijuHillOwnWord : ComebackNames.KaijuHillEnemyWord);
+                _hillWord.color = CMTokens.ToolBrass.Color;
+            }
+            else
+            {
+                HudText.Set(_hillWord, HillWord(s.Hill));
+                _hillWord.color = Cream;
+            }
         }
 
         static Color HillColour(HillState h) =>

@@ -47,8 +47,8 @@ namespace CriticalMass.Sim.Tests
                 + k.RespawnStartSeconds + " -> " + k.RespawnEndSeconds + " s p" + k.CurvePower + "; waves " + k.WaveSeconds + "; turncoat " + k.KaijuTurncoat + "; fatigue " + k.HoldFatigueOn + " "
                 + k.HoldGraceSeconds + "/" + k.HoldSpanSeconds + "/" + k.HoldMinPerMille + "; majority " + k.MajorityMargin + "; forward " + k.ForwardReturnOn + " " + k.ForwardShare + " lost " + k.ForwardWhenHillLost
                 + "; trailing feed " + k.FeedTrailingPerMille + "; kaiju hill " + k.KaijuHillPerMille;
-            // 2026-11-20: TURNCOAT off until the owner rules on Kaiju allegiance (B15RuleSetsTests arm B is this set)
-            const string want = "RALLY True x1.5 past 5 s cap 60 s; respawn True 2 -> 5 s p1; waves 0; turncoat False; fatigue True 20/40/250; majority 1; forward True 0.4 lost True; trailing feed 0; kaiju hill 1000";
+            // 2026-11-21: set D0 = set B (TURNCOAT off until the owner rules on Kaiju allegiance) + KAIJU HOLDS NOTHING x0 on the hill
+            const string want = "RALLY True x1.5 past 5 s cap 60 s; respawn True 2 -> 5 s p1; waves 0; turncoat False; fatigue True 20/40/250; majority 1; forward True 0.4 lost True; trailing feed 0; kaiju hill 0";
             Line("comeback defaults", got, want);
             Assert.AreEqual(want, got);
             Assert.IsTrue(k.Enabled);

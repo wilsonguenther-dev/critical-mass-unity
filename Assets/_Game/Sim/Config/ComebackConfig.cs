@@ -38,8 +38,8 @@ namespace CriticalMass.Sim.Config
         /// <summary>1 = linear, 2 = quadratic (slow start). Integers only.</summary>
         public int CurvePower = 1;
 
-        // Defaults = the pass-2 sweep's set (B15SweepTests rounds 1-3, confirmed on 72 seeds) WITHOUT TURNCOAT (off 2026-11-20 until
-        // the owner rules on Kaiju allegiance): HOLD FATIGUE 20/40/0.25 + FORWARD RETURN 0.4 (also when the hill is lost) + RALLY
+        // Defaults = set D0 (B15RuleSetsTests, 2026-11-21): KAIJU HOLDS NOTHING x0 on top of the pass-2 sweep's set WITHOUT TURNCOAT
+        // (off until the owner rules on Kaiju allegiance): HOLD FATIGUE 20/40/0.25 + FORWARD RETURN 0.4 (also when the hill is lost) + RALLY
         // x1.5 past 5 s, cap 60 s + respawn 2 -> 5 s (B15RuleSetsTests arm B). WAVES and MAJORITY stay off (both made matches
         // worse: waves 6-10 s raised blowouts to 0.46-0.67, majority 2-3 did not lower them).
 
@@ -64,7 +64,7 @@ namespace CriticalMass.Sim.Config
         /// radius), its team's hill seconds count this many per mille (500 = half). 1000 = off. The Kaiju still fights for its
         /// team; it only stops being the thing that holds the hill for it (the diagnosis: the Kaiju side owned 74-89% of the
         /// second half because the enemy left the hill to fight it).</summary>
-        public int KaijuHillPerMille = 1000;
+        public int KaijuHillPerMille = 0;   // 2026-11-21 default ON (D0, coordinator decision, advisor agreed for now; the owner feel-tests it)
         /// <summary>KAIJU HOLDS NOTHING applies wherever the sided Kaiju is while it is up (not only while it stands on the hill).</summary>
         public bool KaijuHillAnywhere = false;
 

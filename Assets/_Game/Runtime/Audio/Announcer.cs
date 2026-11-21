@@ -20,6 +20,7 @@ namespace CriticalMass.Runtime.Audio
         HatchNeutral, BerserkLocked, BerserkHatch, KaijuKnockedOut, KaijuRecovers, FirstKnockOut, MultiKo2, MultiKo3,
         MultiKo4, Victory, Defeat, Draw, SecretHillAlone,
         Rally,   // b15: the first tick a team earns RALLY credit (once a match)
+        KaijuHill,   // b15 D0: the first tick a team's own Kaiju on the hill cuts its score (once a match)
     }
 
     /// <summary>One announcer line: words-pack id (announcer.json), trigger, priority (higher wins a tie) and text.</summary>
@@ -45,7 +46,7 @@ namespace CriticalMass.Runtime.Audio
             "matchStart", "hillTaken", "hillTakenByEnemy", "hillLost", "hillContested", "finalMinute", "eggSoon", "hatchAzure",
             "hatchCrimson", "hatchNeutral", "berserkLocked", "berserkHatch", "kaijuKnockedOut", "kaijuRecovers",
             "firstKnockOut", "multiKo2", "multiKo3", "multiKo4", "victory", "defeat", "draw", "secretHillAlone",
-            "rally",
+            "rally", "kaijuHill",
         };
 
         /// <summary>Indexed by (int)AnnouncerTrigger.</summary>
@@ -74,6 +75,7 @@ namespace CriticalMass.Runtime.Audio
             L("an-21", AnnouncerTrigger.Draw, 3, "A draw. The hill will take a rematch."),
             L("an-22", AnnouncerTrigger.SecretHillAlone, 1, "Still up there on your own? Respect."),
             L("an-23", AnnouncerTrigger.Rally, 2, "Rally! The team behind gets more for the hill."),
+            L("an-24", AnnouncerTrigger.KaijuHill, 2, "A Kaiju on the hill scores nothing for its team."),
         };
 
         static AnnouncerLine L(string id, AnnouncerTrigger t, int p, string text) =>
@@ -279,7 +281,7 @@ namespace CriticalMass.Runtime.Audio
 
         World _world;
         int _cursor;
-        bool _started, _finalCalled, _eggCalled, _firstKoCalled, _endCalled, _rallyCalled;
+        bool _started, _finalCalled, _eggCalled, _firstKoCalled, _endCalled, _rallyCalled, _kaijuHillCalled;
         int _owner;               // 0 none, 1 Azure, 2 Crimson
         int _koCount;
         double _lastKoAt = double.NegativeInfinity;
@@ -291,7 +293,7 @@ namespace CriticalMass.Runtime.Audio
         {
             _world = w;
             _cursor = w != null ? w.EventHead : 0;
-            _started = _finalCalled = _eggCalled = _firstKoCalled = _endCalled = _rallyCalled = false;
+            _started = _finalCalled = _eggCalled = _firstKoCalled = _endCalled = _rallyCalled = _kaijuHillCalled = false;
             _owner = 0;
             if (w != null)
             {
@@ -373,6 +375,12 @@ namespace CriticalMass.Runtime.Audio
             {
                 _rallyCalled = true;
                 q.Enqueue(AnnouncerTrigger.Rally, now);
+            }
+            // b15 D0: one line, once a match, the first time a team's own Kaiju on the hill cuts its score
+            if (!_kaijuHillCalled && w.Rally != null && Comeback.KaijuBlocking(w) >= 0)
+            {
+                _kaijuHillCalled = true;
+                q.Enqueue(AnnouncerTrigger.KaijuHill, now);
             }
             if (!_eggCalled && !m.Hatched && w.Config.HatchSeconds > EggSoonSeconds && c.UntilHatch <= EggSoonSeconds)
             {

@@ -210,6 +210,15 @@
       "key": "dd4f2cad342f"
     },
     {
+      "id": "an-24",
+      "role": "announcer",
+      "text": "A Kaiju on the hill scores nothing for its team.",
+      "voice": "bm_george",
+      "speed": 0.95,
+      "ms": 3204,
+      "key": "9cacc8fed13d"
+    },
+    {
       "id": "story-title",
       "role": "narrator",
       "text": "Critical Mass. Hold the hill.",

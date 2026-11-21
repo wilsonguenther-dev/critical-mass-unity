@@ -233,6 +233,14 @@ namespace CriticalMass.Sim.Core
             return Math.Max(0, per) / 1000.0;
         }
 
+        /// <summary>KAIJU HOLDS NOTHING is cutting the hill owner's score right now: 0 Azure, 1 Crimson, -1 no (HUD, announcer).</summary>
+        public static int KaijuBlocking(World w)
+        {
+            HillState h = w.Match.HillState;
+            if (h != HillState.Azure && h != HillState.Crimson) return -1;
+            return KaijuHillRate(w, h) < 1.0 ? (h == HillState.Azure ? 0 : 1) : -1;
+        }
+
         /// <summary>Kaiju KO (Kaiju.Hatch DamageKaiju): TURNCOAT remembers the team that knocked a sided Kaiju down.</summary>
         public static void OnKaijuKo(World w, int sourceId)
         {
@@ -308,5 +316,12 @@ namespace CriticalMass.Sim.Core
         public const string Rally = "RALLY";
         public const string EnemyRally = "ENEMY RALLY";
         public const string Hint = "Behind: your hill time counts more while you hold it.";
+        /// <summary>KAIJU HOLDS NOTHING: the hill word (short, fits the 300 px word under the hill bar) and the one-time banner.</summary>
+        public const string KaijuHillOwnWord = "NO SCORE: YOUR KAIJU";
+        public const string KaijuHillEnemyWord = "NO SCORE: THEIR KAIJU";
+        public const string KaijuHillOwnHead = "YOUR KAIJU IS ON THE HILL";
+        public const string KaijuHillEnemyHead = "THEIR KAIJU IS ON THE HILL";
+        public const string KaijuHillOwnLine = "No hill score while your Kaiju stands on it.";
+        public const string KaijuHillEnemyLine = "They score nothing while their Kaiju stands on it.";
     }
 }

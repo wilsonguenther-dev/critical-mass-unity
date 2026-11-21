@@ -42,6 +42,9 @@ namespace CriticalMass.Sim.Tests
             /// <summary>Kaiju snowball check: sided hatches, how many the Kaiju side won, how many went to the team trailing on hill
             /// seconds at the hatch (and how many of those it won), and the hatches with a hill leader.</summary>
             public int Sided, SideWon, HatchWithLeader, TrailerGotIt, TrailerGotItWon, LeaderGotIt, LeaderGotItWon;
+            /// <summary>D0 bot check: ticks the owner's own Kaiju on the hill cut its score (Comeback.KaijuBlocking), and the
+            /// owner's and the other team's bodies on the hill summed over those ticks; SidedUpTicks = ticks a sided Kaiju was up.</summary>
+            public double BlockedTicks, BlockedOwnBodies, BlockedEnemyBodies, SidedUpTicks;
         }
 
         static string F(double v, string f = "0.000") => v.ToString(f, CultureInfo.InvariantCulture);
@@ -119,6 +122,14 @@ namespace CriticalMass.Sim.Tests
                     hatchSide = w.Kaiju.State == KaijuState.Azure ? 1 : w.Kaiju.State == KaijuState.Crimson ? -1 : 0;
                     double hl = w.Match.HillSeconds.Azure - w.Match.HillSeconds.Crimson;
                     hatchLead = hl > 0.5 ? 1 : hl < -0.5 ? -1 : 0;
+                }
+                if ((w.Kaiju.State == KaijuState.Azure || w.Kaiju.State == KaijuState.Crimson) && w.Kaiju.KoIn <= 0) arm.SidedUpTicks++;
+                int blk = Comeback.KaijuBlocking(w);
+                if (blk >= 0)
+                {
+                    arm.BlockedTicks++;
+                    arm.BlockedOwnBodies += blk == 0 ? w.Match.HillCount.Azure : w.Match.HillCount.Crimson;
+                    arm.BlockedEnemyBodies += blk == 0 ? w.Match.HillCount.Crimson : w.Match.HillCount.Azure;
                 }
                 for (int i = 0; i < n; i++)
                 {

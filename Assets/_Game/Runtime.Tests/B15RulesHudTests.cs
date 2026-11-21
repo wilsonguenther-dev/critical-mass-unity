@@ -64,5 +64,17 @@ namespace CriticalMass.Runtime.Tests
             Assert.AreEqual("an-23", l.Id);
             Assert.AreEqual("rally", AnnouncerLines.TriggerNames[(int)AnnouncerTrigger.Rally]);
         }
+
+        [Test]
+        public void TheKaijuHillWordsFitTheHillWordAndTheLineIsInTheTable()
+        {
+            // the hill word under the hill bar is 300 reference px at 18 px type: 21 capitals (about 13 px each) fit
+            Assert.LessOrEqual(ComebackNames.KaijuHillOwnWord.Length, 21);
+            Assert.LessOrEqual(ComebackNames.KaijuHillEnemyWord.Length, 21);
+            StringAssert.Contains("No hill score", ComebackNames.KaijuHillOwnLine);
+            AnnouncerLine l = AnnouncerLines.For(AnnouncerTrigger.KaijuHill);
+            Assert.AreEqual("an-24", l.Id);
+            Assert.AreEqual("kaijuHill", AnnouncerLines.TriggerNames[(int)AnnouncerTrigger.KaijuHill]);
+        }
     }
 }

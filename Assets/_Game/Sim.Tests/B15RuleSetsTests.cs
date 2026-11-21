@@ -73,6 +73,7 @@ namespace CriticalMass.Sim.Tests
         {
             S("A all levers off"),
             S("B fatigue+forward+rally+2-5 s", SetB),
+            S("D0 DEFAULT (B + kaiju hill x0)", SetB, KaijuHill(0)),
             S("C B+trailing feed x1.5", SetB, TrailingFeed(500)),
             S("D B+kaiju hill x0.5", SetB, KaijuHill(500)),
             S("D' B+kaiju hill x0.25", SetB, KaijuHill(250)),
@@ -119,6 +120,8 @@ namespace CriticalMass.Sim.Tests
                 + " (inside the walk-back window " + F(a.ProbeWalkInWindow / t, "0.000") + ", outside it " + F((a.ProbeWalkTicks - a.ProbeWalkInWindow) / t, "0.000") + ")"
                 + " || kaiju: sided " + a.Sided + ", side won " + a.SideWon + "; at the hatch the hill trailer got it " + a.TrailerGotIt + " (won " + a.TrailerGotItWon
                 + "), the leader got it " + a.LeaderGotIt + " (won " + a.LeaderGotItWon + ") of " + a.HatchWithLeader + "; turns " + a.Turns
+                + " || kaiju-hill block: " + F(a.BlockedTicks / Math.Max(1, a.Ticks), "0.000") + " of match ticks (" + F(a.BlockedTicks / Math.Max(1, a.SidedUpTicks), "0.00") + " of sided-Kaiju-up ticks), owner bodies on the hill "
+                + F(a.BlockedOwnBodies / Math.Max(1, a.BlockedTicks), "0.0") + " vs other team " + F(a.BlockedEnemyBodies / Math.Max(1, a.BlockedTicks), "0.0") + " while blocked"
                 + " || kills/min " + F(a.Kills / Math.Max(1e-9, a.Minutes), "0.0") + ", KO wait " + F(a.RespawnSum / Math.Max(1, a.RespawnN)) + " s";
         }
 

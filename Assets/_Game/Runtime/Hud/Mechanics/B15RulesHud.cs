@@ -177,11 +177,34 @@ namespace CriticalMass.Runtime.Hud.Mechanics
                 _votesShown[0] = _votesShown[1] = -1;
                 _myVoteShown = -1;
                 _turnsShown = -1;
+                _kaijuHillBanner = false;
             }
             TeamId team = w.Actors[me].Team;
             TickRally(w, team);
+            TickKaijuHill(w, team);
             TickVote(w, me, team);
             TickResults(w, team);
+        }
+
+        bool _kaijuHillBanner;
+
+        /// <summary>b15 D0: once a match, the first time a team's own Kaiju stands on the hill it holds (so that team scores
+        /// nothing), a banner for both teams from their own side; the hill word under the hill bar carries it after that.</summary>
+        void TickKaijuHill(World w, TeamId team)
+        {
+            if (_kaijuHillBanner) return;
+            int t = Comeback.KaijuBlocking(w);
+            if (t < 0) return;
+            _kaijuHillBanner = true;
+            bool own = t == (int)team;
+            Banner.Show(new BannerSpec
+            {
+                Headline = own ? ComebackNames.KaijuHillOwnHead : ComebackNames.KaijuHillEnemyHead,
+                Reason = own ? ComebackNames.KaijuHillOwnLine : ComebackNames.KaijuHillEnemyLine,
+                Style = t == 0 ? BannerStyle.Azure : BannerStyle.Crimson,
+                Priority = 4,
+                HoldSeconds = 2.5,
+            });
         }
 
         void TickRally(World w, TeamId team)
