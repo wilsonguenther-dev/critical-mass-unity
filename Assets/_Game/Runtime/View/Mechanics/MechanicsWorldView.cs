@@ -630,6 +630,7 @@ namespace CriticalMass.Runtime.View.Mechanics
             if (driver.GetComponent<DepthWorldView>() == null) driver.gameObject.AddComponent<DepthWorldView>();
             CriticalMass.Runtime.View.B13.B13Views.EnsureOn(driver);   // b13-hook: the batch 13 item views (H, B, J, K, C)
             if (driver.GetComponent<CriticalMass.Runtime.Hud.Mechanics.DepthHud>() == null) driver.gameObject.AddComponent<CriticalMass.Runtime.Hud.Mechanics.DepthHud>();
+            if (driver.GetComponent<CriticalMass.Runtime.Hud.Mechanics.B15RulesHud>() == null) driver.gameObject.AddComponent<CriticalMass.Runtime.Hud.Mechanics.B15RulesHud>();   // b15-hook
             if (driver.GetComponent<CriticalMass.Runtime.Hud.Mechanics.StationPanel>() == null) driver.gameObject.AddComponent<CriticalMass.Runtime.Hud.Mechanics.StationPanel>();
             return v;
         }

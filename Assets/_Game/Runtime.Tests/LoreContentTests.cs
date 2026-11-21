@@ -272,12 +272,12 @@ namespace CriticalMass.Runtime.Tests
         }
 
         [Test]
-        public void TwentyFiveTipsEachTwentyWordsOrFewerAndTrueToTheSim()
+        public void TwentySixTipsEachTwentyWordsOrFewerAndTrueToTheSim()
         {
             GameConfig cfg = GameConfig.CreateDefault();
             Dictionary<string, Token> tokens = TokenMap();
             var t = Load<TipsFile>("tips.json");
-            Assert.AreEqual(25, t.tips.Length);
+            Assert.AreEqual(26, t.tips.Length);   // b15 pass 4: tip-26, KAIJU HOLDS NOTHING (the D0 default)
             foreach (Tip tip in t.tips)
             {
                 string shown = Resolve(tip.text, cfg, tokens);

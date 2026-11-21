@@ -119,7 +119,7 @@ namespace CriticalMass.Sim.Core
         public static int MendTarget(World w, int id, double aimX, double aimZ)
         {
             Actor a = w.Actors[id];
-            double range = w.Config.Abilities.Healer.MendRange;
+            double range = w.Config.Abilities.Healer.MendRange * HutChoices.MendScale(w, a.Team);   // b15-hook: WIDE MEND (x 1 with the rule off)
             double hx = w.X[id];
             double hz = w.Z[id];
             double px = double.IsFinite(aimX) ? aimX : hx;

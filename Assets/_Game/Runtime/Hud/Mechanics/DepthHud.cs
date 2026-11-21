@@ -40,6 +40,9 @@ namespace CriticalMass.Runtime.Hud.Mechanics
         public const double ChanceCap = 0.70;
 
         public static string HutLine(int level) => HutLines[Mathf.Clamp(level, 0, HutLines.Length - 1)];
+        static readonly string[] HutChoiceLines = { "HUT 0", "HUT 1", "HUT 2", "HUT 3", "HUT 4", "HUT 5" };
+        /// <summary>b15: with hut choices on there is no flat bump, so the badge shows only the level.</summary>
+        public static string HutChoiceLine(int level) => HutChoiceLines[Mathf.Clamp(level, 0, HutChoiceLines.Length - 1)];
         public static string OreLine(int banked, int nextCost) => nextCost <= 0 ? "max level" : "ore " + banked + "/" + nextCost;
         public static bool MeterShown(bool on, double pool) => on && pool > 0;
         public static string ChanceLine(double chance) => "CORRUPTION " + Math.Round(Math.Max(0, chance) * 100).ToString("0", CultureInfo.InvariantCulture) + "%";
@@ -720,7 +723,7 @@ namespace CriticalMass.Runtime.Hud.Mechanics
             if (_hut.gameObject.activeSelf != hut) _hut.gameObject.SetActive(hut);
             if (hut)
             {
-                HudText.Set(_hutLevel, B13Hud.HutLine(Blacksmith.Level(w, team)));
+                HudText.Set(_hutLevel, HutChoices.On(w) ? B13Hud.HutChoiceLine(Blacksmith.Level(w, team)) : B13Hud.HutLine(Blacksmith.Level(w, team)));   // b15-hook
                 HudText.Set(_hutOre, _b13.Ore(Blacksmith.OreBanked(w, team), Blacksmith.NextCost(w, team)));
             }
             bool corruptOn = CriticalMass.Sim.Core.Corruption.On(w);

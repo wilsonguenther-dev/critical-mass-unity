@@ -671,6 +671,7 @@ namespace CriticalMass.Sim.Core
                 {
                     k.Hp = k.MaxHp;
                     Corruption.AtGetUp(w);   // b13-hook
+                    Comeback.OnKaijuRecover(w);   // b15-hook: TURNCOAT (no-op off)
                     World.PushEvent(w, SimEventType.KaijuRecover, -1, -1, k.X, k.Z, 0);
                 }
                 return;

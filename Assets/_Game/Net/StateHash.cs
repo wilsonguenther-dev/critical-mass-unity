@@ -50,7 +50,39 @@ namespace CriticalMass.Net
                 Mix(ref h, Bits(w.Kaiju.Z));
                 Mix(ref h, Bits(w.Kaiju.Hp));
             }
+            MixB15(ref h, w);
             return h;
+        }
+
+        /// <summary>
+        /// b15: the comeback rule's RALLY credit and the hut vote (with the hut level and stock it reads), mixed only while each
+        /// rule is on, so Classic and PhysicsOnly fingerprints never move. A divergence in a vote or a pick shows up the tick it
+        /// happens instead of only once it changes HP or positions.
+        /// </summary>
+        private static void MixB15(ref ulong h, World w)
+        {
+            if (Comeback.On(w) && w.Rally != null)
+            {
+                Mix(ref h, w.Rally.BonusMilli[0]);
+                Mix(ref h, w.Rally.BonusMilli[1]);
+                Mix(ref h, w.Rally.HoldStreak[0]);
+                Mix(ref h, w.Rally.HoldStreak[1]);
+                Mix(ref h, w.Rally.KoTeam);
+                Mix(ref h, w.Rally.Turns);
+            }
+            if (!HutChoices.On(w) || w.HutVote == null) return;
+            HutChoiceState s = w.HutVote;
+            for (int t = 0; t < 2; t++)
+            {
+                Mix(ref h, w.Hut.Level[t]);
+                Mix(ref h, w.Hut.Ore[t]);
+                Mix(ref h, s.Decided[t]);
+                Mix(ref h, s.VoteLevel[t]);
+                Mix(ref h, s.EndTick[t]);
+                Mix(ref h, s.Mask[t]);
+            }
+            for (int i = 0; i < s.Pick.Length; i++) Mix(ref h, s.Pick[i]);
+            for (int i = 0; i < w.ActorCount; i++) Mix(ref h, s.Vote[i]);
         }
 
         private static long Bits(double d) => BitConverter.DoubleToInt64Bits(d);

@@ -213,7 +213,7 @@ namespace CriticalMass.Runtime.Hud.Interact
                 InputContextKind ctx = InputContext.Current;
                 _ctx = ctx;
                 if (MapKey.WasPressedIn(ctx) && !Wheel.IsOpen && !_padHudFocus) { if (Map.IsOpen) CloseMap(); else OpenMap(); }
-                if (ZoomKey.WasPressedIn(ctx) && !Map.IsOpen && !_padHudFocus) Minimap.ToggleZoom();
+                if (ZoomKey.WasPressedIn(ctx) && !Map.IsOpen && !_padHudFocus && !(ZoomKey.WasPressedOnGamepad && CriticalMass.Runtime.Hud.Mechanics.B15RulesHud.VoteOwnsDpad)) Minimap.ToggleZoom();   // b15-hook: D-pad right votes
                 if (CursorKey.WasPressedOnGamepad && InputContext.HudOwnsDpad(ctx) && !_padHudFocus && !Map.IsOpen && !Card.IsOpen && !Wheel.IsOpen)
                 {
                     SetPadFocus(true);
@@ -291,7 +291,7 @@ namespace CriticalMass.Runtime.Hud.Interact
 
         bool TickPing(World w, float now, UnityEngine.Camera cam, Vector2 rootLocal, bool padActive, Gamepad pad, Mouse mouse, ref GateReason reasons)
         {
-            if (!Wheel.IsOpen && PingKey.WasPressedIn(_ctx) && !Card.IsOpen && !_padHudFocus)
+            if (!Wheel.IsOpen && PingKey.WasPressedIn(_ctx) && !Card.IsOpen && !_padHudFocus && !(PingKey.WasPressedOnGamepad && CriticalMass.Runtime.Hud.Mechanics.B15RulesHud.VoteOwnsDpad))   // b15-hook: D-pad left votes
             {
                 double x, z;
                 Vector2 at;

@@ -132,6 +132,18 @@
       "trigger": "secretHillAlone",
       "priority": 1,
       "text": "Still up there on your own? Respect."
+    },
+    {
+      "id": "an-23",
+      "trigger": "rally",
+      "priority": 2,
+      "text": "Rally! The team behind gets more for the hill."
+    },
+    {
+      "id": "an-24",
+      "trigger": "kaijuHill",
+      "priority": 2,
+      "text": "A Kaiju on the hill scores nothing for its team."
     }
   ]
 }
