@@ -432,11 +432,19 @@ namespace CriticalMass.Runtime.View.Anim
                 // b15 Editor review (2026-11-21): the world look's lift alone read flat on the adult parts model: body minus
                 // ground -0.03 to -0.21 at Day/Dusk and -0.03 to +0.05 at Night on the hill (bars +0.12 / +0.15), so the
                 // parts lift is back (checklist 0.4 fallback). Models without part sets keep only their type tint.
+                // b15 view polish (Editor review item 1): the root cause was that the Kaiju had NO rim, so CM/Toon never gave
+                // it the character lift at all (ArtMapping.KaijuRim). With the rim on, the world look's character lift is THE
+                // one lift path; the uniform parts lift is gone, and only a palette VALUE correction stays for the two dark
+                // palettes (BRUTE's brown hide, MIRE's slate): KaijuTypeLook.PaletteValue, identity for ELDER, GROVE, TIMBER.
                 if (parts)
                 {
-                    _typeBlock.SetVector("_MidRatio", Vector4.one * KaijuTypeLook.PartsMidLift);
-                    _typeBlock.SetVector("_ShadowRatio", Vector4.one * KaijuTypeLook.PartsShadowLift);
-                    _typeBlock.SetFloat("_LitMultiplier", KaijuTypeLook.PartsLitLift);
+                    Vector3 v = KaijuTypeLook.PaletteValue(type);
+                    if (v != Vector3.one)
+                    {
+                        _typeBlock.SetFloat("_LitMultiplier", v.x);
+                        _typeBlock.SetVector("_MidRatio", new Vector4(v.y, v.y, v.y, 1f));
+                        _typeBlock.SetVector("_ShadowRatio", new Vector4(v.z, v.z, v.z, 1f));
+                    }
                 }
                 else
                 {
@@ -791,8 +799,19 @@ namespace CriticalMass.Runtime.View.Anim
         // GROVE leaf green crest, BRUTE amber back plates, TIMBER pale bark bands, MIRE blue-violet mist spots, ELDER gold spine.
         // Hues stay off both team hues (Azure cyan, Crimson red) and the corruption purple #8E3FD1.
         public const float LitLift = 1.22f, MidLift = 1.38f, ShadowLift = 1.55f, GlowStrength = 0.85f;
-        /// <summary>b15 Kaiju parts: half the b14 lift (the parts palette is authored lighter than the old slate).</summary>
-        public const float PartsLitLift = 1.10f, PartsMidLift = 1.19f, PartsShadowLift = 1.27f;
+        /// <summary>
+        /// b15 view polish (Editor review item 1): the palette VALUE of a parts model (x lit band multiplier, y mid ratio,
+        /// z shadow ratio; one scalar per band so the hue is kept, the darker bands lifted more so the light parts do not
+        /// clip). Only the two dark palettes move: BRUTE (hide #5C4B47) and MIRE (hide #6E7EA4) read -0.18 / -0.12 against
+        /// the hill at Day/Dusk after the world-look lift. Bands stay distinct (KaijuHillValueTests): lit / mid band at most 0.90 and mid / shadow at most 0.82 (CM/Toon
+        /// defaults 0.84 / 0.69).
+        /// Replaces the uniform b15 parts lift (PartsLitLift 1.10 / 1.19 / 1.27): one lift path, the world look's.
+        /// </summary>
+        public static readonly Vector3 BruteValue = new Vector3(1.80f, 1.90f, 2.20f), MireValue = new Vector3(1.45f, 1.50f, 1.65f);
+        /// <summary>b15 view polish: the fresnel weight of a parts model's type glow (CM_KAIJU_PARTS_FRESNEL in
+        /// CMToonCommon.hlsl; the painted-pattern models keep 0.32).</summary>
+        public const float PartsFresnel = 0.50f;
+        public static Vector3 PaletteValue(KaijuType t) => t == KaijuType.Brute ? BruteValue : t == KaijuType.Mire ? MireValue : Vector3.one;
         /// <summary>b15 Kaiju parts: the adult's part set for a type (ModelSpec.Variants); null = the default ELDER set.</summary>
         public static string Variant(KaijuType t) =>
             t == KaijuType.Grove ? "Grove" : t == KaijuType.Brute ? "Brute" : t == KaijuType.Timber ? "Timber" : t == KaijuType.Mire ? "Mire" : null;

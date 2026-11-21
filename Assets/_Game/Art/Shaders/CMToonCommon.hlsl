@@ -435,6 +435,9 @@ float CMToonKaijuHash(float3 c)
     return frac(sin(dot(c, float3(12.9898, 78.233, 37.719))) * 43758.5453);
 }
 
+// b15 view polish: the parts models' fresnel weight (KaijuTypeLook.PartsFresnel mirrors it; a test reads both).
+#define CM_KAIJU_PARTS_FRESNEL 0.50
+
 half3 CMToonKaijuGlow(half3 color, float3 normalWS, float3 viewDirWS, float3 positionWS)
 {
     if (_KaijuGlow.a <= 0.0h) return color;
@@ -481,7 +484,12 @@ half3 CMToonKaijuGlow(half3 color, float3 normalWS, float3 viewDirWS, float3 pos
     // b14 final look (seen in engine at night): pattern 0.80 -> 0.58 and fresnel 0.55 -> 0.32; at the old values the glow
     // swallowed the body (GROVE read as a lime blob, BRUTE as solid orange).
     color = lerp(color, glow, (half)(pat * 0.58) * k);
-    return saturate(color + glow * (half)(rimGlow * 0.32) * k);
+    // b15 view polish (Editor review item 1): a parts model (pattern 0: its plates and vents are modelled) has no painted
+    // pattern to swallow the body, so its fresnel is stronger and starts a little further in (CMToonKaijuFresnel), which
+    // separates the silhouette from the cream hill paving; the painted-pattern models keep the b14 0.32.
+    half fw = kind == 0 ? (half)CM_KAIJU_PARTS_FRESNEL : 0.32h;
+    rimGlow = kind == 0 ? smoothstep(0.22, 0.70, fres) : rimGlow;
+    return saturate(color + glow * (half)(rimGlow * fw) * k);
 }
 
 // Time of day: how much of the grade a CM/Toon material skips. Characters and the Kaiju (rim strength above 0: world
