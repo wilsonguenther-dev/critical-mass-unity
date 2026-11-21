@@ -126,7 +126,7 @@ else
 fi
 [[ -n "$RUN" ]] || out could-not-start 75 ',"reason":"run did not appear within 120 s"'
 URL="https://github.com/$(gh repo view --json nameWithOwner -q .nameWithOwner)/actions/runs/$RUN"
-echo "remote: $WF on $REF -> $URL (waiting, polls every 30 s, max ${MAXW} min)" >&2
+echo "remote: $WF on $REF -> $URL (waiting, polls every ${CM_REMOTE_POLL_S:-30} s, max ${MAXW} min)" >&2
 deadline=$(( s0 + MAXW * 60 ))
 while :; do
   st=$(gh run view "$RUN" --json status -q .status 2>/dev/null || echo unknown)
