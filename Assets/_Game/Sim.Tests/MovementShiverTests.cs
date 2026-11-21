@@ -585,10 +585,13 @@ namespace CriticalMass.Sim.Tests
                 used++; near += r.NearShare; on += r.OnShare; onS += r.OnHill; worst = Math.Max(worst, r.WorstStill);
             }
             double mNear = used > 0 ? near / used : 0, mOn = used > 0 ? on / used : 0, mOnS = used > 0 ? onS / used : 0;
-            Console.WriteLine("[KaijuHill] six-seed mean over " + used + " seeds: near share " + mNear.ToString("F3") + " (limit 0.55), on share " +
-                              mOn.ToString("F3") + " (limit 0.20), on hill " + mOnS.ToString("F1") + " s (limit 20 s), worst idle " + worst.ToString("F1") + " s (limit 5 s)");
+            Console.WriteLine("[KaijuHill] six-seed mean over " + used + " seeds: near share " + mNear.ToString("F3") + " (limit 0.50), on share " +
+                              mOn.ToString("F3") + " (limit 0.05), on hill " + mOnS.ToString("F1") + " s (limit 10 s), worst idle " + worst.ToString("F1") + " s (limit 5 s)");
             Assert.GreaterOrEqual(used, 4, "at least four seeds give an owned Kaiju a minute");
-            Assert.GreaterOrEqual(mNear, 0.55, "six-seed mean on-or-near share");
+            // b16 KAIJU WAITS OFF THE CIRCLE: the owned Kaiju now waits on the rim and stops on the rim of a hill its own team
+            // holds (it walks in only to clear an enemy-held hill), so the near floor is 0.50 (r5: 0.548) and the on-disc floors below
+            // are 0.05 and 10 s (r5: 0.109, 25.2 s); before b16 0.55 / 0.20 / 20 s.
+            Assert.GreaterOrEqual(mNear, 0.50, "six-seed mean on-or-near share");
         }
 
         /// <summary>
@@ -609,10 +612,10 @@ namespace CriticalMass.Sim.Tests
                 if (r.WorstStill > worst) { worst = r.WorstStill; worstSeed = seed; }
             }
             double mOn = used > 0 ? on / used : 0, mOnS = used > 0 ? onS / used : 0;
-            Console.WriteLine("[KaijuHill] six-seed mean over " + used + " seeds: on share " + mOn.ToString("F3") + " (limit 0.20), on hill " + mOnS.ToString("F1") +
-                              " s (limit 20 s), worst idle off the hill " + worst.ToString("F1") + " s on seed " + worstSeed + " (limit 5 s)");
-            Assert.GreaterOrEqual(mOn, 0.20, "six-seed mean on-hill share");
-            Assert.Greater(mOnS, 20.0, "six-seed mean time on the hill");
+            Console.WriteLine("[KaijuHill] six-seed mean over " + used + " seeds: on share " + mOn.ToString("F3") + " (limit 0.05), on hill " + mOnS.ToString("F1") +
+                              " s (limit 10 s), worst idle off the hill " + worst.ToString("F1") + " s on seed " + worstSeed + " (limit 5 s)");
+            Assert.GreaterOrEqual(mOn, 0.05, "six-seed mean on-hill share (b16: was 0.20, the Kaiju waits off the circle)");
+            Assert.Greater(mOnS, 10.0, "six-seed mean time on the hill (b16: was 20 s)");
             Assert.LessOrEqual(worst, 5.0, "never idle off the hill with no target over 5 s");
         }
 
