@@ -58,10 +58,18 @@ namespace CriticalMass.Runtime.Tests
         [Test]
         public void TheWedgeIsLiftedOverTheHillPaving()
         {
+            // b15 Editor review r3: the placed plaza is sunk; its highest tile is 0.145 over the ground (raycast on the
+            // WorldBase Hill group) and it ends at ~5.8 u, so the lift clears 0.145 without floating far over it, and the
+            // ground between the paving and the hill ring (6..12 u) gets the plain ground lift.
+            const float measuredPavingTop = 0.145f;
             float plaza = SceneryLodTable.Rows["env_hill_plaza"].Height;
             float onHill = SwingTelegraph.SurfaceLift(56, 40, 56, 40, true), off = SwingTelegraph.SurfaceLift(80, 40, 56, 40, true);
-            Debug.Log($"[b15 swing cue] wedge lift on the hill {onHill:0.000} (limit > plaza height {plaza:0.000}), off it {off:0.000} (was 0.035 everywhere)");
-            Assert.Greater(onHill, plaza, "over the raised paving");
+            float ringGround = SwingTelegraph.SurfaceLift(56 + 8, 40, 56, 40, true);
+            Debug.Log($"[b15 swing cue] wedge lift on the paving {onHill:0.000} (paving top {measuredPavingTop:0.000}), at 8 u {ringGround:0.000}, off the hill {off:0.000} (was 0.035 everywhere)");
+            Assert.Greater(onHill, measuredPavingTop, "over the paving");
+            Assert.Less(onHill, measuredPavingTop + 0.1f, "not floating over it");
+            Assert.Less(onHill, plaza + 0.04f);
+            Assert.AreEqual(off, ringGround, 1e-6f, "the ground inside the hill ring past the paving is ground");
             Assert.Greater(off, 0.035f);
             Assert.Less(off, plaza);
         }
