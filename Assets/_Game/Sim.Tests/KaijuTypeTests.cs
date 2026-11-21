@@ -649,6 +649,7 @@ namespace CriticalMass.Sim.Tests
             WinShare.Judge("KaijuType (printed, 24 seeds)", "16v16 pool", t16On, t16Off, true);
             var x16On = new WinShare.Tally(); var x16Off = new WinShare.Tally();
             x16On.Add(t16On); x16Off.Add(t16Off);
+            var e16On = new WinShare.Tally(); var e16Off = new WinShare.Tally();
             foreach (int seed in PairedShift.Extra48())
             {
                 Arm c = RunMatch(seed, 16, false);
@@ -656,11 +657,18 @@ namespace CriticalMass.Sim.Tests
                 Console.WriteLine("[KaijuType] 72-seed pool 16v16 seed " + seed + ": winner control " + c.Winner + ", types on " + t.Winner + " (" + t.Type + ")");
                 x16Off.Add(c.Winner);
                 x16On.Add(t.Winner);
+                e16Off.Add(c.Winner);
+                e16On.Add(t.Winner);
                 Pair(t.Winner, c.Winner);
             }
             Console.WriteLine("[KaijuType] 16v16 Azure win share, paired by seed: " + PairedShift.Text(PairedShift.Of(w16On, w16Off)));
             Console.WriteLine("[KaijuType] 16v16 Crimson win share, paired by seed: " + PairedShift.Text(PairedShift.Of(c16On, c16Off)));
             if (!WinShare.Judge("KaijuType", "16v16 pool of " + x16On.Matches + " (72 seeds)", x16On, x16Off, true)) fails.Add("16v16 win share (see the [win share] line)");
+            // b15 pass 4: the all-match pool takes the same 48 extra 16v16 seeds (112 matches; the 64-match line prints): with the
+            // D0 default the 5v5 arms decorrelate too (0.172 / 0.188 on 64 matches at b23f9b6c, sim run 44846571979)
+            WinShare.Judge("KaijuType (printed, 64 matches)", "all " + allOn.Matches + " matches", allOn, allOff, false);
+            allOn.Add(e16On);
+            allOff.Add(e16Off);
             if (!WinShare.Judge("KaijuType", "all " + allOn.Matches + " matches", allOn, allOff, false)) fails.Add("all-match win share (see the [win share] line)");
             var fpOn = new List<double>(); var fpOff = new List<double>(); var kOn = new List<double>(); var kOff = new List<double>();
             double kpmOn = 0, kpmOff = 0; int hcOn = 0, hcOff = 0;
