@@ -105,7 +105,9 @@ namespace CriticalMass.Sim.Config
         public double StageRadius = 15;
         public int GroupMin = 3;
         public double GroupShare = 0.5;
-        public double RallySeconds = 12;
+        // b15 integrator: 12 -> 6 s. Combined 72 seeds (balance run 44855876723): leader-at-half 0.458 -> 0.606 (band 0.60-0.80),
+        // blowout 0.097 -> 0.125 (limit 0.15), top-10 damage share 0.505 -> 0.501; RallyOutnumberedBy 3 as well overshot the blowout (0.153).
+        public double RallySeconds = 6;
         /// <summary>A respawned bot stages only while the enemy has at least this many more bodies on the hill disc.</summary>
         public int RallyOutnumberedBy = 2;
         public bool TargetHealersFirst = true;
