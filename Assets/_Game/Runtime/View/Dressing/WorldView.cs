@@ -267,6 +267,22 @@ namespace CriticalMass.Runtime.View.Dressing
         {
             _driver = GetComponent<SimDriverBehaviour>();
             if (_driver == null) _driver = FindAnyObjectByType<SimDriverBehaviour>();
+            _live = this;
+        }
+
+        private static WorldView _live;
+
+        /// <summary>
+        /// integrator b15: the live world view has not taken its driver's new world yet. It starts the build in LateUpdate,
+        /// after the driver's Update, so without this the load frame could run a tick before Building turns on
+        /// (PerfSmoothPlayTests "no sim tick ran while the world built" read 1 on the combined candidate). Holds one frame at
+        /// most: the next LateUpdate always starts the build. View timing only; the match is the same.
+        /// </summary>
+        public static bool AwaitsWorld(Sim.Core.World w)
+        {
+            WorldView v = _live;
+            return w != null && v != null && v.isActiveAndEnabled && v._building == null && v._driver != null
+                   && ReferenceEquals(v._driver.World, w) && (!ReferenceEquals(w, v._world) || !ReferenceEquals(w.Map, v._map));
         }
 
         private void LateUpdate() { var cost = CriticalMass.Runtime.Game.FrameCost.Enter(); LateUpdateCost(); CriticalMass.Runtime.Game.FrameCost.Exit(CriticalMass.Runtime.Game.FrameCost.Slot.World, cost); }
