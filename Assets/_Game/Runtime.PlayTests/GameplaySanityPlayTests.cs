@@ -390,6 +390,10 @@ namespace CriticalMass.Runtime.PlayTests
             Assert.IsNotNull(cam, "no main camera");
             World w = _w.W;
             int cooldown = _w.Ticks(_w.Cfg.Class(w.Actors[0].Cls).AttackCooldown) + 2;
+            // b16: a whiffed swing (these clicks hit nobody) recovers longer, by the class's extra miss time (the Warrior's
+            // trade for his duels), so the next click waits for that too
+            double[] whiffExtra = _w.Cfg.Depth.CombatFeel.WhiffExtraSeconds;
+            if (whiffExtra != null && (int)w.Actors[0].Cls < whiffExtra.Length) cooldown += _w.Ticks(whiffExtra[(int)w.Actors[0].Cls]) + 1;
             for (int k = 0; k < 8; k += 2)
             {
                 double ang = k * Math.PI / 4;

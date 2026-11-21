@@ -20,13 +20,15 @@ namespace CriticalMass.Runtime.Onboarding
     /// </summary>
     public static class B13Hints
     {
-        public const int Dodge = 0, Mine = 1, Build = 2, Count = 3;
+        public const int Dodge = 0, Mine = 1, Build = 2, /* b16 */ Cancel = 3, Count = 4;
         public const string PrefsKey = "cm.b13.hints";
         public static readonly string[] Lines =
         {
             "{Dodge} to dodge. A quick dash; you cannot be hit for a moment.",
             "Hold {DigPlace} near an ore vein to MINE, then bank the ore at your hut.",
             "{DigPlace} uses your tool on the outlined spot. {Switch} or 1-7 picks the tool: dig, place, ladder, bridge, walls, block.",
+            // b16 CANCEL (test feature): shown the first time the player winds up a swing with the cancel on
+            "{Cancel} during your swing to FEINT it. Right after a hit lands, {Cancel} recovers faster.",
         };
 
         public static string Line(int i, ControlDevice device) => TrialText.Fill(Lines[Mathf.Clamp(i, 0, Count - 1)], device);
@@ -48,6 +50,7 @@ namespace CriticalMass.Runtime.Onboarding
                 case Dodge: return CriticalMass.Sim.Core.Dodge.On(w) && CriticalMass.Sim.Core.Dodge.CooldownTicks(w, id) <= 0;
                 case Mine: return a.Cls == ClassId.Miner && Blacksmith.On(w);
                 case Build: return a.Cls == ClassId.Builder && BuilderWalls.On(w) && BuilderWalls.Ghost(w, id, out _, out _, out _, out _, out _, out _, out _);
+                case Cancel: return CriticalMass.Runtime.Menu.GameSettings.CancelButton && CombatFeel.On(w) && w.Config.Depth.CombatFeel.CancelEnabled && a.SwingPending;
                 default: return false;
             }
         }
@@ -62,6 +65,7 @@ namespace CriticalMass.Runtime.Onboarding
                 case Dodge: return CriticalMass.Sim.Core.Dodge.Active(w, id);
                 case Mine: return a.Carry == CarryKind.Ore || a.Cls != ClassId.Miner;
                 case Build: return pressedF || a.Cls != ClassId.Builder;
+                case Cancel: return w.Depth.Feel.CancelUsed[id] != CombatFeel.NoTick || !CriticalMass.Runtime.Menu.GameSettings.CancelButton;
                 default: return true;
             }
         }
@@ -156,6 +160,7 @@ namespace CriticalMass.Runtime.Onboarding
                 case "Map": return Action("Map", device, pad ? "D-PAD UP" : "M");
                 case "Switch": return pad ? Action("SwitchDigPlace", device, "LB") : "WHEEL";   // b14: the Builder's next-tool button (left bumper)
                 case "Dodge": return Action("Dodge", device, pad ? "RB" : "SHIFT");   // b14: Left Shift / right bumper
+                case "Cancel": return Action("Cancel", device, pad ? "LB" : "MOUSE 5");   // b16: CANCEL (mouse forward side button / LB)
                 default: return null;
             }
         }

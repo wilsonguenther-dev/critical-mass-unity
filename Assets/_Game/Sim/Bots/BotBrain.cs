@@ -9,6 +9,10 @@ namespace CriticalMass.Sim.Bots
     public static class BotBrain
     {
         /// <summary>Bot think period in sim ticks (round(simHz / thinkHz)).</summary>
+        /// <summary>b16 CANCEL: bots never press it (false). The one switch for a later bot that feints; a const so a match
+        /// cannot flip it and every machine agrees.</summary>
+        public const bool UsesCancel = false;
+
         public static int BotThinkPeriod(GameConfig c) => Math.Max(1, (int)JsMath.Round((double)c.SimHz / c.Bots.ThinkHz));
 
         private static readonly ConditionalWeakTable<World, BotsState> States = new ConditionalWeakTable<World, BotsState>();
@@ -78,6 +82,7 @@ namespace CriticalMass.Sim.Bots
             output.Jump = false;
             output.TerraformSwitch = false; // DG-09: bots never switch the dig / place mode (they never dig: oracle CM-30)
             output.Dodge = false;   // b13-hook: the shared scratch frame never carries a human dodge to a bot (BotReflex sets it)
+            output.Cancel = false;   // b16: bots never press CANCEL (UsesCancel is off; the shared frame never carries a human press)
             BotSteer.SteerBot(w, st, id, output);
             // DG-22 (CM-38): a Demolitions bot's queued TNT throw (BotFsm.DecideDemolitions) is its one press, aimed at the throw point.
             Demolitions.TakeBotTnt(w, id, output);
