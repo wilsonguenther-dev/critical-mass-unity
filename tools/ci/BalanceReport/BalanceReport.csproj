@@ -19,6 +19,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="Program.cs" />
+    <Compile Include="AuditProbe.cs" />
     <Compile Include="../../../Assets/_Game/Sim.Tests/Harness/BalanceProbe.cs" Link="Harness/BalanceProbe.cs" />
     <Compile Include="../../../Assets/_Game/Sim.Tests/Harness/BalanceStats.cs" Link="Harness/BalanceStats.cs" />
     <Compile Include="../../../Assets/_Game/Sim.Tests/Harness/TuningIndex.cs" Link="Harness/TuningIndex.cs" />

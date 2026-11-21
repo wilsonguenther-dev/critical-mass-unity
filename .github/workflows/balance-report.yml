@@ -1,116 +1,51 @@
-# b15 tools: the balance report on a GitHub runner (ubuntu-latest, free standard runner, no secrets, no Unity). Bot matches or a
-# compare are re-simulated headless by tools/balance/balance-report.sh; the report (Markdown + JSON + CSV) is the artifact.
-# Manual: Actions > balance-report > Run workflow (the workflow must be on the default branch for the button; until then the
-# push trigger below runs it: push any commit to a ci/balance/** branch and it compares integration/batch-13-cand1 with that
-# commit at 24 seeds and reports it at 72).
-#   gh workflow run balance-report.yml -f ref=origin/integration/batch-13-cand1 -f seeds=24
-#   gh workflow run balance-report.yml -f mode=compare -f base=origin/integration/batch-13-cand1 -f head=feat/b15-comeback-hut
-#   gh workflow run balance-report.yml -f mode=compare -f base= -f head="Depth.Hut.On=false"
+# PROBE ONLY (feat/b16-mechanics-fixes): the b16 measurement arms and the 72-seed compares vs aa2ecfef. Never merged.
 name: balance-report
 on:
-  workflow_dispatch:
-    inputs:
-      mode:
-        description: "report (one ref), compare (base vs head) or tuning-index"
-        type: choice
-        options: [report, compare, tuning-index]
-        default: report
-      ref:
-        description: "report: the commit to measure (branch, tag or sha; empty = the branch this runs on)"
-        type: string
-        default: ''
-      seeds:
-        description: "bot matches (16v16, the WinShare pool first)"
-        type: choice
-        options: ['24', '72']
-        default: '24'
-      switches:
-        description: "report: switches on top of the rules, e.g. Depth.Hut.On=false;Classes[0].MaxHp=170"
-        type: string
-        default: ''
-      base:
-        description: "compare: a ref, or switches (Path=Value;...), empty = the game as checked out"
-        type: string
-        default: ''
-      head:
-        description: "compare: a ref, or switches"
-        type: string
-        default: ''
   push:
-    branches: ['ci/balance/**']
+    branches: ['ci/balance/b16-mech-**']
 permissions:
   contents: read
-concurrency:
-  group: balance-report-${{ github.ref }}-${{ inputs.mode || 'push' }}
-  cancel-in-progress: false
 jobs:
-  report:
+  arms:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
+      max-parallel: 14
       matrix:
-        seeds: ${{ github.event_name == 'push' && fromJSON('["24","72"]') || fromJSON(format('["{0}"]', inputs.seeds)) }}
-    timeout-minutes: ${{ matrix.seeds == '72' && 60 || 25 }}
+        include:
+          - { job: c16, arms: "cmp-16|--seeds 72" }
+          - { job: c08, arms: "cmp-08|--team-size 8 --seeds 72 --no-duels --set MatchSeconds=240 --set HatchSeconds=120" }
+          - { job: c05, arms: "cmp-05|--team-size 5 --seeds 72 --no-duels --set MatchSeconds=240 --set HatchSeconds=120" }
+          - { job: a01, arms: "heal-on|--seeds 72 --no-duels --set Depth.Mech.HealerTieBreak=true" }
+          - { job: a02, arms: "warrior1|--seeds 72 --no-duels --set Depth.Mech.WarriorHoldWeight=1" }
+          - { job: a03, arms: "nocap|--seeds 72 --no-duels --set Depth.Mech.HillContributorCap=0" }
+          - { job: a04, arms: "allFarmer-A|--seeds 72 --no-duels --mix-team Azure --mix 0,16,0,0,0,0" }
+          - { job: a05, arms: "noWarrior-A|--seeds 72 --no-duels --mix-team Azure --mix 0,6,3,3,2,2" }
+          - { job: a06, arms: "allWarrior-A|--seeds 72 --no-duels --mix-team Azure --mix 16,0,0,0,0,0" }
+          - { job: a07, arms: "idle16|--seeds 72 --no-duels --idle" }
+          - { job: a08, arms: "quick5-idle|--team-size 5 --seeds 200 --no-duels --set MatchSeconds=240 --set HatchSeconds=120 --idle\nquick5|--team-size 5 --seeds 200 --no-duels --set MatchSeconds=240 --set HatchSeconds=120" }
+          - { job: a09, arms: "heal-on-q5|--team-size 5 --seeds 200 --no-duels --set MatchSeconds=240 --set HatchSeconds=120 --set Depth.Mech.HealerTieBreak=true\nheal-off-q5|--team-size 5 --seeds 200 --no-duels --set MatchSeconds=240 --set HatchSeconds=120" }
+          - { job: a10, arms: "heal-on-q8|--team-size 8 --seeds 200 --no-duels --set MatchSeconds=240 --set HatchSeconds=120 --set Depth.Mech.HealerTieBreak=true\nheal-off-q8|--team-size 8 --seeds 200 --no-duels --set MatchSeconds=240 --set HatchSeconds=120" }
+    timeout-minutes: 120
+    env:
+      BASE_REF: aa2ecfef
     steps:
       - uses: actions/checkout@v4
         with:
           lfs: false
-          fetch-depth: 0   # compare and report on other refs need their commits
+          fetch-depth: 0
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.0.x'
-      - name: Balance report
+      - name: Arms
         shell: bash
-        env:
-          # push (self-check): 24 seeds = compare integration/batch-13-cand1 (measured in a worktree) with this commit; 72 = report
-          MODE: ${{ inputs.mode || (matrix.seeds == '24' && 'compare' || 'report') }}
-          REF: ${{ inputs.ref }}
-          SEEDS: ${{ matrix.seeds }}
-          SWITCHES: ${{ inputs.switches }}
-          BASE: ${{ github.event_name == 'push' && 'origin/integration/batch-13-cand1' || inputs.base }}
-          HEAD: ${{ inputs.head }}
-        run: |
-          set -o pipefail
-          start=$(date +%s)
-          out="Temp/balance/report-${SEEDS}"
-          sets=()
-          IFS=';' read -ra parts <<< "${SWITCHES}"
-          for p in "${parts[@]}"; do [[ -n "${p// }" ]] && sets+=(--set "$p"); done
-          case "$MODE" in
-            tuning-index)
-              tools/balance/balance-report.sh tuning-index --out "$out/TUNING-INDEX.md" ;;
-            compare)
-              tools/balance/balance-report.sh compare --base "$BASE" --head "$HEAD" --seeds "$SEEDS" --out "$out" ;;
-            *)
-              tools/balance/balance-report.sh tuning-index --out "$out/TUNING-INDEX.md"
-              if [[ -n "$REF" ]]; then
-                git rev-parse --verify --quiet "$REF^{commit}" >/dev/null || git fetch --quiet origin "$REF"
-                tools/balance/balance-report.sh run --ref "$REF" --seeds "$SEEDS" ${sets[@]+"${sets[@]}"} --out "$out"
-              else
-                tools/balance/balance-report.sh run --seeds "$SEEDS" ${sets[@]+"${sets[@]}"} --label "${GITHUB_REF_NAME}" --out "$out"
-              fi ;;
-          esac
-          rc=$?
-          echo "BALANCE_MINUTES=$(( ( $(date +%s) - start + 59 ) / 60 ))" >> "$GITHUB_ENV"
-          exit $rc
-      - name: Summary
-        if: always()
-        shell: bash
-        run: |
-          {
-            echo "### balance-report (${{ matrix.seeds }} seeds), step time about ${BALANCE_MINUTES:-?} min"
-            for f in Temp/balance/report-${{ matrix.seeds }}/balance-report.md Temp/balance/report-${{ matrix.seeds }}/balance-compare.md; do
-              if [[ -f "$f" ]]; then sed -n '1,/^## Time per class/p' "$f" | head -80; fi
-            done
-          } >> "$GITHUB_STEP_SUMMARY"
+        run: printf "${{ matrix.arms }}\n" | tools/balance/b16-arms.sh
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: balance-report-${{ matrix.seeds }}
+          name: b16-${{ matrix.job }}
           path: |
-            Temp/balance/report-${{ matrix.seeds }}/
-            Temp/balance/base-report/
-            Temp/balance/head-report/
+            Temp/balance/arms/
             Temp/balance/build.log
           if-no-files-found: warn
           retention-days: 30
