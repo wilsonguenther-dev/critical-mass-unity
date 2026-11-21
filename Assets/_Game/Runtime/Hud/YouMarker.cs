@@ -127,7 +127,9 @@ namespace CriticalMass.Runtime.Hud
                 new Vector3(0f, 0f, 0f),
                 new Vector3(-h, up, -h), new Vector3(h, up, -h), new Vector3(h, up, h), new Vector3(-h, up, h),
             };
-            var tri = new[] { 0, 2, 1, 0, 3, 2, 0, 4, 3, 0, 1, 4, 1, 2, 3, 1, 3, 4 };
+            // b15 Editor review: clockwise seen from OUTSIDE (Unity's front face). The old order was inside-out, so the
+            // camera saw only the navy ink hull: the dark square over the player at match start, rematch and respawn.
+            var tri = new[] { 0, 1, 2, 0, 2, 3, 0, 3, 4, 0, 4, 1, 1, 3, 2, 1, 4, 3 };
             var m = new Mesh { name = "You Arrow" };
             m.vertices = v;
             m.triangles = tri;

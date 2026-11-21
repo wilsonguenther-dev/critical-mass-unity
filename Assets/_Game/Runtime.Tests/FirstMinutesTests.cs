@@ -77,6 +77,21 @@ namespace CriticalMass.Runtime.Tests
             Assert.AreEqual(6, arrow.triangles.Length / 3);
             Assert.LessOrEqual(ring.triangles.Length / 3 + arrow.triangles.Length / 3, 100);
             Assert.Greater(ring.bounds.extents.x, 1f, "wider than a fighter's footprint");
+            // b15 Editor review: the arrow was wound inside-out and drew as a navy square (only its ink hull showed).
+            // Every face's Unity normal (cross of b-a, c-a for a clockwise front face) points away from the centroid.
+            Vector3[] v = arrow.vertices;
+            int[] t = arrow.triangles;
+            Vector3 mid = Vector3.zero;
+            foreach (Vector3 p in v) mid += p;
+            mid /= v.Length;
+            int outward = 0;
+            for (int i = 0; i < t.Length; i += 3)
+            {
+                Vector3 a = v[t[i]], b = v[t[i + 1]], c = v[t[i + 2]];
+                if (Vector3.Dot(Vector3.Cross(b - a, c - a), (a + b + c) / 3f - mid) > 0f) outward++;
+            }
+            Debug.Log("[FirstMinutes] arrow faces wound outward: " + outward + " of " + t.Length / 3 + " (limit all)");
+            Assert.AreEqual(t.Length / 3, outward, "every arrow face wound outward (front face seen from outside)");
             Object.DestroyImmediate(ring);
             Object.DestroyImmediate(arrow);
         }
