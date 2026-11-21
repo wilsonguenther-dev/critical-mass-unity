@@ -204,7 +204,9 @@ namespace CriticalMass.Sim.Tests
                                           "\",\"seconds\":" + S(r.Seconds) + ",\"hits\":" + r.Hits + ",\"limit\":\"3-6 (Healer row <=7)\"}");
                         if (!feel) continue;
                         // pass 2 (coordinator): 3-6 s; the Healer's row (support, she mends first) at most 7 s.
-                        double hi = atk == ClassId.Healer ? 7 : 6;
+                        // b16: on the Warrior's column the Healer's limit is 9 s (his one-on-one guard, SoloGuard: she is the
+                        // class every other one beats, and he beats every class).
+                        double hi = atk == ClassId.Healer ? (def == ClassId.Warrior ? 9 : 7) : 6;
                         if (double.IsNaN(r.Seconds) || r.Seconds < 3 || r.Seconds > hi + 1e-9) bad.Add(atk + " on " + def + ": " + S(r.Seconds) + " s");
                     }
                     Console.WriteLine("[ttk " + arm + "] " + atk + ": " + row);
@@ -225,7 +227,8 @@ namespace CriticalMass.Sim.Tests
                 foreach (ClassId c in Six)
                 {
                     Console.WriteLine("{\"item\":\"b15 fight wins\",\"arm\":\"" + arm + "\",\"class\":\"" + c + "\",\"wins\":" + wins[c] + ",\"of\":5,\"limit\":\"<5 after\"}");
-                    if (feel && wins[c] >= 5) bad.Add(c + " wins every fight-back match-up");
+                    // b16 (design advisor 2026-11-21): the Warrior wins every duel by design; no other class may.
+                    if (feel && wins[c] >= 5 && c != ClassId.Warrior) bad.Add(c + " wins every fight-back match-up");
                 }
             }
             Assert.IsEmpty(bad, string.Join("\n", bad));
@@ -327,7 +330,9 @@ namespace CriticalMass.Sim.Tests
             Tick(w, press, null);
             Actor a = w.Actors[0];
             for (int t = 0; t < a.SwingWindup + 1; t++) Tick(w, null, null);
-            int whiff = CombatFeel.Ticks(w, w.Config.Depth.CombatFeel.WhiffRecoverySeconds);
+            CombatFeelConfig wf = w.Config.Depth.CombatFeel;
+            double extra = wf.WhiffExtraSeconds != null ? wf.WhiffExtraSeconds[(int)ClassId.Warrior] : 0;   // b16: the Warrior's miss costs more
+            int whiff = CombatFeel.Ticks(w, wf.WhiffRecoverySeconds + extra);
             Console.WriteLine("{\"item\":\"b15 whiff\",\"recovery\":" + a.SwingRecovery + ",\"expected\":" + (w.Dur.Recovery[0] + whiff) + ",\"cdS\":" + a.AttackCd.ToString("0.000") + "}");
             Assert.AreEqual(w.Dur.Recovery[0] + whiff, a.SwingRecovery, "whiff recovery");
             Assert.AreEqual(1, w.Depth.Feel.Whiffs);
@@ -478,7 +483,9 @@ namespace CriticalMass.Sim.Tests
             });
             Console.WriteLine("{\"item\":\"b15 class mods\",\"minerOnWarrior\":" + minerOnWarrior + ",\"minerOnFarmer\":" + minerOnFarmer + ",\"farmerFar\":" + farmerFar +
                               ",\"farmerClose\":" + farmerClose + ",\"builderOpen\":" + builderOpen + ",\"builderHome\":" + builderHome + "}");
-            Assert.AreEqual(f.Classes[(int)ClassId.Miner].AttackDamage * f.MinerHeavyPierce, minerOnWarrior, 1e-6, "Miner pierces the Warrior");
+            // b16: one on one the Warrior shrugs off SoloGuard of every melee hit
+            double guard = f.SoloGuard != null ? 1 - f.SoloGuard[(int)ClassId.Warrior] : 1;
+            Assert.AreEqual(f.Classes[(int)ClassId.Miner].AttackDamage * (f.MinerPierceWarrior ? f.MinerHeavyPierce : 1) * guard, minerOnWarrior, 1e-6, "Miner pierces the Warrior");
             Assert.AreEqual(f.Classes[(int)ClassId.Miner].AttackDamage, minerOnFarmer, 1e-6);
             Assert.AreEqual(f.Classes[(int)ClassId.Farmer].AttackDamage, farmerFar, 1e-6);
             Assert.AreEqual(f.Classes[(int)ClassId.Farmer].AttackDamage * f.FarmerCloseShare, farmerClose, 1e-6, "Farmer weak up close");
@@ -507,7 +514,7 @@ namespace CriticalMass.Sim.Tests
                 }
             }
             Console.WriteLine("{\"item\":\"b15 sunder\",\"first\":" + hits[0] + ",\"second\":" + (hits.Count > 1 ? hits[1] : -1) + "}");
-            Assert.AreEqual(f.Classes[(int)ClassId.Miner].AttackDamage * f.MinerHeavyPierce * (1 + f.SunderDamageTaken), hits[1], 1e-6, "sundered");
+            Assert.AreEqual(f.Classes[(int)ClassId.Miner].AttackDamage * (f.MinerPierceWarrior ? f.MinerHeavyPierce : 1) * (1 + f.SunderDamageTaken) * guard, hits[1], 1e-6, "sundered");
         }
 
         [Test]

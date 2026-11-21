@@ -710,9 +710,9 @@ Regenerate: `tools/balance/balance-report.sh tuning-index (or the balance-report
 | `Depth.TerrainHeight.KaijuSmashMargin` | 0.25 | double | `Assets/_Game/Sim/Config/TerrainHeightConfig.cs` | Kaiju body overlap test: its wall collider radius (PhysicsConfig.KaijuBodyRadius) plus this margin, u. |
 | `Depth.CombatFeel.Enabled` | true | bool | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` | The one switch (default ON in Full). False = the game before b15 combat feel, bit for bit. |
 | `Depth.CombatFeel.Classes[0].MaxHp` | 115 | double | `Assets/_Game/Sim/Config/GameConfig.cs` |  |
-| `Depth.CombatFeel.Classes[0].MoveSpeed` | 3.8 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | Units per second. |
+| `Depth.CombatFeel.Classes[0].MoveSpeed` | 3.61 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | Units per second. |
 | `Depth.CombatFeel.Classes[0].Radius` | 0.45 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | Collision circle. |
-| `Depth.CombatFeel.Classes[0].AttackDamage` | 21 | double | `Assets/_Game/Sim/Config/GameConfig.cs` |  |
+| `Depth.CombatFeel.Classes[0].AttackDamage` | 24 | double | `Assets/_Game/Sim/Config/GameConfig.cs` |  |
 | `Depth.CombatFeel.Classes[0].AttackRange` | 1.8 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | Melee reach from the actor centre. |
 | `Depth.CombatFeel.Classes[0].AttackArcDeg` | 110 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | Cleave arc, centred on facing. |
 | `Depth.CombatFeel.Classes[0].AttackCooldown` | 0.9 | double | `Assets/_Game/Sim/Config/GameConfig.cs` |  |
@@ -733,7 +733,7 @@ Regenerate: `tools/balance/balance-report.sh tuning-index (or the balance-report
 | `Depth.CombatFeel.Classes[1].AbilityCooldown` | 9 | double | `Assets/_Game/Sim/Config/GameConfig.cs` |  |
 | `Depth.CombatFeel.Classes[1].GatherSeconds` | 1 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | Time to pull one unit from a node. |
 | `Depth.CombatFeel.Classes[1].CarryCapacity` | 3 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | Max units carried. |
-| `Depth.CombatFeel.Classes[1].AttackWindupSeconds` | 0.27 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | DG-69 / OD-2: real seconds from the attack press to the hit (0 = the browser's press-tick hit). |
+| `Depth.CombatFeel.Classes[1].AttackWindupSeconds` | 0.31 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | DG-69 / OD-2: real seconds from the attack press to the hit (0 = the browser's press-tick hit). |
 | `Depth.CombatFeel.Classes[1].RecoverySeconds` | 0.22 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | DG-69: real seconds of slowed follow-through after the hit (the view's recovery; movement stays slowed). |
 | `Depth.CombatFeel.Classes[1].Mass` | 0.8 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | DG-70 / OD-3: knock distances are divided by this (Warrior heaviest, Farmer lightest). |
 | `Depth.CombatFeel.Classes[1].Poise` | 20 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | DG-70: a single hit of at least this much damage staggers this class (HeavyStunSeconds). |
@@ -747,14 +747,14 @@ Regenerate: `tools/balance/balance-report.sh tuning-index (or the balance-report
 | `Depth.CombatFeel.Classes[2].AbilityCooldown` | 12 | double | `Assets/_Game/Sim/Config/GameConfig.cs` |  |
 | `Depth.CombatFeel.Classes[2].GatherSeconds` | 2 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | Time to pull one unit from a node. |
 | `Depth.CombatFeel.Classes[2].CarryCapacity` | 1 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | Max units carried. |
-| `Depth.CombatFeel.Classes[2].AttackWindupSeconds` | 0.2 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | DG-69 / OD-2: real seconds from the attack press to the hit (0 = the browser's press-tick hit). |
+| `Depth.CombatFeel.Classes[2].AttackWindupSeconds` | 0.35 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | DG-69 / OD-2: real seconds from the attack press to the hit (0 = the browser's press-tick hit). |
 | `Depth.CombatFeel.Classes[2].RecoverySeconds` | 0.18 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | DG-69: real seconds of slowed follow-through after the hit (the view's recovery; movement stays slowed). |
 | `Depth.CombatFeel.Classes[2].Mass` | 1.1 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | DG-70 / OD-3: knock distances are divided by this (Warrior heaviest, Farmer lightest). |
 | `Depth.CombatFeel.Classes[2].Poise` | 24 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | DG-70: a single hit of at least this much damage staggers this class (HeavyStunSeconds). |
 | `Depth.CombatFeel.Classes[3].MaxHp` | 120 | double | `Assets/_Game/Sim/Config/GameConfig.cs` |  |
 | `Depth.CombatFeel.Classes[3].MoveSpeed` | 4 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | Units per second. |
 | `Depth.CombatFeel.Classes[3].Radius` | 0.45 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | Collision circle. |
-| `Depth.CombatFeel.Classes[3].AttackDamage` | 12 | double | `Assets/_Game/Sim/Config/GameConfig.cs` |  |
+| `Depth.CombatFeel.Classes[3].AttackDamage` | 15 | double | `Assets/_Game/Sim/Config/GameConfig.cs` |  |
 | `Depth.CombatFeel.Classes[3].AttackRange` | 1.4 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | Melee reach from the actor centre. |
 | `Depth.CombatFeel.Classes[3].AttackArcDeg` | 90 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | Cleave arc, centred on facing. |
 | `Depth.CombatFeel.Classes[3].AttackCooldown` | 0.7 | double | `Assets/_Game/Sim/Config/GameConfig.cs` |  |
@@ -845,15 +845,15 @@ Regenerate: `tools/balance/balance-report.sh tuning-index (or the balance-report
 | `Depth.CombatFeel.LadderFallKnock` | 1.2 | double | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` |  |
 | `Depth.CombatFeel.BotNarrowRawStep` | false | bool | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` | In narrow spots bots follow the raw next-cell step, not the blended flow. OFF by default: the shiver gate's match (seed 7) had 4 hard flags with it and 0 without (sim run 44233001957, CombatFeelTests shiver-by-part). |
 | `Depth.CombatFeel.BotLeadSeconds` | 0.13 | double | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` | Bots lead a moving target by at most this much of their wind-up (real seconds) when they chase and aim. |
-| `Depth.CombatFeel.SunderBreaksArmour` | true | bool | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` | b16 duel order: a SUNDER-marked Warrior loses its armour (its wind-up can be staggered). |
+| `Depth.CombatFeel.SunderBreaksArmour` | false | bool | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` | b16 duel order: a SUNDER-marked Warrior loses its armour (its wind-up can be staggered). |
 | `Depth.CombatFeel.MinerPierceWarrior` | true | bool | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` | b16 duel order: the Miner's pierce bonus (mass 1.3 and up) applies to the Warrior. |
-| `Depth.CombatFeel.StaggerCancelRefund` | 0 | double | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` | b16: share of the cooldown given back when a stagger cancels a wind-up (0 = the full cooldown is kept). |
-| `Depth.CombatFeel.StrikeStaggers` | null | bool[] | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` | b16: per attacker class, does its melee hit stagger (null = every class). |
+| `Depth.CombatFeel.StaggerCancelRefund` | 0.6 | double | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` | b16: share of the cooldown given back when a stagger cancels a wind-up (0 = the full cooldown is kept). |
+| `Depth.CombatFeel.StrikeStaggers` | true,true,true,true,true,false | bool[] | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` | b16: per attacker class, does its melee hit stagger (null = every class). |
 | `Depth.CombatFeel.PulseSelfShare` | 1 | double | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` | b16: share of the Healer's pulse heal the Healer gets on herself (team healing unchanged). |
-| `Depth.CombatFeel.WhiffExtraSeconds` | null | double[] | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` | b16: per class extra recovery (real seconds) after a whiff, on top of WhiffRecoverySeconds. |
-| `Depth.CombatFeel.OutnumberedBreaksArmour` | false | bool | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` | b16 trade: an armoured class struck by a second attacker within OutnumberedSeconds loses its armour for that hit. |
+| `Depth.CombatFeel.WhiffExtraSeconds` | 0.25,0,0,0,0,0 | double[] | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` | b16: per class extra recovery (real seconds) after a whiff, on top of WhiffRecoverySeconds. |
+| `Depth.CombatFeel.OutnumberedBreaksArmour` | true | bool | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` | b16 trade: an armoured class struck by a second attacker within OutnumberedSeconds loses its armour for that hit. |
 | `Depth.CombatFeel.OutnumberedSeconds` | 1 | double | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` | b16 trade: the window for OutnumberedBreaksArmour. |
-| `Depth.CombatFeel.SoloGuard` | null | double[] | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` | b16: per target class, share of melee damage shrugged off while only one enemy fights it (none struck it within OutnumberedSeconds). |
+| `Depth.CombatFeel.SoloGuard` | 0.2,0,0,0,0,0 | double[] | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` | b16: per target class, share of melee damage shrugged off while only one enemy fights it (none struck it within OutnumberedSeconds). |
 | `Depth.CombatFeel.CancelEnabled` | true | bool | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` | b16 CANCEL (Full only): the cancel input feints a wind-up or cuts the recovery after a landed hit. False = the button does nothing. |
 | `Depth.CombatFeel.FeintRecoverySeconds` | 0.1 | double | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` | b16 CANCEL: the fixed recovery after a feint (no swing, no dodge). |
 | `Depth.CombatFeel.FeintRefund` | 0.7 | double | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` | b16 CANCEL: share of the attack cooldown left that a feint gives back (never under the feint recovery). |

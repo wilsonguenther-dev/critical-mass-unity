@@ -40,7 +40,9 @@ namespace CriticalMass.Sim.Config
             {
                 // pass 4: 140 -> 120 HP (Warrior on Warrior 6.10 s and Healer on Warrior 7.80 s were over their limits; his share of all damage 0.44).
                 // pass 4b: 120 -> 115 HP, the tune search BEST (slow run 44841109806: total 9.40 -> 3.04, Demolitions gate 0.257 -> 0.224).
-                MaxHp = 115, MoveSpeed = 3.8, Radius = 0.45, AttackDamage = 21, AttackRange = 1.8, AttackArcDeg = 110,
+                // b16 duel order (design advisor 2026-11-21, lever sweep runs 44921976456 + 44924217345): 21 -> 24 damage and
+                // 3.8 -> 3.61 move (5% slower, "so the non fighter has a chance of escape"); the one-on-one edge is SoloGuard.
+                MaxHp = 115, MoveSpeed = 3.61, Radius = 0.45, AttackDamage = 24, AttackRange = 1.8, AttackArcDeg = 110,
                 AttackCooldown = 0.90, AbilityCooldown = 10, GatherSeconds = 2, CarryCapacity = 1,
                 AttackWindupSeconds = 0.40, RecoverySeconds = 0.30, Mass = 1.6, Poise = 30,
             },
@@ -50,7 +52,7 @@ namespace CriticalMass.Sim.Config
             {
                 MaxHp = 100, MoveSpeed = 4.2, Radius = 0.4, AttackDamage = 23, AttackRange = 2.3, AttackArcDeg = 60,
                 AttackCooldown = 0.65, AbilityCooldown = 9, GatherSeconds = 1, CarryCapacity = 3,
-                AttackWindupSeconds = 0.27, RecoverySeconds = 0.22, Mass = 0.8, Poise = 20,
+                AttackWindupSeconds = 0.31, RecoverySeconds = 0.22, Mass = 0.8, Poise = 20,   // b16: 0.27 -> 0.31 wind-up (no middle-class king)
             },
             // MINER: fast pick (0.20 s wind-up, 0.65 s cycle), light body (110 HP). Armour break: his hits leave SUNDER (+15% for
             // 3 s) and pierce heavy bodies (x1.4 on Mass >= 1.3: the Warrior, the Builder); x2 on structures and walls.
@@ -60,13 +62,13 @@ namespace CriticalMass.Sim.Config
             {
                 MaxHp = 100, MoveSpeed = 4.0, Radius = 0.45, AttackDamage = 17, AttackRange = 1.5, AttackArcDeg = 90,
                 AttackCooldown = 0.65, AbilityCooldown = 12, GatherSeconds = 2, CarryCapacity = 1,
-                AttackWindupSeconds = 0.20, RecoverySeconds = 0.18, Mass = 1.1, Poise = 24,
+                AttackWindupSeconds = 0.35, RecoverySeconds = 0.18, Mass = 1.1, Poise = 24,   // b16: 0.20 -> 0.35 wind-up (the swing only; mining is GatherSeconds and the terraform rules)
             },
             // DEMOLITIONS: weak pry bar (12 every 0.7 s; 10 measured 6.3 s on every class, over the 3-6 s band); her damage is the thrown TNT (telegraphed fuse, area), every
             // TntCooldownTicks instead of 150; her own blast hurts her (TntSelfShare): self-risk.
             new ClassConfig
             {
-                MaxHp = 120, MoveSpeed = 4.0, Radius = 0.45, AttackDamage = 12, AttackRange = 1.4, AttackArcDeg = 90,
+                MaxHp = 120, MoveSpeed = 4.0, Radius = 0.45, AttackDamage = 15, AttackRange = 1.4, AttackArcDeg = 90,   // b16: 12 -> 15
                 AttackCooldown = 0.70, AbilityCooldown = 12, GatherSeconds = 2, CarryCapacity = 1,
                 AttackWindupSeconds = 0.23, RecoverySeconds = 0.25, Mass = 1.0, Poise = 22,
             },
@@ -162,28 +164,28 @@ namespace CriticalMass.Sim.Config
         // one switch; the values below are the ones the 72-seed arms chose (docs/balance, PR body).
         /// <summary>True (b15): a SUNDERED body (a Miner hit it in the last SunderSeconds) loses its armoured wind-up. False: the
         /// Warrior's armour holds against every hit under his Poise, SUNDER or not (SUNDER still adds its damage).</summary>
-        public bool SunderBreaksArmour = true;
+        public bool SunderBreaksArmour = false;   // b16 (b15: true)
         /// <summary>True (b15): the Miner's heavy pierce (MinerHeavyPierce on Mass at or over MinerHeavyMass) applies to the
         /// Warrior too. False: it pierces the Builder (and any other heavy non-fighter) but not the Warrior.</summary>
         public bool MinerPierceWarrior = true;
         /// <summary>Share of the attack cooldown given back when a stagger cancels a wind-up (0 = b15: a cancelled swing
         /// keeps its full cooldown, so the faster wind-up always wins the exchange).</summary>
-        public double StaggerCancelRefund = 0;
+        public double StaggerCancelRefund = 0.6;   // b16 (b15: 0)
         /// <summary>Per class (indexed by ClassId): does a landed melee hit of this class stagger (and so cancel a wind-up)?
         /// null = every class staggers (b15). The knock and the damage are unchanged either way.</summary>
-        public bool[] StrikeStaggers = null;
+        public bool[] StrikeStaggers = { true, true, true, true, true, false };   // b16: the Healer's lantern does not stagger (b15: null)
         /// <summary>Share of her own HEALING WINGS pulse the Healer gets herself (1 = b15; her allies always get all of it).</summary>
         public double PulseSelfShare = 1;
         /// <summary>Per class: extra recovery (real seconds) on top of WhiffRecoverySeconds after a swing that hit nothing
         /// (null = none). The trade for a strong 1v1 Warrior: a miss in a crowd is punished.</summary>
-        public double[] WhiffExtraSeconds = null;
+        public double[] WhiffExtraSeconds = { 0.25, 0, 0, 0, 0, 0 };   // b16 trade: the Warrior's miss (b15: null)
         /// <summary>Outnumbered: an armoured class hit by a SECOND enemy within OutnumberedSeconds of another enemy's hit loses
         /// its armoured wind-up for OutnumberedSeconds (one on one it never triggers). False = b15.</summary>
-        public bool OutnumberedBreaksArmour = false;
+        public bool OutnumberedBreaksArmour = true;   // b16 trade (b15: false)
         public double OutnumberedSeconds = 1.0;
         /// <summary>Per target class: share of melee damage it shrugs off while ONE enemy fights it (no other enemy struck it
         /// within OutnumberedSeconds; null = none). The fighter's one-on-one edge that does not carry into a crowd.</summary>
-        public double[] SoloGuard = null;
+        public double[] SoloGuard = { 0.2, 0, 0, 0, 0, 0 };   // b16: the Warrior one on one (b15: null)
 
         // ---- E. b16 CANCEL button (test feature for high-level play; design advisor 2026-11-21: "it should cancel the attack
         // animation and allows for feints. also cancelling the attack animation after a hit lands would allow people to
