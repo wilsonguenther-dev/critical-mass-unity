@@ -110,6 +110,10 @@ namespace CriticalMass.Runtime.Progression
         /// <summary>The replay's file name in the replay folder ("" when none was saved).</summary>
         public string ReplayFile = string.Empty;
         public int Seed;
+        /// <summary>b16: a practice match (shown apart; not in the careers or the profile's matches).</summary>
+        public bool Practice;
+        /// <summary>b16: the local player left before the end (recorded as a loss).</summary>
+        public bool Left;
     }
 
     /// <summary>
@@ -129,7 +133,10 @@ namespace CriticalMass.Runtime.Progression
         public string PlayerName = DefaultName;
         public int SkillPoints;
         public int Coins;
+        /// <summary>Completed and left matches outside practice (MatchCounting); practice is PracticeMatches.</summary>
         public int MatchesPlayed;
+        /// <summary>b16: completed practice matches (Training, Practice, Spectate, the demo), shown apart. Older files read 0.</summary>
+        public int PracticeMatches;
         public int Wins;
         public int Draws;
         public int Losses;

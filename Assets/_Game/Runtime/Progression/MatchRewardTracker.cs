@@ -138,12 +138,43 @@ namespace CriticalMass.Runtime.Progression
         {
             if (_finished) return Last;
             _finished = true;
+            stats.Practice = MetaRecorder.IsPractice(CriticalMass.Runtime.Flow.PlayModes.SessionMode);   // b16: practice apart
             MatchRewards r = RewardRules.Compute(stats);
             RewardRules.Apply(r, Profile.Current);
             Profile.Commit();
             Last = r;
             RewardsReady?.Invoke(r);
             return r;
+        }
+
+        /// <summary>
+        /// b16 (audit item 11): the local player leaves a running match (QUIT TO TITLE, RESTART MATCH, QUIT GAME): no reward,
+        /// recorded as a loss in the profile, the class career and the history (MatchCounting), once. Nothing when the match
+        /// already ended, is a practice match, was voided (host left) or is a replay / capture.
+        /// </summary>
+        public static bool RecordLeave()
+        {
+            MatchRewardTracker t = Instance;
+            if (t == null || t._finished || SimDriverBehaviour.CaptureMode) return false;
+            World w = t.Driver != null ? t.Driver.World : null;
+            if (w == null || t.Driver.IsReplay || w.Match.Phase != MatchPhase.Playing || LocalActor < 0 || LocalActor >= w.ActorCount) return false;
+            t._finished = true;
+            MatchStatsInput s = t.Current;
+            s.Completed = false;
+            s.Left = true;
+            s.Practice = MetaRecorder.IsPractice(CriticalMass.Runtime.Flow.PlayModes.SessionMode);
+            MatchRewards r = RewardRules.Compute(s);
+            RewardRules.Apply(r, Profile.Current);
+            if (MatchCounting.Counts(s))
+                MetaRecorder.RecordLeave(Profile.Current, w.Actors[LocalActor].Cls, w.Actors[LocalActor].Team, DateTime.UtcNow);
+            Profile.Commit();
+            return true;
+        }
+
+        /// <summary>b16: the host left (online): this match has no result for anyone; nothing is recorded for it.</summary>
+        public static void VoidMatch()
+        {
+            if (Instance != null) Instance._finished = true;
         }
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]

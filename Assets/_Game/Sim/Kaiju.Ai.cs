@@ -750,6 +750,7 @@ namespace CriticalMass.Sim.Core
                 gx = w.X[t];
                 gz = w.Z[t];
                 stop = kc.MeleeRange * ChaseStop;
+                KeepOffOwnHill(w, ref gx, ref gz, ref stop);   // b16-hook: never chase onto the hill its own team holds
             }
             else if (k.State == KaijuState.Neutral)
             {
@@ -762,8 +763,9 @@ namespace CriticalMass.Sim.Core
                 gx = w.Map.Hill.X;
                 gz = w.Map.Hill.Z;
                 stop = HillStop;
+                bool idleOff = IdleOffHillGoal(w, ref gx, ref gz, ref stop);   // b16-hook: a sided Kaiju waits off the scoring ring
                 // fix/kaiju-hill-1: the hill is cut off (barricades in the ring's gaps): break through, or get as close as it can.
-                if (guard && Phys.On(w, pc.KaijuHillSiege) && PickSiege(w))
+                if (!idleOff && guard && Phys.On(w, pc.KaijuHillSiege) && PickSiege(w))
                 {
                     gx = nav.StandCx + 0.5;
                     gz = nav.StandCz + 0.5;

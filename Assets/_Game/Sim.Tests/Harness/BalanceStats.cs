@@ -489,17 +489,25 @@ namespace CriticalMass.Sim.Tests.Harness
             return ok ? "met" : "missed";
         }
 
-        public static List<BalanceTarget> FromJson(string json)
+        public static List<BalanceTarget> FromJson(string json) => FromJson(json, 16);
+
+        /// <summary>b16: the targets for one team size: a target's "bySize" entry for that size ("8", "5") replaces its
+        /// min / max / maxExclusive; other sizes use the top-level band.</summary>
+        public static List<BalanceTarget> FromJson(string json, int teamSize)
         {
             var list = new List<BalanceTarget>();
             if (!(MiniJson.Parse(json) is Dictionary<string, object> root) || !(root.TryGetValue("targets", out object t) && t is List<object> items)) return list;
             foreach (object o in items)
             {
                 if (!(o is Dictionary<string, object> d)) continue;
+                Dictionary<string, object> band = d;
+                if (d.TryGetValue("bySize", out object bs) && bs is Dictionary<string, object> sizes
+                    && sizes.TryGetValue(teamSize.ToString(System.Globalization.CultureInfo.InvariantCulture), out object one) && one is Dictionary<string, object> o1)
+                    band = o1;
                 list.Add(new BalanceTarget
                 {
                     Id = MiniJson.Str(d, "id"), Row = MiniJson.Str(d, "row"), Label = MiniJson.Str(d, "label"), Source = MiniJson.Str(d, "source"),
-                    Min = MiniJson.Num(d, "min"), Max = MiniJson.Num(d, "max"), MaxExclusive = MiniJson.Bool(d, "maxExclusive"),
+                    Min = MiniJson.Num(band, "min"), Max = MiniJson.Num(band, "max"), MaxExclusive = MiniJson.Bool(band, "maxExclusive"),
                 });
             }
             return list;

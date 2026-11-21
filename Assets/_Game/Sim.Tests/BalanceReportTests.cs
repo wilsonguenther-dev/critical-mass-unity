@@ -163,7 +163,12 @@ namespace CriticalMass.Sim.Tests
         public void TheTargetsFileHasTheAuditBandsOnRowsTheReportWrites()
         {
             List<BalanceTarget> targets = BalanceTarget.FromJson(File.ReadAllText("docs/balance/TARGETS.json"));
-            Assert.AreEqual(9, targets.Count);   // b15 wave two: + warriordmg (dmgshare.Warrior); deadwalk reads time.deadwalkback.all
+            Assert.AreEqual(11, targets.Count);   // b15 wave two: + warriordmg; b16: + kaijuowner, crimson8 (side watch)
+            // b16: per-mode bands (bySize): Quick 5v5 and 8v8 on the 240 s clock
+            List<BalanceTarget> five = BalanceTarget.FromJson(File.ReadAllText("docs/balance/TARGETS.json"), 5);
+            Assert.AreEqual(0.2, five.Find(t => t.Id == "blowouts").Max, 1e-9, "5v5 blowout band");
+            Assert.AreEqual(0.15, targets.Find(t => t.Id == "blowouts").Max, 1e-9, "16v16 keeps the audit band");
+            Assert.AreEqual(4, BalanceTarget.FromJson(File.ReadAllText("docs/balance/TARGETS.json"), 8).Find(t => t.Id == "leadchanges").Min, 1e-9);
             GameConfig cfg = BalanceRunner.Config(RulesProfile.Full, null);
             var ms = new List<MatchRecord> { BalanceRunner.BotMatch(cfg, 7, 5, 30) };
             BalanceReport r = BalanceAggregate.Build(ms, DuelRunner.Ttk(RulesProfile.Full, null, 1), DuelRunner.Duels(RulesProfile.Full, null, 1));

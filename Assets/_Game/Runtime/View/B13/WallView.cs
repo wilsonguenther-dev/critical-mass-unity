@@ -91,6 +91,7 @@ namespace CriticalMass.Runtime.View.B13
             if (_mesh == null) return;
             _mesh.Clear();
             GhostCells = CapsDrawn = CracksDrawn = WarnDrawn = 0;
+            KeepoutRingShown = false;
             GhostOkShown = false;
             GhostWhyShown = 0;
             StackGhostLevel = 0;
@@ -115,6 +116,7 @@ namespace CriticalMass.Runtime.View.B13
             bool fill = BuilderWalls.GhostFill(w, me);
             GhostOkShown = ok;
             GhostWhyShown = BuilderWalls.GhostWhy(w, me);
+            DrawHillKeepout(w, cx, cz);
             Color32 c = ok ? GhostOk : GhostBad;
             float top = fill ? 0.05f : tall ? TallTop : ShortTop;
             // b15 terrain height: a BLOCK on a lift cell is one more level: the ghost is that course, from today's top
@@ -131,6 +133,29 @@ namespace CriticalMass.Runtime.View.B13
                 Box(x, z, h + 0.02f, h + top, 0.04f, c, GhostEdge);
                 GhostCells++;
             }
+        }
+
+        /// <summary>b16: the hill keep-out ring was drawn this frame (tests, WallShots).</summary>
+        public static bool KeepoutRingShown { get; private set; }
+        static readonly Color32 KeepoutInk = Pm(240, 64, 56, 90);
+        /// <summary>b16: the ghost within this many units of the keep-out edge shows the ring.</summary>
+        public const float KeepoutHintReach = 5f;
+
+        /// <summary>b16 (audit: walls refused only inside 3 u of the 6 u hill): while a Builder aims a piece near the hill, a
+        /// thin red ground ring shows the no-build circle (BuildConfig.HillKeepout, 7 u), so "can't build on the hill" has a
+        /// place on the ground. Steady (no blink): nothing for the reduced-flashing setting to calm.</summary>
+        void DrawHillKeepout(World w, int cx, int cz)
+        {
+            float r = (float)w.Config.Depth.Build.HillKeepout;
+            float hx = (float)w.Map.Hill.X, hz = (float)w.Map.Hill.Z;
+            float ddx = cx + 0.5f - hx, ddz = cz + 0.5f - hz;
+            float d = Mathf.Sqrt(ddx * ddx + ddz * ddz);
+            if (r <= 0f || d > r + KeepoutHintReach) return;
+            float y = (float)GroundHeight.At(w.Map, hx, hz) + 0.04f;
+            Vector3 c = SimSpace.ToWorld(hx, y, hz);
+            Vector3 right = SimSpace.ToWorld(hx + 1f, y, hz) - c, up = SimSpace.ToWorld(hx, y, hz + 1f) - c;
+            _mesh.Ring(c, right, up, r - 0.12f, r + 0.12f, 0f, Mathf.PI * 2f, 64, KeepoutInk);
+            KeepoutRingShown = true;
         }
 
         void DrawWalls(World w)

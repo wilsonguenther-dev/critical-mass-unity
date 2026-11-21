@@ -665,7 +665,8 @@ namespace CriticalMass.Sim.Tests
             ulong phys = MatchHash.Run(1, 16, 3600, ClassId.Warrior, null, c => c.ApplyRules(RulesProfile.PhysicsOnly));
             Console.WriteLine("{\"item\":\"b15 hashes\",\"fullOff\":\"0x" + off.ToString("X16") + "\",\"fullOn\":\"0x" + on.ToString("X16") + "\",\"classic\":\"0x" + cls.ToString("X16") +
                               "\",\"physicsOnly\":\"0x" + phys.ToString("X16") + "\"}");
-            Assert.AreEqual(0x2C933299522970D2UL, off, "the wave-two switches off are the batch 15 cand1 (wave one) Full game with the b15 fix round's Miner route and Kaiju ladder fixes (sim run 44880553461; was 0x2B40BAD073394FD6)");
+            Assert.AreEqual(0xCF5BEEF5B78200AEUL, off,   // b16: re-pinned with the Full row (sim run 44937275234; was 0x2C933299522970D2)
+                "the wave-two switches off are the batch 15 cand1 (wave one) Full game with the b15 fix round's Miner route and Kaiju ladder fixes (sim run 44880553461; was 0x2B40BAD073394FD6)");
             Assert.AreEqual(0x5C912AEED16BC302UL, cls, "Classic unchanged");
             Assert.AreEqual(0x0836DA5FD21C4854UL, phys, "PhysicsOnly unchanged");
             Assert.AreEqual(on, on2, "same seed, same match (determinism)");

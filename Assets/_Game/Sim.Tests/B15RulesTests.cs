@@ -46,9 +46,13 @@ namespace CriticalMass.Sim.Tests
             string got = "RALLY " + k.RallyOn + " x" + (1 + k.RallyPerMille / 1000.0) + " past " + k.TrailThresholdSeconds + " s cap " + k.BonusCapSeconds + " s; respawn " + k.RespawnCurveOn + " "
                 + k.RespawnStartSeconds + " -> " + k.RespawnEndSeconds + " s p" + k.CurvePower + "; waves " + k.WaveSeconds + "; turncoat " + k.KaijuTurncoat + "; fatigue " + k.HoldFatigueOn + " "
                 + k.HoldGraceSeconds + "/" + k.HoldSpanSeconds + "/" + k.HoldMinPerMille + "; majority " + k.MajorityMargin + "; forward " + k.ForwardReturnOn + " " + k.ForwardShare + " lost " + k.ForwardWhenHillLost
-                + "; trailing feed " + k.FeedTrailingPerMille + "; kaiju hill " + k.KaijuHillPerMille;
-            // 2026-11-21: set D0 = set B (TURNCOAT off until the owner rules on Kaiju allegiance) + KAIJU HOLDS NOTHING x0 on the hill
-            const string want = "RALLY True x1.5 past 5 s cap 60 s; respawn True 2 -> 5 s p1; waves 0; turncoat False; fatigue True 20/40/250; majority 1; forward True 0.4 lost True; trailing feed 0; kaiju hill 0";
+                + "; trailing feed " + k.FeedTrailingPerMille + "; kaiju hill " + k.KaijuHillPerMille
+                + "; small <= " + k.SmallTeamMaxSize + ": x" + (1 + k.SmallRallyPerMille / 1000.0) + " cap " + k.SmallBonusCapSeconds + " s respawn " + k.SmallRespawnStartSeconds
+                + " -> " + k.SmallRespawnEndSeconds + " s lost " + k.SmallForwardWhenHillLost;
+            // b16 2026-11-21: the mechanics audit's combo (owner-approved x1.25 / 45 s / 3 -> 8 s, forward for the trailing team
+            // only, the 5 s threshold kept) for 8 a side and up; 5 a side keeps the b15 set D0 numbers (x1.5 / 60 s / 2 -> 5 s).
+            const string want = "RALLY True x1.25 past 5 s cap 45 s; respawn True 3 -> 8 s p1; waves 0; turncoat False; fatigue True 20/40/250; majority 1; forward True 0.4 lost False; trailing feed 0; kaiju hill 0"
+                + "; small <= 5: x1.5 cap 60 s respawn 2 -> 5 s lost True";
             Line("comeback defaults", got, want);
             Assert.AreEqual(want, got);
             Assert.IsTrue(k.Enabled);
@@ -84,7 +88,9 @@ namespace CriticalMass.Sim.Tests
             // another rule item moves that row.
             // b15 fix round: re-pinned with the Full row (Miner route steering and the Kaiju ladder squeeze are not behind the wave-two
             // switches; sim run 44880553461 at a7433909; was 0x2B40BAD073394FD6 / 0x4E92D5071F543577).
-            const ulong Base16 = 0x2C933299522970D2UL, Base5 = 0xA3A7DED99EA6EFACUL;
+            // b16 mechanics fixes: re-pinned with the Full row (keep-out, type refs, hill count, the idle post are not behind these switches;
+            // sim run 44937275234; was 0x2C933299522970D2 / 0xA3A7DED99EA6EFAC).
+            const ulong Base16 = 0xCF5BEEF5B78200AEUL, Base5 = 0xB73024191643D64CUL;
             Action<GameConfig> off = c =>
             {
                 c.ApplyRules(RulesProfile.Full);

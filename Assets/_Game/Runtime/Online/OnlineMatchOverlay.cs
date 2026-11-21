@@ -81,6 +81,10 @@ namespace CriticalMass.Runtime.Online
             _panel.SetActive(false);
         }
 
+        /// <summary>b16 (audit item 11): the client's screen when the host leaves: the match has no result for anyone.</summary>
+        public const string HostLeftTitle = "HOST LEFT - NO RESULT";
+        public const string HostLeftBody = "The host left the match or lost their connection. No result: it counts as neither a win nor a loss for anyone.";
+
         void Update()
         {
             if (_session == null || _canvas == null) return;
@@ -105,9 +109,10 @@ namespace CriticalMass.Runtime.Online
                         // for everyone, and the match so far is saved as a replay now (30 s or more), not at the next match.
                         bool saved = _session.World != null && _session.World.Tick >= CriticalMass.Runtime.Replay.ReplayCapture.MinAbandonedSeconds * 30;
                         if (_session.World != null) CriticalMass.Runtime.Replay.ReplayCapture.End(_session.World, false);
-                        Show("MATCH ENDED", (_session.IsHost
+                        CriticalMass.Runtime.Progression.MatchRewardTracker.VoidMatch();   // b16: no result for anyone
+                        Show(_session.IsHost ? "MATCH ENDED" : HostLeftTitle, (_session.IsHost
                             ? (_session.ClosedReason ?? "The connection to the room was lost.")
-                            : "The host left the match or lost their connection.") + (saved ? " The match so far is saved in Replays." : ""));
+                            : HostLeftBody) + (saved ? " The match so far is saved in Replays." : ""));
                         break;
                     }
                 }

@@ -276,7 +276,7 @@ namespace CriticalMass.Runtime.Hud.Mechanics
             int key = (who == team ? 1 : 2) * 100000 + left * 2 + (earning ? 1 : 0);
             if (key == _rallyKey) return;
             _rallyKey = key;
-            HudText.Set(_rallyText, B15Hud.RallyLine(who == team, Comeback.Multiplier(w.Config), left));
+            HudText.Set(_rallyText, B15Hud.RallyLine(who == team, Comeback.Multiplier(w), left));
             Color ink = CMTokens.TeamInk(who);
             _rallyText.color = earning ? CMTokens.WarmCream.Color : ink;
             _rallyPanel.RimColor = ink;

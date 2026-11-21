@@ -22,7 +22,12 @@ namespace CriticalMass.Sim.Config
         /// </summary>
         /// b13 r3 integrator: wood 0.02 -> 0.01. Wood-plan teams deliver 2-9 % wood (their supply bots also stock the Builder's
         /// wood), water-plan teams 7-35 % water, so with equal references TIMBER hatched 0 of 24; at 0.01 the wood plans win.
-        public double[] RefShare = { 0.90, 0.10, 0.01, 0.02 };
+        /// b16 (mechanics audit section 4 and 5d): re-pinned to the 16v16 control's mix today (plant 0.759, meat 0.173, wood
+        /// 0.027, water 0.041 over 72 seeds). With the old pin plant scored 0.84 and could never win, meat always scored about 1.7,
+        /// and any wood over 1 % made a TIMBER (one Farmer trip of 3 wood out of ~130 units decided the type): GROVE and ELDER
+        /// hatched 0 of 72. Re-pinned with ElderBelowScore 1.12: Brute 10, Timber 26, Mire 20, Grove 2, Elder 14 of 72, with
+        /// no outcome number moved.
+        public double[] RefShare = { 0.76, 0.17, 0.03, 0.04 };
         /// <summary>The floor applied when pinning RefShare to a kind the control never feeds (wood, water).</summary>
         public double RefFloor = 0.02;
         /// <summary>Two best scores within this of each other = a tie = ELDER.</summary>
@@ -35,7 +40,8 @@ namespace CriticalMass.Sim.Config
         /// 0.898 / 0.102 (3 of 24), and 4 of 24 once the other r3 items moved the matches (full sim gate run 44106440444);
         /// 1.02 drops the meat-led 0.102 mix (score 1.02). 0 = the old rule (ties only).
         /// </summary>
-        public double ElderBelowScore = 1.02;
+        /// b16: 1.12 (audit 5d: 1.12 gives all five types at 16v16; 1.3 gave ELDER 81 of 200 at Quick 5v5).
+        public double ElderBelowScore = 1.12;
         /// <summary>Units of the type's own kind fed (both teams) for power level 1, 2, 3 (below the first: level 0, trait only).</summary>
         public double[] LevelUnits = { 8, 16, 24 };
 

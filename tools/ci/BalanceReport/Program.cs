@@ -147,7 +147,7 @@ namespace CriticalMass.Balance
         }
 
         static List<BalanceTarget> LoadTargets(Options o) =>
-            o.Targets != null && File.Exists(o.Targets) ? BalanceTarget.FromJson(File.ReadAllText(o.Targets)) : new List<BalanceTarget>();
+            o.Targets != null && File.Exists(o.Targets) ? BalanceTarget.FromJson(File.ReadAllText(o.Targets), o.TeamSize) : new List<BalanceTarget>();
 
         static void Write(string dir, string stem, string md, string json, string csv)
         {
