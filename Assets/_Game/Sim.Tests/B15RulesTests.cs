@@ -82,7 +82,9 @@ namespace CriticalMass.Sim.Tests
             // switches off (these two rules, and the combat feel and bot brain merged beside them) every hook returns its input,
             // so the Full match must hash to it bit for bit. Re-pin these two values together with the Full golden row whenever
             // another rule item moves that row.
-            const ulong Base16 = 0x2B40BAD073394FD6UL, Base5 = 0x4E92D5071F543577UL;
+            // b15 fix round: re-pinned with the Full row (Miner route steering and the Kaiju ladder squeeze are not behind the wave-two
+            // switches; sim run 44880553461 at a7433909; was 0x2B40BAD073394FD6 / 0x4E92D5071F543577).
+            const ulong Base16 = 0x2C933299522970D2UL, Base5 = 0xA3A7DED99EA6EFACUL;
             Action<GameConfig> off = c =>
             {
                 c.ApplyRules(RulesProfile.Full);
