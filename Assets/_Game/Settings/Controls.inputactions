@@ -535,7 +535,7 @@
                 {
                     "name": "WASD",
                     "id": "b16c0a11-5e4f-4c1d-9a2b-0c4e7f1d2a03",
-                    "path": "<Keyboard>/semicolon",
+                    "path": "<Keyboard>/p",
                     "interactions": "",
                     "processors": "",
                     "groups": "KeyboardMouse",
@@ -546,7 +546,7 @@
                 {
                     "name": "Arrows",
                     "id": "b16c0a11-5e4f-4c1d-9a2b-0c4e7f1d2a04",
-                    "path": "<Keyboard>/rightShift",
+                    "path": "<Keyboard>/backslash",
                     "interactions": "",
                     "processors": "",
                     "groups": "KeyboardMouse",

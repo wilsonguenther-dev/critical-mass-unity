@@ -220,7 +220,8 @@ namespace CriticalMass.Sim.Tests
                         string who = r.Winner == 0 ? Six[i].ToString() : r.Winner == 1 ? Six[j].ToString() : "none";
                         if (r.Winner == 0) wins[Six[i]]++;
                         if (r.Winner == 1) wins[Six[j]]++;
-                        if (feel && r.Winner < 0) bad.Add(Six[i] + " v " + Six[j] + ": nobody wins in 30 s");
+                        // b16: a trade (both down on the same tick, Seconds set) is a result; only a fight nobody finishes is not
+                        if (feel && r.Winner < 0 && double.IsNaN(r.Seconds)) bad.Add(Six[i] + " v " + Six[j] + ": nobody wins in 30 s");
                         Console.WriteLine("{\"item\":\"b15 ttk fight\",\"arm\":\"" + arm + "\",\"a\":\"" + Six[i] + "\",\"b\":\"" + Six[j] + "\",\"winner\":\"" + who +
                                           "\",\"seconds\":" + S(r.Seconds) + ",\"winnerHpLeft\":" + r.HpLeft.ToString("0.0") + "}");
                     }

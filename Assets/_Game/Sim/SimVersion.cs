@@ -18,6 +18,6 @@ namespace CriticalMass.Sim
         public const int Schema = 6;
 
         /// <summary>The reference-match digest this Schema was pinned for (printed by SimVersionTests).</summary>
-        public const ulong RulesDigest = 0x597B21BFA247E913UL;   // b15 fix round (schema 5: Miner bot route steering, Kaiju squeeze ignores ladders): printed by sim run 44880553461 at a7433909; was 0xC3FD3B160874096B (schema 4, sim run 44856207208)
+        public const ulong RulesDigest = 0x44C1675A017E94E1UL;   // b16 duel order + CANCEL (schema 6): printed by sim run 44925935233 at 80a08aef; was 0x597B21BFA247E913 (schema 5). b15 fix round (schema 5: Miner bot route steering, Kaiju squeeze ignores ladders): printed by sim run 44880553461 at a7433909; was 0xC3FD3B160874096B (schema 4, sim run 44856207208)
     }
 }

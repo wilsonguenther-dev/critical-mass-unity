@@ -154,9 +154,10 @@ namespace CriticalMass.Runtime.Input
             if (was) map.Enable();
         }
 
-        /// <summary>b16 CANCEL defaults, in the Controls tab's slot order: mouse forward side button (mouse column), ; (by J K L),
-        /// Right Shift (by the arrows), LB (controller; shared by context with Next tool, ControlSchemes.ContextPairs).</summary>
-        public static readonly string[] CancelDefaults = { "<Mouse>/forwardButton", "<Keyboard>/semicolon", "<Keyboard>/rightShift", "<Gamepad>/leftShoulder" };
+        /// <summary>b16 CANCEL defaults, in the Controls tab's slot order: mouse forward side button (mouse column), P (by J K L),
+        /// \ (by Enter and the arrows), LB (controller; shared by context with Next tool, ControlSchemes.ContextPairs). Free in
+        /// every preset: the left-handed one puts Jump on Right Shift and Ping on ; (ControlPresets.LeftHandedRemaps).</summary>
+        public static readonly string[] CancelDefaults = { "<Mouse>/forwardButton", "<Keyboard>/p", "<Keyboard>/backslash", "<Gamepad>/leftShoulder" };
 
         /// <summary>b16: adds the Cancel action with CancelDefaults when the actions asset lacks it (in memory only).</summary>
         public static void EnsureCancelAction(InputActionMap map)
