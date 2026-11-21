@@ -164,12 +164,14 @@ namespace CriticalMass.Sim.Tests
         {
             GameConfig cfg = GameConfig.CreateBrowser5v5().ApplyRules(p);
             World w = World.CreateWorld(new WorldOptions { Seed = 7, TeamSize = 5, HumanTeam = TeamId.Azure, HumanClass = ClassId.Warrior, Config = cfg });
-            InputFrame f = SimInput.EmptyInput();
+            InputFrame f = SimInput.EmptyInput(), scratch = SimInput.EmptyInput();
             for (int t = 0; t < 900; t++)
             {
-                CriticalMass.Sim.Bots.BotBrain.FillBotInput(w, 0, f);
+                // actor 0 swings now and then and presses cancel every tick (or never); the bots play the rest
+                f.MoveX = 0.3;
+                f.Attack = t % 20 < 10;
                 f.Cancel = cancel;
-                MatchTick.Advance(w, f, SimInput.EmptyInput());
+                MatchTick.Advance(w, f, scratch);
             }
             return MatchHash.Of(w);
         }
