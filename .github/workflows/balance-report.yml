@@ -14,9 +14,17 @@ jobs:
       max-parallel: 14
       matrix:
         include:
-          - { job: c16, arms: "cmp-16|--seeds 72" }
-          - { job: c08, arms: "cmp-08|--team-size 8 --seeds 72 --no-duels --set MatchSeconds=240 --set HatchSeconds=120" }
-          - { job: c05, arms: "cmp-05|--team-size 5 --seeds 72 --no-duels --set MatchSeconds=240 --set HatchSeconds=120" }
+          - { job: d05-nocap, arms: "d05-nocap|--team-size 5 --seeds 72 --no-duels --set MatchSeconds=240 --set HatchSeconds=120 --set Depth.Mech.HillContributorCap=0" }
+          - { job: d08-nocap, arms: "d08-nocap|--team-size 8 --seeds 72 --no-duels --set MatchSeconds=240 --set HatchSeconds=120 --set Depth.Mech.HillContributorCap=0" }
+          - { job: d05-w1, arms: "d05-w1|--team-size 5 --seeds 72 --no-duels --set MatchSeconds=240 --set HatchSeconds=120 --set Depth.Mech.WarriorHoldWeight=1" }
+          - { job: d08-w1, arms: "d08-w1|--team-size 8 --seeds 72 --no-duels --set MatchSeconds=240 --set HatchSeconds=120 --set Depth.Mech.WarriorHoldWeight=1" }
+          - { job: d05-kidleoff, arms: "d05-kidleoff|--team-size 5 --seeds 72 --no-duels --set MatchSeconds=240 --set HatchSeconds=120 --set Depth.Mech.KaijuIdleOffHill=false" }
+          - { job: d08-kidleoff, arms: "d08-kidleoff|--team-size 8 --seeds 72 --no-duels --set MatchSeconds=240 --set HatchSeconds=120 --set Depth.Mech.KaijuIdleOffHill=false" }
+          - { job: d05-feedold, arms: "d05-feedold|--team-size 5 --seeds 72 --no-duels --set MatchSeconds=240 --set HatchSeconds=120 --set Depth.Mech.FeedExtrasShare=false" }
+          - { job: d08-feedold, arms: "d08-feedold|--team-size 8 --seeds 72 --no-duels --set MatchSeconds=240 --set HatchSeconds=120 --set Depth.Mech.FeedExtrasShare=false" }
+          - { job: d08-cbsmall8, arms: "d08-cbsmall8|--team-size 8 --seeds 72 --no-duels --set MatchSeconds=240 --set HatchSeconds=120 --set Depth.Comeback.SmallTeamMaxSize=8" }
+          - { job: d05-pfoff, arms: "d05-pfoff|--team-size 5 --seeds 72 --no-duels --set MatchSeconds=240 --set HatchSeconds=120 --set Depth.PhysicsFeel.Enabled=false" }
+          - { job: d08-pfoff, arms: "d08-pfoff|--team-size 8 --seeds 72 --no-duels --set MatchSeconds=240 --set HatchSeconds=120 --set Depth.PhysicsFeel.Enabled=false" }
     timeout-minutes: 120
     env:
       BASE_REF: aa2ecfef
