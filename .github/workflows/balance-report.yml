@@ -17,12 +17,6 @@ jobs:
           - { job: c16, arms: "cmp-16|--seeds 72" }
           - { job: c08, arms: "cmp-08|--team-size 8 --seeds 72 --no-duels --set MatchSeconds=240 --set HatchSeconds=120" }
           - { job: c05, arms: "cmp-05|--team-size 5 --seeds 72 --no-duels --set MatchSeconds=240 --set HatchSeconds=120" }
-          - { job: f08, arms: "f08-flatcap|--team-size 8 --seeds 72 --no-duels --set MatchSeconds=240 --set HatchSeconds=120 --set Depth.Mech.HillCapScalesWithSize=false" }
-          - { job: f05, arms: "f05-flatcap|--team-size 5 --seeds 72 --no-duels --set MatchSeconds=240 --set HatchSeconds=120 --set Depth.Mech.HillCapScalesWithSize=false" }
-          - { job: g08, arms: "g08-flatcap-feedold|--team-size 8 --seeds 72 --no-duels --set MatchSeconds=240 --set HatchSeconds=120 --set Depth.Mech.HillCapScalesWithSize=false --set Depth.Mech.FeedExtrasShare=false" }
-          - { job: g05, arms: "g05-flatcap-feedold|--team-size 5 --seeds 72 --no-duels --set MatchSeconds=240 --set HatchSeconds=120 --set Depth.Mech.HillCapScalesWithSize=false --set Depth.Mech.FeedExtrasShare=false" }
-          - { job: w1, arms: "w16-outn15|--seeds 72 --set Depth.CombatFeel.OutnumberedSeconds=1.5" }
-          - { job: w2, arms: "w16-dmg23|--seeds 72 --set Depth.CombatFeel.Classes[0].AttackDamage=23" }
     timeout-minutes: 120
     env:
       BASE_REF: aa2ecfef
