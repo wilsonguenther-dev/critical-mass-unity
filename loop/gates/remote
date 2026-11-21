@@ -5,6 +5,10 @@
 #   loop/gates/remote editmode|playmode|tests [--category '!Slow'|Slow] [--graphics nographics|software]                      (unity-ci.yml, needs the licence)
 #   loop/gates/remote build-windows|build-mac|builds|all                                      (unity-ci.yml, needs the licence)
 #   common: [--ref BRANCH] (default: current branch) [--no-push] [--max-wait MIN] (default 150)
+#   sim only, opt-in (feat/air-test-machine): [--on air] runs it on the second Mac instead (tools/remote/air-sim.sh:
+#     queue lock, hard limit, split over [--jobs N] processes, default 3); [--air-wait MIN] queue wait (default 30);
+#     unreachable, busy past the wait, or refused => falls back to GitHub by itself ("fallback_from":"air" in the line)
+#     unless [--no-fallback]. Default stays --on github; CM_REMOTE_SIM_ON=air switches the default.
 # Prints ONE JSON line (also appended to loop/logs/gates.jsonl); results land in loop/logs/remote/<run id>/.
 # Exit: 0 pass, 1 fail, 78 skipped (no Unity licence secret yet, or the workflow is not on main yet), 75 could not start
 # or timed out waiting (never a test result), 64 usage. Never pushes main.
@@ -13,6 +17,7 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"; ROOT="$(git -C "$PWD" rev-
 LOGS="$HERE/../logs"; mkdir -p "$LOGS/remote"
 what="${1:-}"; shift || true
 REF=''; PUSH=1; MAXW=150; SUITE=fast; CATEGORY='!Slow'; GRAPHICS=nographics
+ON="${CM_REMOTE_SIM_ON:-github}"; JOBS="${CM_AIR_JOBS:-3}"; AIRWAIT=30; FALLBACK=1; FB=''
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --ref) REF="${2:?}"; shift 2 ;;
@@ -21,6 +26,10 @@ while [[ $# -gt 0 ]]; do
     --suite) SUITE="${2:?}"; shift 2 ;;
     --category) CATEGORY="${2:?}"; shift 2 ;;
     --graphics) GRAPHICS="${2:?}"; shift 2 ;;   # nographics (default, as the Mac gate) | software (llvmpipe)
+    --on) ON="${2:?}"; shift 2 ;;                 # github (default) | air (sim only)
+    --jobs) JOBS="${2:?}"; shift 2 ;;
+    --air-wait) AIRWAIT="${2:?}"; shift 2 ;;
+    --no-fallback) FALLBACK=0; shift ;;
     *) echo "remote: unknown option $1" >&2; exit 64 ;;
   esac
 done
@@ -33,10 +42,62 @@ REF="${REF:-$(git -C "$ROOT" rev-parse --abbrev-ref HEAD)}"
 SHA="$(git -C "$ROOT" rev-parse HEAD)"
 out() {  # status exit [extra json fields]
   local line
-  line=$(printf '{"gate":"remote","ts":"%s","what":"%s","workflow":"%s","ref":"%s","sha":"%s","status":"%s","exit":%d%s}' \
-    "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$what" "$WF" "$REF" "${SHA:0:12}" "$1" "$2" "${3:-}")
+  line=$(printf '{"gate":"remote","ts":"%s","what":"%s","workflow":"%s","ref":"%s","sha":"%s","status":"%s","exit":%d%s%s}' \
+    "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$what" "$WF" "$REF" "${SHA:0:12}" "$1" "$2" "${3:-}" "$FB")
   echo "$line"; echo "$line" >> "$LOGS/gates.jsonl"; exit "$2"
 }
+summarise() {  # results folder (run.json + the downloaded artifact) -> one JSON summary
+  python3 -I - "$1" "$what" <<'PY'
+import json, sys, glob, os, xml.etree.ElementTree as ET
+d, what = sys.argv[1], sys.argv[2]
+run = json.load(open(os.path.join(d, 'run.json')))
+jobs = {j['name']: j['conclusion'] for j in run.get('jobs', [])}
+tot = {'total': 0, 'passed': 0, 'failed': 0, 'skipped': 0}; fails = []
+for x in glob.glob(os.path.join(d, '**', '*.xml'), recursive=True):
+    try:
+        r = ET.parse(x).getroot()
+    except ET.ParseError:
+        continue
+    if r.tag != 'test-run':
+        continue
+    for k in tot:
+        tot[k] += int(r.get(k, 0) or 0)
+    fails += [tc.get('fullname') for tc in r.iter('test-case') if tc.get('result') == 'Failed']
+gate_jobs = {k: v for k, v in jobs.items() if not k.startswith('plan')}
+ran = [v for v in gate_jobs.values() if v not in ('skipped', None)]
+concl = run.get('conclusion')
+if concl == 'success' and not ran:
+    status = 'skipped'
+elif concl == 'success':
+    status = 'pass'
+else:
+    status = 'fail'
+print(json.dumps({'status': status, 'conclusion': concl, 'jobs': jobs, 'tests': tot, 'failed_tests': fails[:30]}))
+PY
+}
+
+# ── the second Mac (opt-in): same result files and JSON line; anything that is not a test outcome falls back ──
+case "$ON" in github|air) ;; *) echo "remote: --on github|air" >&2; exit 64 ;; esac
+if [[ "$what" == sim && "$ON" == air ]]; then
+  if [[ $PUSH -eq 1 && "$REF" != main ]]; then git -C "$ROOT" push -q origin "HEAD:refs/heads/$REF" 2>/dev/null || true; fi   # for a fallback
+  s0=$(date +%s)
+  D=$("$ROOT/tools/remote/air-sim.sh" --suite "$SUITE" --sha "$SHA" --jobs "$JOBS" --wait "$AIRWAIT" \
+        --timeout "$(( MAXW < 75 ? MAXW : 75 ))" | tail -1); ac=${PIPESTATUS[0]}
+  case "$ac" in
+    0|1|2|124|130)
+      WF=air-sim; RUN="air-${D##*/air-}"
+      if [[ $ac -eq 124 || $ac -eq 130 ]]; then out timed-out 75 ",\"runner\":\"air\",\"run\":\"$RUN\",\"results\":\"$D\",\"reason\":\"stopped on the Air (exit $ac: hard limit or abort)\""; fi
+      summary=$(summarise "$D")
+      status=$(python3 -I -c 'import json,sys; print(json.loads(sys.argv[1])["status"])' "$summary")
+      extra=",\"runner\":\"air\",\"run\":\"$RUN\",\"minutes\":$(( ($(date +%s) - s0 + 59) / 60 )),\"results\":\"$D\",\"detail\":$summary"
+      [[ "$status" == pass ]] && out pass 0 "$extra"; out fail 1 "$extra" ;;
+    *)
+      case "$ac" in 69) reason=unreachable ;; 75) reason="busy past ${AIRWAIT} min" ;; 67) reason="refused (battery or disk)" ;; *) reason="exit $ac" ;; esac
+      [[ $FALLBACK -eq 1 ]] || out could-not-start 75 ",\"runner\":\"air\",\"reason\":\"Air $reason; --no-fallback\""
+      echo "remote: the Air is $reason; falling back to GitHub" >&2
+      FB=",\"fallback_from\":\"air\",\"fallback_reason\":\"$reason\"" ;;
+  esac
+fi
 gh auth status >/dev/null 2>&1 || out could-not-start 75 ',"reason":"gh not authenticated or GitHub unreachable"'
 if [[ $PUSH -eq 1 ]]; then
   [[ "$REF" == main ]] && out could-not-start 64 ',"reason":"refusing to push main; use a branch"'
@@ -77,34 +138,7 @@ D="$LOGS/remote/$RUN"; mkdir -p "$D"
 gh run view "$RUN" --json conclusion,jobs > "$D/run.json" 2>/dev/null
 gh run download "$RUN" -D "$D" >/dev/null 2>&1 || true
 gh run view "$RUN" --log-failed > "$D/failed.log" 2>/dev/null || true
-summary=$(python3 -I - "$D" "$what" <<'PY'
-import json, sys, glob, os, xml.etree.ElementTree as ET
-d, what = sys.argv[1], sys.argv[2]
-run = json.load(open(os.path.join(d, 'run.json')))
-jobs = {j['name']: j['conclusion'] for j in run.get('jobs', [])}
-tot = {'total': 0, 'passed': 0, 'failed': 0, 'skipped': 0}; fails = []
-for x in glob.glob(os.path.join(d, '**', '*.xml'), recursive=True):
-    try:
-        r = ET.parse(x).getroot()
-    except ET.ParseError:
-        continue
-    if r.tag != 'test-run':
-        continue
-    for k in tot:
-        tot[k] += int(r.get(k, 0) or 0)
-    fails += [tc.get('fullname') for tc in r.iter('test-case') if tc.get('result') == 'Failed']
-gate_jobs = {k: v for k, v in jobs.items() if not k.startswith('plan')}
-ran = [v for v in gate_jobs.values() if v not in ('skipped', None)]
-concl = run.get('conclusion')
-if concl == 'success' and not ran:
-    status = 'skipped'
-elif concl == 'success':
-    status = 'pass'
-else:
-    status = 'fail'
-print(json.dumps({'status': status, 'conclusion': concl, 'jobs': jobs, 'tests': tot, 'failed_tests': fails[:30]}))
-PY
-)
+summary=$(summarise "$D")
 status=$(python3 -I -c 'import json,sys; print(json.loads(sys.argv[1])["status"])' "$summary")
 extra=",\"run\":$RUN,\"url\":\"$URL\",\"minutes\":$(( ($(date +%s) - s0 + 59) / 60 )),\"results\":\"$D\",\"detail\":$summary"
 case "$status" in
