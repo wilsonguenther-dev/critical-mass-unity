@@ -501,10 +501,13 @@ namespace CriticalMass.Runtime.View.Mechanics
 
         /// <summary>b15 view polish (item 7): heal motes drawn this frame (capture logs, tests).</summary>
         public int HealMotesDrawn { get; private set; }
+        /// <summary>b15 view polish r2: heal ground ring pulses drawn this frame.</summary>
+        public int HealRingsDrawn { get; private set; }
 
         void DrawFeed(World w, double alpha, Vector3 camFwd)
         {
             HealMotesDrawn = 0;
+            HealRingsDrawn = 0;
             MechFeed f = Feed;
             double now = SimNow;
             int n = w.ActorCount;
@@ -588,12 +591,24 @@ namespace CriticalMass.Runtime.View.Mechanics
                 float t = age / HealFx.MoteLife;
                 Vector3 feet = ActorPos(w, s.Actor, alpha, 0f);
                 float amt = Mathf.Clamp01((float)(s.Amount / 30));
-                _air.Add = 160;
+                // b15 view polish r2: a ground ring pulse at the healed ally's feet, on the walking surface (over the hill
+                // paving on the hill), with a navy ink outside it for the pale paving
+                HealFx.RingPulse(age, out float rr, out float ra);
+                if (ra > 0f)
+                {
+                    bool hill = w.Map.Hill != null;
+                    double hx = w.PrevX[s.Actor] + (w.X[s.Actor] - w.PrevX[s.Actor]) * alpha, hz = w.PrevZ[s.Actor] + (w.Z[s.Actor] - w.PrevZ[s.Actor]) * alpha;
+                    Vector3 rc = new Vector3(feet.x, feet.y + SwingTelegraph.SurfaceLift(hx, hz, hill ? w.Map.Hill.X : 0, hill ? w.Map.Hill.Z : 0, hill), feet.z);
+                    _ground.Ring(rc, Vector3.right, Vector3.forward, rr, rr + 0.05f, 0f, Mathf.PI * 2f, 32, A(Navy, 0.6f * ra));
+                    _ground.Ring(rc, Vector3.right, Vector3.forward, Mathf.Max(0f, rr - HealFx.RingBandU), rr, 0f, Mathf.PI * 2f, 32, A(Heal, 0.35f * ra), A(Heal, ra));
+                    HealRingsDrawn++;
+                }
+                _air.Add = HealFx.Additive;
                 for (int m = 0; m < HealFx.Motes; m++)
                 {
                     float a = HealFx.MoteAlpha(m, t);
                     if (a <= 0f) continue;
-                    _air.SoftMote(feet + HealFx.MoteOffset(m, t), mR, mU, HealFx.MoteRadius(t, amt), HealFx.MoteSegments, A(Heal, 0.9f * a));
+                    _air.SoftMote(feet + HealFx.MoteOffset(m, t), mR, mU, HealFx.MoteRadius(t, amt), HealFx.MoteSegments, A(Heal, a));
                     HealMotesDrawn++;
                 }
                 _air.Add = 0;
