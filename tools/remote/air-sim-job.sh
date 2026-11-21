@@ -87,11 +87,10 @@ try:
             w[p[1]] = float(p[0])
 except OSError:
     pass
-classes = {}
-for ts in ET.parse(xml).getroot().iter('test-suite'):
-    if ts.get('type') in ('TestFixture', 'ParameterizedFixture') and ts.get('classname'):
-        classes.setdefault(ts.get('classname'), 0)
-        classes[ts.get('classname')] += int(ts.get('testcasecount') or 0)
+classes = {}   # NUnitLite's --explore puts classname on the test cases, not on the fixtures
+for tc in ET.parse(xml).getroot().iter('test-case'):
+    if tc.get('classname'):
+        classes[tc.get('classname')] = classes.get(tc.get('classname'), 0) + 1
 bins = [[0.0, []] for _ in range(n)]
 for c in sorted(classes, key=lambda c: -w.get(c, 60.0)):
     b = min(bins, key=lambda b: b[0]); b[0] += w.get(c, 60.0); b[1].append(c)
