@@ -157,7 +157,9 @@ namespace CriticalMass.Runtime.Menus
                     if (index != null)
                     {
                         int i = int.TryParse(index, out int n) ? n : (int)Enum.Parse(typeof(ClassId), index);
-                        o = ((IList)o)[i];
+                        // b15 wave two: a class row is the row the match plays (GameConfig.Class: the combat feel's rows while
+                        // that rule is on), not the base array (the card said 160 health; the Warrior plays 115)
+                        o = o == (object)cfg.Classes && o is ClassConfig[] ? cfg.Class((ClassId)i) : ((IList)o)[i];
                     }
                     if (o == null) return false;
                 }

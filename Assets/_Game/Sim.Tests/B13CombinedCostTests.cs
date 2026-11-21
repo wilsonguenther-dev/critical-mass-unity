@@ -41,7 +41,8 @@ namespace CriticalMass.Sim.Tests
         /// the same rules (probe run 44854298532), so a one-seed ratio read 0.70 to 1.64 for the same code.</summary>
         public static readonly int[] Seeds = { 4242, 1337, 7, 99, 2024, 31337 };
 
-        [Test]
+        // b15 wave two: a sized multi-seed check runs past Unity EditMode's 180 s default (unity-ci 44857982412); the sim-tests run takes a few minutes
+        [Test, Timeout(900000)]
         public void DodgeWallsAndCorruptionTogetherCostAtMostFifteenPercentPerTick()
         {
             // b15 wave two (limit unchanged, sample sized): judged on the pooled trimmed mean over Seeds (6 x 900 ticks per

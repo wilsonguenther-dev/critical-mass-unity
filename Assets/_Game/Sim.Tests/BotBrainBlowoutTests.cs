@@ -240,7 +240,8 @@ namespace CriticalMass.Sim.Tests
             Assert.AreEqual(seeds.Length, on.Matches);
         }
 
-        [Test]
+        // b15 wave two: a sized multi-seed check runs past Unity EditMode's 180 s default (unity-ci 44857982412); the sim-tests run takes a few minutes
+        [Test, Timeout(900000)]
         public void TwentyFourSeedsBrainOffAgainstOn() => Compare(WinShare.Seeds16, "24 (WinShare.Seeds16)", true);
 
         [Test, Category("Slow")]
