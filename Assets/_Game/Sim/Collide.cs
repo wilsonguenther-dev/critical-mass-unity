@@ -307,9 +307,10 @@ namespace CriticalMass.Sim.Core
         /// of the body's span by at most CornerNudgeMax: shift the cross coordinate `other` off that cell by the overlap (at
         /// most `stepLen`) when the shifted body clears the line, so the body slides round the corner. False = still blocked.
         /// </summary>
-        private static bool CornerNudge(World w, int line, bool alongX, double r, double stepLen, double along, ref double other)
+        private static bool CornerNudge(World w, int line, bool alongX, double r, double stepLen, double along, double blockedAlong, ref double other)
         {
-            double max = w.Config.Physics.CornerNudgeMax;
+            bool feel = PhysicsFeel.On(w);   // b16 [4]: grazes up to 0.35 u are rounded, over several ticks when deeper than a step
+            double max = feel ? PhysicsFeel.Cfg(w).CornerNudgeMax : w.Config.Physics.CornerNudgeMax;
             int lo = JsMath.FloorToInt(other - r - RangeEps);
             int hi = JsMath.FloorToInt(other + r + RangeEps);
             bool loB = alongX ? CellBlocks(w, line, lo, false) : CellBlocks(w, lo, line, false);
@@ -319,19 +320,102 @@ namespace CriticalMass.Sim.Core
             if (loB && !hiB) shift = (lo + 1) - (other - r) + Skin;
             else if (hiB && !loB) shift = -((other + r) - hi + Skin);
             else return false;
-            if (Math.Abs(shift) > max + Skin + 1e-6 || Math.Abs(shift) > stepLen + Skin) return false; // 1e-6: Float32 positions
+            if (Math.Abs(shift) > max + Skin + 1e-6) return false; // 1e-6: Float32 positions
+            if (Math.Abs(shift) > stepLen + Skin)
+            {
+                if (!feel) return false;
+                // b16 [4]: deeper than this step: the forward part stops at the face (the caller clamps it to blockedAlong) and the
+                // body slides sideways by the step length, if that spot is clear. The next ticks finish the slide and walk on.
+                double part = JsMath.F32(other + (shift > 0 ? stepLen : -stepLen));
+                if (alongX ? BoxFits(w, blockedAlong, part, r) : BoxFits(w, part, blockedAlong, r)) other = part;
+                return false;
+            }
             double moved = JsMath.F32(other + shift);
             if (!(alongX ? BoxFits(w, along, moved, r) : BoxFits(w, moved, along, r))) return false;
             other = moved;
             return true;
         }
 
-        /// <summary>Move actor id by (dx, dz) against the grid, sliding along walls. Does not touch other actors.</summary>
-        public static void MoveActor(World w, int id, double dx, double dz, bool air = false)
+        /// <summary>b16 [12]: cos 45 and cos 75 degrees (literal constants, no trig call).</summary>
+        private const double Cos45 = 0.70710678118654757, Cos75 = 0.25881904510252074;
+
+        /// <summary>
+        /// b16 [12]: an own walking sub-step (sx, sz) from (px, pz) that one wall stopped on one axis (xHit: the x part) while
+        /// the other axis moved freely keeps PhysicsFeelConfig.WallSlideKeep of its length along the wall when it heads within
+        /// WallSlideFullDeg of the wall, blending back to the plain projection by WallSlideFadeDeg (no jump in speed at any
+        /// angle). The extra part moves through the grid on that axis only (walls stop it; never more than the sub-step).
+        /// </summary>
+        private static void SlideAlongWall(World w, double px, double pz, double sx, double sz, double r, bool xHit, ref double lx, ref double lz)
+        {
+            double step = Math.Sqrt(sx * sx + sz * sz);
+            double along = Math.Abs(xHit ? sz : sx);
+            if (step < 1e-9 || along < 1e-9) return;
+            // The free axis must have moved by exactly its own part (no corner nudge, no block on it).
+            if (xHit ? lz != JsMath.F32(pz + sz) : lx != JsMath.F32(px + sx)) return;
+            PhysicsFeelConfig c = PhysicsFeel.Cfg(w);
+            double cosA = along / step;   // cosine of the angle between the step and the wall
+            double cosFull = c.WallSlideFullDeg == 45 ? Cos45 : JsMath.Cos(c.WallSlideFullDeg * Math.PI / 180);
+            double cosFade = c.WallSlideFadeDeg == 75 ? Cos75 : JsMath.Cos(c.WallSlideFadeDeg * Math.PI / 180);
+            double keep = c.WallSlideKeep;
+            if (cosA < cosFull)
+            {
+                if (cosA <= cosFade || cosFull <= cosFade) return;
+                double t = (cosFull - cosA) / (cosFull - cosFade);
+                keep += (cosA - keep) * t;
+            }
+            if (keep <= cosA) return;
+            double extra = step * keep - along;
+            if (xHit) AxisMove(w, lx, ref lz, false, sz > 0 ? extra : -extra, r);
+            else AxisMove(w, lz, ref lx, true, sx > 0 ? extra : -extra, r);
+        }
+
+        /// <summary>b16 [12]: move `moving` (x when alongX, else z) by delta with the plain grounded push-out against the grid at the
+        /// fixed other coordinate; never backwards.</summary>
+        private static void AxisMove(World w, double fixedC, ref double moving, bool alongX, double delta, double r)
+        {
+            double n = JsMath.F32(moving + delta);
+            if (alongX)
+            {
+                if (delta > 0)
+                {
+                    int cx = JsMath.FloorToInt(n + r + RangeEps);
+                    if (RowBlocked(w, cx, fixedC, r, false)) n = JsMath.F32(cx - r - Skin);
+                }
+                else
+                {
+                    int cx = JsMath.FloorToInt(n - r - RangeEps);
+                    if (RowBlocked(w, cx, fixedC, r, false)) n = JsMath.F32(cx + 1 + r + Skin);
+                }
+            }
+            else
+            {
+                if (delta > 0)
+                {
+                    int cz = JsMath.FloorToInt(n + r + RangeEps);
+                    if (ColBlocked(w, cz, fixedC, r, false)) n = JsMath.F32(cz - r - Skin);
+                }
+                else
+                {
+                    int cz = JsMath.FloorToInt(n - r - RangeEps);
+                    if (ColBlocked(w, cz, fixedC, r, false)) n = JsMath.F32(cz + 1 + r + Skin);
+                }
+            }
+            if (delta > 0 ? n <= moving : n >= moving) return;
+            moving = n;
+        }
+
+        /// <summary>b16 [12]: true only inside MoveActor called with walk (an actor's own walking step): the wall slide keeps its speed.</summary>
+        private static bool _walkSlide;
+
+        /// <summary>Move actor id by (dx, dz) against the grid, sliding along walls. Does not touch other actors.
+        /// b16 [12]: walk marks an actor's own walking step (Movement), whose wall slide keeps its speed under PhysicsFeel.</summary>
+        public static void MoveActor(World w, int id, double dx, double dz, bool air = false, bool walk = false)
         {
             if (!(dx == dx) || !(dz == dz)) return; // NaN guard
             TerrainHeight.ClimbSeen = false;   // b15: did this move meet a climbable ledge?
+            _walkSlide = walk && !air && PhysicsFeel.On(w);
             SweepActor(w, id, w.X[id], w.Z[id], dx, dz, air, out double x, out double z);
+            _walkSlide = false;
             if (TerrainHeight.ClimbSeen) TerrainHeight.NoteClimb(w, id);
             w.X[id] = JsMath.F32(x);
             w.Z[id] = JsMath.F32(z);
@@ -359,18 +443,19 @@ namespace CriticalMass.Sim.Core
                 double lx = px;
                 double lz = pz;
                 bool corners = !air && Phys.On(w, w.Config.Physics.CornerRounding); // DG-97 (S10): slide round convex corners
+                bool xHit = false, zHit = false;   // b16 [12]: which axis the wall stopped
                 if (sx != 0)
                 {
                     lx = JsMath.F32(lx + sx);
                     if (sx > 0)
                     {
                         int cx = JsMath.FloorToInt(lx + r + RangeEps);
-                        if (RowBlocked(w, cx, lz, r, air) && !(corners && CornerNudge(w, cx, true, r, Math.Abs(sx), lx, ref lz))) lx = JsMath.F32(cx - r - Skin);
+                        if (RowBlocked(w, cx, lz, r, air) && !(corners && CornerNudge(w, cx, true, r, Math.Abs(sx), lx, JsMath.F32(cx - r - Skin), ref lz))) { lx = JsMath.F32(cx - r - Skin); xHit = true; }
                     }
                     else
                     {
                         int cx = JsMath.FloorToInt(lx - r - RangeEps);
-                        if (RowBlocked(w, cx, lz, r, air) && !(corners && CornerNudge(w, cx, true, r, Math.Abs(sx), lx, ref lz))) lx = JsMath.F32(cx + 1 + r + Skin);
+                        if (RowBlocked(w, cx, lz, r, air) && !(corners && CornerNudge(w, cx, true, r, Math.Abs(sx), lx, JsMath.F32(cx + 1 + r + Skin), ref lz))) { lx = JsMath.F32(cx + 1 + r + Skin); xHit = true; }
                     }
                 }
                 if (sz != 0)
@@ -379,12 +464,12 @@ namespace CriticalMass.Sim.Core
                     if (sz > 0)
                     {
                         int cz = JsMath.FloorToInt(lz + r + RangeEps);
-                        if (ColBlocked(w, cz, lx, r, air) && !(corners && CornerNudge(w, cz, false, r, Math.Abs(sz), lz, ref lx))) lz = JsMath.F32(cz - r - Skin);
+                        if (ColBlocked(w, cz, lx, r, air) && !(corners && CornerNudge(w, cz, false, r, Math.Abs(sz), lz, JsMath.F32(cz - r - Skin), ref lx))) { lz = JsMath.F32(cz - r - Skin); zHit = true; }
                     }
                     else
                     {
                         int cz = JsMath.FloorToInt(lz - r - RangeEps);
-                        if (ColBlocked(w, cz, lx, r, air) && !(corners && CornerNudge(w, cz, false, r, Math.Abs(sz), lz, ref lx))) lz = JsMath.F32(cz + 1 + r + Skin);
+                        if (ColBlocked(w, cz, lx, r, air) && !(corners && CornerNudge(w, cz, false, r, Math.Abs(sz), lz, JsMath.F32(cz + 1 + r + Skin), ref lx))) { lz = JsMath.F32(cz + 1 + r + Skin); zHit = true; }
                     }
                 }
                 // CM-33: grounded, inside a diagonal rail's capture zone: the deck and the rail (see the class summary).
@@ -405,6 +490,8 @@ namespace CriticalMass.Sim.Core
                         else if (ActorFits(w, px, fz, r)) pz = fz;
                         continue;
                     }
+                    // b16 [12]: an own walking step along a wall keeps most of its speed (the projection kept cos of the angle).
+                    if (_walkSlide && xHit != zHit) SlideAlongWall(w, px, pz, sx, sz, r, xHit, ref lx, ref lz);
                     px = lx;
                     pz = lz;
                     continue;
@@ -490,6 +577,11 @@ namespace CriticalMass.Sim.Core
             double body = w.Config.Physics.KaijuBodyRadius;
             int shoved = 0;
             double most = 0;
+            // b16 [1] / [7]: the push-out and the slide round the body are capped per tick, and the shoves of every wedged fighter are
+            // summed and applied once, capped at KaijuCrowdShoveMax (order-free; fighters no longer lurch the Kaiju).
+            bool feel = PhysicsFeel.On(w);
+            double stepMax = feel ? PhysicsFeel.Cfg(w).KaijuPinStepMax : double.PositiveInfinity;
+            double crowdX = 0, crowdZ = 0;
             for (int i = 0; i < w.ActorCount; i++)
             {
                 Actor a = w.Actors[i];
@@ -515,14 +607,18 @@ namespace CriticalMass.Sim.Core
                 double push = rr - d;
                 double x0 = w.X[i];
                 double z0 = w.Z[i];
-                MoveActor(w, i, ux * push, uz * push);
+                double radial = Math.Min(push, stepMax);
+                MoveActor(w, i, ux * radial, uz * radial);
                 double ex = w.X[i] - k.X;
                 double ez = w.Z[i] - k.Z;
-                if (ex * ex + ez * ez < (rr - 0.05) * (rr - 0.05))
+                double gone = Math.Sqrt((w.X[i] - x0) * (w.X[i] - x0) + (w.Z[i] - z0) * (w.Z[i] - z0));
+                // (b16: a capped push-out that moved freely just goes on next tick; only one a wall held back is "pinned")
+                if (ex * ex + ez * ez < (rr - 0.05) * (rr - 0.05) && (!feel || radial >= push || gone < radial - 0.02))
                 {
                     // Pinned against a wall: slide round the body (the tangent closer to its own motion, else counter-clockwise).
                     double side = w.Vx[i] * -uz + w.Vz[i] * ux >= 0 ? 1 : -1;
-                    MoveActor(w, i, -uz * side * push * 1.5, ux * side * push * 1.5);
+                    double slide = Math.Min(push * 1.5, stepMax);
+                    MoveActor(w, i, -uz * side * slide, ux * side * slide);
                     ex = w.X[i] - k.X;
                     ez = w.Z[i] - k.Z;
                     double e2 = ex * ex + ez * ez;
@@ -532,12 +628,28 @@ namespace CriticalMass.Sim.Core
                         double e = Math.Sqrt(e2);
                         double vx = e > 1e-6 ? ex / e : ux;
                         double vz = e > 1e-6 ? ez / e : uz;
-                        Kaiju.ShoveKaiju(w, -vx * (rr - e), -vz * (rr - e));
+                        if (feel)
+                        {
+                            crowdX -= vx * (rr - e);
+                            crowdZ -= vz * (rr - e);
+                        }
+                        else Kaiju.ShoveKaiju(w, -vx * (rr - e), -vz * (rr - e));
                     }
                 }
                 double moved = Math.Sqrt((w.X[i] - x0) * (w.X[i] - x0) + (w.Z[i] - z0) * (w.Z[i] - z0));
                 if (moved > most) most = moved;
                 shoved++;
+            }
+            if (feel && (crowdX != 0 || crowdZ != 0))
+            {
+                double cl = Math.Sqrt(crowdX * crowdX + crowdZ * crowdZ);
+                double cap = PhysicsFeel.Cfg(w).KaijuCrowdShoveMax;
+                if (cl > cap)
+                {
+                    crowdX *= cap / cl;
+                    crowdZ *= cap / cl;
+                }
+                Kaiju.ShoveKaiju(w, crowdX, crowdZ);
             }
             if (shoved > 0)
                 World.PushEvent(w, SimEventType.BodyShove, Damage.KaijuSource, -1, k.X, k.Z, shoved, null, DamageCause.None, body,
@@ -589,6 +701,14 @@ namespace CriticalMass.Sim.Core
                 }
                 double r = ActorRadius(w, i);
                 double rr = body + r;
+                // b16 [1]: a fighter the Kaiju walked onto (not one placed deep inside it by a respawn or a landing) is never moved
+                // more than KaijuPinStepMax in a tick, and never across the body: its own side, else the Kaiju gives way.
+                if (PhysicsFeel.On(w) && d >= body - 0.5)
+                {
+                    PinResolve(w, i, ux, uz, d, body, r);
+                    moved++;
+                    continue;
+                }
                 MoveActor(w, i, ux * (rr - d), uz * (rr - d));
                 moved++;
                 double ex = w.X[i] - k.X, ez = w.Z[i] - k.Z;
@@ -621,6 +741,64 @@ namespace CriticalMass.Sim.Core
             return moved;
         }
 
+        /// <summary>b16 [1]: the ring radii (beyond the body radius) a pinned fighter's own-side spot is looked for on.</summary>
+        private static readonly double[] PinRings = { 0.02, 0.15, 0.3 };
+
+        /// <summary>
+        /// b16 [1] (audit item 1: a fighter pinned in a 2-cell dead end was placed 2.71 u away on the far side of the body):
+        /// actor i's centre is d (at least body - 0.5) from the Kaiju's along (ux, uz). (1) The radial push-out toward contact,
+        /// at most KaijuPinStepMax, through the grid (walls slide it along them). (2) Still inside the body radius: the nearest
+        /// spot just outside it on the fighter's OWN half (bearing within 90 degrees of its own) that its box fits and that is
+        /// within KaijuPinStepMax of it. (3) None: the fighter holds the Kaiju, which steps back from it by what is missing (at
+        /// most KaijuPinGiveMax; Kaiju.PinGiveWay). Never a placement through or across the body.
+        /// </summary>
+        private static void PinResolve(World w, int i, double ux, double uz, double d, double body, double r)
+        {
+            Kaiju k = w.Kaiju;
+            PhysicsFeelConfig c = PhysicsFeel.Cfg(w);
+            double stepMax = c.KaijuPinStepMax;
+            double x0 = w.X[i], z0 = w.Z[i];   // the cap counts from where this pass found it
+            double push = Math.Min(body + r - d, stepMax);
+            if (push > 0) MoveActor(w, i, ux * push, uz * push);
+            double ex = w.X[i] - k.X, ez = w.Z[i] - k.Z;
+            double e2 = ex * ex + ez * ez;
+            if (e2 >= body * body) return;
+            double e = Math.Sqrt(e2);
+            double vx = e > 1e-6 ? ex / e : ux, vz = e > 1e-6 ? ez / e : uz;
+            double bestD = double.PositiveInfinity, bx = 0, bz = 0;
+            double lim2 = stepMax * stepMax;
+            for (int ring = 0; ring < PinRings.Length; ring++)
+            {
+                double rad = body + PinRings[ring];
+                double cx = vx, cz = vz;
+                for (int s = 0; s < 16; s++)
+                {
+                    if (cx * vx + cz * vz >= 0)
+                    {
+                        double px = JsMath.F32(k.X + cx * rad), pz = JsMath.F32(k.Z + cz * rad);
+                        double qx = px - x0, qz = pz - z0, q2 = qx * qx + qz * qz;
+                        if (q2 <= lim2 && q2 < bestD && BoxFits(w, px, pz, r))
+                        {
+                            bestD = q2;
+                            bx = px;
+                            bz = pz;
+                        }
+                    }
+                    double nx = cx * Ring16Cos - cz * Ring16Sin;
+                    cz = cx * Ring16Sin + cz * Ring16Cos;
+                    cx = nx;
+                }
+            }
+            if (bestD < double.PositiveInfinity)
+            {
+                w.X[i] = bx;
+                w.Z[i] = bz;
+                return;
+            }
+            double need = Math.Min(body + 0.02 - e, c.KaijuPinGiveMax);
+            if (need > 0) Kaiju.PinGiveWay(w, -vx * need, -vz * need);
+        }
+
         /// <summary>Soft actor-actor separation after all moves: each overlapping living pair is pushed apart through MoveActor.</summary>
         public static void SeparateActors(World w)
         {
@@ -631,6 +809,10 @@ namespace CriticalMass.Sim.Core
         private static double[] SepX = new double[0];
         private static double[] SepZ = new double[0];
         private static double[] SepMoved = new double[0];
+        /// <summary>b16: per actor, its one-cell gap axis this tick (PhysicsFeel.GapOf) and the separation it was moved so far this tick.</summary>
+        private static byte[] SepGap = new byte[0];
+        private static double[] SepAccX = new double[0];
+        private static double[] SepAccZ = new double[0];
 
         /// <summary>
         /// DG-97 (S9, OD-9): order-free relaxed (Jacobi) separation. Each of SeparationIterations passes accumulates every
@@ -647,11 +829,25 @@ namespace CriticalMass.Sim.Core
                 SepX = new double[n];
                 SepZ = new double[n];
                 SepMoved = new double[n];
+                SepGap = new byte[n];
+                SepAccX = new double[n];
+                SepAccZ = new double[n];
             }
             if (Neighbours.Length < w.Hash.Capacity) Neighbours = new int[w.Hash.Capacity];
             double reach = 2 * MaxRadius(w.Config);
             bool feelLadder = CombatFeel.On(w) && w.Depth.Feel.LadderCount > 0;
-            for (int i = 0; i < n; i++) SepMoved[i] = 0;
+            // b16 [3] [5] [6]: one-cell gap flow, the ally push floor, the opposing-ally pass only in gaps, no backwards overshoot.
+            bool feel = PhysicsFeel.On(w);
+            PhysicsFeelConfig pf = feel ? PhysicsFeel.Cfg(w) : null;
+            bool gapFlow = feel && pf.GapFlow;
+            bool noRev = feel && pf.SeparationNoReversal;
+            for (int i = 0; i < n; i++)
+            {
+                SepMoved[i] = 0;
+                SepAccX[i] = 0;
+                SepAccZ[i] = 0;
+                SepGap[i] = feel && w.Actors[i].Alive && w.Actors[i].AirLen == 0 ? PhysicsFeel.GapOf(w, i) : (byte)0;
+            }
             for (int iter = 0; iter < p.SeparationIterations; iter++)
             {
                 SpatialHash.Rebuild(w.Hash, w.X, w.Z, w.Actors, n);
@@ -694,13 +890,17 @@ namespace CriticalMass.Sim.Core
                             ddz /= d;
                         }
                         double overlap = (rr - d) * p.SeparationRelax;
+                        byte gi = SepGap[i], gj = SepGap[j];
                         if (ai.Team == aj.Team)
                         {
                             // b15 combat feel: teammates pass through each other on a ladder lane (two-way traffic, no blocker).
                             if (feelLadder && CombatFeel.AllyPasses(w, i, j)) continue;
-                            overlap *= p.AllyPushShare;
+                            // b16 [6]: the ally push rises to the full push with depth (no two bodies fused into one model).
+                            overlap *= feel ? PhysicsFeel.AllyShare(w, rr - d, p.AllyPushShare) : p.AllyPushShare;
                             // U-071: a retreating bot and an ally heading into it pass (no head-on jam in a one-cell corridor).
-                            if (p.AllyPassOpposing && (ai.AiState == AiState.Retreat || aj.AiState == AiState.Retreat))
+                            // b16 [6]: only where they cannot step round each other (in or at the mouth of a one-cell gap).
+                            if (p.AllyPassOpposing && (ai.AiState == AiState.Retreat || aj.AiState == AiState.Retreat)
+                                && (!feel || !pf.AllyPassInGapsOnly || gi != 0 || gj != 0))
                             {
                                 InputFrame fi = w.Inputs[i], fj = w.Inputs[j];
                                 double li = fi.MoveX * fi.MoveX + fi.MoveZ * fi.MoveZ, lj = fj.MoveX * fj.MoveX + fj.MoveZ * fj.MoveZ;
@@ -711,10 +911,24 @@ namespace CriticalMass.Sim.Core
                         double mj = p.SeparationByMass ? w.Config.Class(aj.Cls).Mass : 1;
                         double pushI = jFixed ? overlap : iFixed ? 0 : overlap * mj / (mi + mj);
                         double pushJ = iFixed ? overlap : jFixed ? 0 : overlap - pushI;
-                        SepX[i] -= ddx * pushI;
-                        SepZ[i] -= ddz * pushI;
-                        SepX[j] += ddx * pushJ;
-                        SepZ[j] += ddz * pushJ;
+                        // b16 [5]: of a pair where only one is in (or walking into) a one-cell gap, that one takes GapLeadShare: the
+                        // queue behind it no longer shoves it sideways out of the mouth.
+                        if (gapFlow && !iFixed && !jFixed && (gi != 0) != (gj != 0))
+                        {
+                            pushI = gi != 0 ? overlap * pf.GapLeadShare : overlap * (1 - pf.GapLeadShare);
+                            pushJ = overlap - pushI;
+                        }
+                        double ix = -ddx * pushI, iz = -ddz * pushI, jx = ddx * pushJ, jz = ddz * pushJ;
+                        if (gapFlow)
+                        {
+                            // b16 [5]: inside a one-cell gap the push across the passage is dropped (along it only).
+                            if (gi == 1) iz = 0; else if (gi == 2) ix = 0;
+                            if (gj == 1) jz = 0; else if (gj == 2) jx = 0;
+                        }
+                        SepX[i] += ix;
+                        SepZ[i] += iz;
+                        SepX[j] += jx;
+                        SepZ[j] += jz;
                         any = true;
                     }
                 }
@@ -724,6 +938,24 @@ namespace CriticalMass.Sim.Core
                     double sx = SepX[i];
                     double sz = SepZ[i];
                     if (sx == 0 && sz == 0) continue;
+                    if (noRev)
+                    {
+                        // b16 [3]: the push against this body's own step this tick (PrevX -> X before separation) may stop it, never
+                        // carry it backwards past where it started (the walk-in, shove-back flip every other tick the shiver gate saw).
+                        double ox = w.X[i] - w.PrevX[i] - SepAccX[i], oz = w.Z[i] - w.PrevZ[i] - SepAccZ[i];
+                        double ol = Math.Sqrt(ox * ox + oz * oz);
+                        if (ol >= 0.02)
+                        {
+                            double ux = ox / ol, uz = oz / ol;
+                            double back = (SepAccX[i] + sx) * ux + (SepAccZ[i] + sz) * uz;
+                            if (back < -ol)
+                            {
+                                sx -= (back + ol) * ux;
+                                sz -= (back + ol) * uz;
+                                if (sx * sx + sz * sz < 1e-12) continue;
+                            }
+                        }
+                    }
                     double len = Math.Sqrt(sx * sx + sz * sz);
                     double room = p.SeparationMaxStep - SepMoved[i];
                     if (room <= 0) continue;
@@ -734,7 +966,10 @@ namespace CriticalMass.Sim.Core
                         len = room;
                     }
                     SepMoved[i] += len;
+                    double bx0 = w.X[i], bz0 = w.Z[i];
                     MoveActor(w, i, sx, sz);
+                    SepAccX[i] += w.X[i] - bx0;
+                    SepAccZ[i] += w.Z[i] - bz0;
                 }
             }
         }

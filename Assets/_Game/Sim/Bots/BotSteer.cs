@@ -346,6 +346,13 @@ namespace CriticalMass.Sim.Bots
                 double side = (id & 1) == 0 ? 1 : -1;
                 double want = reach * 0.7;
                 double pull = (d - want) / reach;
+                if (PhysicsFeel.On(w))
+                {
+                    // b16 [3]: no keep-distance pull within BotPullDeadband of the wanted distance. Pressed sideways into a wall or a
+                    // body the strafe part stops and the pull alone was left, flipping in, out, in as the gap jittered round `want`.
+                    double off = d - want, db = PhysicsFeel.Cfg(w).BotPullDeadband;
+                    pull = off > db ? (off - db) / reach : off < -db ? (off + db) / reach : 0;
+                }
                 Mv.X = (-dz / d) * side * 0.6 + (dx / d) * pull;
                 Mv.Z = (dx / d) * side * 0.6 + (dz / d) * pull;
             }
