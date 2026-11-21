@@ -132,7 +132,7 @@ while :; do
   st=$(gh run view "$RUN" --json status -q .status 2>/dev/null || echo unknown)
   [[ "$st" == completed ]] && break
   (( $(date +%s) > deadline )) && out timed-out 75 ",\"run\":$RUN,\"url\":\"$URL\",\"reason\":\"still $st after ${MAXW} min (the run keeps going on GitHub)\""
-  sleep 30
+  sleep "${CM_REMOTE_POLL_S:-30}"   # feat/air-test-machine: CM_REMOTE_POLL_S=120 for a lower-churn poll
 done
 D="$LOGS/remote/$RUN"; mkdir -p "$D"
 gh run view "$RUN" --json conclusion,jobs > "$D/run.json" 2>/dev/null
