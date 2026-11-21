@@ -157,6 +157,10 @@ namespace CriticalMass.Sim.Config
         /// <summary>The stat row of one class (browser GAME_CONFIG.classes[id]).</summary>
         public ClassConfig Class(ClassId id)
         {
+            // b15 combat feel: while the rule is on (Full rules, CombatFeel.Enabled) the class rows are its rows (same test as
+            // CombatFeel.On, inlined: this is the hottest config read). Classic and PhysicsOnly always read Classes.
+            CombatFeelConfig f = Depth.CombatFeel;
+            if (f != null && f.Enabled && !Depth.Classic && !Physics.Classic) return f.Classes[(int)id];
             return Classes[(int)id];
         }
 

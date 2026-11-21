@@ -98,6 +98,7 @@ namespace CriticalMass.Runtime.Tests
         public void APressFiveTicksEarlyIsDroppedAsBefore()
         {
             GameConfig cfg = GameConfig.CreateDefault();
+            cfg.Depth.CombatFeel.Enabled = false; // b15: with combat feel a press up to 0.20 s early is buffered (CombatFeelTests)
             World w = NewWorld(cfg);
             double dt = SimStep.Dt(cfg);
             double cooldown = cfg.Class(ClassId.Warrior).AttackCooldown;

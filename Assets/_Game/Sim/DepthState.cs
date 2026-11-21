@@ -147,6 +147,8 @@ namespace CriticalMass.Sim.Core
         /// <summary>U-068 counters.</summary>
         public int DropsClaimed;
         public int EggWindows;
+        /// <summary>b15: combat feel per-actor state (buffer, stagger windows, slow, sunder) and the ladder mask (CombatFeel.cs).</summary>
+        public CombatFeelState Feel;
         public int BridgesCollapsed;
         public int BridgesRepaired;
         /// <summary>b15 terrain height: per-actor level, slow and climb state (null unless the rule is on; TerrainHeight.cs).</summary>
@@ -190,6 +192,7 @@ namespace CriticalMass.Sim.Core
                 DropSpots = Core.Pickups.PlaceCentreSpots(map, cfg.Depth.Events.DropSpotsZ),
                 DropProgress = new int[2],
                 BrokenIdx = new int[MapEvents.MaxBrokenCells],
+                Feel = CombatFeelState.Create(cfg, map),
             };
             for (int i = 0; i < s.Pickups.Length; i++) s.Pickups[i] = new Pickup { Source = -1, Spot = -1 };
             s.CoinSpotNextTick = new int[s.CoinSpots.Length];
@@ -211,6 +214,7 @@ namespace CriticalMass.Sim.Core
         /// <summary>Back to the start of a match, in place (World.InitWorld, after the map repaint and the actor spawn).</summary>
         public void Reset(World w)
         {
+            Feel.Reset(); // b15 combat feel
             Array.Clear(RefuseReadyTick, 0, RefuseReadyTick.Length);
             Array.Clear(PassUnits, 0, PassUnits.Length);
             Refusals = 0;

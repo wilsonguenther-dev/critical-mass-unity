@@ -175,6 +175,7 @@ namespace CriticalMass.Sim.Tests
         public void TheBuilderRowKeepsHisOldSwingAndTheOthersStayInTheBandBelowTheWarrior()
         {
             GameConfig c = GameConfig.CreateDefault();
+            c.Depth.CombatFeel.Enabled = false; // b15: combat feel supersedes the light weapons (its rows carry every strike)
             ClassConfig b = c.Class(ClassId.Builder);
             LightWeapon m = c.Depth.LightWeapons.Builder;
             Assert.AreEqual(b.AttackDamage, m.Damage, "the mallet is the Builder's swing as it was");

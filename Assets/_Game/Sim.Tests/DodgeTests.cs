@@ -394,7 +394,9 @@ namespace CriticalMass.Sim.Tests
             var scratches = new InputFrame[2];
             for (int arm = 0; arm < 2; arm++)
             {
-                worlds[arm] = World.CreateWorld(new WorldOptions { Seed = 4242, TeamSize = 16, HumanTeam = TeamId.Azure, HumanClass = ClassId.Warrior, Config = MatchConfig(16, arm == 0) });
+                GameConfig ac = MatchConfig(16, arm == 0);
+                ac.Depth.CombatFeel.Enabled = false; // b15: whole-tick bytes compare the b13 fights; CombatFeelTests holds the feel rule's own calls to 0 B
+                worlds[arm] = World.CreateWorld(new WorldOptions { Seed = 4242, TeamSize = 16, HumanTeam = TeamId.Azure, HumanClass = ClassId.Warrior, Config = ac });
                 scratches[arm] = SimInput.EmptyInput();
                 for (int t = 0; t < Warm; t++) MatchTick.Advance(worlds[arm], null, scratches[arm]);
             }

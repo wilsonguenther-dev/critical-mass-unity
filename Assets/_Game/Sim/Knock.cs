@@ -71,6 +71,12 @@ namespace CriticalMass.Sim.Core
                 t.KVz = JsMath.F32(t.KVz + dirZ * v0);
                 World.PushEvent(w, SimEventType.Knock, target, source, w.X[target], w.Z[target], 0, null, cause, 0, dirX, dirZ, eff, tier, 0, 0);
             }
+            if (stunTicks > 0 && CombatFeel.On(w))
+            {
+                // b15 pass 3: one unbroken stagger run (CombatFeel.BeginMovement counts it) never passes the chain cap.
+                int room = CombatFeel.Ticks(w, w.Config.Depth.CombatFeel.StaggerChainCapSeconds) - w.Depth.Feel.LockRun[target];
+                if (stunTicks > room) stunTicks = room;
+            }
             if (stunTicks > 0 && stunTicks > t.HitStunTicks)
             {
                 t.HitStunTicks = stunTicks;

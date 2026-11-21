@@ -38,6 +38,8 @@ namespace CriticalMass.Sim.Config
         public CorruptionConfig Corruption = new CorruptionConfig();
         /// <summary>b15: terrain height (stacked blocks, walkable pits). One switch: TerrainHeight.Enabled.</summary>
         public TerrainHeightConfig TerrainHeight = new TerrainHeightConfig();
+        /// <summary>b15: combat feel (attack phases, hit reactions, class identity, ladder traffic); CombatFeelConfig.cs.</summary>
+        public CombatFeelConfig CombatFeel = new CombatFeelConfig();
 
         public DepthConfig Clone()
         {
@@ -55,6 +57,7 @@ namespace CriticalMass.Sim.Config
             c.KaijuTypes = KaijuTypes.Clone();
             c.Corruption = Corruption.Clone();
             c.TerrainHeight = TerrainHeight.Clone();
+            c.CombatFeel = CombatFeel.Clone();
             return c;
         }
     }

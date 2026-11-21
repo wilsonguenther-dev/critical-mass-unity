@@ -100,10 +100,14 @@ float4 _CMSwayParams;
 // screen-space dither (clip, no blending, no extra pass); ViewCull.FadeAmount in C# is the same maths (tests).
 float4 _CMFadeCam;
 float4 _CMFadeTarget;
+// b15 combat feel (audit item 8): _CMFadeKeep.xyz = the chest of the fighter the local player just hit, w = keep radius
+// (0 = none). Surfaces inside that sphere are never dithered, so the victim of your own hit stays solid for ~0.35 s.
+float4 _CMFadeKeep;
 
 void CMToonFadeClip(float3 positionWS, float4 positionCS)
 {
     if (_CMFadeCam.w < 0.5) return;
+    if (_CMFadeKeep.w > 0.0 && distance(positionWS, _CMFadeKeep.xyz) < _CMFadeKeep.w) return;
     float3 a = _CMFadeCam.xyz;
     float3 s = _CMFadeTarget.xyz - a;
     float t = dot(positionWS - a, s) / max(dot(s, s), 1e-4);
