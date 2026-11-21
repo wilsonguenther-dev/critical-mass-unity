@@ -550,8 +550,10 @@ namespace CriticalMass.Sim.Tests
         // b14-c: the Slow case was 4242; after the hut regrowth and the Kaiju route guard 4242's Kaiju is never owned (0.0 s, run
         // 44159219254; 2024 likewise), so the precondition, not the rule, failed. 99 (164.3 s owned in the same run) replaces it;
         // the six-seed mean tests still play 4242 and print it as left out.
-        [TestCase(1337)]
-        [TestCase(99, Category = "Slow")]
+        // b16 combine: on the combined rules 1337's and 99's Kaiju hatch Berserk (0 s owned, runs 44953083481 / 44953691993),
+        // the precondition again; 7 (180 s owned) and 2024 (180 s owned) replace them; the six-seed mean tests still play both.
+        [TestCase(7)]
+        [TestCase(2024, Category = "Slow")]
         public void InAWholeMatchTheKaijuGetsOntoTheHillAndNeverIdlesOffItWithNoTarget(int seed)
         {
             KaijuHillRun r = MeasureKaijuHill(seed);

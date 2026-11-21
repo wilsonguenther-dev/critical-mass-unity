@@ -4,7 +4,7 @@ Every tuning field the sim reads from `GameConfig`, found by reflection (`Assets
 
 Regenerate: `tools/balance/balance-report.sh tuning-index (or the balance-report workflow, mode tuning-index)`. `TuningIndexTests` fails when a field has no row here. Paths work as `--set Path=Value` switches for the balance report.
 
-864 fields.
+863 fields.
 
 ## (top level)
 
@@ -938,7 +938,6 @@ Regenerate: `tools/balance/balance-report.sh tuning-index (or the balance-report
 | `Depth.PhysicsFeel.BotNoSnapReversal` | true | bool | `Assets/_Game/Sim/Config/PhysicsFeelConfig.cs` | [3] A bot whose wish flips over 120 degrees off its motion turns through the side at the bot turn rate instead of stepping straight back (fighters and straight walkers; the field-following turn limit already covers th... |
 | `Depth.PhysicsFeel.AllyPushRampFrom` | 0.1 | double | `Assets/_Game/Sim/Config/PhysicsFeelConfig.cs` | Teammates push at PhysicsConfig.AllyPushShare up to AllyPushRampFrom of overlap, rising to the full push at AllyPushFullAt. |
 | `Depth.PhysicsFeel.AllyPushFullAt` | 0.25 | double | `Assets/_Game/Sim/Config/PhysicsFeelConfig.cs` |  |
-| `Depth.PhysicsFeel.AllyGetUpShare` | 0.5 | double | `Assets/_Game/Sim/Config/PhysicsFeelConfig.cs` | b16 combine (D, ally overlap): a teammate getting up is no longer immovable to an ally walking into it: it takes this share of the pair's push (0 = the old rule, the walker takes all of it). |
 | `Depth.PhysicsFeel.AllyPassInGapsOnly` | true | bool | `Assets/_Game/Sim/Config/PhysicsFeelConfig.cs` | The U-071 opposing-ally pass (no push between a retreating bot and an ally walking into it) only inside or at the mouth of a one-cell passage, where they cannot step round each other. |
 | `Depth.PhysicsFeel.GapFlow` | true | bool | `Assets/_Game/Sim/Config/PhysicsFeelConfig.cs` | Bodies queue through one-cell gaps: inside a gap (or one cell from its mouth along its walk) a body's push across the passage is dropped, and of a pair where only one is there, that one takes GapLeadShare of the push. |
 | `Depth.PhysicsFeel.GapLeadShare` | 0.2 | double | `Assets/_Game/Sim/Config/PhysicsFeelConfig.cs` |  |
@@ -948,14 +947,14 @@ Regenerate: `tools/balance/balance-report.sh tuning-index (or the balance-report
 | `Depth.Mech.KaijuIdleStop` | 0.75 | double | `Assets/_Game/Sim/Config/MechRulesConfig.cs` | The idle point is reached when the body is this close to it (u); it then stands and faces the hill. |
 | `Depth.Mech.AfkAutopilot` | true | bool | `Assets/_Game/Sim/Config/MechRulesConfig.cs` | A human whose frames carry no input for AfkSeconds is played by the autopilot (the same bot input a dropped player gets) until his next input, which hands the fighter back on that tick. |
 | `Depth.Mech.AfkSeconds` | 15 | double | `Assets/_Game/Sim/Config/MechRulesConfig.cs` |  |
-| `Depth.Mech.FeedExtrasShare` | true | bool | `Assets/_Game/Sim/Config/MechRulesConfig.cs` | The director's two extra Kaiju feeders (ahead, or 10 s behind) become a share of the team: ceil(FeedExtraShare x team size) = 2 at 16, 1 at 8, 1 at 5 (before: 2 at every size, 3 of 5 bots off the hill at 5v5). |
+| `Depth.Mech.FeedExtrasShare` | false | bool | `Assets/_Game/Sim/Config/MechRulesConfig.cs` | The director's two extra Kaiju feeders (ahead, or 10 s behind) become a share of the team: ceil(FeedExtraShare x team size) = 2 at 16, 1 at 8, 1 at 5 (before: 2 at every size, 3 of 5 bots off the hill at 5v5). |
 | `Depth.Mech.FeedExtraShare` | 0.12 | double | `Assets/_Game/Sim/Config/MechRulesConfig.cs` |  |
 | `Depth.Mech.HutBotsWaitForHumans` | true | bool | `Assets/_Game/Sim/Config/MechRulesConfig.cs` | On a team with at least one human at the controls, bots hold their votes until HutBotLastSeconds are left in the window or every such human has voted, whichever is first, and then follow the humans' majority; when the... |
 | `Depth.Mech.HutBotLastSeconds` | 3 | double | `Assets/_Game/Sim/Config/MechRulesConfig.cs` |  |
 | `Depth.Mech.WarriorHoldWeight` | 2 | int | `Assets/_Game/Sim/Config/MechRulesConfig.cs` | A Warrior standing on the hill counts this many bodies for holding and contesting it (1 = off). |
 | `Depth.Mech.HillContributorCap` | 10 | int | `Assets/_Game/Sim/Config/MechRulesConfig.cs` | At most this many WEIGHTED bodies per team count toward holding or contesting the hill at a team size of HillCapReferenceTeam; other sizes scale it: round(cap x size / reference), at least 1 (16: 10, 8: 5, 5: 3). |
 | `Depth.Mech.HillCapReferenceTeam` | 16 | int | `Assets/_Game/Sim/Config/MechRulesConfig.cs` |  |
-| `Depth.Mech.HillCapScalesWithSize` | true | bool | `Assets/_Game/Sim/Config/MechRulesConfig.cs` | b16 combine (D, blowouts): false = the cap is HillContributorCap at every team size (the design ruling's "at most 10 units per team"), so it bites at 16 a side only; true = scaled by team size as above. |
+| `Depth.Mech.HillCapScalesWithSize` | false | bool | `Assets/_Game/Sim/Config/MechRulesConfig.cs` | b16 combine (D, blowouts): false = the cap is HillContributorCap at every team size (the design ruling's "at most 10 units per team"), so it bites at 16 a side only; true = scaled by team size as above. |
 | `Depth.Mech.HillCapBotsOffHill` | true | bool | `Assets/_Game/Sim/Config/MechRulesConfig.cs` | Bots on a team already at the cap do something else: hill-job bots past it take the INTERCEPT job (stand on the enemy's approach, InterceptAlong u of path from the hill toward the enemy pad, and fight whoever comes). |
 | `Depth.Mech.InterceptAlong` | 12 | double | `Assets/_Game/Sim/Config/MechRulesConfig.cs` |  |
 | `Depth.Mech.HillCapLockSeconds` | 3 | double | `Assets/_Game/Sim/Config/MechRulesConfig.cs` | A bot's intercept / hill switch holds at least this long (no flip-flop at the disc edge). |

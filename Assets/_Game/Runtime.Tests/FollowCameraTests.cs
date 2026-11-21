@@ -266,6 +266,7 @@ namespace CriticalMass.Runtime.Tests
                 GameSettings.GroundCamera = true;
                 Assert.AreEqual(CameraView.ThirdPerson, GameSettings.CameraView, "a stored first person plays as third person while hidden");
                 GameSettings.CameraView = CameraView.TopDown;
+                CameraHeading.ClassicChosen = false;   // the steps above chose the classic diamond; start the rest from the creator angle
                 FollowCamera.FirstPersonEnabled = true;   // the rest of this test is the switch on (the code stays)
 
                 Assert.AreEqual(CameraView.ThirdPerson, FollowCamera.Next(CameraView.TopDown));
