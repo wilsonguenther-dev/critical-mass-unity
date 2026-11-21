@@ -79,6 +79,48 @@ namespace CriticalMass.Runtime.View.Effects
         /// <summary>Reduced flashing: no bright edge above this alpha.</summary>
         public const float ReducedEdgeCap = 0.6f;
 
+        // b15 view polish r2 (Editor review round 2): the ground wedge alone failed (on the hill it drew under the raised
+        // paving; in contact the two bodies hid it). The warning now lives ON THE ATTACKER: (a) a bright neutral glint on
+        // the weapon hand plus a streak along the weapon arm and past the hand along the weapon, (b) a thin bright arc at
+        // chest height in front of the attacker along the swing path (air layer: depth-tested, so it shows over ground and
+        // paving, and it sits outside the attacker's own body), (c) the wedge stays as a secondary cue, lifted to the local
+        // walking surface (SurfaceLift: the hill paving's top on the hill).
+        /// <summary>A wind-up this short or shorter (wall s) is at full strength from its first frame (the Miner's 0.20 s);
+        /// a longer one ramps from RampFloor to 1.</summary>
+        public const float ShortWindupSeconds = 0.25f, RampFloor = 0.6f;
+        /// <summary>The arc: height over the surface, bright and ink widths (u), radius as a share of the reach, and the
+        /// least clearance outside the attacker's body radius.</summary>
+        public const float ArcHeight = 1.05f, ArcWidth = 0.06f, ArcInkWidth = 0.13f, ArcReachShare = 0.8f, ArcMinClear = 0.25f;
+        /// <summary>The weapon cue: glint radius, arm streak width, how far past the hand it runs along the weapon, and the
+        /// start flash (the glint starts FlashScale times larger and settles over FlashSeconds; none under reduced flashing).</summary>
+        public const float GlintRadius = 0.24f, ArmWidth = 0.08f, WeaponExtend = 0.45f, FlashSeconds = 0.10f, FlashScale = 1.45f;
+        /// <summary>The hill paving's top over GroundHeight.At (env_hill_plaza is 0.23 tall, SceneryLodTable) plus a margin,
+        /// inside the hill ring's radius; GroundLift everywhere else (was a flat 0.035 over the world ground).</summary>
+        public const float HillPavingTop = 0.27f, HillPavingRadius = 12f, GroundLift = 0.04f;
+
+        /// <summary>Cue strength 0..1 at wind-up progress p for a wind-up of this many wall seconds.</summary>
+        public static float Strength(float p, float windupSeconds) =>
+            windupSeconds <= ShortWindupSeconds ? 1f : Mathf.Lerp(RampFloor, 1f, Mathf.Clamp01(p));
+
+        /// <summary>The cue's alpha: the strength itself, or under reduced flashing a steady glow capped at ReducedEdgeCap.</summary>
+        public static float CueAlpha(float strength, bool reduceFlashing) =>
+            reduceFlashing ? Mathf.Min(Mathf.Clamp01(strength), ReducedEdgeCap) : Mathf.Clamp01(strength);
+
+        /// <summary>The glint's size factor: the start flash (FlashScale settling to 1 over FlashSeconds); 1 under reduced flashing.</summary>
+        public static float GlintScale(float sinceStartSeconds, bool reduceFlashing) =>
+            reduceFlashing ? 1f : Mathf.Lerp(FlashScale, 1f, Mathf.Clamp01(sinceStartSeconds / FlashSeconds));
+
+        /// <summary>The arc's radius: ArcReachShare of the reach, never inside the body plus ArcMinClear.</summary>
+        public static float ArcRadius(float reach, float bodyRadius) => Mathf.Max(bodyRadius + ArcMinClear, reach * ArcReachShare);
+
+        /// <summary>The ground wedge's height over GroundHeight.At at sim (x, z): over the hill paving on the hill.</summary>
+        public static float SurfaceLift(double x, double z, double hillX, double hillZ, bool hasHill)
+        {
+            if (!hasHill) return GroundLift;
+            double dx = x - hillX, dz = z - hillZ;
+            return dx * dx + dz * dz <= HillPavingRadius * HillPavingRadius ? HillPavingTop + GroundLift : GroundLift;
+        }
+
         public Color32 Fill, Grow, Lead;
         public float BaseIn, BaseOut, GrowIn, GrowOut, LeadA, InkA, EdgeA;
 
@@ -97,6 +139,53 @@ namespace CriticalMass.Runtime.View.Effects
                 t.EdgeA = Mathf.Min(t.EdgeA, ReducedEdgeCap);
             }
             return t;
+        }
+    }
+
+    /// <summary>
+    /// b15 view polish r2: where each fighter's weapon hand and elbow were drawn this frame (ActorViews.PostPose records
+    /// them after the pose), so the wind-up cue sits on the attacker's weapon arm. View only; no allocation after a model's
+    /// first frame (its hand bone is cached per model).
+    /// </summary>
+    public static class SwingCue
+    {
+        public const int Max = 64;
+        static readonly CriticalMass.Runtime.View.Art.ModelView[] _mv = new CriticalMass.Runtime.View.Art.ModelView[Max];
+        static readonly Transform[] _hand = new Transform[Max], _elbow = new Transform[Max];
+        static readonly Vector3[] _handAt = new Vector3[Max], _elbowAt = new Vector3[Max];
+        static readonly int[] _frame = new int[Max];
+
+        public static void Record(int i, CriticalMass.Runtime.View.Art.ModelView mv)
+        {
+            if (i < 0 || i >= Max || mv == null) return;
+            if (!ReferenceEquals(_mv[i], mv))
+            {
+                _mv[i] = mv;
+                Transform h = mv.Bone(CriticalMass.Runtime.View.Anim.WeaponProps.HandBone);
+                Transform e = h != null ? h.parent : null;   // handslot.r -> hand.r
+                if (e != null && e.parent != null) e = e.parent;   // -> the forearm (its origin is the elbow)
+                if (h == null)
+                {
+                    h = mv.Bone(CriticalMass.Runtime.View.Anim.WeaponProps.HandBoneFallback);
+                    e = h != null ? h.parent : null;
+                }
+                _hand[i] = h;
+                _elbow[i] = e;
+            }
+            if (_hand[i] == null) return;
+            _handAt[i] = _hand[i].position;
+            _elbowAt[i] = _elbow[i] != null ? _elbow[i].position : _handAt[i] + Vector3.up * 0.3f;
+            _frame[i] = Time.frameCount;
+        }
+
+        /// <summary>The weapon hand and elbow drawn this frame or the last (false: no model or no hand bone).</summary>
+        public static bool TryArm(int i, out Vector3 hand, out Vector3 elbow)
+        {
+            hand = elbow = Vector3.zero;
+            if (i < 0 || i >= Max || _hand[i] == null || Time.frameCount - _frame[i] > 1) return false;
+            hand = _handAt[i];
+            elbow = _elbowAt[i];
+            return true;
         }
     }
 }

@@ -151,11 +151,18 @@ namespace CriticalMass.Runtime.View.Mechanics
     /// </summary>
     public static class HealFx
     {
+        // b15 view polish r2 (Editor review round 2): the round-1 motes (4 of radius 0.11..0.16 u, alpha 0.9) were lost at
+        // the gameplay camera in a fight. Fewer, larger, brighter motes that orbit just OUTSIDE the torso (so they do not
+        // cover the fighter), and a visible ground ring pulse at the healed ally's feet.
         /// <summary>Motes per heal, their life (s), the solid core share of a mote's radius, segments per mote.</summary>
-        public const int Motes = 4, MoteSegments = 10;
-        public const float MoteLife = 0.8f, MoteCore = 0.45f;
-        /// <summary>Rise (u) over the life from the start height, and the start height over the actor's feet.</summary>
-        public const float Rise = 1.1f, StartHeight = 1.15f;
+        public const int Motes = 3, MoteSegments = 12;
+        public const float MoteLife = 0.9f, MoteCore = 0.5f;
+        /// <summary>Rise (u) over the life from the start height, the start height over the feet, the orbit radius at the
+        /// start and at the end (outside a fighter's body radius, about 0.4 u), the peak alpha and the additive share.</summary>
+        public const float Rise = 1.2f, StartHeight = 0.95f, OrbitStart = 0.45f, OrbitEnd = 0.7f, PeakAlpha = 1f;
+        public const byte Additive = 220;
+        /// <summary>The ground ring pulse: from RingStart to RingEnd (u) over RingLife (s), band RingBandU, peak alpha.</summary>
+        public const float RingStart = 0.35f, RingEnd = 1.15f, RingLife = 0.55f, RingBandU = 0.13f, RingAlpha = 0.9f;
 
         /// <summary>Offset of mote i (0..Motes-1) at t (0..1 of its life): staggered starts, a slow spiral out, rising.</summary>
         public static Vector3 MoteOffset(int i, float t)
@@ -163,23 +170,31 @@ namespace CriticalMass.Runtime.View.Mechanics
             float lag = i * 0.12f;
             float u = Mathf.Clamp01((t - lag) / (1f - lag));
             float a = i * (Mathf.PI * 2f / Motes) + u * 1.6f;
-            float spread = 0.18f + 0.22f * u;
+            float spread = Mathf.Lerp(OrbitStart, OrbitEnd, u);
             return new Vector3(Mathf.Cos(a) * spread, StartHeight + Rise * u * (2f - u) + i * 0.08f, Mathf.Sin(a) * spread);
         }
 
-        /// <summary>Mote i's alpha at t: a soft fade in over its first 20%, out over its last 45% (0 before it starts).</summary>
+        /// <summary>Mote i's alpha at t: a quick fade in over its first 12%, out over its last 40% (0 before it starts).</summary>
         public static float MoteAlpha(int i, float t)
         {
             float lag = i * 0.12f;
             if (t < lag || t >= 1f) return 0f;
             float u = (t - lag) / (1f - lag);
-            return Mathf.Clamp01(u / 0.2f) * Mathf.Clamp01((1f - u) / 0.45f);
+            return PeakAlpha * Mathf.Clamp01(u / 0.12f) * Mathf.Clamp01((1f - u) / 0.4f);
         }
 
-        /// <summary>Mote radius (u) at t: grows a little, then shrinks as it fades; amount 0..1 (heal size) adds up to 30%.</summary>
-        public static float MoteRadius(float t, float amount01) => (0.11f + 0.05f * Mathf.Sin(Mathf.PI * Mathf.Clamp01(t))) * (1f + 0.3f * Mathf.Clamp01(amount01));
+        /// <summary>Mote radius (u) at t: grows a little, then shrinks as it fades; amount 0..1 (heal size) adds up to 20%.</summary>
+        public static float MoteRadius(float t, float amount01) => (0.2f + 0.06f * Mathf.Sin(Mathf.PI * Mathf.Clamp01(t))) * (1f + 0.2f * Mathf.Clamp01(amount01));
 
-        /// <summary>The ground ring's band width as a share of its radius, and its soft inner edge (inner alpha share).</summary>
+        /// <summary>The ground ring pulse at age (s): its outer radius and alpha (alpha 0 once done).</summary>
+        public static void RingPulse(float age, out float radius, out float alpha)
+        {
+            float t = Mathf.Clamp01(age / RingLife);
+            radius = Mathf.Lerp(RingStart, RingEnd, 1f - (1f - t) * (1f - t));
+            alpha = age < 0f || age >= RingLife ? 0f : RingAlpha * (1f - t);
+        }
+
+        /// <summary>The Wings pulse ring's band width as a share of its radius, and its soft inner edge (inner alpha share).</summary>
         public const float RingBand = 0.22f, RingInnerAlpha = 0f;
     }
 

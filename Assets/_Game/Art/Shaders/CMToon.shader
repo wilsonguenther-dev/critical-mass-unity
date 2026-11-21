@@ -68,6 +68,7 @@ Shader "CM/Toon"
         _SmoothNormals ("Smoothed Normals From UV3 (characters, 0 imported)", Range(0, 1)) = 0
         _KaijuGlow ("Kaiju Type Glow (rgb hue, a strength; 0 off)", Color) = (0, 0, 0, 0)
         _KaijuPattern ("Kaiju Glow Pattern (0 none, 1 crest, 2 plates, 3 bands, 4 spots, 5 spine)", Range(0, 5)) = 0
+        _KaijuTone ("Kaiju Tone (rgb tint, a saturation; a 0 = not a Kaiju)", Vector) = (1, 1, 1, 0)
         _TeamTopTint ("Team Tint On Top-Facing Fixed Colours (characters: headgear, shoulders)", Range(0, 1)) = 0
     }
 
@@ -142,6 +143,9 @@ Shader "CM/Toon"
                 // team cloth so the team reads from the 55-degree camera without repainting. Characters only (ArtMaterials).
                 albedo = CMToonTeamTop(albedo, input.color, normalWS);
                 albedo = CMToonDecal(albedo, input.uv0);
+                // b15 view polish r2: the Kaiju's saturated identity colour at a mid value, never clipping (CMToonKaijuTone)
+                albedo = CMToonKaijuTone(albedo, input.color);
+                half kaijuW = CMToonKaijuW();
 
                 // Three bands from N.L; a cast shadow drops the pixel to the shadow band; a top-facing surface is one
                 // band lighter (2.2 bevel rule: tops exactly one band lighter than their sides).
@@ -150,11 +154,14 @@ Shader "CM/Toon"
                 band = min(2.0h, band + _TopBandLift * smoothstep(0.65, 0.75, normalWS.y));
                 // b15 world look: fighters and the Kaiju (rim above 0) lift their shadow and mid bands (characters are the
                 // brightest layer at every time of day; three tones stay distinct).
-                half charW = step(0.001h, _RimStrength);
+                // b15 view polish r2: the Kaiju keeps its rim (team edge) but not the character band fill and gain (they
+                // washed it pale and clipped it in round 1)
+                half charW = step(0.001h, _RimStrength) * (1.0h - kaijuW);
                 band = CMTodCharacterBand(band, charW);
                 half3 lit = CMToonBandColor(albedo, band);
                 // Time of day (CMTimeOfDay.hlsl): key and shadow tint by band, sky fill, moon rim on world solids.
-                half todLift = CMToonTodLift();
+                // b15 view polish r2: the Kaiju takes CM_KAIJU_TOD_SHARE of the grade (lit by night, still clear)
+                half todLift = CMToonTodLift() * (1.0h - (half)CM_KAIJU_TOD_SHARE * kaijuW);
                 lit = CMTodGrade(lit, band * 0.5h, todLift);
                 lit = CMTodCharacterGain(lit, charW);
                 lit = CMTodRim(lit, normalWS, viewDirWS, mainLight.direction, todLift);
