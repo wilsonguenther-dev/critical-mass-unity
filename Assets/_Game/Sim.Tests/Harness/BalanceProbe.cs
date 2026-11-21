@@ -64,6 +64,10 @@ namespace CriticalMass.Sim.Tests.Harness
         // per class
         public double[] Body = new double[Classes];
         public double[] ActorSec = new double[Classes], DeadSec = new double[Classes], WalkSec = new double[Classes], FightSec = new double[Classes];
+        /// <summary>b15 wave two (PR #219's definition, the one TARGETS.json's deadwalk band answers): time lost to a death =
+        /// not alive, plus the walk back from the Respawn event until the first of hill radius + WalkBackHillMargin, a hit dealt
+        /// or taken, a job (GatherProgress &gt; 0 or channelling a vein), WalkBackCap seconds, or death.</summary>
+        public double[] DownSec = new double[Classes], WalkBackSec = new double[Classes];
         public double[] Damage = new double[Classes], Kills = new double[Classes], Deaths = new double[Classes], Healing = new double[Classes];
         public double[] Objective = new double[Classes], Delivered = new double[Classes], KaijuDamage = new double[Classes];
         public double Top10DamageShare, Top10KillShare;
@@ -100,10 +104,13 @@ namespace CriticalMass.Sim.Tests.Harness
         public const double StuckDistance = 0.05;
         public const double LeadDeadBand = 0.5;
         public const double OwnedFrom = 30;
+        /// <summary>The walk back after a respawn ends this far outside the hill radius, or after this many seconds (PR #219).</summary>
+        public const double WalkBackHillMargin = 6, WalkBackCap = 20;
 
         int _cursor, _hz, _n, _fightTicks;
         double _dt;
-        int[] _lastFight, _held;
+        int[] _lastFight, _held, _walkFrom;
+        bool[] _walkBack;
         double[] _px, _pz, _ax, _az, _damage, _kills;
         int _lastSign;
         bool _halfDone;
@@ -126,6 +133,8 @@ namespace CriticalMass.Sim.Tests.Harness
             _cursor = w.EventHead;
             _lastFight = new int[_n];
             _held = new int[_n];
+            _walkFrom = new int[_n];
+            _walkBack = new bool[_n];
             _px = new double[_n];
             _pz = new double[_n];
             _ax = new double[_n];
@@ -186,6 +195,23 @@ namespace CriticalMass.Sim.Tests.Harness
                     bool onHill = hx * hx + hz * hz <= hillR * hillR;
                     bool moving = dx * dx + dz * dz > WalkSpeed * _dt * WalkSpeed * _dt;
                     if (moving && a.CarryAmount <= 0 && !onHill) _r.WalkSec[c] += _dt;
+                }
+                // b15 wave two: dead (not alive) + the walk back after a respawn (PR #219's definition)
+                if (!a.Alive)
+                {
+                    _r.DownSec[c] += _dt;
+                    _walkBack[i] = false;
+                }
+                else if (_walkBack[i])
+                {
+                    double bx = w.X[i] - w.Map.Hill.X, bz = w.Z[i] - w.Map.Hill.Z, br = hillR + WalkBackHillMargin;
+                    if (bx * bx + bz * bz < br * br || a.GatherProgress > 0 || Blacksmith.ChannelVein(w, i) >= 0 || tick - _walkFrom[i] > WalkBackCap * _hz)
+                        _walkBack[i] = false;
+                    else
+                    {
+                        _r.DownSec[c] += _dt;
+                        _r.WalkBackSec[c] += _dt;
+                    }
                 }
                 StuckStep(w, i, a);
             }
@@ -268,13 +294,17 @@ namespace CriticalMass.Sim.Tests.Harness
             switch (e.Type)
             {
                 case SimEventType.Hit:
-                    if (e.A >= 0 && e.A < _n) _lastFight[e.A] = tick;
+                    if (e.A >= 0 && e.A < _n) { _lastFight[e.A] = tick; _walkBack[e.A] = false; }
                     if (e.B >= 0 && e.B < _n)
                     {
                         _lastFight[e.B] = tick;
+                        _walkBack[e.B] = false;
                         _damage[e.B] += e.Value;
                         _r.Damage[ClsOf(w, e.B)] += e.Value;
                     }
+                    break;
+                case SimEventType.Respawn:
+                    if (e.A >= 0 && e.A < _n) { _walkBack[e.A] = true; _walkFrom[e.A] = tick; }
                     break;
                 case SimEventType.Death:
                     if (e.A >= 0 && e.A < _n) _r.Deaths[ClsOf(w, e.A)]++;

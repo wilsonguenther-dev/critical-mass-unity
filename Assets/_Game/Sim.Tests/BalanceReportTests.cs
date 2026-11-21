@@ -160,7 +160,7 @@ namespace CriticalMass.Sim.Tests
         public void TheTargetsFileHasTheAuditBandsOnRowsTheReportWrites()
         {
             List<BalanceTarget> targets = BalanceTarget.FromJson(File.ReadAllText("docs/balance/TARGETS.json"));
-            Assert.AreEqual(8, targets.Count);
+            Assert.AreEqual(9, targets.Count);   // b15 wave two: + warriordmg (dmgshare.Warrior); deadwalk reads time.deadwalkback.all
             GameConfig cfg = BalanceRunner.Config(RulesProfile.Full, null);
             var ms = new List<MatchRecord> { BalanceRunner.BotMatch(cfg, 7, 5, 30) };
             BalanceReport r = BalanceAggregate.Build(ms, DuelRunner.Ttk(RulesProfile.Full, null, 1), DuelRunner.Duels(RulesProfile.Full, null, 1));

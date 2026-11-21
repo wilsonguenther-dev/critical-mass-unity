@@ -244,6 +244,9 @@ namespace CriticalMass.Sim.Tests.Harness
                     for (int k = 0; k < MatchRecord.Classes; k++) sum[k] = m.DeadSec[k] + m.WalkSec[k];
                     return share(m, sum);
                 }));
+                // b15 wave two: PR #219's time lost to a death (not alive + the walk back from the respawn); TARGETS deadwalk
+                Mean(r, "time.walkback." + cn, T, cn + ": walking back after a respawn (to hill radius + 6, a hit, a job, 20 s)", Each(ms, m => share(m, m.WalkBackSec)));
+                Mean(r, "time.deadwalkback." + cn, T, cn + ": dead or walking back after a respawn", Each(ms, m => share(m, m.DownSec)));
             }
 
             const string P = "Per class (per body per match)";
@@ -263,6 +266,12 @@ namespace CriticalMass.Sim.Tests.Harness
                     double tot = 0;
                     for (int k = 0; k < MatchRecord.Classes; k++) tot += m.Kills[k];
                     return Ratio(m.Kills[cc], tot);
+                }));
+                Mean(r, "dmgshare." + cn, P, cn + ": share of all fighter damage (whole class)", Each(ms, m =>
+                {
+                    double tot = 0;
+                    for (int k = 0; k < MatchRecord.Classes; k++) tot += m.Damage[k];
+                    return Ratio(m.Damage[cc], tot);
                 }));
             }
             const string C = "Concentration";
