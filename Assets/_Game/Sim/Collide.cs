@@ -906,7 +906,9 @@ namespace CriticalMass.Sim.Core
                         if (d2 >= rr * rr) continue;
                         bool iFixed = ai.StandUp > 0;
                         bool jFixed = aj.StandUp > 0;
-                        if (iFixed && jFixed) continue;
+                        // b16 [6]: two fighters getting up on the same spawn spot were both immovable and stayed fused (0.85 u in
+                        // the crowd match); under the feel rule they share the push like any pair.
+                        if (iFixed && jFixed) { if (!feel) continue; iFixed = jFixed = false; }
                         double d = Math.Sqrt(d2);
                         if (d < 1e-6)
                         {
@@ -952,7 +954,8 @@ namespace CriticalMass.Sim.Core
                         double ix = -ddx * pushI, iz = -ddz * pushI, jx = ddx * pushJ, jz = ddz * pushJ;
                         if (gapFlow)
                         {
-                            // b16 [5]: inside a one-cell gap the push across the passage is dropped (along it only).
+                            // b16 [5]: inside a one-cell gap the push across the passage is dropped (along it only); at the mouth
+                            // (3 / 4) it is kept, so the queue outside never stacks.
                             if (gi == 1) iz = 0; else if (gi == 2) ix = 0;
                             if (gj == 1) jz = 0; else if (gj == 2) jx = 0;
                         }

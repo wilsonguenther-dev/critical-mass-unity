@@ -221,7 +221,10 @@ namespace CriticalMass.Sim.Bots
                 Reset(s, x, z, facing);
                 return;
             }
-            _path[s] += step;
+            // b16 [3]: under the physics-feel rule a knocked step (a TNT shove, a hit's knockback, the Kaiju's blast slide) is the
+            // hit's distance, not the legs': it is left out of the walked path too, as it already was out of the reversals. A
+            // bot thrown 5 m by a blast and walking 1 m back read as a Dither (5 of the 12 flags in the fast gate's match).
+            if (!_knocked || !PhysicsFeel.On(w)) _path[s] += step;
             if (_knocked)
             {
                 _ldx[s] = 0; // the next step of its own is not compared with the knock

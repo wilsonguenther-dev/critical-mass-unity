@@ -1073,6 +1073,23 @@ namespace CriticalMass.Sim.Bots
                         oz = hx * sn + hz * turnCos;
                     }
                 }
+                else if (PhysicsFeel.On(w) && PhysicsFeel.Cfg(w).BotNoSnapReversal && vs >= TurnLimitFraction * cc.MoveSpeed)
+                {
+                    // b16 [3]: no snap reversal. A fighter (or a bot walking straight at a point) whose wish flips to more than 120
+                    // degrees off the way it is moving turns through the side at TurnStep a step instead of stepping straight back:
+                    // the approach / retreat band flipping in, out, in read as Reversals in the fast gate's match. Dodges, the cloud
+                    // and the unjam step are decided after this and are not limited.
+                    double hx = vx / vs;
+                    double hz = vz / vs;
+                    if (hx * ox + hz * oz < -0.5)
+                    {
+                        double turnCos = TurnCos(cfg);
+                        double turnSin = TurnSin(cfg);
+                        double sn = hx * oz - hz * ox >= 0 ? turnSin : -turnSin;
+                        ox = hx * turnCos - hz * sn;
+                        oz = hx * sn + hz * turnCos;
+                    }
+                }
                 output.MoveX = ox;
                 output.MoveZ = oz;
                 st.WantMove[id] = 1;

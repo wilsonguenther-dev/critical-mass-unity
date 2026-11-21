@@ -64,6 +64,9 @@ namespace CriticalMass.Sim.Config
         /// <summary>Separation never pushes a walking body backwards past a standstill in one tick: the part of the push against its
         /// own step this tick is capped at that step's length (lateral and forward parts are kept).</summary>
         public bool SeparationNoReversal = true;
+        /// <summary>[3] A bot whose wish flips over 120 degrees off its motion turns through the side at the bot turn rate instead
+        /// of stepping straight back (fighters and straight walkers; the field-following turn limit already covers the rest).</summary>
+        public bool BotNoSnapReversal = true;
 
         // ---- [6] allies fusing, [5] one-cell gaps
         /// <summary>Teammates push at PhysicsConfig.AllyPushShare up to AllyPushRampFrom of overlap, rising to the full push at
