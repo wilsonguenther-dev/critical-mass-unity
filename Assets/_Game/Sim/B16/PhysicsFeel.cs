@@ -135,8 +135,9 @@ namespace CriticalMass.Sim.Core
         }
 
         /// <summary>
-        /// [5] Actor i's one-cell passage: 1 / 2 inside one (along x / along z), 3 / 4 at its mouth (the next cell along the
-        /// larger part of its velocity is one), 0 none.
+        /// [5] Actor i's one-cell passage axis (1 along x, 2 along z, 0 none): its own cell, else the next cell along the
+        /// larger part of its velocity (the mouth it is walking into). At the mouth the push across the passage is dropped
+        /// too (keeping it there was tried: 4 of 8 through in 8 s instead of 8).
         /// </summary>
         public static byte GapOf(World w, int i)
         {
@@ -148,7 +149,7 @@ namespace CriticalMass.Sim.Core
             double ax = Math.Abs(vx), az = Math.Abs(vz);
             if (ax < 0.1 && az < 0.1) return 0;
             byte m = ax >= az ? GapAt(map, cx + (vx > 0 ? 1 : -1), cz) : GapAt(map, cx, cz + (vz > 0 ? 1 : -1));
-            return m == 0 ? (byte)0 : (byte)(m + 2);
+            return m;
         }
 
         /// <summary>[6] The share of a teammate pair's push at overlap o (u): AllyPushShare, ramping to 1 from AllyPushRampFrom to AllyPushFullAt.</summary>

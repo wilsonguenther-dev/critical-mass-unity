@@ -681,6 +681,12 @@ namespace CriticalMass.Sim.Core
             double body = w.Config.Physics.KaijuBodyRadius;
             double b2 = body * body;
             int moved = 0;
+            // b16 [1]: a give-way (Kaiju.PinGiveWay) moves the Kaiju, which can put it onto a fighter this pass already cleared
+            // (1 actor-tick in KaijuDepenetrateTests' six whole matches): one more pass then, with no give-way.
+            bool feelPin = PhysicsFeel.On(w);
+            for (int pass = 0; pass < (feelPin ? 2 : 1); pass++)
+            {
+            double kx0 = k.X, kz0 = k.Z;
             for (int i = 0; i < w.ActorCount; i++)
             {
                 Actor a = w.Actors[i];
@@ -705,7 +711,7 @@ namespace CriticalMass.Sim.Core
                 double rr = body + r;
                 // b16 [1]: a fighter the Kaiju walked onto (not one placed deep inside it by a respawn or a landing) is never moved
                 // more than KaijuPinStepMax in a tick, and never across the body: its own side, else the Kaiju gives way.
-                if (PhysicsFeel.On(w) && d >= body - PhysicsFeel.Cfg(w).KaijuPinStepMax)
+                if (feelPin && pass == 0 && d >= body - PhysicsFeel.Cfg(w).KaijuPinStepMax)
                 {
                     if (PinResolve(w, i, ux, uz, d, body, r))
                     {
@@ -718,7 +724,9 @@ namespace CriticalMass.Sim.Core
                     d = Math.Sqrt(dx * dx + dz * dz);
                     if (d > 1e-6) { ux = dx / d; uz = dz / d; }
                 }
-                MoveActor(w, i, ux * (rr - d), uz * (rr - d));
+                // (the second pass only lifts it out of the body: the Kaiju stepped at most KaijuPinStepMax onto it)
+                double to = pass == 1 ? body + 0.02 : rr;
+                if (to > d) MoveActor(w, i, ux * (to - d), uz * (to - d));
                 moved++;
                 double ex = w.X[i] - k.X, ez = w.Z[i] - k.Z;
                 if (ex * ex + ez * ez >= b2) continue;
@@ -746,6 +754,8 @@ namespace CriticalMass.Sim.Core
                     w.X[i] = bx;
                     w.Z[i] = bz;
                 }
+            }
+            if (k.X == kx0 && k.Z == kz0) break;
             }
             return moved;
         }
@@ -954,8 +964,7 @@ namespace CriticalMass.Sim.Core
                         double ix = -ddx * pushI, iz = -ddz * pushI, jx = ddx * pushJ, jz = ddz * pushJ;
                         if (gapFlow)
                         {
-                            // b16 [5]: inside a one-cell gap the push across the passage is dropped (along it only); at the mouth
-                            // (3 / 4) it is kept, so the queue outside never stacks.
+                            // b16 [5]: in a one-cell gap or at its mouth the push across the passage is dropped (along it only).
                             if (gi == 1) iz = 0; else if (gi == 2) ix = 0;
                             if (gj == 1) jz = 0; else if (gj == 2) jx = 0;
                         }
