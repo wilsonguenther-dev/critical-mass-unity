@@ -643,7 +643,7 @@ namespace CriticalMass.Runtime.Audio
                 _queue.Clear();
             }
             // b14 review: no subtitle over the Characters screen, Controls page or another menu that covers the match
-            UpdateSubtitle(now, paused || title || CriticalMass.Runtime.View.Affordance.TerrainAffordanceView.MenuCovers);
+            UpdateSubtitle(now, paused || title || CriticalMass.Runtime.Menus.MenuGate.AnyOpen);
         }
 
         void Begin(AnnouncerLine line)

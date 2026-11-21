@@ -202,7 +202,7 @@ namespace CriticalMass.Runtime.Hud.Mechanics
             if (_canvas == null) return;
             InteractUi.UpdateScale(_canvas);
             if (_canvas.worldCamera == null) _canvas.worldCamera = UnityEngine.Camera.main;
-            bool hide = w == null || view == null || w.Match.Phase == MatchPhase.Ended || Scoreboard.AnyOpen;
+            bool hide = w == null || view == null || w.Match.Phase == MatchPhase.Ended || Scoreboard.AnyOpen || CriticalMass.Runtime.Menus.MenuGate.AnyOpen;
             if (_canvas.enabled == hide) _canvas.enabled = !hide;
             if (hide) { VoteOwnsDpad = false; return; }
             int me = view.Feed.LocalActor;

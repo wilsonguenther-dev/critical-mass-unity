@@ -334,7 +334,7 @@ namespace CriticalMass.Runtime.View.Affordance
             }
             double now = Time.unscaledTimeAsDouble;
             UnityEngine.Camera cam = UnityEngine.Camera.main;
-            if (w == null || w.Map == null || CriticalMass.Runtime.Flow.GameFlow.MenuIdle || MenuCovers)   // b14 review: an overlay canvas, it drew over the CHARACTERS screen and the Controls page
+            if (w == null || w.Map == null || CriticalMass.Runtime.Flow.GameFlow.MenuIdle || CriticalMass.Runtime.Menus.MenuGate.AnyOpen)   // b14 review: an overlay canvas, it drew over the CHARACTERS screen and the Controls page
             {
                 Showing = false;
                 HideUi();
@@ -415,11 +415,8 @@ namespace CriticalMass.Runtime.View.Affordance
         /// rewards panel, credits, the results highlights). Those are camera-space canvases, so the HUD's overlay canvases
         /// (this prompt pill, the tool strip) drew on top of them, over their BACK buttons.
         /// </summary>
-        public static bool MenuCovers =>
-            CriticalMass.Runtime.Menus.Characters.CharactersScreen.IsOpenNow || CriticalMass.Runtime.Menus.ControlsCardScreen.IsOpen
-            || CriticalMass.Runtime.Codex.LoreCard.IsOpen || CriticalMass.Runtime.Menu.CharacterPanel.IsOpen
-            || CriticalMass.Runtime.Menu.RewardsOverlay.IsOpen || CriticalMass.Runtime.Menus.Credits.IsOpen
-            || CriticalMass.Runtime.Menu.ResultsHighlights.IsOpen;
+        /// <summary>b15 view polish (item 4): the shared menu gate (Menus.MenuGate); kept as a name for its callers.</summary>
+        public static bool MenuCovers => CriticalMass.Runtime.Menus.MenuGate.AnyOpen;
 
         void AimOf(World w, out bool hasAim, out double ax, out double az)
         {

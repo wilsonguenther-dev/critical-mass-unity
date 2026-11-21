@@ -35,6 +35,8 @@ namespace CriticalMass.Runtime.Menus
 
         public static ProfileMenuScreen Instance { get; private set; }
         public bool IsOpen => _open;
+        /// <summary>b15 view polish (item 4): the profile screen is open (MenuGate).</summary>
+        public static bool AnyOpen => Instance != null && Instance._open;
         public ProfileTab Tab { get; private set; }
         public ClassId Class { get; private set; }
         public int HistoryPage { get; private set; }

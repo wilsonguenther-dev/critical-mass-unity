@@ -103,6 +103,8 @@ namespace CriticalMass.Runtime.Menus
 
         public static ClassSelect Instance => _instance;
         public static bool IsOpen => _instance != null && _instance.Mode != SelectMode.None;
+        /// <summary>b15 view polish (item 4): the full-screen setup picker is open (MenuGate; the respawn strip is HUD).</summary>
+        public static bool SetupOpen => _instance != null && _instance.Mode == SelectMode.Setup;
 
         /// <summary>The class confirmed in setup last (kept between launches); Warrior until one is chosen.</summary>
         public static ClassId SelectedClass
