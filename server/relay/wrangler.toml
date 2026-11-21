@@ -30,3 +30,28 @@ new_sqlite_classes = ["Usage"]
 [observability]
 enabled = true
 head_sampling_rate = 0.01
+
+# b17-harden (not deployed by the builder; see server/relay/README.md "b17"): per-IP limits checked in the Worker before
+# any Durable Object request. Workers Rate Limiting binding (https://developers.cloudflare.com/workers/runtime-apis/bindings/rate-limit/,
+# GA 2025-09; needs wrangler 4.36+; approximate, per Cloudflare location). Whether the Free plan accepts it is not stated
+# on that page: if `wrangler deploy` refuses these blocks, delete them; src/index.js then uses its in-memory fallback.
+[[ratelimits]]
+name = "CREATE_LIMIT"
+namespace_id = "17001"
+  [ratelimits.simple]
+  limit = 3
+  period = 60
+
+[[ratelimits]]
+name = "JOIN_LIMIT"
+namespace_id = "17002"
+  [ratelimits.simple]
+  limit = 60
+  period = 60
+
+[[ratelimits]]
+name = "MSG_LIMIT"
+namespace_id = "17003"
+  [ratelimits.simple]
+  limit = 9000
+  period = 60

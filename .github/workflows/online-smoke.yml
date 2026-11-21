@@ -77,7 +77,7 @@ jobs:
           P=tools/online/HeadlessPeer/bin/Release/net8.0/cm-online-peer.dll
           R=http://127.0.0.1:8787
           mkdir -p out
-          dotnet $P -host -relay $R -humans 2 -ticks $T -teamsize 16 -name Host -hash-log out/host.txt -code-out out/code.txt -timeout 600 -lobby 120 > out/host.log 2>&1 &
+          dotnet $P -host -relay $R -humans 2 -ticks $T -teamsize 16 -name Host -hash-log out/host.txt -code-out out/code.txt -timeout 600 -lobby 120 -chat-at 300 -chat-text "b17 hello from the host" > out/host.log 2>&1 &
           HP=$!
           # code.txt is written only once the host's own connection is in the room ("ROOM READY"), so the joiner never races it.
           for i in $(seq 1 60); do [ -s out/code.txt ] && break; sleep 1; done
@@ -86,7 +86,7 @@ jobs:
           DR="${{ inputs.drop_rejoin || '' }}"
           DROP=""; RJ=0
           if [ -n "$DR" ]; then DROP="-drop-at ${DR%%:*} -rejoin-after ${DR##*:}"; RJ=1; fi
-          dotnet $P -join "$CODE" -relay $R -ticks $T -name Joiner -team crimson -class Miner -hash-log out/join.txt -timeout 600 $DROP > out/join.log 2>&1
+          dotnet $P -join "$CODE" -relay $R -ticks $T -name Joiner -team crimson -class Miner -hash-log out/join.txt -timeout 600 $DROP -chat-at 150 -chat-text "b17 hello from the joiner" -callout-at 180 -callout-id 7 > out/join.log 2>&1
           JC=$?
           wait $HP; HC=$?
           cat out/host.log out/join.log
@@ -98,6 +98,8 @@ jobs:
             python3 tools/online/compare-hashes.py out/host.txt out/join.txt.rejoin --min $(( (T - D) / 30 - 4 )) --from $(( D + 60 )) || exit 1
           fi
           grep -h "ONLINE TRAFFIC" out/host.log out/join.log || true
+          # b17-chat: a chat line each way and a callout ride the room connection (and the fingerprints above still match)
+          bash tools/online/chat-check.sh out/host.log out/join.log "${DR%%:*}" || exit 1
           [ $HC -eq 0 ] && [ $JC -eq 0 ]
       - name: b15-zero-cost, direct play (no relay), fallback to the relay, and the relay's usage count
         run: |
@@ -198,12 +200,12 @@ jobs:
           T="${{ inputs.ticks || '1800' }}"
           CODE=$(sed -n 's/^code=//p' room/room.txt)
           if [ "${{ matrix.role }}" = host ]; then
-            dotnet $P -host -code "$CODE" -key "$(cat "$RUNNER_TEMP/room-key.txt")" -relay "$RELAY" -humans 2 -ticks $T -hash-log hashes.txt -lobby 540 -timeout 1800 2>&1 | tee peer.log
+            dotnet $P -host -code "$CODE" -key "$(cat "$RUNNER_TEMP/room-key.txt")" -relay "$RELAY" -humans 2 -ticks $T -hash-log hashes.txt -lobby 540 -timeout 1800 -chat-at 300 -chat-text "b17 hello from the host" 2>&1 | tee peer.log
           else
             DR="${{ inputs.drop_rejoin || '' }}"
             DROP=""
             if [ -n "$DR" ]; then DROP="-drop-at ${DR%%:*} -rejoin-after ${DR##*:}"; fi
-            dotnet $P -join "$CODE" -relay "$RELAY" -ticks $T -team crimson -hash-log hashes.txt -timeout 1800 -join-tries 80 $DROP 2>&1 | tee peer.log
+            dotnet $P -join "$CODE" -relay "$RELAY" -ticks $T -team crimson -hash-log hashes.txt -timeout 1800 -join-tries 80 $DROP -chat-at 150 -chat-text "b17 hello from the joiner" -callout-at 180 -callout-id 7 2>&1 | tee peer.log
           fi
           exit ${PIPESTATUS[0]}
       - uses: actions/upload-artifact@v4
@@ -227,6 +229,8 @@ jobs:
           python3 tools/online/crossplay-check.py hashes-host/peer.log hashes-join/peer.log --names host,join
           python3 tools/online/compare-hashes.py hashes-host/hashes.txt hashes-join/hashes.txt --min $(( ${{ inputs.ticks || '1800' }} / 30 - 2 )) || exit 1
           DR="${{ inputs.drop_rejoin || '' }}"
+          # b17-chat: the Windows host and the macOS joiner exchanged a chat line and a callout through the relay
+          bash tools/online/chat-check.sh hashes-host/peer.log hashes-join/peer.log "${DR%%:*}" || exit 1
           if [ -n "$DR" ]; then
             T="${{ inputs.ticks || '1800' }}"; D=${DR%%:*}
             grep -E "ONLINE (DROPPED|REJOINING|REJOINED|TOHUMAN|TOBOT)" hashes-join/peer.log hashes-host/peer.log || true

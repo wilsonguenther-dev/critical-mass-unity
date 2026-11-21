@@ -158,7 +158,24 @@ namespace CriticalMass.Net
                 TeamOf = p => { RoomMember m = Find(p); return m != null ? (int)m.Team : -1; },
                 Knows = p => { RoomMember m = Find(p); return m != null && m.Confirmed; },
                 PeersInRoom = ConfirmedPeers,
+                // b17-chat: an All line is one broadcast while nobody in the room is half-joined (else one per member).
+                CanBroadcast = AllConfirmed,
             };
+            Chat.Voice = new VoiceChannel(transport)
+            {
+                TeamOf = p => { RoomMember m = Find(p); return m != null ? (int)m.Team : -1; },
+                Knows = p => { RoomMember m = Find(p); return m != null && m.Confirmed; },
+                InLobby = () => Phase == RoomPhase.Lobby && Session == null,
+                Hears = Chat.Hears,
+                CanBroadcast = AllConfirmed,
+                PeersInRoom = ConfirmedPeers,
+            };
+        }
+
+        private bool AllConfirmed()
+        {
+            foreach (RoomMember m in Members) if (!m.Confirmed) return false;
+            return true;
         }
 
         private IEnumerable<int> ConfirmedPeers()
@@ -257,7 +274,7 @@ namespace CriticalMass.Net
             }
             RoomMember m = Find(ev.From);
             if (m == null || ev.Data == null || ev.Length < 1) return;
-            if (ev.Data[0] == ChatChannel.Msg) { if (m.Confirmed) Chat.Handle(ref ev, now); return; }
+            if (ChatWire.Owns(ev.Data[0])) { if (m.Confirmed) Chat.Handle(ref ev, now); return; }   // b17-chat: the whole chat block (30 to 39)
             var r = new WireReader(ev.Data, 1, ev.Length);
             switch (ev.Data[0])
             {
@@ -354,7 +371,7 @@ namespace CriticalMass.Net
         {
             if (ev.Data == null || ev.Length < 1) return;
             int type = ev.Data[0];
-            if (type == ChatChannel.Msg) { Chat.Handle(ref ev, now); return; }
+            if (ChatWire.Owns(type)) { Chat.Handle(ref ev, now); return; }
             if (type == RoomMsg.Hello) { Reject(ev.From, "The match already started."); return; }
             if (type != RoomMsg.Rejoin || Session == null) return;
             var r = new WireReader(ev.Data, 1, ev.Length);
@@ -550,6 +567,13 @@ namespace CriticalMass.Net
             _name = RoomMsg.CleanName(name);
             _build = build ?? "";
             Chat = new ChatChannel(transport);
+            // b17-chat: lobby push-to-talk (off until this player turns it on); teams from the host's roster.
+            Chat.Voice = new VoiceChannel(transport)
+            {
+                TeamOf = p => { foreach (RoomMember m in Members) if (m.Peer == p) return (int)m.Team; return -1; },
+                InLobby = () => Phase == RoomPhase.Lobby && Session == null,
+                Hears = Chat.Hears,
+            };
             Rejoining = rejoinSecret != 0;
             Secret = rejoinSecret != 0 ? rejoinSecret : NewSecret();
         }
@@ -662,7 +686,7 @@ namespace CriticalMass.Net
                 default: return;
             }
             if (ev.From != Peers.Host || ev.Data == null || ev.Length < 1) return;
-            if (ev.Data[0] == ChatChannel.Msg) { Chat.Handle(ref ev, now); return; }
+            if (ChatWire.Owns(ev.Data[0])) { Chat.Handle(ref ev, now); return; }
             var r = new WireReader(ev.Data, 1, ev.Length);
             switch (ev.Data[0])
             {

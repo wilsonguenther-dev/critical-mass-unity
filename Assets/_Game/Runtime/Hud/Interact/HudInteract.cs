@@ -213,7 +213,10 @@ namespace CriticalMass.Runtime.Hud.Interact
                 InputContextKind ctx = InputContext.Current;
                 _ctx = ctx;
                 if (MapKey.WasPressedIn(ctx) && !Wheel.IsOpen && !_padHudFocus) { if (Map.IsOpen) CloseMap(); else OpenMap(); }
-                if (ZoomKey.WasPressedIn(ctx) && !Map.IsOpen && !_padHudFocus && !(ZoomKey.WasPressedOnGamepad && CriticalMass.Runtime.Hud.Mechanics.B15RulesHud.VoteOwnsDpad)) Minimap.ToggleZoom();   // b15-hook: D-pad right votes
+                // b17-chat: online, a controller's D-pad right is a hold for quick chat; its short tap zooms on release (TakeZoomTap)
+                bool chatHold = ZoomKey.WasPressedOnGamepad && CriticalMass.Runtime.Online.OnlineChatHud.PadQuickChatOwnsZoom;
+                if (ZoomKey.WasPressedIn(ctx) && !chatHold && !Map.IsOpen && !_padHudFocus && !(ZoomKey.WasPressedOnGamepad && CriticalMass.Runtime.Hud.Mechanics.B15RulesHud.VoteOwnsDpad)) Minimap.ToggleZoom();   // b15-hook: D-pad right votes
+                if (CriticalMass.Runtime.Online.OnlineChatHud.TakeZoomTap() && !Map.IsOpen && !_padHudFocus) Minimap.ToggleZoom();
                 if (CursorKey.WasPressedOnGamepad && InputContext.HudOwnsDpad(ctx) && !_padHudFocus && !Map.IsOpen && !Card.IsOpen && !Wheel.IsOpen)
                 {
                     SetPadFocus(true);
