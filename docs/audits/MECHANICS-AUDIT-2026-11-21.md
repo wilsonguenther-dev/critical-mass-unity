@@ -6,6 +6,27 @@ Paths are relative to `Assets/_Game/` unless they say otherwise. Physics (moveme
 audit's ground and is not covered. Duel order, Warrior speed and the cancel button are being changed on
 `feat/b16-duel-rules-cancel` and are not re-audited; where that work interacts with a finding it is said.
 
+## Ranked top 15
+
+| # | what | number | who notices | severity | fix (size) | sim / view | decision? |
+|---|---|---|---|---|---|---|---|
+| 1 | **The first four minutes do not matter; the Kaiju decides the 16v16 match** | leading at 2:00 or 4:00 wins 0.46; Kaiju owner wins 0.883; the team behind at the hatch gets it 37 of 60 | skilled player | high | comeback "combo" for Full Battle and 8v8: x1.25 RALLY, cap 45 s, respawn 3 to 8 s, forward return for the trailing team only, trail threshold kept at 5 s. Measured: lead at 2:00 wins 0.59, owner 0.627, blowouts 0.097 (S, config) | sim | owner (differs from his approved set in two places) |
+| 2 | **Stacking Farmers (or dropping Warriors) wins; stacking Warriors loses** | 16 Farmers 0.847; 0 Warriors 0.861; 16 Warriors 0.035; one more Warrior 0.292 | skilled player, premade groups | high | give the Warrior a hill job that turns damage into score, plus a per-team class cap; must be measured with the b16 duel changes (M) | sim | design advisor |
+| 3 | **Allied Kaiju AI parks on the hill and zeroes its own team** | idle point 1.5 u from the centre (`Sim/Kaiju.Hatch.cs:36`); NO SCORE 60 s a match | new player ("our score stopped") | high | idle point on the hill rim outside the ring, enemy side (S) | sim | no |
+| 4 | **Shipped comeback numbers differ from the owner's approval, and the code comments are stale** | shipped x1.5 / 60 s / 5 s / 2 to 5 s vs approved x1.25 / 45 s / 15 s / 3 to 8 s | nobody (owner) | medium | decide per item 1; fix the comments in `ComebackConfig.cs:9-14` (S) | sim | owner |
+| 5 | **The Healer is the most valuable class and the worst experience** | 18 deaths a match (others 7.9 to 13.6), dead or walking back 0.436; 4 Healers win 0.632; bots weight her at 1% of her distance | new player | high | soften the bot focus weight (off: deaths 13.6, blowouts 0.264, so not off) and credit healing on the results screen (S) | sim + view | design advisor (he asked for healer focus) |
+| 6 | **No AFK rule; one idle human swings a small match** | idle team at Quick 5v5 wins 0.080 (n 200); at 5v5 480 s 0.530 | everyone online | high | autopilot after 15 s idle + feeder extras as a team share (S) | sim | no |
+| 7 | **Hut votes are cast by bots before a human can read the cards** | 15 bots close the vote in about 3 s; 0.8% of votes go to the coin flip | new and skilled player | medium | bots wait until every human has voted or 6 s have passed (S) | sim | no |
+| 8 | **Kaiju type picker: Grove and Elder never hatch at 16v16; one wood trip decides the type** | Brute 24, Timber 29, Mire 19, Grove 0, Elder 0 of 72; wood over 1% = Timber | skilled player | medium | re-pin `RefShare` to today's mix and raise `ElderBelowScore` (round 4 value below) (S, config) | sim | no |
+| 9 | **Walls can be built on the outer half of the scoring disc** | keep-out 3 u on a 6 u hill; keep-out 7 u: Kaiju owner 0.883 to 0.729, bot walls 3.4 to 0.85 | skilled Builder | medium | keep-out 7 u (S, config) | sim | no |
+| 10 | **Dead resources** | water banked 7.0, spent 0; coins 648 a team, no sink anywhere; wood ends at 11.9 unspent | skilled player | low | hide the water and coin counters until they have a use; give wood a second sink (S view / M sim) | view | owner (coins tie to decision C/D) |
+| 11 | **Quitting records nothing; a host quit ends everyone's match; three match counters disagree** | leave = no loss (`MatchRewards.cs:112`); HostLeft ends all (`LockstepSession.cs:443-464`); profile and history count practice, class career does not (`MetaRecorder.cs:162`) | new player (counts), everyone (host) | medium | leave = loss for the leaver; "host left, no result" screen; show practice separately (S); host migration later (L) | view + meta | no |
+| 12 | **One spot on the map; nobody goes anywhere else** | 56% of living time within 15 u of the hill; enemy half 0.3% | skilled player | medium | a second objective or a resource found only in the enemy half (L, map) | sim | owner |
+| 13 | **Bots never switch class or use the terrain verbs** | 0 class switches, 0 raises or lowers, 0 purifies in 72 matches | skilled player | medium | switch at respawn to fill a missing Healer/Farmer, once per 60 s (M) | sim | no |
+| 14 | **The rules that decide the match are never taught** | trial (14 steps) skips the feed race, fatigue, RALLY, the hill rule and votes; no "why we lost"; the Kaiju type's cause is hidden; the Miner goal text is stale (`MatchWords.cs:85`) | new player | medium | results-screen turning point ("you lost the egg race by N"), type reason on hatch, fix the Miner line (S to M) | view | no |
+| 15 | **Side bias that changes with team size** | Quick 8v8 Crimson wins 0.585 (n 200); 16v16 Azure 0.639 (n 72, in noise) | nobody yet | low | 400-seed check per size, then look at spawn and node layout (S to measure) | sim | no |
+
+
 **How it was measured.** The headless balance tool (`tools/balance/balance-report.sh`, GitHub runner, no Unity) with an
 audit-only observer added on the probe branch `ci/balance/audit-mech-r1` (`tools/ci/BalanceReport/AuditProbe.cs`; never
 merged). The observer reads the sim from the outside and adds: zones by class, activity by minute, hill seconds lost to each
@@ -208,6 +229,40 @@ Reading: the owner-approved set is the only one that makes the first half matter
 0.255, decided at 23 s). "Forward for the trailing team only" is the best single anti-blowout lever measured (0.042,
 lead changes 5 for the first time) but leaves the Kaiju in charge. "RALLY x1.25 + forward for trailing only" is the best
 balance in round 2 (blowouts 0.069, margin 28 s, Kaiju owner 0.75), still with a flat first half.
+
+### 5c. Fix candidates, round 3 (16v16 72 matches; Quick 200)
+
+"combo" = RALLY x1.25, cap 45 s, respawn 3 to 8 s (the owner-approved numbers) but the trail threshold kept at 5 s, and
+FORWARD RETURN for the trailing team only. "next build" = combo + Kaiju type re-pin (`RefShare` 0.76/0.17/0.03/0.04,
+`ElderBelowScore` 1.3) + wall keep-out 7 u.
+
+| arm | Azure win | blowout | lead changes med / mean | leader at half wins | lead at 2:00 / 4:00 wins | decided at | margin | ends within 15 s | Kaiju owner wins |
+|---|---|---|---|---|---|---|---|---|---|
+| control (shipped) | 0.639 | 0.125 | 4 / 4.29 | 0.458 | 0.46 / 0.46 | 326 | 40 | 0.208 | 0.883 |
+| **combo** | 0.625 | **0.097** | 3 / 3.60 | **0.634** | **0.59 / 0.63** | 193 | 42 | 0.236 | **0.627** |
+| combo + trail threshold 15 s (= the full approved set + forward rule) | 0.514 | 0.194 | 2 / 2.96 | 0.569 | 0.58 / 0.57 | 244 | 28 | 0.319 | 0.759 |
+| wall keep-out 7 u alone | 0.625 | 0.125 | 4 / 4.03 | 0.611 | 0.54 / 0.61 | 250 | 42 | 0.208 | 0.729 |
+| type re-pin + Elder 1.3 alone | 0.625 | 0.153 | 4 / 4.15 | 0.500 | 0.52 / 0.50 | 300 | 40 | 0.250 | 0.883 |
+| **next build** | 0.639 | 0.111 | 4 / 3.86 | 0.620 | 0.61 / 0.62 | 240 | 45 | 0.250 | 0.724 |
+| Quick 5v5 combo | 0.440 | 0.245 | 1 / 1.55 | 0.750 | 0.76 | **27** | 24 | 0.355 | 0.401 |
+| Quick 5v5 next build | 0.455 | 0.260 | 1 / 1.57 | 0.730 | 0.74 | **28** | 24 | 0.370 | 0.422 |
+| Quick 8v8 combo | 0.495 | 0.215 | 2 / 2.62 | 0.492 | 0.49 | 148 | 25 | 0.345 | 0.803 |
+| 4 Healers, 3 Warriors (one team, pooled n 144) | changed team wins **0.632** | 0.278 | | | | | | | |
+
+Reading:
+- **combo fixes the 16v16 arc**: the first half now matters (leading at 2:00 wins 0.59, leader-at-half 0.634, inside the
+  0.60-0.80 target for the first time), the Kaiju decides less (0.883 to 0.627), and blowouts fall to 0.097. Cost: lead
+  changes 4 to 3.
+- The 15 s trail threshold is the part of the owner's approved set that hurts (blowouts 0.194); the multiplier, cap and
+  respawn are the parts that help.
+- **Quick 5v5 must keep today's numbers.** combo there drops the median "decided at" from 172 s to 27 s: at 5 a side the
+  x1.5 RALLY is what keeps a 4-minute match alive. Comeback numbers per mode (Full Battle and 8v8: combo; Quick 5v5:
+  shipped) is a small change in `PlayModes` rules.
+- Wall keep-out 7 u: bots build 3.4 to 0.85 walls a match (most bot walls were on the disc) and the Kaiju owner's edge
+  falls to 0.729; no other cost. Do it.
+- Type re-pin with Elder 1.3 makes ELDER 22 of 72 at 16v16 but Grove 0, and ELDER 81 of 200 at Quick 5v5 (too many).
+  Round 4 tries 1.12 and 1.18.
+- Four Healers beat the standard lineup 0.632: the Healer is the strongest body to add (section 2).
 
 ---
 
@@ -523,3 +578,42 @@ worst body to stack. The biggest learning gap is the one with the biggest effect
 | 10 | Overtime or a mercy rule | 21% of 16v16 matches end within 15 s (good), 12.5% are blowouts with nothing to play for | S |
 | 11 | Per-team bot difficulty and a ladder | allies are always Normal; there is no way to make a 1-human team feel carried or tested | S |
 
+
+---
+
+## Do in the next build (no decision needed)
+
+1. Allied Kaiju idle point on the hill rim, outside the ring (item 3). S, sim.
+2. AFK: hand an idle human to the autopilot after 15 s; feeder extras as a team share (item 6). S, sim.
+3. Hut vote: bots wait for the humans (all voted, or 6 s) (item 7). S, sim.
+4. Wall keep-out 7 u from the hill centre (item 9). S, config; measured.
+5. Kaiju type re-pin (item 8, value from round 4). S, config; measured.
+6. Small view fixes: Miner goal text, "host left, no result" screen, practice shown apart on the profile, leave = loss
+   for the leaver, hide the water and coin counters (items 10, 11, 14). S, view.
+
+Each sim item changes the golden and the rules digest; the builder re-pins and runs the 72-seed compare as usual.
+**Interaction with `feat/b16-duel-rules-cancel`:** a slower Warrior raises his walk-back share (already 0.338) and moves
+him further down the team-pick order (item 2); land b16 first, then run the class-mix arms again before item 2's fix.
+
+## Needs a decision (with recommendations)
+
+1. **Comeback numbers (owner).** Recommendation: take "combo" for Full Battle and Quick 8v8 (x1.25, cap 45 s, respawn
+   3 to 8 s, forward return for the trailing team only, trail threshold kept at 5 s, not 15 s) and keep today's numbers
+   for Quick 5v5, where the stronger RALLY is what keeps a 4-minute match alive (combo there: decided at 27 s).
+2. **The Warrior's team job (design advisor).** He wins every duel by ruling, but the team that drops him wins 0.861.
+   Recommendation: a Warrior on the disc counts as two bodies for ownership (his fighting becomes score), and a cap of
+   6 of one class per 16 (2 per 5); measure both after b16 lands.
+3. **Healer focus strength (design advisor).** Recommendation: keep "bots target Healers" but as a tie-breaker (weight
+   0.5 instead of 0.01), which keeps the ruling's intent and stops 18 deaths a match.
+4. **Coins (owner).** Recommendation: hide the in-match coin counter until a cosmetic shop exists (decision C/D), rather
+   than invent a power sink.
+5. **A reason to leave the centre (owner).** Recommendation: not in the next build; put a second objective on the map
+   roadmap item ("map data out of rules, then a second map") already approved.
+
+## Works well, do not break
+
+1. **Spawn safety:** 0.1% of deaths within 12 u of the victim's pad, 0.0% within 4 s of a respawn.
+2. **Close finishes and no draws:** 0 draws; 21% of 16v16 and 37% of Quick 5v5 matches end within 15 s; Quick Match
+   blowouts 0.20, held up by RALLY.
+3. **Drop, rejoin and human orders:** a dropped player's fighter is played by the autopilot and handed back on rejoin
+   (cross-play smoke passes); a human's ping is obeyed at once by up to 3 bots.
