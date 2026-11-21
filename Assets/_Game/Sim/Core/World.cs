@@ -881,8 +881,8 @@ namespace CriticalMass.Sim.Core
             // b15 (W6): every lazily filled bot route field gets its buffer now, so no first use allocates mid-match (no rule change).
             RouteFields.Preallocate(world);
             Jump.Warm(world.Config);   // b15 wave two: the jump planner's buffers exist before the first tick (no first-jump allocation)
-            Terraform.Warm(world);    // b15 wave two: the shrine-goal caches match this map before the first tick (no first-dig allocation)
-            Barricades.Warm(world);
+            CriticalMass.Sim.Core.Terraform.Warm(world);    // b15 wave two: the shrine-goal caches match this map before the first tick (no first-dig allocation)
+            CriticalMass.Sim.Core.Barricades.Warm(world);
             return world;
         }
 
