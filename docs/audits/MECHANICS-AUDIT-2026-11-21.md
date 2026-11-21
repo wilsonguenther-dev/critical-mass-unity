@@ -151,7 +151,7 @@ share here clear of 0.5). The root is the bot plan. The director counts a human 
 (`BotDirector.cs:11` `InactiveSeconds = 15`), so at 5v5 the idle team is "short-handed" (1 of 5 is over
 `ShortHandedMinShare` 0.15, `DepthConfig.cs:423`) and switches to the short-handed plan: one egg-duty bot, everyone else on
 the hill (`BotDirector.cs:186`). The normal plan sends `round(0.25 x 5) = 1` feeder **plus two more** whenever the team is
-ahead (`AdvantageExtra = 2`) or 10 s behind (`GambitExtra = 2`), i.e. 3 of 5 bots away from the hill most of the match.
+ahead (`AdvantageExtra = 2`) or 10 s behind (`GambitExtra = 2`), i.e. 3 of 5 bots away from the hill for most of the time before the hatch.
 Those extras are absolute numbers tuned at 16v16 (6 of 16). So at 5v5 "four bots on the hill" beats "five players with
 three at the egg". At 16v16 one idle player is 6%, under the threshold, and nothing happens (0.500).
 **Rule fix (S, sim):** make the two extras a share of the team (`ceil(0.12 x team)`: 2 at 16, 1 at 5), and treat an idle
@@ -170,4 +170,175 @@ sign flips of the cumulative difference; HOLD FATIGUE and RALLY already cut the 
 lead is small but rarely flips. Recommendation: replace the target with "share of matches within 30 s at 6:00" (control:
 measured in round 2) or "lead at 2:00 wins 0.55-0.70" — both say what the owner cares about (the early game matters, the
 end is not certain).
+
+---
+
+## 2. Classes as roles
+
+Lineup at 16 (`Sim/Config/DepthConfig.cs:391`): 5 Warriors, 4 Farmers, 2 Miners, 2 Demolitions, 1 Builder, 2 Healers.
+Actor 0 (the player's seat) starts as a Warrior (`Sim.Tests/Harness/BalanceProbe.cs` options, `HumanClass = Warrior`).
+
+### What each class is for, and what it actually does (control, 72 matches, per fighter)
+
+| class | job by design | kills / deaths | share of fighter damage | hill credit (s) | dead / walking / fighting share | dead or walking back after a respawn | time on the hill disc |
+|---|---|---|---|---|---|---|---|
+| Warrior | fight, hold | 14.6 / 13.6 | 0.429 | 170 | 0.107 / 0.317 / 0.339 | 0.338 | 0.568 |
+| Farmer | gather, feed (x1.25 allegiance) | 12.1 / 8.4 | 0.241 | 86 | 0.069 / 0.306 / 0.268 | 0.206 | 0.245 |
+| Miner | mine ore for the hut | 8.8 / 7.9 | 0.080 | 66 | 0.067 / 0.393 / 0.163 | 0.185 | 0.200 |
+| Demolitions | TNT and mines | 17.4 / 13.6 | 0.210 | 149 | 0.107 / 0.322 / 0.354 | 0.312 | 0.492 |
+| Builder | walls, ladders, bridges | 7.0 / 8.6 | 0.035 | 96 | 0.074 / 0.340 / 0.167 | 0.215 | 0.278 |
+| Healer | mend, pulse, purify | 0.1 / **18.0** | 0.005 (4,899 HP healed) | 134 | **0.138 / 0.396** / 0.216 | **0.436** | 0.440 |
+
+(Zones are "time alive", sampled every 0.5 s; full zone table in section 6.)
+
+### Contribution to winning: one team's lineup changed, both sides pooled (n 144 each, +-0.08)
+
+| arm (16 bodies, W F M D B H) | changed team wins | what moved |
+|---|---|---|
+| no Healers, 2 more Warriors (7 4 2 2 1 0) | **0.083** | hill 128 vs 223 s; leader-at-half 0.889; blowouts 0.458 |
+| one Warrior swapped for a Healer (4 4 2 2 1 3) | **0.604** | |
+| no Farmers, 4 more Warriors (9 0 2 2 1 2) | **0.188** | Kaiju to the enemy in 144 of 144 (allegiance 289 vs 1,067) |
+| one Farmer swapped for a Warrior (6 3 2 2 1 2) | **0.292** | Kaiju to the enemy 0.68 |
+| one Warrior swapped for a Farmer (4 5 2 2 1 2) | 0.486 | |
+| **no Warriors, 5 more Farmers (0 9 2 2 1 2)** | **0.861** | hill 218 vs 133 s; wins 82 of 102 even without the Kaiju; median "decided at" 11 s |
+| no Demolitions, 2 more Warriors (7 4 2 0 1 2) | 0.375 | |
+| one Warrior swapped for Demolitions | 0.493 | |
+| no Miners, 2 more Warriors (7 4 0 2 1 2) | 0.500 | ore 0, hut level 0, no loss |
+| one Warrior swapped for a Miner | 0.535 | |
+| no Builder, 1 more Warrior (6 4 2 2 0 2) | 0.576 | |
+| one Warrior swapped for a Builder | 0.458 | |
+| all 16 Warriors | **0.035** | |
+| all 16 Demolitions | 0.201 | |
+
+**What this says.** In the team game the Warrior is the weakest body to add and the Healer the strongest. Every arm that
+adds Warriors loses (0.035 to 0.375, the Builder and Miner swaps are within noise); the one arm that removes them all wins
+0.861 and settles the hill in the first minute. The score counts bodies on the disc, not damage: a Warrior is the slowest
+body (3.8 u/s against 4.0-4.2), spends 0.338 of the match dead or walking back, and his damage (0.43 of all fighter damage)
+does not convert into hill seconds. Two Healers are worth more than any two other bodies (4,899 HP healed per match, about
+30 Warrior lives). This is bot play; a human Warrior who stands on the disc is better than a bot Warrior who chases, but the
+direction is large and consistent.
+
+**Interaction with b16.** The design advisor's ruling makes the Warrior win every duel and move "a touch slower", and
+the builder is doing exactly that. The duel matrix is not the problem; the team arms show the Warrior is already the worst
+team pick, and slowing him moves him further down. The fix belongs to the score, not the duel: see item 3 of the ranked list
+(a Warrior needs a job only he can do on the hill).
+
+### Does each kit hold a decision?
+- Warrior: when to raise the shield and whom to cleave (yes, moment-to-moment). No decision about where to be: hill only.
+- Farmer: which node, which KIND to feed (it sets the Kaiju type, section 4), when to fight. The richest decision set.
+- Miner: none to speak of: mine, haul home, repeat (0.39 of his time walking, every phase). Removing both Miners costs
+  nothing (0.500). The hut levels he buys are measured in section 3.
+- Demolitions: where to throw (193 TNT a match, 11.8% of all deaths are explosions). A real decision.
+- Builder: what to build where; bots stand still 8-9% of the first three minutes waiting for wood and never dig or place.
+- Healer: whom to mend, when to pulse, when to purify (0 purifies in 72 matches). Real, but she is the bots' first target
+  (`Sim/Bots/TeamBrain.cs:279`, `TargetHealersFirst`), dies 18 times a match (once every 27 s) and is dead or walking back
+  0.436 of the match.
+
+### Overlap and traps
+- Miner, Demolitions and Builder share one stat row (120 HP, 16 damage, 1.5 range; `GameConfig.cs:54-74`); the combat
+  audit already lists it (not re-audited).
+- **Trap for a new player: the Healer.** She is the most valuable class to the team and the worst experience: 18 deaths,
+  almost half the match dead or walking. A first-time Healer will feel useless while being the reason the team wins, and
+  nothing on screen tells her so (the results screen ranks by knock-outs and hill time).
+- **Trap for a team: Warriors.** The player's default class is the one whose duplicates lose.
+
+### Class switching
+- A dead player may pick a class for the next respawn (`Sim/Respawn.cs:22-48`, the HUD's respawn class tiles); alive at
+  the base station only when the station rule is on.
+- Bots never switch (`Sim/Bots/BotSteer.cs:172`, `ClassPick = -1`; measured 0 switches in 72 matches). With the class arms
+  above, a bot team that loses both Healers or all Farmers stays that way all match.
+- Recommendation: bots switch at respawn to fill a missing role (no living Healer, no Farmer before the hatch, an enemy
+  Kaiju with no KAIJU HUNTERS), at most once per bot per 60 s. Small, sim, deterministic.
+
+---
+
+## 3. Economy
+
+### Every resource (control, per team per match)
+
+| resource | sources | sinks | measured | verdict |
+|---|---|---|---|---|
+| Plant | nodes, 6 charges, 20 s regrowth | egg (allegiance) | 49.7 delivered | works |
+| Meat | 2 per knock-out | egg | 11.3 delivered | works |
+| Wood | 10 groves, supply drops (+4) | Builder walls (1 or 2), ladders/bridges, egg | team stock peaks 14.4, **ends 11.9 unspent**; 3.3 walls and 5.3 pieces a match | hoarded: the Builder bot cannot spend it fast enough |
+| Water | 5 springs, supply drops (+2) | egg (+Mire), **the station ladder only** (`Sim/Sources.cs:67-74`, called from `Sim/Stations.cs:116`, off under the hut rule) | stock peaks 7.0, **ends 7.0: never spent** | dead resource at the base |
+| Food stock | banked food | Farmers withdraw | peak 0.4 | unused path |
+| Ore | 6 veins, 6 charges, 12 s regrowth | hut levels 6/10/14/18/24 (72) | 64.8 banked; L5 in 0.368 of team-matches at 7:17 | works, barely |
+| Corruption | 3 nodes | egg (berserk at 100 instability) | 3.5 delivered; berserk 12 of 72 | works |
+| Coins | 3 per knock-out, piles, drops | **nothing in the match or in the profile** (no code subtracts coins) | 648 picked per team | still no sink (systems audit #20) |
+
+### The hut and its votes
+- Levels reached (release report): L1 0:16, L2 1:03, L3 2:02, L4 4:44, L5 7:17 (in 37% of team-matches). Levels at 6:00
+  differ in 13 of 72 matches (section 5).
+- Vote rules (`Sim/B15/HutChoices.cs:193-271`): 8 s window, closes early when one card has more than half of the team
+  (`2a > members`); a tie or no vote = a seeded coin flip (`DefaultCard`, `:184`); a player may change his vote until it
+  closes; AFK players count as members and never vote. Bots vote 1 to 4 s after the vote opens, 80% for the "team need"
+  card (`BotNeed`, `:296-326`).
+- **A human's vote almost never matters with bots.** With 15 bots at 80% agreement the ninth matching vote lands within
+  about 3 s and closes the vote before a human has read both cards. Measured: 625 votes, 5 decided by lot (0.8%). At 5v5,
+  95 of 1,309 (7%) by lot. In a 16-human room the window is the full 8 s and ties are a coin flip.
+- Pick rates (control): L1 QuickReturn 73 / ToughWalls 71; L2 RichVeins 107 / ShieldWall 37; L3 ShortFuse 72 /
+  BlastGuard 72; L4 KaijuHunters 76 / WideMend 67; L5 HillAnchor 37 / SwiftFeet 13.
+- **Win share per card cannot be read from these matches**: the bots pick by situation (WIDE MEND when they own the
+  Kaiju, SWIFT FEET when behind at L5), so WIDE MEND "wins" 49 of 57 and SWIFT FEET 0 of 7 because of when they are
+  picked, not what they do. Measuring card strength needs a forced-pick arm (both teams forced to opposite cards), which
+  the vote code has no switch for.
+- Hut votes off (flat +5% a level): Azure 0.444, blowouts 0.111, margin 28 s, Kaiju owner wins 0.678 (with votes 0.883).
+  The L4 pair is a Kaiju amplifier: the owner takes WIDE MEND, the other side's KAIJU HUNTERS does not rescue it.
+- Text drift: the Miner's first-match goal says ore makes "your whole team stronger" (`Runtime/Game/MatchWords.cs:85`),
+  but with hut votes on the flat +5% is replaced by the cards (`HutChoices.cs:86`).
+
+### Build costs vs value
+- Walls cost 1 (short) or 2 (tall) wood (`Sim/Config/BuildConfig.cs:46-47`), live 45 or 60 s, and are refused only inside
+  3 u of the hill centre (`BuildConfig.cs:24`) while the hill is 6 u. Walls off: Kaiju owner wins 0.733 (on 0.883),
+  leader-at-half 0.597: the bot walls help whoever holds the hill with the Kaiju.
+- TNT: 193 throws, 261 explosions, 50 craters and 68 mines triggered a match. The Demolitions is the busiest system.
+- Miner barricades: 0 placed (dead system, systems audit #5).
+
+---
+
+## 4. Kaiju
+
+### Feed, hatch, allegiance
+- Hatch is a fixed timer, 240 s, in 72 of 72 matches (no variance: there is no "time to hatch" to distribute).
+- Allegiance = whoever delivered more (`Sim/Kaiju.Hatch.cs:63-69`); berserk if the corruption lock fired first. Control:
+  Azure 38, Crimson 22, berserk 12, neutral 0.
+- **The team behind at the hatch gets the Kaiju 37 times in 60**, because trailing bots send two extra feeders
+  (`BotDirector.cs:190`), and then wins 32 of those 37. The owner wins 53 of 60 (0.883). Without RALLY the owner wins 0.610,
+  without the hill rule 60 of 60.
+- Never feed (scripted: one team's egg-duty bots go to the hill, any food in hand vanishes): that team **leads by 101 s at
+  the hatch and still wins only 0.271** (n 144); the enemy gets the Kaiju every time. Not an exploit. It also shows the size
+  of the swing: a 101 s lead at 4:00 is worth less than the Kaiju.
+
+### Which type hatches (control, 72)
+Brute 24, Timber 29, Mire 19, **Grove 0, Elder 0**. The picker divides each kind's share of the feed by a reference share
+(`Sim/Config/KaijuTypesConfig.cs:25`, `RefShare = {0.90, 0.10, 0.01, 0.02}`), pinned to an old control mix. The mix now
+is 0.759 plant, 0.173 meat, 0.027 wood, 0.041 water, so plant scores 0.84 and can never win, meat always scores about 1.7, and
+**any wood over 1% or water over 2% beats it** (31 and 23 of 72 matches). Elder needs every score under 1.02
+(`ElderBelowScore`), which a meat share of 0.17 never allows. So the type is decided by one or two off-kind deliveries:
+a single Farmer trip of 3 wood out of ~130 units makes a Timber. At 5v5 all five appear (Grove 44, Elder 21 of 200),
+because small teams feed small, lumpy mixes. Round 2 measures `RefShare` re-pinned to today's mix.
+
+### Behaviour and death
+- Sided and up 149 s of its 240 s; 66 s of that inside the hill ring; the owner's score is zeroed 60 s a match.
+- Knocked out at least once in 96% of matches, first at a median 359 s, for 60 s (`GameConfig.cs:359`); 1.22 knock-outs
+  a match. It never dies for good.
+- With no target, an allied Kaiju walks to within 1.5 u of the hill centre (`Kaiju.Hatch.cs:36-37`): **its own AI parks it
+  on the one spot where the hill rule zeroes its team's score**, and its own bots then escort it off
+  (`DepthConfig.cs:117-121` `OwnKaijuEscort`). The rule and the AI fight each other 60 s a match.
+- Kaiju kills are 4.2% of all deaths (claw 3.0%, slam 1.2%).
+
+### How much the Kaiju decides the match
+- With the Kaiju: leader at 4:00 wins 0.46. Without it (never hatches): 0.90, blowouts 0.417, leader-at-half 0.903.
+- So the Kaiju is the comeback mechanic, and it is a strong one: the side that gets it wins 0.88.
+
+### Counterplay for the team that lost it
+Knock it out (needs ~1,000+ damage; done in 96% of matches but only after 6:00 on the median), take KAIJU HUNTERS at L4
+(+25% damage; taken 76 times), hold the hill while it stands there (the hill rule). The team without a sided Kaiju of its
+own wins 12 of 34. There is no way to steal or turn it (TURNCOAT is off, `ComebackConfig.cs:55`, advisor ruling).
+
+### Side effects of the hill rule
+- Teams do not avoid feeding: never-feed loses (0.271).
+- The Kaiju is not "led off" by the enemy; it is pushed off by its own team, because its AI walks back. See the fix in the
+  ranked list (move the allied Kaiju's idle point to the hill rim on the enemy side).
 
