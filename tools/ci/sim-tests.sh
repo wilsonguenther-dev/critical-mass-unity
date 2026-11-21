@@ -12,7 +12,7 @@
 set -uo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$ROOT"
-WHERE='cat != Slow'; COMPILE_ONLY=0
+WHERE='cat == Probe || test =~ CombatFeelBalanceTests || test =~ KaijuRouteGuardTests'; COMPILE_ONLY=0
 case "${1:-}" in
   --slow) WHERE='cat == Slow' ;;
   --all) WHERE='' ;;
