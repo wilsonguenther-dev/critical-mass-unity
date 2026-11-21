@@ -1,116 +1,90 @@
-# b15 tools: the balance report on a GitHub runner (ubuntu-latest, free standard runner, no secrets, no Unity). Bot matches or a
-# compare are re-simulated headless by tools/balance/balance-report.sh; the report (Markdown + JSON + CSV) is the artifact.
-# Manual: Actions > balance-report > Run workflow (the workflow must be on the default branch for the button; until then the
-# push trigger below runs it: push any commit to a ci/balance/** branch and it compares integration/batch-13-cand1 with that
-# commit at 24 seeds and reports it at 72).
-#   gh workflow run balance-report.yml -f ref=origin/integration/batch-13-cand1 -f seeds=24
-#   gh workflow run balance-report.yml -f mode=compare -f base=origin/integration/batch-13-cand1 -f head=feat/b15-comeback-hut
-#   gh workflow run balance-report.yml -f mode=compare -f base= -f head="Depth.Hut.On=false"
+# b16 duel-order lever search (ci/balance/b16-* only; NEVER merge this workflow): job 1 plays the duel tables of every lever
+# combination of tools/balance/b16-arms.py (32 shards, no matches); job 2 keeps the arms whose duel order holds, ranks them
+# by lever cost and plays the cheapest at 72 seeds (both Warrior speed arms, plus the Warrior trade arms), each compared
+# with the game as shipped (no switches = aa2ecfef rules) measured on the same runner.
 name: balance-report
 on:
-  workflow_dispatch:
-    inputs:
-      mode:
-        description: "report (one ref), compare (base vs head) or tuning-index"
-        type: choice
-        options: [report, compare, tuning-index]
-        default: report
-      ref:
-        description: "report: the commit to measure (branch, tag or sha; empty = the branch this runs on)"
-        type: string
-        default: ''
-      seeds:
-        description: "bot matches (16v16, the WinShare pool first)"
-        type: choice
-        options: ['24', '72']
-        default: '24'
-      switches:
-        description: "report: switches on top of the rules, e.g. Depth.Hut.On=false;Classes[0].MaxHp=170"
-        type: string
-        default: ''
-      base:
-        description: "compare: a ref, or switches (Path=Value;...), empty = the game as checked out"
-        type: string
-        default: ''
-      head:
-        description: "compare: a ref, or switches"
-        type: string
-        default: ''
   push:
     branches: ['ci/balance/**']
+  workflow_dispatch: {}
 permissions:
   contents: read
 concurrency:
-  group: balance-report-${{ github.ref }}-${{ inputs.mode || 'push' }}
+  group: balance-report-${{ github.ref }}
   cancel-in-progress: false
 jobs:
-  report:
+  sweep:
     runs-on: ubuntu-latest
+    timeout-minutes: 90
     strategy:
       fail-fast: false
       matrix:
-        seeds: ${{ github.event_name == 'push' && fromJSON('["24","72"]') || fromJSON(format('["{0}"]', inputs.seeds)) }}
-    timeout-minutes: ${{ matrix.seeds == '72' && 60 || 25 }}
+        job: [0, 1, 2, 3, 4, 5, 6, 7]
     steps:
       - uses: actions/checkout@v4
-        with:
-          lfs: false
-          fetch-depth: 0   # compare and report on other refs need their commits
+        with: { lfs: false }
       - uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: '8.0.x'
-      - name: Balance report
+        with: { dotnet-version: '8.0.x' }
+      - name: Duel sweep
         shell: bash
-        env:
-          # push (self-check): 24 seeds = compare integration/batch-13-cand1 (measured in a worktree) with this commit; 72 = report
-          MODE: ${{ inputs.mode || (matrix.seeds == '24' && 'compare' || 'report') }}
-          REF: ${{ inputs.ref }}
-          SEEDS: ${{ matrix.seeds }}
-          SWITCHES: ${{ inputs.switches }}
-          BASE: ${{ github.event_name == 'push' && 'origin/integration/batch-13-cand1' || inputs.base }}
-          HEAD: ${{ inputs.head }}
         run: |
           set -o pipefail
-          start=$(date +%s)
-          out="Temp/balance/report-${SEEDS}"
-          sets=()
-          IFS=';' read -ra parts <<< "${SWITCHES}"
-          for p in "${parts[@]}"; do [[ -n "${p// }" ]] && sets+=(--set "$p"); done
-          case "$MODE" in
-            tuning-index)
-              tools/balance/balance-report.sh tuning-index --out "$out/TUNING-INDEX.md" ;;
-            compare)
-              tools/balance/balance-report.sh compare --base "$BASE" --head "$HEAD" --seeds "$SEEDS" --out "$out" ;;
-            *)
-              tools/balance/balance-report.sh tuning-index --out "$out/TUNING-INDEX.md"
-              if [[ -n "$REF" ]]; then
-                git rev-parse --verify --quiet "$REF^{commit}" >/dev/null || git fetch --quiet origin "$REF"
-                tools/balance/balance-report.sh run --ref "$REF" --seeds "$SEEDS" ${sets[@]+"${sets[@]}"} --out "$out"
-              else
-                tools/balance/balance-report.sh run --seeds "$SEEDS" ${sets[@]+"${sets[@]}"} --label "${GITHUB_REF_NAME}" --out "$out"
-              fi ;;
-          esac
-          rc=$?
-          echo "BALANCE_MINUTES=$(( ( $(date +%s) - start + 59 ) / 60 ))" >> "$GITHUB_ENV"
-          exit $rc
-      - name: Summary
-        if: always()
-        shell: bash
-        run: |
-          {
-            echo "### balance-report (${{ matrix.seeds }} seeds), step time about ${BALANCE_MINUTES:-?} min"
-            for f in Temp/balance/report-${{ matrix.seeds }}/balance-report.md Temp/balance/report-${{ matrix.seeds }}/balance-compare.md; do
-              if [[ -f "$f" ]]; then sed -n '1,/^## Time per class/p' "$f" | head -80; fi
-            done
-          } >> "$GITHUB_STEP_SUMMARY"
+          tools/balance/balance-report.sh tuning-index --out Temp/balance/ti.md >/dev/null || { cat Temp/balance/build.log | tail -40; exit 2; }
+          DLL=tools/ci/BalanceReport/bin/Release/net8.0/balance-report.dll
+          python3 tools/balance/b16-arms.py grid Temp/b16/arms.tsv
+          wc -l Temp/b16/arms.tsv
+          for p in 0 1 2 3; do
+            s=$(( ${{ matrix.job }} * 4 + p ))
+            dotnet $DLL duel-sweep --arms Temp/b16/arms.tsv --shard $s/32 --duel-reps 4 --out Temp/b16/sweep/shard-$s.csv > Temp/b16/sweep-$s.log 2>&1 &
+          done
+          wait
+          tail -n 2 Temp/b16/sweep-*.log
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: balance-report-${{ matrix.seeds }}
+          name: b16-sweep-${{ matrix.job }}
           path: |
-            Temp/balance/report-${{ matrix.seeds }}/
-            Temp/balance/base-report/
-            Temp/balance/head-report/
-            Temp/balance/build.log
-          if-no-files-found: warn
+            Temp/b16/sweep/
+            Temp/balance/ti.md
+          retention-days: 30
+  arms:
+    needs: sweep
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+        with: { lfs: false }
+      - uses: actions/setup-dotnet@v4
+        with: { dotnet-version: '8.0.x' }
+      - uses: actions/download-artifact@v4
+        with: { path: Temp/b16/sweep, pattern: 'b16-sweep-*' }
+      - name: Pick and play the arms at 72 seeds
+        shell: bash
+        run: |
+          set -o pipefail
+          tools/balance/balance-report.sh tuning-index --out Temp/balance/ti.md >/dev/null || { tail -40 Temp/balance/build.log; exit 2; }
+          DLL=tools/ci/BalanceReport/bin/Release/net8.0/balance-report.dll
+          python3 tools/balance/b16-arms.py pick Temp/b16/sweep Temp/b16/picked.tsv 4 | tee Temp/b16/pick.log
+          cat Temp/b16/picked.tsv
+          : > Temp/b16/cmds.txt
+          while IFS=$'\t' read -r nm sw; do
+            sets=""
+            IFS=';' read -ra parts <<< "$sw"
+            for p in "${parts[@]}"; do [[ -n "${p// }" ]] && sets="$sets --set '$p'"; done
+            echo "dotnet $DLL run --seeds 72 --duel-reps 8 $sets --label $nm --out Temp/b16/run/$nm > Temp/b16/run-$nm.log 2>&1" >> Temp/b16/cmds.txt
+          done < Temp/b16/picked.tsv
+          mkdir -p Temp/b16/run
+          xargs -d '\n' -P 4 -I{} bash -c '{}' < Temp/b16/cmds.txt
+          for d in Temp/b16/run/*/; do
+            n=$(basename "$d"); [[ "$n" == base ]] && continue
+            dotnet $DLL compare --base Temp/b16/run/base/balance-report.json --head "$d/balance-report.json" --out "Temp/b16/cmp/$n" > "Temp/b16/cmp-$n.log" 2>&1
+          done
+          python3 tools/balance/b16-arms.py table Temp/b16/run/*/ | tee Temp/b16/table.md
+          { echo "### b16 arms (72 seeds)"; cat Temp/b16/pick.log; echo; cat Temp/b16/table.md; } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: b16-arms
+          path: |
+            Temp/b16/
           retention-days: 30
