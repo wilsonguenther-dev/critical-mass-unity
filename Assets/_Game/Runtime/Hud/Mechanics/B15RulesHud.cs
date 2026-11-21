@@ -21,13 +21,50 @@ namespace CriticalMass.Runtime.Hud.Mechanics
     {
         /// <summary>The vote keys: [ and ] on the keyboard (free in every scheme), D-pad left / right on a controller.</summary>
         public const string KeyLeft = "[", KeyRight = "]", PadLeft = "D-PAD <", PadRight = "D-PAD >";
-        public const float CardW = 232f, CardH = 78f, CardGap = 12f, HeadH = 26f;
+        // b15 view polish (Editor review item 2): the cards read at ~8 px (232 x 78, best-fit text shrinking to 9) stacked
+        // under the RALLY tag. Now 300 x 96 at the 1080p reference with type that never shrinks below its size (name 18,
+        // line 16 / floor 15, votes and key 15), the key to press, the countdown in the head, a LEADING mark on the card the
+        // team leads, and their OWN anchor (VoteTop), so a taller RALLY tag can never push them or sit on them. The canvas
+        // scales with the screen (HudLayout.Scale), so the sizes hold at every resolution relative to 1080p.
+        public const float CardW = 300f, CardH = 96f, CardGap = 12f, HeadH = 30f, HeadGap = 6f;
+        public const int HeadFont = 18, NameFont = 18, LineFont = 16, LineFloor = 15, VotesFont = 15, KeyFont = 15;
+        /// <summary>The vote's own anchor: a fixed line under the RALLY tag's lane (not RallyRect.yMax).</summary>
+        public const float VoteTop = 344f;
 
-        public const float RallyW = 320f, RallyH = 30f;
+        // b15 view polish (item 8): the RALLY tag text has the same 16 px floor (was 16 shrinking to 10).
+        public const float RallyW = 380f, RallyH = 36f;
+        public const int RallyFont = 18, RallyFloor = 16;
 
         public static Rect RallyRect => new Rect((HudLayout.RefW - RallyW) * 0.5f, HudZones.EventY + HudZones.EventH + 8f, RallyW, RallyH);
 
-        public static Rect VoteRect => new Rect((HudLayout.RefW - (2f * CardW + CardGap)) * 0.5f, RallyRect.yMax + 8f, 2f * CardW + CardGap, HeadH + CardH);
+        public static Rect VoteRect => new Rect((HudLayout.RefW - (2f * CardW + CardGap)) * 0.5f, VoteTop, 2f * CardW + CardGap, HeadH + HeadGap + CardH);
+
+        /// <summary>One card's rect in reference px (c 0 left, 1 right).</summary>
+        public static Rect CardRect(int c) => new Rect(VoteRect.x + c * (CardW + CardGap), VoteRect.y + HeadH + HeadGap, CardW, CardH);
+
+        /// <summary>The card the team leads (1 or 2), 0 on a tie.</summary>
+        public static int Leading(int votesA, int votesB) => votesA > votesB ? 1 : votesB > votesA ? 2 : 0;
+        public const string LeadingWord = "LEADING";
+
+        // b15 view polish (item 8): "NO SCORE: YOUR KAIJU" / "THEIR KAIJU" as a pill directly under the hill meter (the hill
+        // bar ends at 106 in the match band), above the objective line (HudZones.JobY 140): warning amber fill with navy ink
+        // for YOUR Kaiju (your own Kaiju costs you the hill), calm panel navy with cream ink for THEIR Kaiju; 18 px type,
+        // 16 px floor; a short scale pulse when the state begins (no brightness flash unless intense flashing is on).
+        public const float KaijuPillW = 340f, KaijuPillH = 28f, KaijuPillTop = 108f;
+        public const int KaijuPillFont = 18, KaijuPillFloor = 16;
+        public const string KaijuPillWarnHex = "#F2A93B";
+        public const float PulseSeconds = 0.45f, PulseScale = 0.10f;
+
+        public static Rect KaijuPillRect => new Rect((HudLayout.RefW - KaijuPillW) * 0.5f, KaijuPillTop, KaijuPillW, KaijuPillH);
+
+        /// <summary>The pulse scale at t seconds after the state began (1 outside the pulse; one smooth bump).</summary>
+        public static float Pulse(float t) => t < 0f || t >= PulseSeconds ? 1f : 1f + PulseScale * Mathf.Sin(Mathf.PI * t / PulseSeconds);
+
+        /// <summary>The pill's fill brightening toward cream during the pulse: only with intense flashing allowed.</summary>
+        public static float PulseFlash(float t, bool intenseAllowed) => intenseAllowed && t >= 0f && t < PulseSeconds ? 0.35f * Mathf.Sin(Mathf.PI * t / PulseSeconds) : 0f;
+
+        /// <summary>Rendered type size in screen px for a reference size on a w x h screen (the HUD canvas scale).</summary>
+        public static float ScreenPx(int refSize, float w, float h) => refSize * HudLayout.Scale(w, h);
 
         public static string RallyLine(bool own, double multiplier, int secondsLeft) =>
             (own ? ComebackNames.Rally : ComebackNames.EnemyRally) + " x" + multiplier.ToString("0.##", CultureInfo.InvariantCulture) + "   " + secondsLeft + " s left";
@@ -84,7 +121,8 @@ namespace CriticalMass.Runtime.Hud.Mechanics
         Text _rallyText, _voteHead;
         readonly RectTransform[] _card = new RectTransform[2];
         readonly VectorShape[] _cardPanel = new VectorShape[2];
-        readonly Text[] _cardKey = new Text[2], _cardName = new Text[2], _cardLine = new Text[2], _cardVotes = new Text[2];
+        readonly Text[] _cardKey = new Text[2], _cardName = new Text[2], _cardLine = new Text[2], _cardVotes = new Text[2], _cardLead = new Text[2];
+        int _leadShown = -1;
 
         // caches: strings rebuilt only when their numbers change
         int _epoch = -1, _rallyKey = int.MinValue, _voteKey = int.MinValue, _cardsLevel = -1, _keysDevice = -1;
@@ -126,30 +164,32 @@ namespace CriticalMass.Runtime.Hud.Mechanics
             MenuUi.Place(_rally, r.x, r.y, r.width, r.height);
             _rallyPanel = Chip(_rally, "Panel", 0f, 0f, r.width, r.height, CMTokens.WithAlpha(panel, 0.92f), 10f);
             _rallyPanel.RimPx = 2f;
-            _rallyText = MenuUi.Fit(MenuUi.Label(_rally, "Text", CMTokens.Display, 16, cream, TextAnchor.MiddleCenter, 6f, 0f, r.width - 12f, r.height, "", 2f), 10);
+            _rallyText = MenuUi.Fit(MenuUi.Label(_rally, "Text", CMTokens.Display, B15Hud.RallyFont, cream, TextAnchor.MiddleCenter, 8f, 0f, r.width - 16f, r.height, "", 2f), B15Hud.RallyFloor);
             _rally.gameObject.SetActive(false);
 
             Rect v = B15Hud.VoteRect;
             _vote = MenuUi.Rt(_space, "Hut Vote");
             HudZones.RegisterPanel(_vote);
             MenuUi.Place(_vote, v.x, v.y, v.width, v.height);
-            VectorShape hp = Chip(_vote, "Head Panel", 0f, 0f, v.width, B15Hud.HeadH - 2f, CMTokens.WithAlpha(panel, 0.92f), 8f);
+            VectorShape hp = Chip(_vote, "Head Panel", 0f, 0f, v.width, B15Hud.HeadH, CMTokens.WithAlpha(panel, 0.94f), 8f);
             hp.RimPx = 2f;
             hp.RimColor = brass;
-            _voteHead = MenuUi.Fit(MenuUi.Label(_vote, "Head", CMTokens.Display, 15, brass, TextAnchor.MiddleCenter, 6f, 0f, v.width - 12f, B15Hud.HeadH - 2f, "", 2f), 10);
+            _voteHead = MenuUi.Fit(MenuUi.Label(_vote, "Head", CMTokens.Display, B15Hud.HeadFont, brass, TextAnchor.MiddleCenter, 8f, 0f, v.width - 16f, B15Hud.HeadH, "", 2f), B15Hud.HeadFont);
             for (int c = 0; c < 2; c++)
             {
-                float x = c * (B15Hud.CardW + B15Hud.CardGap);
+                const float W = B15Hud.CardW, H = B15Hud.CardH;
+                float x = c * (W + B15Hud.CardGap);
                 RectTransform card = MenuUi.Rt(_vote, "Card " + c);
-                MenuUi.Place(card, x, B15Hud.HeadH, B15Hud.CardW, B15Hud.CardH);
+                MenuUi.Place(card, x, B15Hud.HeadH + B15Hud.HeadGap, W, H);
                 _card[c] = card;
-                _cardPanel[c] = Chip(card, "Panel", 0f, 0f, B15Hud.CardW, B15Hud.CardH, CMTokens.WithAlpha(panel, 0.94f), 12f);
+                _cardPanel[c] = Chip(card, "Panel", 0f, 0f, W, H, CMTokens.WithAlpha(panel, 0.96f), 12f);
                 _cardPanel[c].RimPx = 2f;
-                Chip(card, "Key Chip", 8f, 8f, 64f, 26f, CMTokens.WithAlpha(brass, 0.95f), 6f);
-                _cardKey[c] = MenuUi.Fit(MenuUi.Label(card, "Key", CMTokens.Mono, 15, CMTokens.VoidNavy.Color, TextAnchor.MiddleCenter, 8f, 8f, 64f, 26f, "", 0f), 9);
-                _cardName[c] = MenuUi.Fit(MenuUi.Label(card, "Name", CMTokens.Display, 15, cream, TextAnchor.MiddleLeft, 80f, 6f, B15Hud.CardW - 88f, 30f, "", 2f), 10);
-                _cardLine[c] = MenuUi.Fit(MenuUi.Label(card, "Line", CMTokens.Ui, 14, cream, TextAnchor.MiddleLeft, 10f, 38f, B15Hud.CardW - 20f, 20f, "", 1.5f), 10);
-                _cardVotes[c] = MenuUi.Fit(MenuUi.Label(card, "Votes", CMTokens.Mono, 13, CMTokens.WithAlpha(cream, 0.85f), TextAnchor.MiddleRight, 10f, 56f, B15Hud.CardW - 20f, 18f, "", 1.5f), 9);
+                Chip(card, "Key Chip", 10f, 10f, 76f, 30f, CMTokens.WithAlpha(brass, 0.95f), 6f);
+                _cardKey[c] = MenuUi.Fit(MenuUi.Label(card, "Key", CMTokens.Mono, B15Hud.KeyFont, CMTokens.VoidNavy.Color, TextAnchor.MiddleCenter, 10f, 10f, 76f, 30f, "", 0f), B15Hud.KeyFont);
+                _cardName[c] = MenuUi.Fit(MenuUi.Label(card, "Name", CMTokens.Display, B15Hud.NameFont, cream, TextAnchor.MiddleLeft, 96f, 8f, W - 106f, 34f, "", 2f), B15Hud.NameFont);
+                _cardLine[c] = MenuUi.Fit(MenuUi.Label(card, "Line", CMTokens.Ui, B15Hud.LineFont, cream, TextAnchor.MiddleLeft, 12f, 44f, W - 24f, 24f, "", 1.5f), B15Hud.LineFloor);
+                _cardLead[c] = MenuUi.Fit(MenuUi.Label(card, "Leading", CMTokens.Display, B15Hud.VotesFont, brass, TextAnchor.MiddleLeft, 12f, 70f, 120f, 20f, "", 1.5f), B15Hud.VotesFont);
+                _cardVotes[c] = MenuUi.Fit(MenuUi.Label(card, "Votes", CMTokens.Mono, B15Hud.VotesFont, CMTokens.WithAlpha(cream, 0.9f), TextAnchor.MiddleRight, W - 132f, 70f, 120f, 20f, "", 1.5f), B15Hud.VotesFont);
             }
             _vote.gameObject.SetActive(false);
         }
@@ -323,6 +363,7 @@ namespace CriticalMass.Runtime.Hud.Mechanics
                 }
                 _votesShown[0] = _votesShown[1] = -1;
                 _myVoteShown = -1;
+                _leadShown = -1;
             }
             int secs = B15Hud.SecondsLeft(HutChoices.VoteTicksLeft(w, team), w.Config.SimHz);
             int key = level * 1000 + secs;
@@ -337,6 +378,12 @@ namespace CriticalMass.Runtime.Hud.Mechanics
                 if (n == _votesShown[c]) continue;
                 _votesShown[c] = n;
                 HudText.Set(_cardVotes[c], B15Hud.Votes(n));
+            }
+            int lead = B15Hud.Leading(_votesShown[0], _votesShown[1]);
+            if (lead != _leadShown)
+            {
+                _leadShown = lead;
+                for (int c = 0; c < 2; c++) HudText.Set(_cardLead[c], lead == c + 1 ? B15Hud.LeadingWord : string.Empty);
             }
             int mine = HutChoices.VoteOf(w, me);
             if (mine != _myVoteShown)
