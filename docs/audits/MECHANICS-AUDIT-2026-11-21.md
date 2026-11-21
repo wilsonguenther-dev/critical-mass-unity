@@ -17,14 +17,14 @@ audit's ground and is not covered. Duel order, Warrior speed and the cancel butt
 | 5 | **The Healer is the most valuable class and the worst experience** | 18 deaths a match (others 7.9 to 13.6), dead or walking back 0.436; 4 Healers win 0.632; bots weight her at 1% of her distance | new player | high | soften the bot focus weight (off: deaths 13.6, blowouts 0.264, so not off) and credit healing on the results screen (S) | sim + view | design advisor (he asked for healer focus) |
 | 6 | **No AFK rule; one idle human swings a small match** | idle team at Quick 5v5 wins 0.080 (n 200); at 5v5 480 s 0.530 | everyone online | high | autopilot after 15 s idle + feeder extras as a team share (S) | sim | no |
 | 7 | **Hut votes are cast by bots before a human can read the cards** | 15 bots close the vote in about 3 s; 0.8% of votes go to the coin flip | new and skilled player | medium | bots wait until every human has voted or 6 s have passed (S) | sim | no |
-| 8 | **Kaiju type picker: Grove and Elder never hatch at 16v16; one wood trip decides the type** | Brute 24, Timber 29, Mire 19, Grove 0, Elder 0 of 72; wood over 1% = Timber | skilled player | medium | re-pin `RefShare` to today's mix and raise `ElderBelowScore` (round 4 value below) (S, config) | sim | no |
+| 8 | **Kaiju type picker: Grove and Elder never hatch at 16v16; one wood trip decides the type** | Brute 24, Timber 29, Mire 19, Grove 0, Elder 0 of 72; wood over 1% = Timber | skilled player | medium | re-pin `RefShare` to 0.76/0.17/0.03/0.04 and `ElderBelowScore` 1.12: all five types at 16v16, outcomes unchanged (S, config; measured) | sim | no |
 | 9 | **Walls can be built on the outer half of the scoring disc** | keep-out 3 u on a 6 u hill; keep-out 7 u: Kaiju owner 0.883 to 0.729, bot walls 3.4 to 0.85 | skilled Builder | medium | keep-out 7 u (S, config) | sim | no |
 | 10 | **Dead resources** | water banked 7.0, spent 0; coins 648 a team, no sink anywhere; wood ends at 11.9 unspent | skilled player | low | hide the water and coin counters until they have a use; give wood a second sink (S view / M sim) | view | owner (coins tie to decision C/D) |
 | 11 | **Quitting records nothing; a host quit ends everyone's match; three match counters disagree** | leave = no loss (`MatchRewards.cs:112`); HostLeft ends all (`LockstepSession.cs:443-464`); profile and history count practice, class career does not (`MetaRecorder.cs:162`) | new player (counts), everyone (host) | medium | leave = loss for the leaver; "host left, no result" screen; show practice separately (S); host migration later (L) | view + meta | no |
 | 12 | **One spot on the map; nobody goes anywhere else** | 56% of living time within 15 u of the hill; enemy half 0.3% | skilled player | medium | a second objective or a resource found only in the enemy half (L, map) | sim | owner |
 | 13 | **Bots never switch class or use the terrain verbs** | 0 class switches, 0 raises or lowers, 0 purifies in 72 matches | skilled player | medium | switch at respawn to fill a missing Healer/Farmer, once per 60 s (M) | sim | no |
 | 14 | **The rules that decide the match are never taught** | trial (14 steps) skips the feed race, fatigue, RALLY, the hill rule and votes; no "why we lost"; the Kaiju type's cause is hidden; the Miner goal text is stale (`MatchWords.cs:85`) | new player | medium | results-screen turning point ("you lost the egg race by N"), type reason on hatch, fix the Miner line (S to M) | view | no |
-| 15 | **Side bias that changes with team size** | Quick 8v8 Crimson wins 0.585 (n 200); 16v16 Azure 0.639 (n 72, in noise) | nobody yet | low | 400-seed check per size, then look at spawn and node layout (S to measure) | sim | no |
+| 15 | **Side bias at 8 a side** | Quick 8v8 Crimson wins 0.570 (0.52-0.62, n 400); 16v16 Azure 0.639 (n 72, in noise) | skilled player over many matches | low | measure spawn and node distances per team size, then even them (S to M) | sim | no |
 
 
 **How it was measured.** The headless balance tool (`tools/balance/balance-report.sh`, GitHub runner, no Unity) with an
@@ -261,8 +261,25 @@ Reading:
 - Wall keep-out 7 u: bots build 3.4 to 0.85 walls a match (most bot walls were on the disc) and the Kaiju owner's edge
   falls to 0.729; no other cost. Do it.
 - Type re-pin with Elder 1.3 makes ELDER 22 of 72 at 16v16 but Grove 0, and ELDER 81 of 200 at Quick 5v5 (too many).
-  Round 4 tries 1.12 and 1.18.
+  Round 4: 1.12 is right (5d).
 - Four Healers beat the standard lineup 0.632: the Healer is the strongest body to add (section 2).
+
+### 5d. Round 4: Kaiju type picker and the side check
+
+| arm (`RefShare` 0.76/0.17/0.03/0.04 + `ElderBelowScore`) | types (Brute / Timber / Mire / Grove / Elder) | Azure win | blowout | Kaiju owner wins |
+|---|---|---|---|---|
+| shipped, 16v16 | 24 / 29 / 19 / 0 / 0 | 0.639 | 0.125 | 0.883 |
+| Elder 1.12, 16v16 (72) | 10 / 26 / 20 / 2 / 14 | 0.653 | 0.125 | 0.900 |
+| Elder 1.18, 16v16 (72) | 8 / 26 / 20 / 0 / 18 | 0.639 | 0.153 | 0.883 |
+| Elder 1.12, Quick 5v5 (200) | 3 / 43 / 24 / 121 / 9 | 0.445 | 0.195 | 0.571 |
+| Elder 1.12, Quick 8v8 (200) | 0 / 18 / 50 / 125 / 7 | 0.420 | 0.190 | 0.801 |
+| Elder 1.18, Quick 5v5 (200) | 3 / 43 / 24 / 111 / 19 | 0.455 | 0.190 | 0.571 |
+
+- **Elder 1.12 is the value**: all five types appear at 16v16 and no outcome number moves (the type is flavour, not
+  balance). Timber still leads at 16v16 and Grove at Quick, because one off-kind trip still swings a small feed; a
+  per-size reference is a later refinement.
+- **Side check, Quick 8v8 at 400 matches: Azure 0.430 (0.38-0.48).** Crimson wins 0.570 at 8 a side on today's rules.
+  It is real, and it is a layout question (spawn or node distances at 8), not a rule.
 
 ---
 
@@ -314,7 +331,7 @@ direction is large and consistent.
 
 **Interaction with b16.** The design advisor's ruling makes the Warrior win every duel and move "a touch slower", and
 the builder is doing exactly that. The duel matrix is not the problem; the team arms show the Warrior is already the worst
-team pick, and slowing him moves him further down. The fix belongs to the score, not the duel: see item 3 of the ranked list
+team pick, and slowing him moves him further down. The fix belongs to the score, not the duel: see item 2 of the ranked list
 (a Warrior needs a job only he can do on the hill).
 
 ### Does each kit hold a decision?
@@ -413,7 +430,7 @@ is 0.759 plant, 0.173 meat, 0.027 wood, 0.041 water, so plant scores 0.84 and ca
 a single Farmer trip of 3 wood out of ~130 units makes a Timber. At 5v5 all five appear (Grove 44, Elder 21 of 200),
 because small teams feed small, lumpy mixes. Round 2: `RefShare` re-pinned to today's mix (0.76, 0.17, 0.03, 0.04) gives
 Grove 13, Brute 13, Timber 26, Mire 20, Elder 0 of 72, with no change to who owns it or who wins (owner wins 0.883);
-round 3 adds `ElderBelowScore` 1.3.
+rounds 3 and 4 add `ElderBelowScore` (1.12 gives all five types, section 5d).
 
 ### Behaviour and death
 - Sided and up 149 s of its 240 s; 66 s of that inside the hill ring; the owner's score is zeroed 60 s a match.
@@ -535,7 +552,7 @@ worst body to stack. The biggest learning gap is the one with the biggest effect
 | 3 | **Wall the outer half of the hill** | code (bots never aim walls; not scriptable in the probe) | walls are refused only within 3 u of the centre (`Sim/Config/BuildConfig.cs:24`) on a 6 u disc; bot walls alone move Kaiju-owner wins 0.733 to 0.883 | a skilled Builder | keep-out = hill radius + 1 u (S, sim) |
 | 4 | Pick the Kaiju type with one delivery | measured | any wood over 1% of the feed makes a TIMBER (31 of 72); one Farmer trip of 3 wood decides it | a skilled Farmer | re-pin `RefShare` (round 2) |
 | 5 | Never feed, play only the hill | scripted, 144 matches | loses: 0.271 even with a 101 s lead at the hatch | nobody | none needed |
-| 6 | **Stack Farmers** | scripted, 144 matches each | **16 Farmers beat the standard lineup 0.847** (blowouts 0, decided at 11 s); no Warriors (9 Farmers) 0.861; all-Warrior 0.035, all-Demolitions 0.201 | a premade team of humans, or anyone who reads this table | the Warrior job plus a class cap per team (ranked items 2 and 4) |
+| 6 | **Stack Farmers** | scripted, 144 matches each | **16 Farmers beat the standard lineup 0.847** (blowouts 0, decided at 11 s); no Warriors (9 Farmers) 0.861; all-Warrior 0.035, all-Demolitions 0.201 | a premade team of humans, or anyone who reads this table | the Warrior job plus a class cap per team (ranked item 2) |
 
 ---
 
@@ -587,7 +604,7 @@ worst body to stack. The biggest learning gap is the one with the biggest effect
 2. AFK: hand an idle human to the autopilot after 15 s; feeder extras as a team share (item 6). S, sim.
 3. Hut vote: bots wait for the humans (all voted, or 6 s) (item 7). S, sim.
 4. Wall keep-out 7 u from the hill centre (item 9). S, config; measured.
-5. Kaiju type re-pin (item 8, value from round 4). S, config; measured.
+5. Kaiju type re-pin: `RefShare` 0.76/0.17/0.03/0.04, `ElderBelowScore` 1.12 (item 8). S, config; measured.
 6. Small view fixes: Miner goal text, "host left, no result" screen, practice shown apart on the profile, leave = loss
    for the leaver, hide the water and coin counters (items 10, 11, 14). S, view.
 
@@ -617,3 +634,9 @@ him further down the team-pick order (item 2); land b16 first, then run the clas
    blowouts 0.20, held up by RALLY.
 3. **Drop, rejoin and human orders:** a dropped player's fighter is played by the autopilot and handed back on rejoin
    (cross-play smoke passes); a human's ping is obeyed at once by up to 3 bots.
+
+---
+
+*Probe runs (GitHub Actions, balance-report on probe branches, never merged): round 1 44923985604
+(`ci/balance/audit-mech-r1`), round 2 44925053690 (`-r2`), round 3 44925584287 (`-r3`), round 4 44926040627 (`-r4`).
+Analysis scripts were scratch only; every number above is from those runs' `audit.jsonl` files.*
