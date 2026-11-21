@@ -100,6 +100,37 @@ namespace CriticalMass.Sim.Tests
             return -1;
         }
 
+        /// <summary>
+        /// b15 fix round (Editor review: DIG landed one cell short): in the Full game the dig goes to the AIMED cell whenever its
+        /// square reaches into the 1.6 u circle, and the marker (Terraform.TargetCell, read by the view) names the very cell
+        /// that is dug. Classic keeps the old pull-back. An aim whose cell is out of reach is still pulled back in both.
+        /// </summary>
+        [Test]
+        public void TheDigLandsOnTheAimedCellWhenItsSquareIsInReachAndTheMarkerNamesTheDugCell()
+        {
+            World w = Strip();
+            w.Config.Depth.Classic = false;
+            w.X[Miner] = 32.5;
+            w.Z[Miner] = 9.5;
+            // (34, 10): nearest edge point (34, 10) is 1.58 u away (in reach); its centre (34.5, 10.5) is 2.24 u away (off the hill).
+            Assert.IsTrue(Terraform.TargetCell(w, Miner, 34.5, 10.5, out int mx, out int mz));
+            Assert.AreEqual(34, mx, "marker x: the aimed cell");
+            Assert.AreEqual(10, mz, "marker z: the aimed cell");
+            Assert.AreEqual(Terraform.Dug, Terraform.Dig(w, Miner, 34.5, 10.5));
+            Assert.AreEqual(Cell.Void, CellAt(w, 34, 10), "the dug cell is the marked cell");
+            Assert.AreEqual(Cell.Floor, CellAt(w, 33, 10), "not the cell one short");
+            Assert.AreEqual(10 * w.Map.Width + 34, LastEvent(w).B);
+            // Out of reach (the square of (36, 10) is 3.5 u away): pulled back to 1.6 u along the line, as before.
+            Assert.IsTrue(Terraform.TargetCell(w, Miner, 36.5, 10.5, out int fx, out int fz));
+            Assert.AreEqual(34, fx);
+            Assert.AreEqual(9, fz);
+            // Classic (and PhysicsOnly, the same depth-off switch): the old pull-back, bit for bit.
+            w.Config.Depth.Classic = true;
+            Assert.IsTrue(Terraform.TargetCell(w, Miner, 34.5, 10.5, out int cx, out int cz));
+            Assert.AreEqual(33, cx, "Classic keeps the pull-back");
+            Assert.AreEqual(10, cz);
+        }
+
         // ------------------------------------------------------------------------------------------- ported (09e0904)
 
         [Test]
