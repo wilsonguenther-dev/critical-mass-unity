@@ -375,7 +375,8 @@ namespace CriticalMass.Runtime.Tests
             StringAssert.Contains("2.5 s", ProgressionWords.AbilityText(cfg, ClassId.Warrior));
             StringAssert.Contains("60%", ProgressionWords.AbilityText(cfg, ClassId.Warrior));
             StringAssert.Contains("6 m", ProgressionWords.AbilityText(cfg, ClassId.Farmer));
-            StringAssert.Contains("22 damage", ProgressionWords.AttackText(cfg, ClassId.Warrior));
+            // b15 combat feel: the Warrior row is CombatFeelConfig's under the rule (27); the text reads whatever the config says.
+            StringAssert.Contains(cfg.Class(ClassId.Warrior).AttackDamage.ToString("0") + " damage", ProgressionWords.AttackText(cfg, ClassId.Warrior));
         }
 
         // ---- character panel build ----

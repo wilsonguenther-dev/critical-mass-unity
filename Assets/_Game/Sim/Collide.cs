@@ -644,6 +644,7 @@ namespace CriticalMass.Sim.Core
             }
             if (Neighbours.Length < w.Hash.Capacity) Neighbours = new int[w.Hash.Capacity];
             double reach = 2 * MaxRadius(w.Config);
+            bool feelLadder = CombatFeel.On(w) && w.Depth.Feel.LadderCount > 0;
             for (int i = 0; i < n; i++) SepMoved[i] = 0;
             for (int iter = 0; iter < p.SeparationIterations; iter++)
             {
@@ -689,6 +690,8 @@ namespace CriticalMass.Sim.Core
                         double overlap = (rr - d) * p.SeparationRelax;
                         if (ai.Team == aj.Team)
                         {
+                            // b15 combat feel: teammates pass through each other on a ladder lane (two-way traffic, no blocker).
+                            if (feelLadder && CombatFeel.AllyPasses(w, i, j)) continue;
                             overlap *= p.AllyPushShare;
                             // U-071: a retreating bot and an ally heading into it pass (no head-on jam in a one-cell corridor).
                             if (p.AllyPassOpposing && (ai.AiState == AiState.Retreat || aj.AiState == AiState.Retreat))

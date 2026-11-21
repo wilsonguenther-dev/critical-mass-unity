@@ -78,6 +78,7 @@ namespace CriticalMass.Sim.Core
 
         public static bool Knocks(World w, DamageCause cause) =>
             Phys.On(w, w.Config.Physics.Knockback) ||
+            cause == DamageCause.Melee && CombatFeel.On(w) ||   // b15 combat feel: melee hits knock, stagger and carry their tier
             (cause == DamageCause.KaijuMelee || cause == DamageCause.KaijuSlam) && Phys.On(w, w.Config.Physics.KaijuKnockback);
 
         /// <summary>

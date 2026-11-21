@@ -281,6 +281,10 @@ namespace CriticalMass.Sim.Bots
             double tx = x;
             double tz = z;
             bool calm = Phys.On(w, w.Config.Physics.BotCalmSteer);
+            // b15 combat feel: the first walkable spot that is also OPEN ground (all 8 neighbours walkable) wins; else the first
+            // walkable one as before (with the rule on, the draws continue until an open spot or the 12th try).
+            bool feel = CombatFeel.On(w);
+            bool found = false, foundOpen = false;
             for (int tries = 0; tries < 12; tries++)
             {
                 double ang = Rng.NextFloat(st.Rng) * Math.PI * 2;
@@ -291,9 +295,21 @@ namespace CriticalMass.Sim.Bots
                 // fix/movement-shiver-4 (BotCalmSteer): only a spot it can walk to in a straight line. A walkable cell on the far
                 // side of a thin wall sent the unstick walk into the wall for its whole second (actor 28 Pressed at the ring).
                 if (calm && BotSteer.FirstBlockedCell(w.Map, x, z, cx + 0.5, cz + 0.5) >= 0) continue;
-                tx = cx + 0.5;
-                tz = cz + 0.5;
-                break;
+                if (!feel)
+                {
+                    tx = cx + 0.5;
+                    tz = cz + 0.5;
+                    break;
+                }
+                bool open = CombatFeel.OpenCell(w.Map, cx, cz);
+                if (!found || (open && !foundOpen))
+                {
+                    tx = cx + 0.5;
+                    tz = cz + 0.5;
+                    found = true;
+                    foundOpen = open;
+                }
+                if (foundOpen) break;
             }
             st.UnstickX[id] = JsMath.F32(tx);
             st.UnstickZ[id] = JsMath.F32(tz);

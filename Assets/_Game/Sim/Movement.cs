@@ -19,6 +19,8 @@ namespace CriticalMass.Sim.Core
         {
             GameConfig cfg = w.Config;
             int bufferTicks = Jump.BufferTicks(cfg);
+            bool feel = CombatFeel.On(w); // b15 combat feel
+            if (feel) CombatFeel.BeginMovement(w);
             for (int i = 0; i < w.ActorCount; i++)
             {
                 Actor a = w.Actors[i];
@@ -80,7 +82,9 @@ namespace CriticalMass.Sim.Core
                     if (a.Cls == ClassId.Warrior && a.AbilityActive > 0) speed *= cfg.Abilities.WarriorShield.MoveSpeedMultiplier;
                     // DG-69: slowed through the wind-up and the recovery (no skating swings).
                     int slowLen = a.SwingWindup + (cfg.Physics.SwingSlowsRecovery ? a.SwingRecovery : 0);
-                    if (slowLen > 0 && w.Tick > a.SwingTick && w.Tick <= a.SwingTick + slowLen)
+                    // b15 combat feel: its own wind-up / recovery / stagger-slow / ladder scale replaces SwingMoveMultiplier.
+                    if (feel) speed *= CombatFeel.SpeedScale(w, i);
+                    else if (slowLen > 0 && w.Tick > a.SwingTick && w.Tick <= a.SwingTick + slowLen)
                         speed *= cfg.Physics.SwingMoveMultiplier;
                     speed *= Pickups.SpeedScale(w, i); // U-066 Haste (exactly 1 without it)
                     speed *= B13Hooks.SpeedScale(w, i);   // b13-hook

@@ -84,8 +84,8 @@ namespace CriticalMass.Sim.Config
             bool windup = Phys.On(c, c.Physics.AttackWindup);
             for (int i = 0; i < AttackWindup.Length; i++)
             {
-                AttackWindup[i] = windup ? RealSeconds(c, c.Classes[i].AttackWindupSeconds, pace) : 0;
-                Recovery[i] = windup ? RealSeconds(c, c.Classes[i].RecoverySeconds, pace) : 0;
+                AttackWindup[i] = windup ? RealSeconds(c, c.Class((ClassId)i).AttackWindupSeconds, pace) : 0;
+                Recovery[i] = windup ? RealSeconds(c, c.Class((ClassId)i).RecoverySeconds, pace) : 0;
             }
             for (int i = 0; i < LightWindup.Length; i++)
             {

@@ -119,7 +119,10 @@ namespace CriticalMass.Sim.Core
         public static int MendTarget(World w, int id, double aimX, double aimZ)
         {
             Actor a = w.Actors[id];
-            double range = w.Config.Abilities.Healer.MendRange;
+            double range = CombatFeel.MendRange(w.Config); // b15 combat feel: CombatFeelConfig.MendRange (else HealerConfig.MendRange)
+            // b15 combat feel: a bot Healer mends the MOST HURT ally in range (lowest HP share, lowest id on a tie); a player
+            // keeps the aim rule (the ally nearest her aim), so she chooses.
+            bool mostHurt = !a.IsHuman && CombatFeel.On(w);
             double hx = w.X[id];
             double hz = w.Z[id];
             double px = double.IsFinite(aimX) ? aimX : hx;
@@ -136,7 +139,7 @@ namespace CriticalMass.Sim.Core
                 if (dx * dx + dz * dz > range * range) continue;
                 double ax = w.X[j] - px;
                 double az = w.Z[j] - pz;
-                double d = ax * ax + az * az;
+                double d = mostHurt ? t.Hp / Math.Max(1, t.MaxHp) : ax * ax + az * az;
                 if (d < bestD)
                 {
                     bestD = d;
@@ -155,7 +158,7 @@ namespace CriticalMass.Sim.Core
             Actor a = w.Actors[id];
             a.AttackCd = w.Config.Class(ClassId.Healer).AttackCooldown;
             a.AnimAction = 0;
-            double d = Restore(w, t, id, w.Config.Abilities.Healer.MendHeal);
+            double d = Restore(w, t, id, CombatFeel.MendHeal(w.Config)); // b15 combat feel: CombatFeelConfig.MendHeal
             w.Healer.Stats.Mends++;
             World.PushEvent(w, SimEventType.HealCast, id, KindMend, w.X[t], w.Z[t], d);
             return true;
