@@ -628,6 +628,7 @@ namespace CriticalMass.Sim.Core
             world.Hut.Reset(world);   // b13-hook
             world.Rally.Reset(world);   // b15-hook: the comeback rule
             world.HutVote.Reset(world);   // b15-hook: the hut choices
+            world.Mech.Reset(world);   // b16-hook: the mechanics fixes
             world.Walls.Reset(world);   // b13-hook
             world.Dodges.Reset(world);   // b13-hook
             world.KaijuKind.Reset(world);   // b13-hook
@@ -862,6 +863,7 @@ namespace CriticalMass.Sim.Core
                 Hut = new HutState(),   // b13-hook
                 Rally = new ComebackState(),   // b15-hook
                 HutVote = new HutChoiceState(),   // b15-hook
+                Mech = new MechState(),   // b16-hook
                 Walls = new WallsState(),   // b13-hook
                 Dodges = new DodgeState(),   // b13-hook
                 KaijuKind = new KaijuTypeState(),   // b13-hook
@@ -871,6 +873,7 @@ namespace CriticalMass.Sim.Core
             world.Hut.Init(world);   // b13-hook
             world.Rally.Init(world);   // b15-hook
             world.HutVote.Init(world);   // b15-hook
+            world.Mech.Init(world);   // b16-hook
             world.Walls.Init(world);   // b13-hook
             world.Dodges.Init(world);   // b13-hook
             world.KaijuKind.Init(world);   // b13-hook
@@ -1011,6 +1014,8 @@ namespace CriticalMass.Sim.Core
         public ComebackState Rally;   // b15-hook
         /// <summary>b15 rule B: the hut vote and the side-grades each team chose (Sim/B15/HutChoices.cs).</summary>
         public HutChoiceState HutVote;   // b15-hook
+        /// <summary>b16: the mechanics fixes' state (idle players, the hill count, bots past the hill cap; Sim/B16/MechRules.cs).</summary>
+        public MechState Mech;   // b16-hook
         /// <summary>CM b13 [B]: the Builder walls (Sim/B13/BuilderWalls.cs).</summary>
         public WallsState Walls;   // b13-hook
         /// <summary>CM b13 [J]: the dodges (Sim/B13/Dodge.cs).</summary>

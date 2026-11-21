@@ -695,7 +695,7 @@ namespace CriticalMass.Sim.Bots
             bool brainOn = TeamBrain.On(w);
             byte job = brainOn ? st.Job[id] : TeamBrain.JobNone;
             if (job == TeamBrain.JobGuard) cocky = false;
-            if (job == TeamBrain.JobEscort) cocky = true;   // b15 KAIJU HOLDS NOTHING: an escort chases fights off the hill
+            if (TeamBrain.OffHillJob(job)) cocky = true;   // b15 KAIJU HOLDS NOTHING escort, b16 intercept: chase fights off the hill
             BotSkillConfig sk = BotSkill.Profile(w, id); // DG-21: null = Normal (the browser bots)
             // b13 r3 [H]: a Miner bot under the hut rule perceives fights out to HutConfig.BotFightRange (8 u, FightKeepRange).
             Perceive(w, st, id, fighting || cocky || BotMine.WidePerception(w, st, id) ? FightKeepRange : FightRange, sk);

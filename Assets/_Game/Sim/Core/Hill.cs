@@ -22,6 +22,7 @@ namespace CriticalMass.Sim.Core
             int n = w.ActorCount;
             int azure = 0;
             int crimson = 0;
+            int wa = 0, wc = 0;   // b16-hook: weighted bodies (a Warrior counts WarriorHoldWeight; 1 each with the rule off)
             for (int i = 0; i < n; i++)
             {
                 Actor a = w.Actors[i];
@@ -30,12 +31,16 @@ namespace CriticalMass.Sim.Core
                 double dz = w.Z[i] - hill.Z;
                 if (dx * dx + dz * dz < r2)
                 {
-                    if (a.Team == TeamId.Azure) azure++;
-                    else crimson++;
+                    if (a.Team == TeamId.Azure) { azure++; wa += MechRules.HillWeight(w, i); }
+                    else { crimson++; wc += MechRules.HillWeight(w, i); }
                 }
             }
             m.HillCount.Azure = azure;
             m.HillCount.Crimson = crimson;
+            // b16 the hill count: Warrior weight first, then at most HillCap per team counts (raw bodies stay in HillCount).
+            // With both rules off (Classic, PhysicsOnly) wa = azure and wc = crimson, so ownership is exactly as before.
+            azure = MechRules.Counted(w, 0, wa);   // b16-hook
+            crimson = MechRules.Counted(w, 1, wc);   // b16-hook
             HillState next;
             if (azure == 0 && crimson == 0) next = HillState.Neutral;
             else if (azure > crimson) next = HillState.Azure;

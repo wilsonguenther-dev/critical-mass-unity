@@ -28,6 +28,24 @@ namespace CriticalMass.Runtime.Progression
         public MatchOutcome Outcome;
         /// <summary>True only when the match ran to its end (no reward for a quit).</summary>
         public bool Completed;
+        /// <summary>b16: a practice mode (Training, Practice, Spectate, the demo: MetaRecorder.IsPractice). Counted apart in
+        /// PlayerProfile.PracticeMatches, never in the matches / wins / losses the profile shows (MatchCounting).</summary>
+        public bool Practice;
+        /// <summary>b16: the local player left a running match (quit, restart): no reward, recorded as a loss (MatchCounting).</summary>
+        public bool Left;
+    }
+
+    /// <summary>
+    /// b16 (mechanics audit item 11): ONE rule for the three match counters (the profile's matches / W-D-L, the class careers
+    /// and the history): a match counts when it ran to its end or the local player left it, and it is not a practice match;
+    /// a leave counts as a loss. Practice matches are counted apart (PlayerProfile.PracticeMatches; history rows carry
+    /// MatchRecord.Practice). A match whose host left counts nowhere ("no result").
+    /// </summary>
+    public static class MatchCounting
+    {
+        public static bool Counts(in MatchStatsInput s) => (s.Completed || s.Left) && !s.Practice;
+
+        public static MatchOutcome Outcome(in MatchStatsInput s) => s.Left && !s.Completed ? MatchOutcome.Loss : s.Outcome;
     }
 
     /// <summary>One line of the results breakdown.</summary>
@@ -162,12 +180,17 @@ namespace CriticalMass.Runtime.Progression
                 int capSp = Leveling.TotalFor(Leveling.MaxLevel);
                 p.SkillPoints = (int)Math.Min((long)p.SkillPoints + r.SkillPoints, capSp);
                 p.Coins = (int)Math.Min((long)p.Coins + r.Coins, int.MaxValue);
-                p.MatchesPlayed++;
-                if (r.Stats.Outcome == MatchOutcome.Win) p.Wins++;
-                else if (r.Stats.Outcome == MatchOutcome.Draw) p.Draws++;
-                else p.Losses++;
                 p.KnockOuts += Math.Max(0, r.Stats.KnockOuts);
                 if (r.SkillPoints > p.BestMatchSkillPoints) p.BestMatchSkillPoints = r.SkillPoints;
+            }
+            if (r.Stats.Practice && r.Stats.Completed) p.PracticeMatches++;   // b16: practice apart
+            if (MatchCounting.Counts(r.Stats))   // b16: one rule for the three counters; a leave is a loss
+            {
+                MatchOutcome o = MatchCounting.Outcome(r.Stats);
+                p.MatchesPlayed++;
+                if (o == MatchOutcome.Win) p.Wins++;
+                else if (o == MatchOutcome.Draw) p.Draws++;
+                else p.Losses++;
             }
             r.SkillPointsAfter = p.SkillPoints;
             r.CoinsAfter = p.Coins;

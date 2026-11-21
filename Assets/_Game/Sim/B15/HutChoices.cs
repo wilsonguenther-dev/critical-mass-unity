@@ -201,6 +201,12 @@ namespace CriticalMass.Sim.Core
             }
             int level = s.VoteLevel[t];
             int members = 0, a = 0, b = 0;
+            // b16 (mechanics audit #7): on a team with a person at the controls the bots wait for the people. Pass 1 takes every
+            // press and counts the people's votes; pass 2 casts the bot votes and counts. With the rule off (or an all-bot team)
+            // pass 2 casts exactly as before.
+            bool wait = DepthRules.On(w, w.Config.Depth.Mech.HutBotsWaitForHumans);
+            bool auto0 = Auto0(w);
+            int humans = 0, hv = 0, ha = 0, hb = 0;
             for (int i = 0; i < w.ActorCount; i++)
             {
                 Actor x = w.Actors[i];
@@ -213,16 +219,37 @@ namespace CriticalMass.Sim.Core
                     s.Vote[i] = (byte)press; // a human may change his mind inside the window: the last press counts
                     inp.StationBuy = 0;      // taken: the station never sees a vote press
                 }
-                else if (!x.IsHuman && s.Vote[i] == 0 && s.BotTick[i] >= 0 && w.Tick >= s.BotTick[i])
+                if (!wait || !MechRules.AtControls(w, i, auto0)) continue;
+                humans++;
+                if (s.Vote[i] == 0) continue;
+                hv++;
+                if (s.Vote[i] == 1) ha++;
+                else hb++;
+            }
+            bool people = wait && humans > 0;
+            // the bots hold their votes until HutBotLastSeconds are left or every person has voted
+            bool hold = people && hv < humans && w.Tick < s.EndTick[t] - Ticks(w.Config, w.Config.Depth.Mech.HutBotLastSeconds);
+            // then they follow the people's majority; with the people split evenly they abstain (the tie-break is one card)
+            int follow = people && hv > 0 ? (ha > hb ? 1 : hb > ha ? 2 : -1) : 0;
+            for (int i = 0; i < w.ActorCount; i++)
+            {
+                Actor x = w.Actors[i];
+                if (x.Team != team) continue;
+                if (!x.IsHuman && !hold && follow >= 0 && s.Vote[i] == 0 && s.BotTick[i] >= 0 && w.Tick >= s.BotTick[i])
                 {
-                    s.Vote[i] = (byte)BotCard(w, i, level);
+                    s.Vote[i] = (byte)(follow > 0 ? follow : BotCard(w, i, level));
                     s.BotTick[i] = -1;
                 }
                 if (s.Vote[i] == 1) a++;
                 else if (s.Vote[i] == 2) b++;
             }
-            if (2 * a > members || 2 * b > members || w.Tick >= s.EndTick[t]) Close(w, team, level, a, b);
+            int tieCard = people && hv > 0 ? BotNeed(w, team, level) : DefaultCard(w, team, level);
+            if (2 * a > members || 2 * b > members || w.Tick >= s.EndTick[t]) Close(w, team, level, a, b, tieCard);
         }
+
+        /// <summary>b16: actor 0 is on the plain autopilot (a bot match: the bots drive it), so no person is at its controls.</summary>
+        static bool Auto0(World w) =>
+            CriticalMass.Sim.Bots.BotBrain.TryGetBotsState(w, out CriticalMass.Sim.Bots.BotsState st) && CriticalMass.Sim.Bots.BotsState.HumanDriven(st, w);
 
         static void Open(World w, TeamId team, int level)
         {
@@ -243,12 +270,12 @@ namespace CriticalMass.Sim.Core
             }
         }
 
-        static void Close(World w, TeamId team, int level, int a, int b)
+        static void Close(World w, TeamId team, int level, int a, int b, int tieCard)
         {
             HutChoiceState s = w.HutVote;
             int t = (int)team;
             bool tie = a == b;
-            int card = a > b ? 1 : b > a ? 2 : DefaultCard(w, team, level);
+            int card = a > b ? 1 : b > a ? 2 : tieCard;
             s.Pick[t * HutChoiceState.Levels + level - 1] = (byte)card;
             s.Mask[t] |= 1 << (int)OptionAt(level, card);
             s.Decided[t] = level;

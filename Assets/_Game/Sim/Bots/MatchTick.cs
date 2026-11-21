@@ -36,8 +36,8 @@ namespace CriticalMass.Sim.Bots
         {
             Tap?.OnAdvance(w, humanFrame);
             BotReflex.BeginFills(w);   // b13 r3 integrator: the dodge reflex's per-tick threat lists (sim cost)
-            // (1) actor 0: the human's frame, or the bots on autopilot.
-            if (humanFrame != null) SimInput.ApplyInput(w, 0, humanFrame);
+            // (1) actor 0: the human's frame, or the bots on autopilot (b16: also after AfkSeconds of frames with no input).
+            if (humanFrame != null && !MechRules.AutopilotFrame(w, 0, humanFrame)) SimInput.ApplyInput(w, 0, humanFrame);
             else
             {
                 BotBrain.FillBotInput(w, 0, scratch);
@@ -67,7 +67,7 @@ namespace CriticalMass.Sim.Bots
             Tap?.OnAdvanceHumans(w, frames);
             BotReflex.BeginFills(w);
             InputFrame f0 = frames != null && frames.Length > 0 ? frames[0] : null;
-            if (f0 != null) SimInput.ApplyInput(w, 0, f0);
+            if (f0 != null && !MechRules.AutopilotFrame(w, 0, f0)) SimInput.ApplyInput(w, 0, f0);   // b16-hook: idle players
             else
             {
                 BotBrain.FillBotInput(w, 0, scratch);
@@ -77,7 +77,7 @@ namespace CriticalMass.Sim.Bots
             for (int id = 1; id < w.ActorCount; id++)
             {
                 InputFrame f = frames != null && id < frames.Length ? frames[id] : null;
-                if (f != null) SimInput.ApplyInput(w, id, f);
+                if (f != null && !MechRules.AutopilotFrame(w, id, f)) SimInput.ApplyInput(w, id, f);   // b16-hook: idle players
                 else
                 {
                     BotBrain.FillBotInput(w, id, scratch);
