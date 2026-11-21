@@ -25,12 +25,15 @@ namespace CriticalMass.Sim.Config
         public double WallSlideFadeDeg = 75;
 
         // ---- [1] Kaiju pins a fighter, [7] crowd shoves the Kaiju
-        /// <summary>Most a fighter is moved in one tick by the Kaiju body's push-out and its end-of-tick depenetration (u). The old
-        /// ring search could place a pinned fighter 2.71 u away on the far side of the body.</summary>
-        public double KaijuPinStepMax = 0.35;
-        /// <summary>A pinned fighter (no free spot on its own side within KaijuPinStepMax) holds the Kaiju: the body gives way by
-        /// at most this much per tick (u) instead of the fighter being placed through it.</summary>
-        public double KaijuPinGiveMax = 0.1;
+        /// <summary>Most a fighter is moved in one tick by the Kaiju body's push-out and its end-of-tick depenetration together (u;
+        /// with a top-speed step, 0.13 u, the whole tick stays under 0.35 u). The old ring search could place a pinned fighter
+        /// 2.71 u away on the far side of the body. A fighter found deeper than this inside the body (a respawn, a landing) still
+        /// takes the old ring search.</summary>
+        public double KaijuPinStepMax = 0.2;
+        /// <summary>A pinned fighter (no free spot on its own side within KaijuPinStepMax) holds the Kaiju: the body gives way
+        /// instead of the fighter being placed through it, by what is missing (at most KaijuPinStepMax), with the Kaiju's whole
+        /// move this tick (its walk plus the give-way) held under KaijuNetSpeedMax.</summary>
+        public double KaijuNetSpeedMax = 3.0;
         /// <summary>Most the whole crowd of fighters wedged against it can shove the Kaiju in one tick (u, about 0.6 u/s of drift).
         /// The rest is dropped: fighters do not move the Kaiju beyond a slow drift.</summary>
         public double KaijuCrowdShoveMax = 0.02;

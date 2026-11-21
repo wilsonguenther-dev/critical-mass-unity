@@ -21,11 +21,12 @@ namespace CriticalMass.Sim.Tests
     {
         // ------------------------------------------------------------------------------------------------ helpers (PA.cs)
 
-        private static World NewW(bool on, ClassId cls, int seed = 4242, int team = 16, double hatch = 1e6)
+        private static World NewW(bool on, ClassId cls, int seed = 4242, int team = 16, double hatch = 1e6, Action<PhysicsFeelConfig> tweak = null)
         {
             GameConfig cfg = GameConfig.CreateDefault();
             cfg.HatchSeconds = hatch;
             cfg.Depth.PhysicsFeel.Enabled = on;
+            tweak?.Invoke(cfg.Depth.PhysicsFeel);
             return World.CreateWorld(new WorldOptions { Seed = seed, TeamSize = team, HumanTeam = TeamId.Azure, HumanClass = cls, Config = cfg });
         }
 
@@ -251,7 +252,12 @@ namespace CriticalMass.Sim.Tests
             k.X = ox; k.Z = oz; k.PrevX = ox; k.PrevZ = oz;
             Assert.Greater(Demolitions.ThrowTnt(w, 0, ox - 1.0, oz), 0);
             double maxV = 0;
-            for (int t = 0; t < 90; t++) { In(w, 0, 0, 0); SimStep.Step(w); maxV = Math.Max(maxV, Math.Sqrt(k.PushVx * k.PushVx + k.PushVz * k.PushVz)); }
+            for (int t = 0; t < 90; t++)
+            {
+                if (maxV == 0) { k.X = ox; k.Z = oz; }   // held on its spot until the blast (its AI would walk it off)
+                In(w, 0, 0, 0); SimStep.Step(w);
+                maxV = Math.Max(maxV, Math.Sqrt(k.PushVx * k.PushVx + k.PushVz * k.PushVz));
+            }
             World w2 = NewW(true, ClassId.Warrior); Bench(w2, new[] { 0 });
             OpenSpot(w2, 14, w2.Map.Hill.X, w2.Map.Hill.Z, out double qx, out double qz);
             Hatch(w2);
@@ -271,12 +277,14 @@ namespace CriticalMass.Sim.Tests
 
         // ------------------------------------------------------------------------------------------------ [4] corner grazes
 
+        /// <summary>Ticks to pass a pillar grazed by `off` u (NaN: no pillar, the free run over the same distance); -1 stopped.</summary>
         private static int Graze(bool on, double off)
         {
             World w = NewW(on, ClassId.Warrior); Bench(w, new[] { 0 });
             OpenSpot(w, 12, w.Map.Hill.X, w.Map.Hill.Z, out double qx, out double qz);
             int pc = (int)Math.Floor(qx), pz = (int)Math.Floor(qz);
-            w.Map.Cells[Idx(w, pc, pz)] = Cell.Wall;
+            if (double.IsNaN(off)) off = 0.0;
+            else w.Map.Cells[Idx(w, pc, pz)] = Cell.Wall;
             double r0 = Collide.ActorRadius(w, 0);
             Put(w, 0, pc - 3, pz - r0 + off);
             for (int t = 1; t <= 90; t++) { In(w, 0, 1, 0); SimStep.Step(w); if (w.X[0] > pc + 1 + r0) return t; }
@@ -286,12 +294,14 @@ namespace CriticalMass.Sim.Tests
         [Test]
         public void Item4_AGrazeUpTo035UOfAPillarSlidesRoundItInsteadOfStopping()
         {
+            int free = Graze(true, double.NaN);
+            Json("4 pillar graze: free run over the same distance (ticks)", Graze(false, double.NaN).ToString(), free.ToString(), "reference (the audit's ~24 was an estimate)");
             foreach (double off in new[] { 0.05, 0.15, 0.3, 0.34 })
             {
                 int b = Graze(false, off), a = Graze(true, off);
-                Json("4 pillar graze by " + N(off) + " u: tick past the pillar (-1 = stopped; free run ~24)", b.ToString(), a.ToString(), "past it within 34 ticks");
+                Json("4 pillar graze by " + N(off) + " u: tick past the pillar (-1 = stopped)", b.ToString(), a.ToString(), "past it, at most 6 ticks over the free run " + free);
                 Assert.Greater(a, 0, "a " + off + " u graze slides round");
-                Assert.LessOrEqual(a, 34, "a " + off + " u graze costs at most 10 ticks over a free run");
+                Assert.LessOrEqual(a, free + 6, "a " + off + " u graze costs at most 0.2 s over a free run");
             }
         }
 
@@ -492,6 +502,8 @@ namespace CriticalMass.Sim.Tests
             {
                 ang += omega;
                 if (t == 180) ang += Math.PI;   // the far side in one tick
+                // The Kaiju is held on its spot and on this fighter (its AI faces a chased target inside claw reach + 1.5).
+                k.X = ox; k.Z = oz; k.PrevX = ox; k.PrevZ = oz; k.TargetId = 0;
                 double fx = k.X + 2.4 * Math.Cos(ang), fz = k.Z + 2.4 * Math.Sin(ang);
                 Put(w, 0, fx, fz);
                 In(w, 0, 0, 0);
@@ -523,16 +535,18 @@ namespace CriticalMass.Sim.Tests
 
         private struct Crowd
         {
-            public double WorstOverlap, CrowdP50, CrowdP95, OpenP95, KaijuMaxTurn, KaijuMaxSpeed;
+            public double WorstOverlap, WorstHill, WorstPlain, CrowdP50, CrowdP95, OpenP95, KaijuMaxTurn, KaijuMaxSpeed;
+            public string WorstWhat, PlainWhat;
+            public int Hard;
             public int Flags, KaijuFast, Big45;
             public long Alloc;
             public ulong Hash;
         }
 
         /// <summary>The audit's crowd run (PACrowd.Run): 16v16 Full, seed 7, Kaiju from 0:30, 3600 ticks (the fast shiver gate's match).</summary>
-        private static Crowd RunCrowd(bool on, int seed = 7, int ticks = 3600)
+        private static Crowd RunCrowd(bool on, int seed = 7, int ticks = 3600, Action<PhysicsFeelConfig> tweak = null, bool print = true)
         {
-            World w = NewW(on, ClassId.Warrior, seed, 16, 30);
+            World w = NewW(on, ClassId.Warrior, seed, 16, 30, tweak);
             InputFrame s = SimInput.EmptyInput();
             var watch = new ShiverWatch();
             int n = w.ActorCount;
@@ -567,7 +581,16 @@ namespace CriticalMass.Sim.Tests
                         if (!w.Actors[j].Alive || w.Actors[j].AirLen > 0) continue;
                         double dx = w.X[i] - w.X[j], dz = w.Z[i] - w.Z[j];
                         double ov = Collide.ActorRadius(w, i) + Collide.ActorRadius(w, j) - Math.Sqrt(dx * dx + dz * dz);
-                        if (ov > c.WorstOverlap) c.WorstOverlap = ov;
+                        if (ov <= 0.05) continue;
+                        bool ladder = a.Team == w.Actors[j].Team && CombatFeel.On(w) && CombatFeel.AllyPasses(w, i, j);
+                        double mx = (w.X[i] + w.X[j]) * 0.5 - hX, mz = (w.Z[i] + w.Z[j]) * 0.5 - hZ;
+                        bool hill = mx * mx + mz * mz < hR * hR;
+                        string what = "tick " + w.Tick + " " + i + "/" + j + (a.Team == w.Actors[j].Team ? " allies" : " enemies") + (ladder ? " ladder-pass" : "")
+                            + " " + a.AiState + "/" + w.Actors[j].AiState + " standUp " + a.StandUp + "/" + w.Actors[j].StandUp + " at " + N(w.X[i]) + "," + N(w.Z[i])
+                            + " cells " + w.Map.Cells[Idx(w, JsMath.FloorToInt(w.X[i]), JsMath.FloorToInt(w.Z[i]))] + "/" + w.Map.Cells[Idx(w, JsMath.FloorToInt(w.X[j]), JsMath.FloorToInt(w.Z[j]))];
+                        if (ov > c.WorstOverlap) { c.WorstOverlap = ov; c.WorstWhat = what; }
+                        if (hill && ov > c.WorstHill) c.WorstHill = ov;
+                        if (!ladder && ov > c.WorstPlain) { c.WorstPlain = ov; c.PlainWhat = what; }
                     }
                     if (!double.IsNaN(hx[i, 0]) && !double.IsNaN(hx[i, 1]))
                     {
@@ -604,8 +627,9 @@ namespace CriticalMass.Sim.Tests
             c.CrowdP95 = crowdD2.Count == 0 ? 0 : crowdD2[Math.Min(crowdD2.Count - 1, (int)(0.95 * crowdD2.Count))];
             c.OpenP95 = openD2.Count == 0 ? 0 : openD2[Math.Min(openD2.Count - 1, (int)(0.95 * openD2.Count))];
             c.Flags = watch.Count;
+            foreach (ShiverFlag f in watch.Flags) if (f.Actor == ShiverWatch.KaijuId || f.Kind == ShiverKind.Reversals || f.Kind == ShiverKind.Dither && f.Reversals >= 4) c.Hard++;
             c.Hash = CriticalMass.Net.StateHash.Of(w);
-            if (on) { int shown = 0; foreach (ShiverFlag f in watch.Flags) if (shown++ < 20) Console.WriteLine(ShiverWatch.Format(f)); }
+            if (on && print) { int shown = 0; foreach (ShiverFlag f in watch.Flags) if (shown++ < 20) Console.WriteLine(ShiverWatch.Format(f)); }
             return c;
         }
 
@@ -613,7 +637,12 @@ namespace CriticalMass.Sim.Tests
         public void Items3678_TheHillCrowdMatchNoFusedAlliesNoAddedJitterNoKaijuLurchOrFlip()
         {
             Crowd b = RunCrowd(false), a = RunCrowd(true);
-            Json("6 hill crowd worst body overlap (u)", N(b.WorstOverlap), N(a.WorstOverlap), "<= 0.25");
+            Json("6 worst body overlap anywhere (u)", N(b.WorstOverlap), N(a.WorstOverlap), "reported");
+            Console.WriteLine("    worst before: " + b.WorstWhat + " | after: " + a.WorstWhat);
+            Json("6 worst body overlap in the hill disc (u)", N(b.WorstHill), N(a.WorstHill), "reported");
+            Json("6 worst body overlap, pairs not on a ladder lane (b15 lets allies pass there) (u)", N(b.WorstPlain), N(a.WorstPlain), "<= 0.25");
+            Console.WriteLine("    worst plain before: " + b.PlainWhat + " | after: " + a.PlainWhat);
+            Json("3 hard shiver flags (Kaiju, Reversals, Dither 4+), seed 7 hatch 0:30, 2 min", b.Hard.ToString(), a.Hard.ToString(), "0");
             Json("6 hill crowd jitter |second difference| median (u/tick^2)", N(b.CrowdP50), N(a.CrowdP50), "no added jitter");
             Json("6 hill crowd jitter p95 (u/tick^2)", N(b.CrowdP95), N(a.CrowdP95), "no added jitter");
             Json("6 open walkers jitter p95 (u/tick^2)", N(b.OpenP95), N(a.OpenP95), "unchanged");
@@ -623,13 +652,58 @@ namespace CriticalMass.Sim.Tests
             Json("8 Kaiju max facing change in one tick (deg)", N(b.KaijuMaxTurn), N(a.KaijuMaxTurn), "<= 10");
             Json("8 Kaiju turns over 45 deg in one tick", b.Big45.ToString(), a.Big45.ToString(), "0");
             Json("feels-best cheap step: bytes allocated in SimStep after a 600-tick warm-up", b.Alloc.ToString(), a.Alloc.ToString(), "0 (not more than before)");
-            Assert.LessOrEqual(a.WorstOverlap, 0.25, "no fused allies");
+            Assert.LessOrEqual(a.WorstPlain, 0.25, "no fused bodies (off the ladder lanes)");
             Assert.LessOrEqual(a.CrowdP95, b.CrowdP95 * 1.15 + 0.002, "no added crowd jitter");
             Assert.AreEqual(0, a.KaijuFast, "no Kaiju lurch");
             Assert.LessOrEqual(a.KaijuMaxTurn, 10.0 + 1e-6, "Kaiju turn-rate cap");
             Assert.IsTrue(a.Alloc == 0 || a.Alloc <= b.Alloc, "no added allocation in the step");
             Crowd again = RunCrowd(true);
             Assert.AreEqual(a.Hash, again.Hash, "deterministic: the same seed twice gives the same hash");
+        }
+
+        /// <summary>
+        /// Diagnostic (prints only): the fast shiver gate's match with each b16 rule switched off in turn, so a change in flags,
+        /// hard flags or overlap is pinned on the rule that makes it.
+        /// </summary>
+        [Test]
+        public void Diag_EachRuleOffInTurnOnTheFastGateMatch()
+        {
+            var arms = new List<KeyValuePair<string, Action<PhysicsFeelConfig>>>
+            {
+                new KeyValuePair<string, Action<PhysicsFeelConfig>>("all on", null),
+                new KeyValuePair<string, Action<PhysicsFeelConfig>>("blast shove off", f => f.BlastShove = false),
+                new KeyValuePair<string, Action<PhysicsFeelConfig>>("separation no-reversal off", f => f.SeparationNoReversal = false),
+                new KeyValuePair<string, Action<PhysicsFeelConfig>>("bot pull deadband 0", f => f.BotPullDeadband = 0),
+                new KeyValuePair<string, Action<PhysicsFeelConfig>>("gap flow off", f => f.GapFlow = false),
+                new KeyValuePair<string, Action<PhysicsFeelConfig>>("ally push ramp off", f => { f.AllyPushRampFrom = 1e9; f.AllyPushFullAt = 2e9; }),
+                new KeyValuePair<string, Action<PhysicsFeelConfig>>("ally pass anywhere", f => f.AllyPassInGapsOnly = false),
+                new KeyValuePair<string, Action<PhysicsFeelConfig>>("corner nudge 0.1", f => f.CornerNudgeMax = 0.1),
+                new KeyValuePair<string, Action<PhysicsFeelConfig>>("wall slide keep off", f => f.WallSlideKeep = 0),
+                new KeyValuePair<string, Action<PhysicsFeelConfig>>("Kaiju turn uncapped", f => f.KaijuTurnDegPerSec = 1e9),
+                new KeyValuePair<string, Action<PhysicsFeelConfig>>("Kaiju pin/crowd caps off", f => { f.KaijuPinStepMax = 1e9; f.KaijuCrowdShoveMax = 1e9; f.KaijuNetSpeedMax = 1e9; }),
+            };
+            Crowd off = RunCrowd(false, print: false);
+            Console.WriteLine("{\"item\":\"diag rule off\",\"arm\":\"rule disabled (before)\",\"flags\":" + off.Flags + ",\"hard\":" + off.Hard + ",\"worstPlain\":" + N(off.WorstPlain) + ",\"crowdP50\":" + N(off.CrowdP50) + "}");
+            foreach (var arm in arms)
+            {
+                Crowd c = RunCrowd(true, tweak: arm.Value, print: false);
+                Console.WriteLine("{\"item\":\"diag rule off\",\"arm\":\"" + arm.Key + "\",\"flags\":" + c.Flags + ",\"hard\":" + c.Hard + ",\"worstPlain\":" + N(c.WorstPlain) + ",\"crowdP50\":" + N(c.CrowdP50) + "}");
+            }
+        }
+
+        /// <summary>Classic and PhysicsOnly never see the rule: the same match hash with the switch on and off, PhysicsFeel.On false.</summary>
+        [Test]
+        public void ClassicAndPhysicsOnlyNeverSeeTheRule()
+        {
+            foreach (RulesProfile p in new[] { RulesProfile.Classic, RulesProfile.PhysicsOnly })
+            {
+                ulong on = CriticalMass.Sim.Tests.Harness.MatchHash.Run(1, 16, 1800, ClassId.Warrior, null, c => c.ApplyRules(p));
+                ulong off = CriticalMass.Sim.Tests.Harness.MatchHash.Run(1, 16, 1800, ClassId.Warrior, null, c => { c.ApplyRules(p); c.Depth.PhysicsFeel.Enabled = false; });
+                Console.WriteLine("{\"item\":\"" + p + " unchanged\",\"on\":\"0x" + on.ToString("X16") + "\",\"off\":\"0x" + off.ToString("X16") + "\"}");
+                Assert.AreEqual(off, on, p);
+                Assert.IsFalse(PhysicsFeel.On(GameConfig.CreateBrowser5v5().ApplyRules(p)), p + ": PhysicsFeel.On");
+            }
+            Assert.IsTrue(PhysicsFeel.On(GameConfig.CreateDefault()), "on in the game's default (Full)");
         }
 
         /// <summary>[3] The shiver soak (the audit's PAW.Soak, MovementShiverTests' six matches): at least 80% fewer flags.</summary>

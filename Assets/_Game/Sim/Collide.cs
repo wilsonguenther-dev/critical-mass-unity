@@ -582,6 +582,7 @@ namespace CriticalMass.Sim.Core
             bool feel = PhysicsFeel.On(w);
             double stepMax = feel ? PhysicsFeel.Cfg(w).KaijuPinStepMax : double.PositiveInfinity;
             double crowdX = 0, crowdZ = 0;
+            if (feel) BeginKaijuMoved(w);
             for (int i = 0; i < w.ActorCount; i++)
             {
                 Actor a = w.Actors[i];
@@ -617,7 +618,7 @@ namespace CriticalMass.Sim.Core
                 {
                     // Pinned against a wall: slide round the body (the tangent closer to its own motion, else counter-clockwise).
                     double side = w.Vx[i] * -uz + w.Vz[i] * ux >= 0 ? 1 : -1;
-                    double slide = Math.Min(push * 1.5, stepMax);
+                    double slide = Math.Min(push * 1.5, Math.Max(0, stepMax - gone));
                     MoveActor(w, i, -uz * side * slide, ux * side * slide);
                     ex = w.X[i] - k.X;
                     ez = w.Z[i] - k.Z;
@@ -638,6 +639,7 @@ namespace CriticalMass.Sim.Core
                 }
                 double moved = Math.Sqrt((w.X[i] - x0) * (w.X[i] - x0) + (w.Z[i] - z0) * (w.Z[i] - z0));
                 if (moved > most) most = moved;
+                if (feel) KMoved[i] += moved;
                 shoved++;
             }
             if (feel && (crowdX != 0 || crowdZ != 0))
@@ -703,11 +705,18 @@ namespace CriticalMass.Sim.Core
                 double rr = body + r;
                 // b16 [1]: a fighter the Kaiju walked onto (not one placed deep inside it by a respawn or a landing) is never moved
                 // more than KaijuPinStepMax in a tick, and never across the body: its own side, else the Kaiju gives way.
-                if (PhysicsFeel.On(w) && d >= body - 0.5)
+                if (PhysicsFeel.On(w) && d >= body - PhysicsFeel.Cfg(w).KaijuPinStepMax)
                 {
-                    PinResolve(w, i, ux, uz, d, body, r);
-                    moved++;
-                    continue;
+                    if (PinResolve(w, i, ux, uz, d, body, r))
+                    {
+                        moved++;
+                        continue;
+                    }
+                    // the last resort below starts from where the pin pass left both bodies
+                    dx = w.X[i] - k.X;
+                    dz = w.Z[i] - k.Z;
+                    d = Math.Sqrt(dx * dx + dz * dz);
+                    if (d > 1e-6) { ux = dx / d; uz = dz / d; }
                 }
                 MoveActor(w, i, ux * (rr - d), uz * (rr - d));
                 moved++;
@@ -750,19 +759,20 @@ namespace CriticalMass.Sim.Core
         /// at most KaijuPinStepMax, through the grid (walls slide it along them). (2) Still inside the body radius: the nearest
         /// spot just outside it on the fighter's OWN half (bearing within 90 degrees of its own) that its box fits and that is
         /// within KaijuPinStepMax of it. (3) None: the fighter holds the Kaiju, which steps back from it by what is missing (at
-        /// most KaijuPinGiveMax; Kaiju.PinGiveWay). Never a placement through or across the body.
+        /// most KaijuPinStepMax; Kaiju.PinGiveWay). Never a placement through or across the body; false when still inside.
         /// </summary>
-        private static void PinResolve(World w, int i, double ux, double uz, double d, double body, double r)
+        private static bool PinResolve(World w, int i, double ux, double uz, double d, double body, double r)
         {
             Kaiju k = w.Kaiju;
             PhysicsFeelConfig c = PhysicsFeel.Cfg(w);
-            double stepMax = c.KaijuPinStepMax;
-            double x0 = w.X[i], z0 = w.Z[i];   // the cap counts from where this pass found it
+            // The cap counts from where this pass found it, less what the Kaiju's body push already moved it this tick.
+            double stepMax = Math.Max(0, c.KaijuPinStepMax - KaijuMovedThisTick(w, i));
+            double x0 = w.X[i], z0 = w.Z[i];
             double push = Math.Min(body + r - d, stepMax);
             if (push > 0) MoveActor(w, i, ux * push, uz * push);
             double ex = w.X[i] - k.X, ez = w.Z[i] - k.Z;
             double e2 = ex * ex + ez * ez;
-            if (e2 >= body * body) return;
+            if (e2 >= body * body) return true;
             double e = Math.Sqrt(e2);
             double vx = e > 1e-6 ? ex / e : ux, vz = e > 1e-6 ? ez / e : uz;
             double bestD = double.PositiveInfinity, bx = 0, bz = 0;
@@ -793,11 +803,32 @@ namespace CriticalMass.Sim.Core
             {
                 w.X[i] = bx;
                 w.Z[i] = bz;
-                return;
+                return true;
             }
-            double need = Math.Min(body + 0.02 - e, c.KaijuPinGiveMax);
+            double need = Math.Min(body + 0.02 - e, c.KaijuPinStepMax);
             if (need > 0) Kaiju.PinGiveWay(w, -vx * need, -vz * need);
+            ex = w.X[i] - k.X;
+            ez = w.Z[i] - k.Z;
+            // Still inside (neither the fighter nor the Kaiju could move): the caller's ring search, the old last resort.
+            return ex * ex + ez * ez >= body * body;
         }
+
+        /// <summary>b16 [1]: per actor, how far the Kaiju's body push (KaijuBody) moved it this tick, so the end-of-tick pass keeps the
+        /// whole tick under KaijuPinStepMax. Scratch (grow-once), stamped with the world and tick it belongs to; not state.</summary>
+        private static double[] KMoved = new double[0];
+        private static int KMovedTick = int.MinValue;
+        private static World KMovedWorld;
+
+        private static void BeginKaijuMoved(World w)
+        {
+            if (KMoved.Length < w.ActorCount) KMoved = new double[w.ActorCount];
+            for (int i = 0; i < w.ActorCount; i++) KMoved[i] = 0;
+            KMovedTick = w.Tick;
+            KMovedWorld = w;
+        }
+
+        private static double KaijuMovedThisTick(World w, int i) =>
+            ReferenceEquals(KMovedWorld, w) && KMovedTick == w.Tick && i < KMoved.Length ? KMoved[i] : 0;
 
         /// <summary>Soft actor-actor separation after all moves: each overlapping living pair is pushed apart through MoveActor.</summary>
         public static void SeparateActors(World w)

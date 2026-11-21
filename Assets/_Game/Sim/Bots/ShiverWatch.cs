@@ -166,6 +166,8 @@ namespace CriticalMass.Sim.Bots
             // b15 combat feel: while the Kaiju's target is knocked around (by fighters' hits) the Kaiju turning after it is the
             // chase, not a door shiver.
             _knocked = CombatFeel.On(w) && k.TargetId >= 0 && k.TargetId < n && Knocked(w.Actors[k.TargetId]);
+            // b16 [2]: a Kaiju sliding from a blast is moved by the blast, not by its legs (PushVx / PushVz are 0 without the rule).
+            if (k.PushVx != 0 || k.PushVz != 0) _knocked = true;
             Sample(w, n, k.X, k.Z, k.PrevX, k.PrevZ, k.Facing, true, kWants, KaijuTypes.MoveSpeed(w), dt,
                 ClassId.Warrior, TeamId.Azure, AiState.None, k.TargetId);
             _knocked = false;
