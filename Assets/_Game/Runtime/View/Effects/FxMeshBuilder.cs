@@ -99,6 +99,9 @@ namespace CriticalMass.Runtime.View.Effects
             return true;
         }
 
+        /// <summary>Vertex i's colour (tests: soft edges fade to alpha 0).</summary>
+        public Color32 ColorAt(int i) => _v[i].Col;
+
         public void Clear()
         {
             _grp = false; _gk = 1f; _ga = 1f;
@@ -158,6 +161,15 @@ namespace CriticalMass.Runtime.View.Effects
                 V(c + (right * Mathf.Cos(a) + up * Mathf.Sin(a)) * rr, col);
             }
             for (int k = 0; k < n; k++) T(centre, centre + 1 + k, centre + 1 + (k + 1) % n);
+        }
+
+        /// <summary>b15 view polish (item 7): a soft round mote: a solid core to HealFx.MoteCore x r, then a falloff ring to
+        /// alpha 0 at r (no hard quad edge). n segments.</summary>
+        public void SoftMote(Vector3 c, Vector3 right, Vector3 up, float r, int n, Color32 col)
+        {
+            float core = r * CriticalMass.Runtime.View.Mechanics.HealFx.MoteCore;
+            Blob(c, right, up, core, null, n, 0f, col);
+            Ring(c, right, up, core, r, 0f, Mathf.PI * 2f, n, col, new Color32(col.r, col.g, col.b, 0));
         }
 
         /// <summary>A star with `points` spikes: outer radius r, inner radius r * inner.</summary>
