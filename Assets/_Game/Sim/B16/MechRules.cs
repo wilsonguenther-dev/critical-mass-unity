@@ -147,6 +147,7 @@ namespace CriticalMass.Sim.Core
         /// <summary>round(cap x size / reference), at least 1 (10 at 16, 5 at 8, 3 at 5).</summary>
         public static int CapFor(MechRulesConfig k, int teamSize)
         {
+            if (!k.HillCapScalesWithSize) return Math.Max(1, k.HillContributorCap);   // b16 combine: the ruling's flat cap
             int refSize = Math.Max(1, k.HillCapReferenceTeam);
             return Math.Max(1, (k.HillContributorCap * teamSize * 2 + refSize) / (2 * refSize));
         }

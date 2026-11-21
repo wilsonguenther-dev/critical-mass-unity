@@ -310,6 +310,11 @@ namespace CriticalMass.Sim.Core
         private static bool CornerNudge(World w, int line, bool alongX, double r, double stepLen, double along, double blockedAlong, ref double other)
         {
             bool feel = PhysicsFeel.On(w);   // b16 [4]: grazes up to 0.35 u are rounded, over several ticks when deeper than a step
+            // b16 combine: not at a bridge. On a deck or at its mouth the wide rounding slid a body that grazed the mouth corner
+            // round it onto the island beside the mouth, where it stood against the edge (CreatorAcceptance Need4: B7 back and
+            // B8 forward at +-60 degrees stalled at tick 17; Sim repro BridgeCrossingSweepTests...AcceptanceCrossingAt60Degrees:
+            // only "corner nudge 0.1" and "physics feel off" crossed). There the plain rule's 0.1 u keeps the body in the band.
+            if (feel && NearBridge(alongX ? along : other, alongX ? other : along)) feel = false;
             double max = feel ? PhysicsFeel.Cfg(w).CornerNudgeMax : w.Config.Physics.CornerNudgeMax;
             int lo = JsMath.FloorToInt(other - r - RangeEps);
             int hi = JsMath.FloorToInt(other + r + RangeEps);
@@ -334,6 +339,17 @@ namespace CriticalMass.Sim.Core
             if (!(alongX ? BoxFits(w, along, moved, r) : BoxFits(w, moved, along, r))) return false;
             other = moved;
             return true;
+        }
+
+        /// <summary>b16 combine: within the deck band plus one cell of any bridge span (its mouths included: the distance is to the
+        /// span segment). Bridges are fixed map geometry (BridgeSpans.All), so this is a pure function of the position.</summary>
+        private static bool NearBridge(double x, double z)
+        {
+            double reach = SkybreakBasinMap.BridgeHalfWidth + 1.0;
+            IReadOnlyList<BridgeSpan> spans = BridgeSpans.All;
+            for (int k = 0; k < spans.Count; k++)
+                if (BridgeSpans.Distance(spans[k], x, z) <= reach) return true;
+            return false;
         }
 
         /// <summary>b16 [12]: cos 45 and cos 75 degrees (literal constants, no trig call).</summary>
@@ -954,6 +970,12 @@ namespace CriticalMass.Sim.Core
                         double mj = p.SeparationByMass ? w.Config.Class(aj.Cls).Mass : 1;
                         double pushI = jFixed ? overlap : iFixed ? 0 : overlap * mj / (mi + mj);
                         double pushJ = iFixed ? overlap : jFixed ? 0 : overlap - pushI;
+                        // b16 combine (D): a teammate getting up shares the push with the ally walking into it (AllyGetUpShare).
+                        if (feel && pf.AllyGetUpShare > 0 && ai.Team == aj.Team && iFixed != jFixed)
+                        {
+                            if (iFixed) { pushI = overlap * pf.AllyGetUpShare; pushJ = overlap - pushI; }
+                            else { pushJ = overlap * pf.AllyGetUpShare; pushI = overlap - pushJ; }
+                        }
                         // b16 [5]: of a pair where only one is in (or walking into) a one-cell gap, that one takes GapLeadShare: the
                         // queue behind it no longer shoves it sideways out of the mouth.
                         if (gapFlow && !iFixed && !jFixed && (gi != 0) != (gj != 0))

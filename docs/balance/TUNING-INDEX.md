@@ -4,7 +4,7 @@ Every tuning field the sim reads from `GameConfig`, found by reflection (`Assets
 
 Regenerate: `tools/balance/balance-report.sh tuning-index (or the balance-report workflow, mode tuning-index)`. `TuningIndexTests` fails when a field has no row here. Paths work as `--set Path=Value` switches for the balance report.
 
-862 fields.
+864 fields.
 
 ## (top level)
 
@@ -938,6 +938,7 @@ Regenerate: `tools/balance/balance-report.sh tuning-index (or the balance-report
 | `Depth.PhysicsFeel.BotNoSnapReversal` | true | bool | `Assets/_Game/Sim/Config/PhysicsFeelConfig.cs` | [3] A bot whose wish flips over 120 degrees off its motion turns through the side at the bot turn rate instead of stepping straight back (fighters and straight walkers; the field-following turn limit already covers th... |
 | `Depth.PhysicsFeel.AllyPushRampFrom` | 0.1 | double | `Assets/_Game/Sim/Config/PhysicsFeelConfig.cs` | Teammates push at PhysicsConfig.AllyPushShare up to AllyPushRampFrom of overlap, rising to the full push at AllyPushFullAt. |
 | `Depth.PhysicsFeel.AllyPushFullAt` | 0.25 | double | `Assets/_Game/Sim/Config/PhysicsFeelConfig.cs` |  |
+| `Depth.PhysicsFeel.AllyGetUpShare` | 0.5 | double | `Assets/_Game/Sim/Config/PhysicsFeelConfig.cs` | b16 combine (D, ally overlap): a teammate getting up is no longer immovable to an ally walking into it: it takes this share of the pair's push (0 = the old rule, the walker takes all of it). |
 | `Depth.PhysicsFeel.AllyPassInGapsOnly` | true | bool | `Assets/_Game/Sim/Config/PhysicsFeelConfig.cs` | The U-071 opposing-ally pass (no push between a retreating bot and an ally walking into it) only inside or at the mouth of a one-cell passage, where they cannot step round each other. |
 | `Depth.PhysicsFeel.GapFlow` | true | bool | `Assets/_Game/Sim/Config/PhysicsFeelConfig.cs` | Bodies queue through one-cell gaps: inside a gap (or one cell from its mouth along its walk) a body's push across the passage is dropped, and of a pair where only one is there, that one takes GapLeadShare of the push. |
 | `Depth.PhysicsFeel.GapLeadShare` | 0.2 | double | `Assets/_Game/Sim/Config/PhysicsFeelConfig.cs` |  |
@@ -954,6 +955,7 @@ Regenerate: `tools/balance/balance-report.sh tuning-index (or the balance-report
 | `Depth.Mech.WarriorHoldWeight` | 2 | int | `Assets/_Game/Sim/Config/MechRulesConfig.cs` | A Warrior standing on the hill counts this many bodies for holding and contesting it (1 = off). |
 | `Depth.Mech.HillContributorCap` | 10 | int | `Assets/_Game/Sim/Config/MechRulesConfig.cs` | At most this many WEIGHTED bodies per team count toward holding or contesting the hill at a team size of HillCapReferenceTeam; other sizes scale it: round(cap x size / reference), at least 1 (16: 10, 8: 5, 5: 3). |
 | `Depth.Mech.HillCapReferenceTeam` | 16 | int | `Assets/_Game/Sim/Config/MechRulesConfig.cs` |  |
+| `Depth.Mech.HillCapScalesWithSize` | true | bool | `Assets/_Game/Sim/Config/MechRulesConfig.cs` | b16 combine (D, blowouts): false = the cap is HillContributorCap at every team size (the design ruling's "at most 10 units per team"), so it bites at 16 a side only; true = scaled by team size as above. |
 | `Depth.Mech.HillCapBotsOffHill` | true | bool | `Assets/_Game/Sim/Config/MechRulesConfig.cs` | Bots on a team already at the cap do something else: hill-job bots past it take the INTERCEPT job (stand on the enemy's approach, InterceptAlong u of path from the hill toward the enemy pad, and fight whoever comes). |
 | `Depth.Mech.InterceptAlong` | 12 | double | `Assets/_Game/Sim/Config/MechRulesConfig.cs` |  |
 | `Depth.Mech.HillCapLockSeconds` | 3 | double | `Assets/_Game/Sim/Config/MechRulesConfig.cs` | A bot's intercept / hill switch holds at least this long (no flip-flop at the disc edge). |

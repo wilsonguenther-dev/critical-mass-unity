@@ -1073,13 +1073,16 @@ namespace CriticalMass.Sim.Bots
                         oz = hx * sn + hz * turnCos;
                     }
                 }
-                else if (PhysicsFeel.On(w) && PhysicsFeel.Cfg(w).BotNoSnapReversal && vs >= 0.05 * cc.MoveSpeed)
+                else if (PhysicsFeel.On(w) && PhysicsFeel.Cfg(w).BotNoSnapReversal && a.AiState == AiState.Fight && vs >= TurnLimitFraction * cc.MoveSpeed)
                 {
                     // b16 [3]: no snap reversal. A fighter (or a bot walking straight at a point) whose wish flips to more than 120
                     // degrees off the way it is moving turns through the side at TurnStep a step instead of stepping straight back:
                     // the approach / retreat band flipping in, out, in read as Reversals in the fast gate's match. Dodges, the cloud
                     // and the unjam step are decided after this and are not limited. From 5% of top speed: a fighter slowed by its
                     // own swing (CombatFeel.SpeedScale) moves under the field rule's quarter and snapped back there.
+                    // b16 combine: fighters only, from TurnLimitFraction (the physics builder's next fix): from 5% it also reached
+                    // gatherers and point walkers (lone walker stall, KaijuHill on-share 0.153), and its round 4 at 25% soaked 192
+                    // shiver flags against 276 at 5%.
                     double hx = vx / vs;
                     double hz = vz / vs;
                     if (hx * ox + hz * oz < -0.5)

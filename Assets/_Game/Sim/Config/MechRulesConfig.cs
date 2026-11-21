@@ -44,6 +44,9 @@ namespace CriticalMass.Sim.Config
         /// apply first, so a Warrior fills 2 of the 10. Bodies past the cap add nothing. 0 = no cap.</summary>
         public int HillContributorCap = 10;
         public int HillCapReferenceTeam = 16;
+        /// <summary>b16 combine (D, blowouts): false = the cap is HillContributorCap at every team size (the design ruling's
+        /// "at most 10 units per team"), so it bites at 16 a side only; true = scaled by team size as above.</summary>
+        public bool HillCapScalesWithSize = true;
         /// <summary>Bots on a team already at the cap do something else: hill-job bots past it take the INTERCEPT job (stand on
         /// the enemy's approach, InterceptAlong u of path from the hill toward the enemy pad, and fight whoever comes).</summary>
         public bool HillCapBotsOffHill = true;
