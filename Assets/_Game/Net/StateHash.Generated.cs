@@ -93,6 +93,7 @@ namespace CriticalMass.Net
             H_MapDef(ref h, o.Map);
             H_MatchState(ref h, o.Match);
             A(ref h, o.MeatDropped);
+            H_MechState(ref h, o.Mech);
             {
                 var a3 = o.Nodes;
                 if (a3 == null) M(ref h, -1);
@@ -838,6 +839,20 @@ namespace CriticalMass.Net
             M(ref h, (long)o.Phase);
             D(ref h, o.Time);
             M(ref h, (long)o.Winner);
+        }
+
+        private static void H_MechState(ref ulong h, global::CriticalMass.Sim.Core.MechState o)
+        {
+            if (o == null) { M(ref h, 0x4E554C4CL); return; }
+            A(ref h, o.Auto);
+            M(ref h, o.Handbacks);
+            A(ref h, o.HillCounted);
+            A(ref h, o.HillWeighted);
+            A(ref h, o.IdleTicks);
+            M(ref h, o.Intercepts);
+            A(ref h, o.Surplus);
+            A(ref h, o.SurplusLock);
+            M(ref h, o.Takeovers);
         }
 
         private static void H_ResourceNode(ref ulong h, global::CriticalMass.Sim.Core.ResourceNode o)
