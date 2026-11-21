@@ -307,7 +307,10 @@ namespace CriticalMass.Sim.Tests
                     along.Add((w.X[0] - ox) * ux + (w.Z[0] - oz) * uz);
                     if (t >= 6 && along[t] - along[t - 3] < 0.01) stall = t;
                 }
-                Assert.AreEqual(Math.Abs(deg) == 30 ? 41 : 49, stall, deg + " deg: the stall tick CI printed");
+                // b16: the Warrior walks 3.61 u/s (was 3.8): the CI-printed stall ticks 41 / 49 at 3.8 scale by 3.8 / speed
+                // (30 deg: 43 measured, sim run 44925935233), one tick either way for rounding.
+                double slow = 3.8 / w.Config.Class(ClassId.Warrior).MoveSpeed;
+                Assert.AreEqual(Math.Round((Math.Abs(deg) == 30 ? 41 : 49) * slow), stall, 1.0, deg + " deg: the stall tick CI printed, scaled by the Warrior's speed");
                 Assert.AreEqual(4.0, along[along.Count - 1], 0.15, deg + " deg: stopped at the collapsed gap (the middle third starts at Len / 3 = 4.48 u)");
             }
             frame.MoveX = 0;

@@ -40,6 +40,8 @@ namespace CriticalMass.Balance
             public string Out;
             public string Label = "", Commit = "";
             public string Base, Head;
+            public string Arms;
+            public int Shard, Shards = 1;
         }
 
         public static int Main(string[] args)
@@ -51,6 +53,7 @@ namespace CriticalMass.Balance
                 {
                     case "tuning-index": return TuningIndexCommand(o);
                     case "compare": return Compare(o);
+                    case "duel-sweep": return DuelSweep(o);
                     default: return Run(o);
                 }
             }
@@ -92,6 +95,14 @@ namespace CriticalMass.Balance
                     case "--commit": o.Commit = V(); break;
                     case "--base": o.Base = V(); break;
                     case "--head": o.Head = V(); break;
+                    case "--arms": o.Arms = V(); break;
+                    case "--shard":
+                    {
+                        string[] kn = V().Split('/');
+                        o.Shard = int.Parse(kn[0], CultureInfo.InvariantCulture);
+                        o.Shards = int.Parse(kn[1], CultureInfo.InvariantCulture);
+                        break;
+                    }
                     default: throw new ArgumentException("unknown option " + k);
                 }
             }
@@ -225,14 +236,17 @@ namespace CriticalMass.Balance
             }
             double matchWall = wall.Elapsed.TotalSeconds;
             DuelRunner.Cell[,] ttk = null, duels = null;
+            DuelRunner.Cell[] esc = null, escDodge = null;
             var dw = Stopwatch.StartNew();
             if (o.Duels)
             {
                 ttk = DuelRunner.Ttk(profile, sets, o.DuelReps);
                 duels = DuelRunner.Duels(profile, sets, o.DuelReps);
+                esc = DuelRunner.Escape(profile, sets, o.DuelReps, false);
+                escDodge = DuelRunner.Escape(profile, sets, o.DuelReps, true);
             }
             double duelWall = dw.Elapsed.TotalSeconds;
-            BalanceReport r = BalanceAggregate.Build(matches, ttk, duels);
+            BalanceReport r = BalanceAggregate.Build(matches, ttk, duels, esc, escDodge);
             r.Meta.Add(new KeyValuePair<string, string>("label", label ?? ""));
             r.Meta.Add(new KeyValuePair<string, string>("commit", o.Commit));
             r.Meta.Add(new KeyValuePair<string, string>("source", source));
@@ -286,6 +300,76 @@ namespace CriticalMass.Balance
                     Console.WriteLine("[compare] " + l.Label + ": " + BalanceFormat.Num(l.Base.Value) + " -> " + BalanceFormat.Num(l.Head.Value) + " (noise +-" + BalanceFormat.Num(l.Noise) + ")");
                 }
             Console.WriteLine("[compare] " + outside + " rows outside the noise");
+            return 0;
+        }
+
+        /// <summary>
+        /// b16: duel-sweep --arms FILE [--shard k/n] [--duel-reps N] [--out FILE.csv]: the duel tables only (no matches) for every
+        /// arm of FILE (one arm a line: name, a tab, switches "Path=Value;Path=Value"; # comments), this shard's share of
+        /// them (line index mod n == k). One CSV line per arm: violations of the duel order, each class's wins, the matrix
+        /// (row beats column, both seatings), the median time to kill and the escape rates.
+        /// </summary>
+        static int DuelSweep(Options o)
+        {
+            if (o.Arms == null) throw new ArgumentException("duel-sweep needs --arms FILE");
+            string outPath = o.Out ?? "Temp/balance/duel-sweep.csv";
+            string dir = Path.GetDirectoryName(outPath);
+            if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
+            var sb = new System.Text.StringBuilder("arm,violations,why,wins_W,wins_F,wins_M,wins_D,wins_B,wins_H,beats,ttk_median,ttk_min,ttk_max,escape,escape_dodge,switches\n");
+            int idx = -1, done = 0;
+            var wall = Stopwatch.StartNew();
+            foreach (string raw in File.ReadAllLines(o.Arms))
+            {
+                string line = raw.Trim();
+                if (line.Length == 0 || line.StartsWith("#", StringComparison.Ordinal)) continue;
+                idx++;
+                if (o.Shards > 1 && idx % o.Shards != o.Shard) continue;
+                int tab = line.IndexOf('\t');
+                string name = tab >= 0 ? line.Substring(0, tab).Trim() : line;
+                string spec = tab >= 0 ? line.Substring(tab + 1).Trim() : "";
+                var sets = new List<string>(o.Sets);
+                foreach (string tok in spec.Split(';'))
+                    if (tok.Trim().Length > 0) sets.Add(tok.Trim());
+                DuelRunner.Cell[,] duels = DuelRunner.Duels(o.Profile, sets, o.DuelReps);
+                DuelRunner.Cell[,] ttk = DuelRunner.Ttk(o.Profile, sets, o.DuelReps);
+                DuelRunner.Cell[] esc = DuelRunner.Escape(o.Profile, sets, o.DuelReps, false);
+                DuelRunner.Cell[] escD = DuelRunner.Escape(o.Profile, sets, o.DuelReps, true);
+                int bad = DuelRunner.OrderViolations(duels, out string why);
+                var wins = new int[6];
+                var beats = new List<string>();
+                for (int a = 0; a < 6; a++)
+                    for (int b = 0; b < 6; b++)
+                        if (a != b && DuelRunner.Beats(duels, a, b))
+                        {
+                            wins[a]++;
+                            beats.Add(BalanceAggregate.ClassNames[a].Substring(0, 2) + ">" + BalanceAggregate.ClassNames[b].Substring(0, 2));
+                        }
+                var meds = new List<double>();
+                for (int a = 0; a < 6; a++)
+                    for (int b = 0; b < 6; b++)
+                    {
+                        var st = BalanceStat.Sorted(ttk[a, b].Ttk);
+                        if (st.Count > 0) meds.Add(BalanceStat.Quantile(st, 0.5));
+                    }
+                meds.Sort();
+                double ttkMed = meds.Count > 0 ? BalanceStat.Quantile(meds, 0.5) : double.NaN;
+                int ew = 0, er = 0, dwn = 0, dr = 0;
+                for (int c = 1; c < 6; c++)
+                {
+                    ew += esc[c].Wins; er += esc[c].Reps;
+                    dwn += escD[c].Wins; dr += escD[c].Reps;
+                }
+                string F(double v) => v.ToString("0.###", CultureInfo.InvariantCulture);
+                sb.Append(name).Append(',').Append(bad).Append(",\"").Append(why.Replace("\"", "'")).Append("\",");
+                for (int a = 0; a < 6; a++) sb.Append(wins[a]).Append(',');
+                sb.Append(string.Join(" ", beats)).Append(',').Append(F(ttkMed)).Append(',').Append(meds.Count > 0 ? F(meds[0]) : "").Append(',')
+                  .Append(meds.Count > 0 ? F(meds[meds.Count - 1]) : "").Append(',').Append(F(er > 0 ? (double)ew / er : double.NaN)).Append(',')
+                  .Append(F(dr > 0 ? (double)dwn / dr : double.NaN)).Append(",\"").Append(spec).Append("\"\n");
+                done++;
+                if (done % 20 == 0) Console.WriteLine("[sweep] " + done + " arms, " + wall.Elapsed.TotalSeconds.ToString("0", CultureInfo.InvariantCulture) + " s");
+            }
+            File.WriteAllText(outPath, sb.ToString());
+            Console.WriteLine("[sweep] " + done + " arms -> " + outPath + " in " + wall.Elapsed.TotalSeconds.ToString("0", CultureInfo.InvariantCulture) + " s");
             return 0;
         }
 

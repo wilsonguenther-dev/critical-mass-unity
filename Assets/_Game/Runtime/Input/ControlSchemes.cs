@@ -61,7 +61,10 @@ namespace CriticalMass.Runtime.Input
         /// opens the base station inside your own station ring (StationPanel) and, everywhere else, holding it shows all
         /// usable terrain (TerrainAffordanceView ignores the hold while the station panel is open).
         /// </summary>
-        static readonly string[][] ContextPairs = { new[] { "OpenStation", "ShowTerrain" } };
+        static readonly string[][] ContextPairs = { new[] { "OpenStation", "ShowTerrain" },
+            // b16: on a controller LB cancels inside your own swing window (the wind-up, or the recovery after a landed hit) and
+            // steps the Builder / Miner tool everywhere else (HumanInputState.Fill picks one per press).
+            new[] { "Cancel", "SwitchDigPlace" } };
 
         /// <summary>True when the two actions share a button by context (ContextPairs).</summary>
         public static bool ContextShared(string a, string b)

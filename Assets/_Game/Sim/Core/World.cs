@@ -711,6 +711,7 @@ namespace CriticalMass.Sim.Core
             f.StationBuy = 0;
             f.PingKind = 0;
             f.Dodge = false;   // b13-hook
+            f.Cancel = false;   // b16 cancel
         }
 
         /// <summary>Build a world for opts: a fresh Skybreak Basin map and every buffer allocated at capacity.</summary>

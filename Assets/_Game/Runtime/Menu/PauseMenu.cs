@@ -1392,6 +1392,8 @@ namespace CriticalMass.Runtime.Menu
                 // feat/camera-creator-angle: the high camera's heading (creator's angle, red base bottom-left, or the classic
                 // diamond; applies from the next match) and the experimental ground camera, in one cycle.
                 Stepper(tab, 6, "CAMERA", CameraText, StepCamera),
+                // b16 CANCEL (test feature, on by default): off = your cancel presses (feint / hit-cancel) do nothing.
+                Stepper(tab, 7, "CANCEL BUTTON (FEINT)", () => GameSettings.CancelButton ? "ON" : "OFF", d => GameSettings.CancelButton = !GameSettings.CancelButton),
             };
             MenuItem watch = MenuUi.Item(tab, "Watch Intro", ContentX, ContentY + GameTabLines * (LineH + LineGap) + 12f, 420f, 56f,
                 "WATCH INTRO", MenuItem.Kind.Button, UiScale.TypeBody, true, CMTokens.Display);
@@ -1430,7 +1432,7 @@ namespace CriticalMass.Runtime.Menu
         /// <summary>Stepper lines on the Game tab (the three buttons sit under them).</summary>
         // batch 7: 7 lines (colour-blind, subtitles, time of day, camera); the three buttons sit 68 apart so Problem Report
         // ends at y 1000, inside the panel (PanelY 140 + PanelH 870 = 1010).
-        const int GameTabLines = 7;
+        const int GameTabLines = 8;
 
         /// <summary>CAMERA line (feat/follow-camera-1): TOP-DOWN: CREATOR ANGLE / TOP-DOWN: CLASSIC DIAMOND / THIRD PERSON /
         /// FIRST PERSON. F5 in a match cycles TOP-DOWN, THIRD PERSON, FIRST PERSON (the top-down heading is kept).</summary>

@@ -571,6 +571,14 @@ namespace CriticalMass.Runtime.View.Mechanics
                             GroundRing(c, R * t, R * t + 0.12f, 0f, Mathf.PI * 2f, 28, A(Brass, 0.95f * (1f - t)));
                         }
                         break;
+                    case MechFeed.BurstFeint:
+                        // b16 CANCEL: the feint flick: a thin cream ring that snaps INWARD in 0.2 s (the dodge's ring grows)
+                        if (age > 0.2f) break;
+                        {
+                            float t = age / 0.2f, r = Mathf.Lerp(R, 0.25f, t);
+                            GroundRing(c, Mathf.Max(0f, r - 0.07f), r, 0f, Mathf.PI * 2f, 24, A(Cream, 0.9f * (1f - t)));
+                        }
+                        break;
                     case MechFeed.BurstMine:
                         if (age > 0.18f) break;
                         GroundRing(c, Mathf.Max(0f, R - 0.15f), R + 0.05f, 0f, Mathf.PI * 2f, 28, A(Hurt, 0.95f));

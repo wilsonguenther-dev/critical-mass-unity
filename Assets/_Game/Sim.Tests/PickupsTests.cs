@@ -182,7 +182,10 @@ namespace CriticalMass.Sim.Tests
             w.Inputs[0].Attack = false;
             List<SimEvent> hits = DepthKit.Since(w, head, SimEventType.Hit);
             Assert.Greater(hits.Count, 0);
-            Assert.AreEqual(w.Config.Class(ClassId.Warrior).AttackDamage * 1.5, hits[0].Value, 1e-9);
+            // b16: one on one the struck Warrior shrugs off SoloGuard of the hit
+            double[] guard = w.Config.Depth.CombatFeel.SoloGuard;
+            double g = CombatFeel.On(w) && guard != null ? 1 - guard[(int)ClassId.Warrior] : 1;
+            Assert.AreEqual(w.Config.Class(ClassId.Warrior).AttackDamage * 1.5 * g, hits[0].Value, 1e-9);
             Assert.Less(w.Actors[enemy].Hp, hp);
 
             DepthKit.Put(w, enemy, 60, 40);

@@ -182,7 +182,8 @@ namespace CriticalMass.Sim.Core
                 double dx = w.X[j] - cx;
                 double dz = w.Z[j] - cz;
                 if (dx * dx + dz * dz > r2) continue;
-                total += Restore(w, j, id, cfg.PulseHeal);
+                // b16: PulseSelfShare of the pulse for the Healer herself (her duel sustain); her allies get all of it.
+                total += Restore(w, j, id, j == id && CombatFeel.On(w) ? cfg.PulseHeal * w.Config.Depth.CombatFeel.PulseSelfShare : cfg.PulseHeal);
             }
             a.AbilityCd = w.Config.Class(ClassId.Healer).AbilityCooldown;
             a.AnimAction = 0;

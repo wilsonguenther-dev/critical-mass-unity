@@ -61,6 +61,8 @@ namespace CriticalMass.Sim.Core
             for (int i = 0; i < n; i++)
             {
                 Actor a = w.Actors[i];
+                // b16 CANCEL (Full rules only): a feint drops the wind-up before its contact tick; a hit-cancel cuts the recovery.
+                if (feel) CombatFeel.TakeCancel(w, i);
                 // DG-69: a wound-up swing lands on its contact tick, along the facing locked at the press.
                 if (a.SwingPending && w.Tick >= a.SwingTick + a.SwingWindup)
                 {
