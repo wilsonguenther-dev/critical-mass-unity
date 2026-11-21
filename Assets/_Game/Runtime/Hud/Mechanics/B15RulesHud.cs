@@ -188,7 +188,8 @@ namespace CriticalMass.Runtime.Hud.Mechanics
                 _cardKey[c] = MenuUi.Fit(MenuUi.Label(card, "Key", CMTokens.Mono, B15Hud.KeyFont, CMTokens.VoidNavy.Color, TextAnchor.MiddleCenter, 10f, 10f, 76f, 30f, "", 0f), B15Hud.KeyFont);
                 _cardName[c] = MenuUi.Fit(MenuUi.Label(card, "Name", CMTokens.Display, B15Hud.NameFont, cream, TextAnchor.MiddleLeft, 96f, 8f, W - 106f, 34f, "", 2f), B15Hud.NameFont);
                 _cardLine[c] = MenuUi.Fit(MenuUi.Label(card, "Line", CMTokens.Ui, B15Hud.LineFont, cream, TextAnchor.MiddleLeft, 12f, 44f, W - 24f, 24f, "", 1.5f), B15Hud.LineFloor);
-                _cardLead[c] = MenuUi.Fit(MenuUi.Label(card, "Leading", CMTokens.Display, B15Hud.VotesFont, brass, TextAnchor.MiddleLeft, 12f, 70f, 120f, 20f, "", 1.5f), B15Hud.VotesFont);
+                // b15 Editor review r2: LEADING at the name size (the Display face at 15 read about 8 px tall at 1080p, 6 px on a laptop)
+                _cardLead[c] = MenuUi.Fit(MenuUi.Label(card, "Leading", CMTokens.Display, B15Hud.NameFont, brass, TextAnchor.MiddleLeft, 12f, 70f, 120f, 22f, "", 1.5f), B15Hud.NameFont);
                 _cardVotes[c] = MenuUi.Fit(MenuUi.Label(card, "Votes", CMTokens.Mono, B15Hud.VotesFont, CMTokens.WithAlpha(cream, 0.9f), TextAnchor.MiddleRight, W - 132f, 70f, 120f, 20f, "", 1.5f), B15Hud.VotesFont);
             }
             _vote.gameObject.SetActive(false);
