@@ -6,7 +6,7 @@
 #   loop/gates/remote build-windows|build-mac|builds|all                                      (unity-ci.yml, needs the licence)
 #   common: [--ref BRANCH] (default: current branch) [--no-push] [--max-wait MIN] (default 150)
 #   sim only, opt-in (feat/air-test-machine): [--on air] runs it on the second Mac instead (tools/remote/air-sim.sh:
-#     queue lock, hard limit, split over [--jobs N] processes, default 3); [--air-wait MIN] queue wait (default 30);
+#     queue lock, hard limit, split over [--jobs N] processes, default 4); [--air-wait MIN] queue wait (default 30);
 #     unreachable, busy past the wait, or refused => falls back to GitHub by itself ("fallback_from":"air" in the line)
 #     unless [--no-fallback]. Default stays --on github; CM_REMOTE_SIM_ON=air switches the default.
 # Prints ONE JSON line (also appended to loop/logs/gates.jsonl); results land in loop/logs/remote/<run id>/.
@@ -17,7 +17,7 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"; ROOT="$(git -C "$PWD" rev-
 LOGS="$HERE/../logs"; mkdir -p "$LOGS/remote"
 what="${1:-}"; shift || true
 REF=''; PUSH=1; MAXW=150; SUITE=fast; CATEGORY='!Slow'; GRAPHICS=nographics
-ON="${CM_REMOTE_SIM_ON:-github}"; JOBS="${CM_AIR_JOBS:-3}"; AIRWAIT=30; FALLBACK=1; FB=''
+ON="${CM_REMOTE_SIM_ON:-github}"; JOBS="${CM_AIR_JOBS:-4}"; AIRWAIT=30; FALLBACK=1; FB=''
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --ref) REF="${2:?}"; shift 2 ;;

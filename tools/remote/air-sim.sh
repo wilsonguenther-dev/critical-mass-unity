@@ -8,7 +8,7 @@
 # `git archive` (Sim, Sim.Tests, Net, tools, docs, ProjectSettings: about 2 MB), copies it to ~/cm-remote/runs/<id>/
 # on the box, and runs tools/remote/air-sim-job.sh there through air-run.sh: the box's queue lock (one job at a time;
 # a second caller waits up to --wait minutes, default 30, then gives up with 75 so the gate can use GitHub), caffeinate,
-# a hard limit (--timeout, default 75 min, the whole job's process group is stopped). --jobs N (default 3) splits the
+# a hard limit (--timeout, default 75 min, the whole job's process group is stopped). --jobs N (default 4) splits the
 # tests by fixture over N processes (the box caps N by free memory); --jobs 1 runs tools/ci/sim-tests.sh exactly as
 # the workflow does. Results come back to OUT (default loop/logs/remote/air-<id>) in the workflow artifact's layout:
 # sim-results/ci/sim-results.xml + sim-build.log, plus run.json ({conclusion, jobs}) like `gh run view --json`.
@@ -19,7 +19,7 @@ set -uo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(git -C "$PWD" rev-parse --show-toplevel 2>/dev/null || (cd "$HERE/../.." && pwd))"
 source "$HERE/_remote-lib.sh"
-SUITE=fast; SHA=HEAD; REF=''; JOBS="${CM_AIR_JOBS:-3}"; WAIT=30; TMIN=75; OUT=''
+SUITE=fast; SHA=HEAD; REF=''; JOBS="${CM_AIR_JOBS:-4}"; WAIT=30; TMIN=75; OUT=''
 TRIES="${CM_AIR_TRIES:-3}"; GAP="${CM_AIR_TRY_GAP:-20}"
 while [[ $# -gt 0 ]]; do
   case "$1" in

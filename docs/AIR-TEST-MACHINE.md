@@ -8,7 +8,7 @@ switches the default.
 ## Use
 
 ```
-loop/gates/remote sim --suite slow --on air              # the slow set on the Air, split over 3 processes
+loop/gates/remote sim --suite slow --on air              # the slow set on the Air, split over 4 processes
 loop/gates/remote sim --suite fast --on air              # the per-batch set
 loop/gates/remote sim --suite slow --on air --jobs 1     # one process, exactly tools/ci/sim-tests.sh --slow
 ```
@@ -21,7 +21,7 @@ Same command, same JSON line (also in `loop/logs/gates.jsonl`) and same result f
 What is tested is the committed tree of the current commit (uncommitted edits are not, as on GitHub). The branch is
 still pushed first so a fallback can use it; `--no-push` skips that.
 
-Options: `--jobs N` (default 3; the box lowers it when free memory is short, about 300 MB of free memory per process; one peaked at 178 MB),
+Options: `--jobs N` (default 4, the fastest measured; the box lowers it when free memory is short, about 300 MB of free memory per process; one peaked at 178 MB),
 `--air-wait MIN` (how long to wait for the box when another job holds it, default 30), `--no-fallback`.
 `CM_REMOTE_SIM_ON=air` makes `--on air` the default; `CM_AIR_JOBS` sets the default split.
 
@@ -50,7 +50,32 @@ Refresh the split weights after the test set changes a lot:
 
 ## Measured (2026-11-21)
 
-MEASUREMENTS
+Same Sim content as integration/batch-15-cand1 aa2ecfef (no Sim, test, golden or harness change since a15d48a6, so
+GitHub run 44881963787 is the reference). The Air: M1 (4 fast + 4 efficiency cores), 8 GB, macOS 27.2.1, on its
+charger, the owner's apps left open (about 14.6 GB of swap already in use before any test, 1.3 to 2.3 GB free).
+
+| run | where | processes | wall | peak memory (all dotnet) | result |
+|---|---|---|---|---|---|
+| fast set (747 tests) | GitHub 44881961553 | 1 | 3.6 min job, 190 s of tests | | 734 pass, 1 fail, 12 skipped |
+| fast set | Air, as CI | 1 | 155 s (150 s of tests) | 295 MB | identical |
+| slow set (64 tests) | GitHub 44881963787 | 1 | 58 min job, 3,440 s of tests | | 57 pass, 7 fail |
+| slow set, run 1 | Air, as CI | 1 | 53.9 min (3,235 s) | 178 MB, one core at 100 % | identical |
+| slow set, run 2 | Air, through the gate | 1 | 54.1 min (3,247 s), 55 min gate | 460 MB with the build | identical |
+| slow set | Air, through the gate | 2 | E_WALL | E_MEM | identical |
+| slow set | Air, through the gate | 3 | 20.6 min (1,236 s) | 279 MB | identical |
+| slow set | Air, through the gate | 4 | **16.6 min (995 s)**, 17 min gate | 339 MB | identical |
+
+One process on the Air is only about 6 % faster than GitHub on the slow set (27 % on the fast set). The win is the
+split: 4 processes take the slow set from 54 to 16.6 minutes and never queue behind GitHub's other branches. Each
+process slows by about 20 % when four run at once (shared cores and memory bandwidth on a fanless machine), so 4 is
+the knee; more would land on the efficiency cores.
+
+Determinism: in every run, every test has the same result as on GitHub, and every game number printed by the slow
+tests (wins, blowouts, lead changes, kill rates, shares) is identical to the digit between Linux x64 and macOS arm64.
+Only timing numbers differ (microseconds per tick, seconds, cost ratios). One timing sub-check is load-sensitive:
+`B15RulesSoakTests.ComebackAndHutChoices...` prints "both on sim cost +1.8 % (limit +3 %) PASS" on GitHub, +2.9 % and
++2.5 % PASS with one process on the Air, and +3.6 % FAIL (3 processes) and +13.5 % FAIL (4 processes) in the splits. That test fails on every machine for other
+reasons today; treat its cost line (and every tick-cost budget) as timing-flaky in a split run.
 
 ## Why not a GitHub self-hosted runner
 
