@@ -144,6 +144,45 @@ namespace CriticalMass.Runtime.View.Mechanics
     /// HitStunLen</c> for the stun badge. The integrator flips it once PR #49 is merged (Player Settings scripting define,
     /// or <c>-define:CM_SIM_PHYSICS</c> in a csc.rsp next to CriticalMass.Runtime.asmdef).
     /// </summary>
+    /// <summary>
+    /// b15 view polish (Editor review item 7): the heal shapes (the Healer's Mend and Healing Wings), pure so a test reads
+    /// them. Bible row (heal): soft mint motes rising off the healed ally, a ring on the ground, no hard quads. The old
+    /// sparkle was a plus sign of two flat quads; the pulse ring had a hard inner edge. Colour: MechanicsWorldView.HealMint.
+    /// </summary>
+    public static class HealFx
+    {
+        /// <summary>Motes per heal, their life (s), the solid core share of a mote's radius, segments per mote.</summary>
+        public const int Motes = 4, MoteSegments = 10;
+        public const float MoteLife = 0.8f, MoteCore = 0.45f;
+        /// <summary>Rise (u) over the life from the start height, and the start height over the actor's feet.</summary>
+        public const float Rise = 1.1f, StartHeight = 1.15f;
+
+        /// <summary>Offset of mote i (0..Motes-1) at t (0..1 of its life): staggered starts, a slow spiral out, rising.</summary>
+        public static Vector3 MoteOffset(int i, float t)
+        {
+            float lag = i * 0.12f;
+            float u = Mathf.Clamp01((t - lag) / (1f - lag));
+            float a = i * (Mathf.PI * 2f / Motes) + u * 1.6f;
+            float spread = 0.18f + 0.22f * u;
+            return new Vector3(Mathf.Cos(a) * spread, StartHeight + Rise * u * (2f - u) + i * 0.08f, Mathf.Sin(a) * spread);
+        }
+
+        /// <summary>Mote i's alpha at t: a soft fade in over its first 20%, out over its last 45% (0 before it starts).</summary>
+        public static float MoteAlpha(int i, float t)
+        {
+            float lag = i * 0.12f;
+            if (t < lag || t >= 1f) return 0f;
+            float u = (t - lag) / (1f - lag);
+            return Mathf.Clamp01(u / 0.2f) * Mathf.Clamp01((1f - u) / 0.45f);
+        }
+
+        /// <summary>Mote radius (u) at t: grows a little, then shrinks as it fades; amount 0..1 (heal size) adds up to 30%.</summary>
+        public static float MoteRadius(float t, float amount01) => (0.11f + 0.05f * Mathf.Sin(Mathf.PI * Mathf.Clamp01(t))) * (1f + 0.3f * Mathf.Clamp01(amount01));
+
+        /// <summary>The ground ring's band width as a share of its radius, and its soft inner edge (inner alpha share).</summary>
+        public const float RingBand = 0.22f, RingInnerAlpha = 0f;
+    }
+
     public static class MechPhysics
     {
 #if CM_SIM_PHYSICS

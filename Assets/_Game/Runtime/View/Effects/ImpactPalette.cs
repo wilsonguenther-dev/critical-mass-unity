@@ -66,4 +66,37 @@ namespace CriticalMass.Runtime.View.Effects
             return best;
         }
     }
+
+    /// <summary>
+    /// b15 view polish (Editor review item 3): the fighter wind-up wedge's look (pure; FxScene.DrawSwingTelegraphs and a
+    /// test read it). Neutral colours only (ImpactPalette), so a wedge never reads as a team. Quiet tier for every swing,
+    /// a brighter tier when the local fighter is inside an enemy's wedge. With reduced flashing the bright edges are capped.
+    /// </summary>
+    public struct SwingTelegraph
+    {
+        /// <summary>Wedge inner radius (u) and the widths of the leading edge, the outer ink and the outer bright edge.</summary>
+        public const float Inner = 0.15f, LeadW = 0.08f, InkW = 0.14f, EdgeW = 0.07f;
+        /// <summary>Reduced flashing: no bright edge above this alpha.</summary>
+        public const float ReducedEdgeCap = 0.6f;
+
+        public Color32 Fill, Grow, Lead;
+        public float BaseIn, BaseOut, GrowIn, GrowOut, LeadA, InkA, EdgeA;
+
+        public static SwingTelegraph For(bool atMe, bool reduceFlashing)
+        {
+            float k = atMe ? 1f : 0.8f;
+            var t = new SwingTelegraph
+            {
+                Fill = ImpactPalette.SparkEdge, Grow = ImpactPalette.SparkMid, Lead = ImpactPalette.SparkHot,
+                BaseIn = 0.20f * k, BaseOut = 0.34f * k, GrowIn = 0.30f * k, GrowOut = 0.52f * k,
+                LeadA = 0.95f * k, InkA = 0.75f * k, EdgeA = 0.92f * k,
+            };
+            if (reduceFlashing)
+            {
+                t.LeadA = Mathf.Min(t.LeadA, ReducedEdgeCap);
+                t.EdgeA = Mathf.Min(t.EdgeA, ReducedEdgeCap);
+            }
+            return t;
+        }
+    }
 }

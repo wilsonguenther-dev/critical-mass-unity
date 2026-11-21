@@ -382,7 +382,18 @@ namespace CriticalMass.Sim.Tests
             Console.WriteLine("[b13 H] hill lead changes per match, sized pool: " + PairedShift.Text(lcp) + " = " + (lcRel * 100).ToString("+0;-0") + "% of control (95% interval "
                 + ((lcRel - lcRelHalf) * 100).ToString("+0;-0") + "% to " + ((lcRel + lcRelHalf) * 100).ToString("+0;-0") + "%)");
             double slOn = lcp.MeanOn * lcp.N, slOff = lcp.MeanOff * lcp.N;
-            Check("hill lead changes over " + lcp.N + " matches (" + (on.Matches16 + wOn.Matches16 + xOn.Matches16) + " of them 16v16)", slOn, slOff, Math.Abs(slOn - slOff) <= Math.Max(3, 0.3 * slOff) + 1e-9, "+-30% of control");
+            // b15 fix round: RE-BASELINED on the combined head. The b13 band (hut on within +-30% of a Hut.On=false control) no
+            // longer measures "the hut leaves match flow alone": after wave two the hut carries the comeback rule's hut choices
+            // (votes ride on hut levels) and the bot brain's Miner ore job, and lead changes became a b15 TARGET where more is the
+            // goal (TARGETS.json: at least 5 a match). Measured on 61e3f9f5 (sim slow 44871935552): on 448, control 249 over these
+            // 112 matches; with the hut choices off in both arms (44860611840) still +46% (95% interval +18% to +74%), so the hut
+            // itself, not noise, moves it, and the no-hut arm is no longer the game's baseline. The same +-30% band now guards the
+            // hut arm against the combined head's measured 448 on the same 112-match pool (a regression check); the on-vs-control
+            // numbers and their paired interval print above.
+            const double HeadLeadChanges112 = 448;
+            Console.WriteLine("[b13 H] hill lead changes on vs the Hut.On=false control (printed): on " + slOn + ", control " + slOff);
+            Check("hill lead changes over " + lcp.N + " matches (" + (on.Matches16 + wOn.Matches16 + xOn.Matches16) + " of them 16v16) vs the combined head's " + HeadLeadChanges112, slOn, HeadLeadChanges112,
+                  lcp.N == 112 && Math.Abs(slOn - HeadLeadChanges112) <= 0.3 * HeadLeadChanges112 + 1e-9, "+-30% of the combined head (61e3f9f5) on the same pool");
             var lv = new List<double>();
             foreach (int l in on.EndLevel16) lv.Add(l);
             double med = Median(lv);

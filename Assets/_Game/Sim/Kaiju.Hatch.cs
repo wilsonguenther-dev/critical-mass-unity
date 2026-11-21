@@ -162,15 +162,38 @@ namespace CriticalMass.Sim.Core
         internal static bool SqueezeOn(World w) =>
             Phys.On(w, w.Config.Physics.KaijuBridgeSqueeze) && Phys.On(w, w.Config.Physics.SolidKaiju);
 
-        /// <summary>feat/kaiju-bridges-1: a Bridge cell lies within `halo` cells (Chebyshev) of (cx, cz).</summary>
-        private static bool NearBridge(MapDef map, int cx, int cz, int halo)
+        /// <summary>
+        /// feat/kaiju-bridges-1: a Bridge cell lies within `halo` cells (Chebyshev) of (cx, cz). b15 fix round (Full profile
+        /// only): a Builder LADDER's cells (Bridge laid over a wall) do not count. The squeeze is for the stair-stepped decks;
+        /// round a ladder it made a pocket of squeeze-only cells cut off from the rest of the clearance grid. 16v16 seed 38: a
+        /// ladder on the shrine-yard wall at (53, 11) (laid 204.9 s, gone 264.9 s) made the hatch cell (55, 13) one of those
+        /// cells, the Kaiju's region was the pocket, no fighter and no hill were in it, and the owned Kaiju stood with no
+        /// target from its 240 s hatch until the ladder expired, when it walked to the hill at once.
+        /// </summary>
+        private static bool NearBridge(World w, MapDef map, int cx, int cz, int halo)
         {
+            bool skipLadders = DepthRules.On(w, true) && w.Builder != null;
             for (int dz = -halo; dz <= halo; dz++)
                 for (int dx = -halo; dx <= halo; dx++)
                 {
                     int x = cx + dx, z = cz + dz;
-                    if (MapGrid.InBounds(map, x, z) && map.Cells[z * map.Width + x] == Cell.Bridge) return true;
+                    if (!MapGrid.InBounds(map, x, z)) continue;
+                    int i = z * map.Width + x;
+                    if (map.Cells[i] == Cell.Bridge && !(skipLadders && LadderCell(w.Builder, i))) return true;
                 }
+            return false;
+        }
+
+        /// <summary>b15 fix round: cell index i is one a laid (not carried) Builder ladder turned into Bridge.</summary>
+        private static bool LadderCell(BuilderState b, int i)
+        {
+            BuiltPiece[] ps = b.Pieces;
+            for (int s = 0; ps != null && s < ps.Length; s++)
+            {
+                BuiltPiece p = ps[s];
+                if (p == null || !p.Active || p.Carried || p.Kind != BuiltPieces.Ladder || p.Cells == null) continue;
+                for (int k = 0; k < p.Count; k++) if (p.Cells[k] == i) return true;
+            }
             return false;
         }
 
@@ -261,7 +284,7 @@ namespace CriticalMass.Sim.Core
             // feat/kaiju-bridges-2: or the cell centre is on a diagonal bridge's deck for the squeezed body (the CM-33
             // deck rule the actors use): the raster stair-steps of the shallow bridges (base to hill, south island to the
             // far islands) leave no cell the 0.7 m circle fits by the box rule.
-            bool sqz = !ok && squeeze && NearBridge(map, cx, cz, halo) &&
+            bool sqz = !ok && squeeze && NearBridge(w, map, cx, cz, halo) &&
                        (MapGrid.ClearanceOk(map, cx, cz, sr) || Collide.DeckSpanAt(w, cx + 0.5, cz + 0.5, sr) != null);
             sq[i] = sqz ? (byte)1 : (byte)0;
             byte v = ok || sqz ? Cell.Floor : Cell.Wall;

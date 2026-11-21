@@ -1121,13 +1121,23 @@ namespace CriticalMass.Runtime.View.Effects
                     double off = Math.Abs(Math.IEEERemainder(Math.Atan2(dz, dx) - a.SwingFacing, Math.PI * 2));
                     atMe = d <= reach + _cfg.Class(w.Actors[me].Cls).Radius && off <= half;
                 }
-                Color32 team = a.Team == TeamId.Azure ? AzureC : CrimsonC;
-                float k = atMe ? 1f : 0.55f;
+                // b15 view polish (Editor review item 3): invisible at the gameplay camera (team-tinted fill at 0.07..0.16 x
+                // 0.55). Now neutral (ImpactPalette sand / cream, never a team hue), about three times as opaque, from closer
+                // to the body, with a thicker inked rim and a thin bright LEADING EDGE on the growing fill. The outer edge
+                // stays the hit shape (reach exactly). Drawn in the ground layer (queue GroundFxQueue: after the world decals,
+                // depth-tested so characters stand over it). Reduced flashing caps the bright edge (SwingTelegraph.For).
+                SwingTelegraph st = SwingTelegraph.For(atMe, FeelGate.ReduceFlashing);
                 int seg = Mathf.Clamp((int)(cc.AttackArcDeg / 9), 6, 16);
-                ground.Ring(c, gr, gu, 0.3f, reach, ang - half, ang + half, seg, A(atMe ? WarnHot : team, 0.07f * k), A(atMe ? Warn : team, 0.16f * k));
-                if (p > 0.02f) ground.Ring(c, gr, gu, 0.3f, Mathf.Max(0.32f, reach * p), ang - half, ang + half, seg, A(atMe ? WarnHot : team, 0.16f * k), A(atMe ? Warn : team, 0.3f * k));
-                ground.Ring(c, gr, gu, reach - 0.07f, reach + 0.02f, ang - half, ang + half, seg, A(Navy, 0.55f * k));
-                ground.Ring(c, gr, gu, reach - 0.05f, reach, ang - half, ang + half, seg, A(atMe ? WarnHot : team, 0.75f * k));
+                float r0 = SwingTelegraph.Inner;
+                ground.Ring(c, gr, gu, r0, reach, ang - half, ang + half, seg, A(st.Fill, st.BaseIn), A(st.Fill, st.BaseOut));
+                float front = Mathf.Max(r0 + 0.04f, reach * p);
+                if (p > 0.02f)
+                {
+                    ground.Ring(c, gr, gu, r0, front, ang - half, ang + half, seg, A(st.Grow, st.GrowIn), A(st.Grow, st.GrowOut));
+                    ground.Ring(c, gr, gu, Mathf.Max(r0, front - SwingTelegraph.LeadW), front, ang - half, ang + half, seg, A(st.Lead, st.LeadA));
+                }
+                ground.Ring(c, gr, gu, reach - SwingTelegraph.InkW, reach + 0.02f, ang - half, ang + half, seg, A(Navy, st.InkA));
+                ground.Ring(c, gr, gu, reach - SwingTelegraph.EdgeW, reach, ang - half, ang + half, seg, A(st.Lead, st.EdgeA));
             }
         }
 

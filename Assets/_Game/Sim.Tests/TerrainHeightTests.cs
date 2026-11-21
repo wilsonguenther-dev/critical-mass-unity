@@ -701,7 +701,22 @@ namespace CriticalMass.Sim.Tests
             Limit(failures, "16v16 kills per minute", kOn, kOff, kOff > 0 && kOn >= kOff * 0.80 - 1e-9 && kOn <= kOff * 1.15 + 1e-9, "-20% / +15%");
             Limit(failures, "16v16 hill lead changes", on.LeadChanges, off.LeadChanges, Math.Abs(on.LeadChanges - off.LeadChanges) <= 0.30 * Math.Max(1, off.LeadChanges) + 1e-9, "+-30%");
             Console.WriteLine("{\"item\":\"b15 height balance\",\"editedCellsOn\":" + on.Cells + ",\"drops\":" + on.Drops + ",\"climbs\":" + on.Climbs + ",\"steps\":" + on.Steps + "}");
-            if (!WinShare.Judge("b15 terrain height", "16v16 (" + WinShare.Seeds16.Length + " seeds)", TallyOf(on), TallyOf(off), true)) failures.Add("16v16 win share (see the [win share] line)");
+            // b15 fix round: the 24-seed share measured a 0.167 shift (13 / 11 on vs 9 / 14 control, sim run 44871935552): at n 24
+            // the shift's standard error is 0.144, so a 0.15 limit fails on noise about 30% of the time. The 24-seed line prints;
+            // the same 0.15 limit is judged on 144 seeds (the 24 plus PairedShift.Extra(120), standard error 0.059: about 1% per
+            // team on noise). The other limits keep the 24 seeds.
+            WinShare.Judge("b15 terrain height (printed, 24 seeds)", "16v16 (" + WinShare.Seeds16.Length + " seeds)", TallyOf(on), TallyOf(off), true);
+            var onX = new Arm();
+            var offX = new Arm();
+            foreach (int seed in PairedShift.Extra(120))
+            {
+                PlayMatch(seed, 16, true, onX, "balance 144");
+                PlayMatch(seed, 16, false, offX, "balance 144");
+            }
+            WinShare.Tally tOn = TallyOf(on), tOff = TallyOf(off);
+            tOn.Add(TallyOf(onX));
+            tOff.Add(TallyOf(offX));
+            if (!WinShare.Judge("b15 terrain height", "16v16 (144 seeds)", tOn, tOff, true)) failures.Add("16v16 win share (see the [win share] line)");
             Assert.IsEmpty(failures, string.Join("\n", failures));
         }
 

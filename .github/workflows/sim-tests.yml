@@ -40,7 +40,7 @@ concurrency:
 jobs:
   sim:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 90   # b15 fix round: the slow suite ran 48 of 60 min (44871935552); the 144-seed win-share pools add about 7 min
     steps:
       - uses: actions/checkout@v4
         with:

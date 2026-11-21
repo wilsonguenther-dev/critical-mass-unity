@@ -28,9 +28,18 @@ namespace CriticalMass.Runtime.View.B13
         // draw call, same material as the cloud. Shape per type (colour-blind safe): GROVE eight leaf petals, BRUTE ten
         // spikes, TIMBER three concentric bark rings, MIRE twelve mist dots, ELDER a solid ring with four diamonds. Under it a
         // dark soft contact shadow so the body lifts off the night ground.
-        public const int HaloRings = 20, HaloSegments = 120;
+        // b15 view polish (Editor review item 1): the contact shadow is a wider, deeper pool (the hill paving is the lightest
+        // ground on the map, and the reviewer's value test reads the ground in a 12 px ring around the body): it reaches
+        // ContactReach x the halo radius (the mesh extends past the glow ring, which still ends at 1) and holds
+        // ContactAlpha out to ContactPlateau. The glow shapes and their radius are unchanged.
+        public const int HaloRings = 29, HaloSegments = 120;
         /// <summary>Halo radius in u at type scale 1 (the body's hit radius is 1.64 u; the ring sits just outside the feet).</summary>
-        public const float HaloRadius = 2.9f, HaloGlowAlpha = 0.62f, HaloShadowAlpha = 0.50f;
+        public const float HaloRadius = 2.9f, HaloGlowAlpha = 0.62f, HaloShadowAlpha = ContactAlpha;
+        public const float ContactAlpha = 0.70f, ContactPlateau = 0.60f, ContactReach = 1.45f;
+
+        /// <summary>The contact shadow's alpha at r (in halo radii): ContactAlpha to ContactPlateau, a smooth fade to 0 at ContactReach.</summary>
+        public static float ContactShadowAlpha(float r) =>
+            ContactAlpha * (1f - Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(ContactPlateau, ContactReach, r)));
         static readonly Color32 HaloShadow = new Color32(24, 35, 59, 255);
         GameObject _haloGo;
         MeshFilter _haloFilter;
@@ -229,14 +238,14 @@ namespace CriticalMass.Runtime.View.B13
             c[0] = new Color32(HaloShadow.r, HaloShadow.g, HaloShadow.b, (byte)(HaloShadowAlpha * 255));
             for (int ri = 0; ri < nr; ri++)
             {
-                float r = (ri + 1) / (float)nr;
+                float r = (ri + 1) / (float)nr * ContactReach;
                 for (int ai = 0; ai < na; ai++)
                 {
                     float a = ai * Mathf.PI * 2f / na;
                     int idx = 1 + ri * na + ai;
                     v[idx] = new Vector3(Mathf.Cos(a) * r, 0, Mathf.Sin(a) * r);
-                    float g = Mathf.Clamp01(HaloPattern(type, r, a));
-                    float sh = HaloShadowAlpha * (1f - Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(0.15f, 0.70f, r)));
+                    float g = r <= 1f ? Mathf.Clamp01(HaloPattern(type, r, a)) : 0f;
+                    float sh = ContactShadowAlpha(r);
                     float alpha = g * HaloGlowAlpha + sh * (1f - g);
                     float wg = alpha > 1e-4f ? g * HaloGlowAlpha / alpha : 0f;
                     c[idx] = new Color32((byte)Mathf.Lerp(HaloShadow.r, glow.r, wg), (byte)Mathf.Lerp(HaloShadow.g, glow.g, wg),
@@ -262,7 +271,7 @@ namespace CriticalMass.Runtime.View.B13
             m.vertices = v;
             m.colors32 = c;
             m.triangles = t;
-            m.bounds = new Bounds(Vector3.zero, new Vector3(2, 0.2f, 2));
+            m.bounds = new Bounds(Vector3.zero, new Vector3(2f * ContactReach, 0.2f, 2f * ContactReach));
             m.UploadMeshData(true);
             return m;
         }

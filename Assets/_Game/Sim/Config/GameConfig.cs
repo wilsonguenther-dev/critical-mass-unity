@@ -488,6 +488,9 @@ namespace CriticalMass.Sim.Config
     public sealed class MinerTerraformConfig
     {
         public double Reach = 1.6;
+        /// <summary>b15 fix round (Full profile only): dig / place on the aimed cell when its square reaches into the Reach circle,
+        /// instead of the cell under the aim pulled back to Reach (which could land one cell short of the marked cell).</summary>
+        public bool DigAimedCell = true;
         public double TeamCooldownTicks = 30;
         public double MinGapTicks = 15;
         public double ActorMargin = 0.05;

@@ -656,7 +656,7 @@ namespace CriticalMass.Sim.Tests
             ulong phys = MatchHash.Run(1, 16, 3600, ClassId.Warrior, null, c => c.ApplyRules(RulesProfile.PhysicsOnly));
             Console.WriteLine("{\"item\":\"b15 hashes\",\"fullOff\":\"0x" + off.ToString("X16") + "\",\"fullOn\":\"0x" + on.ToString("X16") + "\",\"classic\":\"0x" + cls.ToString("X16") +
                               "\",\"physicsOnly\":\"0x" + phys.ToString("X16") + "\"}");
-            Assert.AreEqual(0x2B40BAD073394FD6UL, off, "the wave-two switches off are the batch 15 cand1 (wave one) Full game");
+            Assert.AreEqual(0x2C933299522970D2UL, off, "the wave-two switches off are the batch 15 cand1 (wave one) Full game with the b15 fix round's Miner route and Kaiju ladder fixes (sim run 44880553461; was 0x2B40BAD073394FD6)");
             Assert.AreEqual(0x5C912AEED16BC302UL, cls, "Classic unchanged");
             Assert.AreEqual(0x0836DA5FD21C4854UL, phys, "PhysicsOnly unchanged");
             Assert.AreEqual(on, on2, "same seed, same match (determinism)");
@@ -785,9 +785,21 @@ namespace CriticalMass.Sim.Tests
         /// Sim cost per tick, same job, arms stepped in turn tick by tick (B13CombinedCostTests' method: JIT and runner drift fall
         /// on every arm alike; trimmed mean drops the slowest 2%). Arms: off; on; and on with one part of the rule taken back,
         /// so a cost over budget names its part. The rule changes the fight, so on and off are different matches.
+        /// <para>b15 fix round (unity-ci EditMode: 351 s against Unity's 180 s default): the five whole-tick arms x four seeds
+        /// (168,000 stepped ticks, printed only, never asserted) move to the slow suite as
+        /// <see cref="TickCostWholeTickArmsPrinted"/>; this test keeps its one assertion (the rule's own code on the same world,
+        /// share of the whole tick at most 0.05) on the same 7,500 + 900 tick world.</para>
         /// </summary>
         [Test]
         public void TickCostWithTheRuleOnIsWithinTheBudget()
+        {
+            const int Warm = 7500, Ticks = 900;
+            AssertRuleOwnShare(Warm, Ticks);
+        }
+
+        /// <summary>The whole-tick arms of the cost check (printed evidence; the different fights make them unassertable).</summary>
+        [Test, Category("Slow"), Timeout(1800000)]
+        public void TickCostWholeTickArmsPrinted()
         {
             // Four seeds, so one arm landing in a 30-body pile-up (run 44233001957: on 104 us vs 52 us the run before, same
             // code) does not decide it; the arms of one seed step in turn.
@@ -851,6 +863,11 @@ namespace CriticalMass.Sim.Tests
             for (int a = 0; a < n; a++)
                 Console.WriteLine("{\"item\":\"b15 tick cost arm\",\"arm\":\"" + names[a] + "\",\"usPerTick\":" + us[a].ToString("0.0") + ",\"vsOff\":" + (us[a] / us[0] - 1).ToString("0.000") + ",\"seeds\":4}");
             double delta = us[1] / us[0] - 1;
+            Console.WriteLine("{\"item\":\"b15 tick cost arms\",\"offUs\":" + us[0].ToString("0.0") + ",\"onUs\":" + us[1].ToString("0.0") + ",\"wholeTickDelta\":" + delta.ToString("0.000") + "}");
+        }
+
+        private static void AssertRuleOwnShare(int Warm, int Ticks)
+        {
             // Same job: the rule's own per-tick code, each entry point called for every actor of the class the game calls it for,
             // every tick (an upper bound: in the game DamageMul, StaggerFor and NearHome run per hit only, MendTarget per press), timed on the same world against its whole tick.
             GameConfig oc = GameConfig.CreateBrowser5v5().ApplyRules(RulesProfile.Full);
@@ -869,7 +886,7 @@ namespace CriticalMass.Sim.Tests
                 own += c2 - c1;
             }
             double share = (double)own / Math.Max(1, tick);
-            Console.WriteLine("{\"item\":\"b15 tick cost\",\"offUs\":" + us[0].ToString("0.0") + ",\"onUs\":" + us[1].ToString("0.0") + ",\"wholeTickDelta\":" + delta.ToString("0.000") +
+            Console.WriteLine("{\"item\":\"b15 tick cost\"" +
                               ",\"ruleOwnUsPerTick\":" + (own * 1e6 / Stopwatch.Frequency / Ticks).ToString("0.00") + ",\"ruleOwnShare\":" + share.ToString("0.000") +
                               ",\"limit\":0.05,\"note\":\"whole-tick arms play different fights (seed-to-seed spread is -15% to +62% even with the shipped wind-ups); the asserted number is the rule's own code on the same world\"}");
             Assert.LessOrEqual(share, 0.05, "the rule's own per-tick code, same job");

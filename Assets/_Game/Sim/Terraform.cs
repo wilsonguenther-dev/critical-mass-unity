@@ -264,10 +264,25 @@ namespace CriticalMass.Sim.Core
         /// </summary>
         public static bool TargetCell(World w, int id, double aimX, double aimZ, out int cx, out int cz)
         {
-            Abilities.ClampToRange(w.X[id], w.Z[id], aimX, aimZ, w.Actors[id].Facing, w.Config.Abilities.MinerTerraform.Reach, out double tx, out double tz);
+            double reach = w.Config.Abilities.MinerTerraform.Reach;
+            MapDef map = w.Map;
+            // b15 fix round (Editor review, Full profile only): the AIMED cell when its square reaches into the dig circle
+            // (CircleHitsCell, the rule the view's in-reach marker uses). Before, an aim at a cell whose edge was in reach but
+            // whose centre was past 1.6 u was pulled back along the line and landed in the nearer cell (a dig one cell short of
+            // the marked cell, e.g. from (33.5, 12.5) the aim (35.5, 13.5) dug (34, 13)). Classic / PhysicsOnly keep the clamp.
+            if (DepthRules.On(w, w.Config.Abilities.MinerTerraform.DigAimedCell) && double.IsFinite(aimX) && double.IsFinite(aimZ))
+            {
+                int ax = JsMath.FloorToInt(aimX), az = JsMath.FloorToInt(aimZ);
+                if (CircleHitsCell(w.X[id], w.Z[id], reach, ax, az))
+                {
+                    cx = ax;
+                    cz = az;
+                    return cx >= 0 && cz >= 0 && cx < map.Width && cz < map.Height;
+                }
+            }
+            Abilities.ClampToRange(w.X[id], w.Z[id], aimX, aimZ, w.Actors[id].Facing, reach, out double tx, out double tz);
             cx = JsMath.FloorToInt(tx);
             cz = JsMath.FloorToInt(tz);
-            MapDef map = w.Map;
             return cx >= 0 && cz >= 0 && cx < map.Width && cz < map.Height;
         }
 

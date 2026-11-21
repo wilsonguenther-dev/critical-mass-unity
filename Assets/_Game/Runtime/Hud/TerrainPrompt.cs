@@ -118,7 +118,7 @@ namespace CriticalMass.Runtime.Hud
         void LateUpdate()
         {
             if (_canvas == null) return;
-            bool hudOn = _hud != null && _hud.Canvas != null && _hud.Canvas.enabled && !CriticalMass.Runtime.View.Affordance.TerrainAffordanceView.MenuCovers;   // b14 review: never over a full-screen menu
+            bool hudOn = _hud != null && _hud.Canvas != null && _hud.Canvas.enabled && !CriticalMass.Runtime.Menus.MenuGate.AnyOpen;   // b14 review: never over a full-screen menu
             if (_canvas.enabled != hudOn) _canvas.enabled = hudOn;
             if (!hudOn)
             {

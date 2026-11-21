@@ -232,7 +232,60 @@ namespace CriticalMass.Runtime.Hud
             _medallionHalf.gameObject.SetActive(false);
             Icon(_medallion.transform, "Crown", UiIcons.Crown, 13f, 11f, 34f, 34f);
             _hillWord = Label(c, "Hill Word", CMTokens.Ui, UiScale.TypeSmall, Cream, TextAnchor.MiddleCenter, 250f, 106f, 300f, 22f, "NEUTRAL");   // fix/hud-containment-5: ends at the band's 128 (was 130, under the job line's gap)
+            // b15 view polish (Editor review item 8): the Kaiju-on-the-hill state is a pill under the hill meter, not the
+            // small brass word (B15Hud.KaijuPillRect: 340 x 28, 18 px type, 16 px floor, clear of the objective line).
+            Rect pr = CriticalMass.Runtime.Hud.Mechanics.B15Hud.KaijuPillRect;
+            float mx = HudLayout.RefRect(HudCluster.Match).x;
+            _kaijuPill = Rt(c, "Kaiju Hill Pill");
+            Place(_kaijuPill, pr.x - mx, pr.y, pr.width, pr.height);
+            _kaijuPillShape = Shape(_kaijuPill, "Fill", ShapeKind.RoundRect, 0f, 0f, pr.width, pr.height, Panel, pr.height * 0.5f);
+            _kaijuPillShape.OutlinePx = 3f;
+            _kaijuPillText = CriticalMass.Runtime.Menu.MenuUi.Fit(Label(_kaijuPill, "Text", CMTokens.Display, CriticalMass.Runtime.Hud.Mechanics.B15Hud.KaijuPillFont,
+                Cream, TextAnchor.MiddleCenter, 10f, 0f, pr.width - 20f, pr.height, "", 0f), CriticalMass.Runtime.Hud.Mechanics.B15Hud.KaijuPillFloor);
+            _kaijuPill.gameObject.SetActive(false);
         }
+
+        RectTransform _kaijuPill;
+        VectorShape _kaijuPillShape;
+        Text _kaijuPillText;
+        int _kaijuPillState = -1;   // -1 hidden, 0 your Kaiju, 1 their Kaiju
+        float _kaijuPillAt = -10f;
+
+        /// <summary>b15 view polish: the Kaiju-on-the-hill pill (tests read its rect, text and type size).</summary>
+        public RectTransform KaijuPill => _kaijuPill;
+        public Text KaijuPillText => _kaijuPillText;
+
+        void ApplyKaijuPill(HudState s)
+        {
+            int state = s.KaijuBlocksHill < 0 ? -1 : (s.HasPlayer && (int)s.Team == s.KaijuBlocksHill ? 0 : 1);
+            if (state != _kaijuPillState)
+            {
+                _kaijuPillState = state;
+                bool on = state >= 0;
+                _kaijuPill.gameObject.SetActive(on);
+                _hillWord.gameObject.SetActive(!on);
+                if (on)
+                {
+                    _kaijuPillAt = Time.unscaledTime;
+                    HudText.Set(_kaijuPillText, state == 0 ? ComebackNames.KaijuHillOwnWord : ComebackNames.KaijuHillEnemyWord);
+                    _kaijuPillText.color = state == 0 ? Navy : Cream;
+                    _kaijuPillShape.RimColor = state == 0 ? Navy : Cream;
+                    _kaijuPillShape.RimPx = 2f;
+                    _kaijuPillDirty = true;
+                }
+            }
+            if (state < 0) return;
+            float t = SnapAnimations ? 10f : Time.unscaledTime - _kaijuPillAt;
+            float k = CriticalMass.Runtime.Hud.Mechanics.B15Hud.Pulse(t);
+            _kaijuPill.localScale = new Vector3(k, k, 1f);
+            Color baseFill = state == 0 ? CMTokens.ParseHex(CriticalMass.Runtime.Hud.Mechanics.B15Hud.KaijuPillWarnHex) : Panel;
+            float flash = CriticalMass.Runtime.Hud.Mechanics.B15Hud.PulseFlash(t, !CriticalMass.Runtime.Menu.GameSettings.ReduceFlashing);
+            Color fill = flash > 0f ? Color.Lerp(baseFill, Cream, flash) : baseFill;
+            _kaijuPillShape.SetFill(fill);
+            if (_kaijuPillDirty) { _kaijuPillDirty = false; _kaijuPillShape.SetVerticesDirty(); }
+        }
+
+        bool _kaijuPillDirty = true;
 
         void BuildTeamPanel(RectTransform c, TeamId team, float x, out Text score, VectorShape[] pips, out Text onHill)
         {
@@ -734,17 +787,10 @@ namespace CriticalMass.Runtime.Hud
             _medallion.SetFill(HillColour(s.Hill));
             // b15 D0: the owner's own Kaiju stands on the hill, so the owner scores nothing; the word says so from each side's
             // point of view (words, not colour alone: brass ink is a second cue)
-            if (s.KaijuBlocksHill >= 0)
-            {
-                bool ours = s.HasPlayer && (int)s.Team == s.KaijuBlocksHill;
-                HudText.Set(_hillWord, ours ? ComebackNames.KaijuHillOwnWord : ComebackNames.KaijuHillEnemyWord);
-                _hillWord.color = CMTokens.ToolBrass.Color;
-            }
-            else
-            {
-                HudText.Set(_hillWord, HillWord(s.Hill));
-                _hillWord.color = Cream;
-            }
+            // b15 view polish (item 8): that state is now the pill under the hill meter (ApplyKaijuPill); the word stays the hill's.
+            HudText.Set(_hillWord, HillWord(s.Hill));
+            _hillWord.color = Cream;
+            ApplyKaijuPill(s);
         }
 
         static Color HillColour(HillState h) =>
