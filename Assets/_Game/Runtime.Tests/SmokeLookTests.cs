@@ -94,9 +94,11 @@ namespace CriticalMass.Runtime.Tests
         {
             foreach (UnityEngine.Color32 c in new[] { FxScene.PoolLight, FxScene.PoolMid, FxScene.PoolDark })
             {
-                Assert.Greater(c.r, 2 * c.g, $"{c} reads red, not black or brown");
-                Assert.Greater(c.r, 2 * c.b, $"{c} reads red");
-                Assert.Less(c.r, 200, $"{c} is a dark blood red, far from the bright Crimson team hue");
+                // b15 (PR #222 routed patch): the pool takes the violet-brown gore tones: a clear tone (not black), out of the red band.
+                Assert.Greater(c.r, c.g + 20, $"{c} has a clear tone, not black or grey");
+                Assert.Greater(c.b, c.g, $"{c} leans violet, not red-orange");
+                Assert.IsFalse(CriticalMass.Runtime.View.Effects.GoreShots.BloodRed(c), $"{c} is out of the blood-red band (reads as Crimson)");
+                Assert.Less(c.r, 200, $"{c} is dark, far from the bright Crimson team hue");
             }
             float reach = FxScene.KnockOutPoolSize * FxScene.KnockOutPoolReach;
             Assert.LessOrEqual(2f * reach, 1.25f, "about one fighter's footprint across at Full");

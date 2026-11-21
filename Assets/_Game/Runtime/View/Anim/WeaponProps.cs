@@ -32,6 +32,7 @@ namespace CriticalMass.Runtime.View.Anim
         public static bool Shoves(GameConfig c, bool hasAttacker, ClassId attCls)
         {
             if (!hasAttacker) return false;
+            if (c != null && CombatFeel.On(c)) return true; // b15 combat feel: every melee hit knocks back
             LightWeapon lw = On(c, attCls);
             return lw != null && lw.Shove > 0;
         }

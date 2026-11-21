@@ -36,6 +36,10 @@ namespace CriticalMass.Sim.Config
         public KaijuTypesConfig KaijuTypes = new KaijuTypesConfig();
         /// <summary>CM b13 [C]: the corruption crystal, the roll and the wild Kaiju.</summary>
         public CorruptionConfig Corruption = new CorruptionConfig();
+        /// <summary>b15: combat feel (attack phases, hit reactions, class identity, ladder traffic); CombatFeelConfig.cs.</summary>
+        public CombatFeelConfig CombatFeel = new CombatFeelConfig();
+        /// <summary>b15: the bot brain (a light team brain that hands out jobs, group-up before an assault, target choice); Bots/TeamBrain.cs.</summary>
+        public BotBrainConfig BotBrain = new BotBrainConfig();
 
         public DepthConfig Clone()
         {
@@ -52,8 +56,61 @@ namespace CriticalMass.Sim.Config
             c.Dodge = Dodge.Clone();
             c.KaijuTypes = KaijuTypes.Clone();
             c.Corruption = Corruption.Clone();
+            c.CombatFeel = CombatFeel.Clone();
+            c.BotBrain = BotBrain.Clone();
             return c;
         }
+    }
+
+    /// <summary>
+    /// b15 bot brain (design advisor 2026-11-19, owner: "we will get it all into the game"). Full rules only: it runs when
+    /// Enabled is true, DepthConfig.Classic is false and PhysicsConfig.Classic is false (TeamBrain.On), so the Classic and
+    /// PhysicsOnly hashes never move; Enabled = false is the bot code before it, bit for bit. Deterministic, no RNG, and it
+    /// reads only what a player on the team could see on the scoreboard and the map (bodies on the hill, the Kaiju, own
+    /// team's positions): no hidden information.
+    /// <list type="bullet">
+    /// <item>(a) Jobs: a hostile Kaiju gets a KITE squad (KiteSquad fast fighters) that keeps it busy from the side away from
+    /// the hill; everyone else stays on the hill (before: every bot left to fight it). GuardCount hill-squad bots never chase
+    /// off the hill, even when the team is far ahead. Feeders keep the director's egg quota; Miners and Builders keep their
+    /// class tasks and are called to the hill when it is lost by CallToHillDeficit bodies or more.</item>
+    /// <item>(b) Group up: a hill bot walking in while the enemy holds the hill by RallyOutnumberedBy or more waits at
+    /// StageRadius from the hill centre and goes in with the others once the group (staged plus own bodies on the hill)
+    /// reaches the holders' disc bodies minus one (at least GroupMin, at most GroupShare x team) or the oldest has waited
+    /// RallySeconds.</item>
+    /// <item>(c) Target choice: a visible Healer within fight range first, else the lowest-health enemy within attack reach,
+    /// else the nearest; the current target keeps TargetStickScore (no flicker).</item>
+    /// </list>
+    /// </summary>
+    public sealed class BotBrainConfig
+    {
+        public bool Enabled = false;
+        /// <summary>Kite squad size at 10 living bots or fewer, and above that.</summary>
+        public int KiteSquad = 2, KiteSquadLarge = 3;
+        /// <summary>A kiter needs this share of its HP when it is picked.</summary>
+        public double KiteMinHpShare = 0.5;
+        /// <summary>A kiter goes for the hostile Kaiju from this far (the plain FSM engages within 12 u).</summary>
+        public double KiteEngageRange = 40;
+        /// <summary>Hill-squad bots that never chase off the hill (the cocky rule skips them).</summary>
+        public int GuardCount = 2;
+        /// <summary>The staging ring: this far from the hill centre (outside the Kaiju's 13 u fight zone).</summary>
+        public double StageRadius = 15;
+        public int GroupMin = 3;
+        public double GroupShare = 0.5;
+        public double RallySeconds = 12;
+        /// <summary>A respawned bot stages only while the enemy has at least this many more bodies on the hill disc.</summary>
+        public int RallyOutnumberedBy = 2;
+        public bool TargetHealersFirst = true;
+        public double TargetStickScore = 1.5;
+        public int CallToHillDeficit = 3;
+        /// <summary>KAIJU HOLDS NOTHING job (PR #219's rule: a team scores nothing while its own sided Kaiju stands in the hill
+        /// ring). While that cuts our score and no enemy is on the disc, hill-job bots past the guards escort the Kaiju off the
+        /// disc toward the enemy pad; they return the tick it leaves the ring or an enemy steps on the disc. The rule's own
+        /// switch is read through TeamBrain.KaijuHoldsNothingRule (a partial-method hook: no rule on this base = never).</summary>
+        public bool OwnKaijuEscort = true;
+        /// <summary>Test lever for a base without PR #219: behave as if the rule were on (it does not change the score).</summary>
+        public bool OwnKaijuRuleAssumed = false;
+
+        public BotBrainConfig Clone() => (BotBrainConfig)MemberwiseClone();
     }
 
     /// <summary>U-068 map events (our rule). Timing in sim ticks at 30 Hz.</summary>

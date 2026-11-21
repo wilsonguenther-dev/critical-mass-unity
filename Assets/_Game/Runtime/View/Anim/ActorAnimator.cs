@@ -752,7 +752,10 @@ namespace CriticalMass.Runtime.View.Anim
             // feat/light-weapons-1: a light-weapon swing sets its own cooldown; the Healer's lantern swing (not her mend) is
             // the press whose swing started on this action's tick, and plays the shared one-hand Attack clip instead of Cast.
             LightWeapon lw = LightWeapons.On(cfg) ? LightWeapons.Row(cfg, actor.Cls) : null;
-            bool lightCd = lw != null && actor.AttackCd > 0 && Math.Abs(actor.AttackCd + aa - lw.CooldownSeconds) < 1e-3;
+            // b15 combat feel: the light weapons are off under it; the Healer's lantern and the pry bar are her class row's swing.
+            double lightCdSec = lw != null ? lw.CooldownSeconds
+                : CombatFeel.On(cfg) && (actor.Cls == ClassId.Healer || actor.Cls == ClassId.Demolitions) ? cc.AttackCooldown : -1;
+            bool lightCd = lightCdSec > 0 && actor.AttackCd > 0 && Math.Abs(actor.AttackCd + aa - lightCdSec) < 1e-3;
             bool attack = actor.AttackCd > 0 && Math.Abs(actor.AttackCd + aa - cc.AttackCooldown) < 1e-3 || lightCd;
             bool lantern = lightCd && actor.Cls == ClassId.Healer && tick != int.MinValue
                 && Math.Abs((tick - actor.SwingTick) / cfg.SimHz - aa) < 1.5 / cfg.SimHz;

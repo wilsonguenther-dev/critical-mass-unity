@@ -24,6 +24,7 @@ namespace CriticalMass.Sim.Tests
         static GameConfig Cfg(bool dodge, bool walls, bool corruption)
         {
             GameConfig c = GameConfig.CreateDefault();
+            c.Depth.CombatFeel.Enabled = false; // b15: this measures the three b13 items on the b13 fights; CombatFeelTests times the feel rule
             c.Depth.Dodge.On = dodge;
             c.Depth.Build.On = walls;
             c.Depth.Corruption.On = corruption;

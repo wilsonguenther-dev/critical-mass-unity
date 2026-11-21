@@ -56,6 +56,7 @@ namespace CriticalMass.Sim.Core
             // then all are applied in queue order, so a lower id never cancels a higher id's swing by killing it first.
             bool fair = Phys.On(w, cfg.Physics.FairTrades);
             bool lane = Phys.On(w, true);
+            bool feel = CombatFeel.On(w); // b15 combat feel (Full rules only)
             w.Hits.Count = 0;
             for (int i = 0; i < n; i++)
             {
@@ -66,19 +67,32 @@ namespace CriticalMass.Sim.Core
                     a.SwingPending = false;
                     if (a.Alive && a.StandUp <= 0) ResolveSwing(w, i, a.SwingFacing, fair, lane, maxTargetRadius, candidates);
                 }
-                if (!a.Alive || a.StandUp > 0 || !w.Inputs[i].Attack || a.AttackCd > 0 || a.SwingPending) continue;
+                // b15 combat feel: a press up to BufferSeconds before the swing could start is kept (input buffering).
+                bool wants = feel ? CombatFeel.WantsAttack(w, i, w.Inputs[i].Attack) : w.Inputs[i].Attack;
+                if (!a.Alive || a.StandUp > 0 || !wants || a.AttackCd > 0 || a.SwingPending) continue;
                 if (Dodge.Active(w, i)) continue; // CM b13 J: a dodging actor cannot attack (rule off: never active)
                 if (lane && a.HitStunTicks > 0) continue; // DG-70: a staggered actor cannot start a swing
                 // feat/light-weapons-1: with LightWeapons on, the Demolitions Expert swings her pry bar and the Healer her
                 // lantern; off (or Classic) it is DG-22 (CM-38: no regular attack, Travis 2026-11-06) and DG-40 exactly.
                 LightWeapon lw = LightWeapons.Of(w, a.Cls);
-                if (a.Cls == ClassId.Demolitions && lw == null) continue;
+                // b15 combat feel: the class rows carry every strike (LightWeapons is off under it), so the Demolitions Expert
+                // and the Healer swing their own rows.
+                if (a.Cls == ClassId.Demolitions && lw == null && !feel) continue;
+                // b15: with her TNT ready the attack press is the throw (Demolitions.AttackThrowsNow, before Combat next tick);
+                // the pry bar swings only while the TNT cools down (a held press no longer pry-swings the TNT away for good).
+                if (feel && a.Cls == ClassId.Demolitions && w.Config.Abilities.DemolitionsTnt.ThrowOnAttack && w.Tick >= w.Demolitions.TntReadyTick[i]) continue;
                 if (a.Cls == ClassId.Healer)
                 {
                     // DG-40 (U-061): the attack press mends a hurt ally FIRST (support first); the lantern swings only when
                     // nobody can be mended, so a Healer among her team heals and a Healer caught alone defends herself.
-                    if (Healer.TryMend(w, i) || lw == null) continue;
+                    if (Healer.TryMend(w, i))
+                    {
+                        if (feel) CombatFeel.TookPress(w, i);
+                        continue;
+                    }
+                    if (lw == null && !feel) continue;
                 }
+                if (feel) CombatFeel.TookPress(w, i);
                 ClassConfig cc = cfg.Class(a.Cls);
                 double range = lw != null ? lw.Range : cc.AttackRange;
                 a.AttackCd = lw != null ? lw.CooldownSeconds : cc.AttackCooldown;
@@ -92,7 +106,9 @@ namespace CriticalMass.Sim.Core
                 double fx = JsMath.Cos(a.Facing);
                 double fz = JsMath.Sin(a.Facing);
                 // DG-16 (view request), DG-69: the swing starts on the press tick: reach point, locked facing, wind-up length.
-                if (lane) World.PushEvent(w, SimEventType.AttackStart, i, KindAttack, w.X[i] + fx * range, w.Z[i] + fz * range, a.Facing, null, DamageCause.None, 0, fx, fz, 0, 0, windup, a.SwingRecovery);
+                // b15 combat feel: the telegraph needs the real hit shape: Radius = reach, Impulse = full arc in degrees.
+                if (lane && feel) World.PushEvent(w, SimEventType.AttackStart, i, KindAttack, w.X[i] + fx * range, w.Z[i] + fz * range, a.Facing, null, DamageCause.None, range, fx, fz, cc.AttackArcDeg, 0, windup, a.SwingRecovery);
+                else if (lane) World.PushEvent(w, SimEventType.AttackStart, i, KindAttack, w.X[i] + fx * range, w.Z[i] + fz * range, a.Facing, null, DamageCause.None, 0, fx, fz, 0, 0, windup, a.SwingRecovery);
                 else World.PushEvent(w, SimEventType.AttackStart, i, -1, w.X[i] + fx * range, w.Z[i] + fz * range, a.Facing);
                 if (windup > 0) a.SwingPending = true;
                 else ResolveSwing(w, i, a.Facing, fair, lane, maxTargetRadius, candidates);
@@ -123,7 +139,7 @@ namespace CriticalMass.Sim.Core
         {
             Actor a = w.Actors[id];
             if (!a.Alive || a.StandUp > 0) return false;
-            if (a.Cls == ClassId.Demolitions && LightWeapons.Of(w, a.Cls) == null) return false; // feat/light-weapons-1
+            if (a.Cls == ClassId.Demolitions && LightWeapons.Of(w, a.Cls) == null && !CombatFeel.On(w)) return false; // feat/light-weapons-1 (b15: feel rows)
             if (TickDown(a.AttackCd, SimStep.Dt(w.Config)) > 0) return false;
             if (a.SwingPending && w.Tick + 1 < a.SwingTick + a.SwingWindup) return false;
             if (Phys.On(w, true) && a.HitStunTicks > 1) return false;
@@ -154,6 +170,7 @@ namespace CriticalMass.Sim.Core
             bool body = Phys.On(w, cfg.Physics.ArcCoversBody); // DG-100 (S13): the arc reaches the target's body, not just its centre
             int cap = Phys.On(w, true) ? cfg.Physics.CleaveMaxTargets : 0; // OD-10: 0 = no cap
             int hits = 0;
+            bool feel = CombatFeel.On(w); // b15 combat feel
             bool walls = Phys.On(w, cfg.Physics.WallsBlockHits); // DG-83: no hits through walls or barricades
             int count = SpatialHash.QueryCircle(w.Hash, ax, az, range + maxTargetRadius, candidates);
             for (int k = 0; k < count; k++)
@@ -177,11 +194,16 @@ namespace CriticalMass.Sim.Core
                 if (walls && !SegmentClear.Clear(w.Map, ax, az, w.X[j], w.Z[j])) continue;
                 if (cap > 0 && hits >= cap) break;
                 hits++;
-                if (fair) w.Hits.Add(j, i, dmg, ax, az);
+                // b15 combat feel: the per-target multiplier (sunder, Farmer close range, Miner pierce, Builder at home) is read
+                // on the queue, before any hit of this tick lands, and the strike applies knock and stagger (CombatFeel).
+                double hitDmg = feel ? dmg * CombatFeel.DamageMul(w, i, j, Math.Sqrt(d2)) : dmg;
+                if (fair) w.Hits.Add(j, i, hitDmg, ax, az);
+                else if (feel) CombatFeel.ApplyStrike(w, j, hitDmg, i, ax, az);
                 else if (Damage.ApplyMelee(w, j, dmg, i, ax, az) > 0) LightWeapons.Shove(w, j, i, ax, az, dmg); // feat/light-weapons-1
             }
             // Structures (CM-05): the same swing chips enemy barricades in its arc; a Miner's pick also breaks breakables.
-            Barricades.DamageBarricadesInArc(w, i, ax, az, fx, fz, range, cosHalf, baseDmg);
+            int evBefore = w.EventHead; // b15: a swing that only hit a structure (it raised an event) is not a whiff
+            Barricades.DamageBarricadesInArc(w, i, ax, az, fx, fz, range, cosHalf, feel ? baseDmg * CombatFeel.StructureMul(w, a.Cls) : baseDmg);
             if (a.Cls == ClassId.Miner) Abilities.MinerWallBreak(w, i, ax, az, fx, fz);
             // CM-31: the same swing chips knock-down decorations in its arc (any class, bots included).
             Topple.ToppleInArc(w, i, ax, az, fx, fz, range, cosHalf);
@@ -199,8 +221,10 @@ namespace CriticalMass.Sim.Core
                     && (!walls || SegmentClear.Clear(w.Map, ax, az, kj.X, kj.Z)))
                 {
                     Kaiju.DamageKaiju(w, i, dmg);
+                    evBefore = -1; // b15: a Kaiju hit is not a whiff
                 }
             }
+            if (feel) CombatFeel.AfterContact(w, i, hits + (w.EventHead != evBefore ? 1 : 0));
             // DG-69: the contact tick, even on a whiff.
             if (lane) World.PushEvent(w, SimEventType.AttackContact, i, -1, ax + fx * range, az + fz * range, hits, null, DamageCause.None, 0, fx, fz, 0, 0, 0, 0);
         }
@@ -216,8 +240,14 @@ namespace CriticalMass.Sim.Core
         public static void ApplyPendingHits(World w)
         {
             PendingHits h = w.Hits;
+            bool feel = CombatFeel.On(w);
             for (int k = 0; k < h.Count; k++)
             {
+                if (feel)
+                {
+                    CombatFeel.ApplyStrike(w, h.Target[k], h.Amount[k], h.Source[k], h.SrcX[k], h.SrcZ[k]); // b15 combat feel
+                    continue;
+                }
                 // feat/light-weapons-1: a landed light-weapon hit also shoves (Shove is a no-op for every other swing).
                 if (Damage.ApplyMelee(w, h.Target[k], h.Amount[k], h.Source[k], h.SrcX[k], h.SrcZ[k]) > 0)
                     LightWeapons.Shove(w, h.Target[k], h.Source[k], h.SrcX[k], h.SrcZ[k], h.Amount[k]);
@@ -310,7 +340,8 @@ namespace CriticalMass.Sim.Core
         }
 
         /// <summary>True when the rule runs in config c (depth lane on and LightWeapons.Enabled).</summary>
-        public static bool On(GameConfig c) => c.Depth.LightWeapons != null && DepthRules.On(c, c.Depth.LightWeapons.Enabled);
+        // b15 combat feel supersedes the light weapons: its class rows carry every class's strike.
+        public static bool On(GameConfig c) => c.Depth.LightWeapons != null && DepthRules.On(c, c.Depth.LightWeapons.Enabled) && !CombatFeel.On(c);
 
         public static bool On(World w) => On(w.Config);
 
@@ -347,6 +378,18 @@ namespace CriticalMass.Sim.Core
         public static bool BotKeepsPress(World w, int id, double aimX, double aimZ)
         {
             Actor a = w.Actors[id];
+            if (CombatFeel.On(w))
+            {
+                // b15 combat feel: a Healer bot keeps a press that mends; a Healer or Demolitions bot otherwise swings only at a
+                // target inside its row's reach (her TNT is thrown by the attack press before Combat, Demolitions.cs).
+                if (a.Cls != ClassId.Healer && a.Cls != ClassId.Demolitions) return true;
+                if (a.Cls == ClassId.Healer && Healer.MendTarget(w, id, aimX, aimZ) >= 0) return true;
+                if (!double.IsFinite(aimX) || !double.IsFinite(aimZ)) return false;
+                double fdx = aimX - w.X[id];
+                double fdz = aimZ - w.Z[id];
+                double fr = w.Config.Class(a.Cls).AttackRange + BotBodyAllowance;
+                return fdx * fdx + fdz * fdz <= fr * fr;
+            }
             LightWeapon lw = Of(w, a.Cls);
             if (lw == null || a.Cls == ClassId.Builder) return true;
             if (a.Cls == ClassId.Healer && Healer.MendTarget(w, id, aimX, aimZ) >= 0) return true;

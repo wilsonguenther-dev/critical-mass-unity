@@ -40,7 +40,13 @@ namespace CriticalMass.Runtime.View.Effects
 
         // ---- palette (sRGB; three flat tone steps per material, Void Navy outline) ----
         public static readonly Color32 Navy = new Color32(24, 35, 59, 255);
-        public static readonly Color32 BloodLight = new Color32(214, 52, 60, 255), BloodMid = new Color32(150, 18, 34, 255), BloodDark = new Color32(88, 8, 20, 255);
+        // b15 combat feel (routed patch from PR #222, blind-spot audit P5 / A2): hit colour stays out of the team hues. The blood
+        // tones are the FULL-gore violet-brown of View.Effects.ImpactPalette (GoreLight / GoreMid / GoreDark, PR #222): at least
+        // 30 degrees of hue from Azure, Crimson and the colour-blind pair. Same values, inlined until #222 lands on this base.
+        public static readonly Color32 BloodLight = new Color32(128, 62, 100, 255), BloodMid = new Color32(96, 44, 74, 255), BloodDark = new Color32(62, 28, 48, 255);
+        /// <summary>Hit sparks and impact dust (ImpactPalette.SparkHot / SparkMid / SparkEdge / DustLight / DustDark, PR #222): neutral, under 0.25 saturation.</summary>
+        public static readonly Color32 SparkHot = new Color32(255, 250, 236, 255), SparkMid = new Color32(255, 240, 200, 255), SparkEdge = new Color32(238, 222, 184, 255);
+        public static readonly Color32 DustLight = new Color32(200, 190, 172, 255), DustDark = new Color32(128, 120, 108, 255);
         // World around arena 1 (2026-11-13): marks left ON THE GROUND by hits and knock-outs (splats, drips, the stamped
         // paint) are a neutral dark ink, not red. Red ground paint read as "Crimson team" under every fight, which breaks
         // the bible's reserved-hue rule (art direction 2026-11-12: ground decals for hits and knock-outs are neutral marks
@@ -49,9 +55,9 @@ namespace CriticalMass.Runtime.View.Effects
         public static readonly Color32 GroundInkLight = new Color32(104, 104, 118, 255), GroundInkMid = new Color32(64, 66, 82, 255), GroundInkDark = new Color32(38, 42, 58, 255);
         public const float GroundInkAlpha = 0.72f;
         /// <summary>polish-5 (candidate-2 gore sheets: the Full knock-out stain was a big near-black patch that read as oil
-        /// or scorch): the knock-out pool alone is a dark blood red, clearly red on tan stone and green grass; every other
-        /// ground mark keeps the neutral ink above. Far from the Crimson team hue (much darker).</summary>
-        public static readonly Color32 PoolLight = new Color32(150, 34, 40, 255), PoolMid = new Color32(112, 16, 26, 255), PoolDark = new Color32(76, 8, 18, 255);
+        /// or scorch): the knock-out pool is a clear tone, not black. b15 (PR #222 routed patch): it takes the Gore tones
+        /// (violet-brown), no longer a red that reads as the Crimson team.</summary>
+        public static readonly Color32 PoolLight = BloodLight, PoolMid = BloodMid, PoolDark = BloodDark;
         public const float PoolAlpha = 0.82f;
         /// <summary>polish-5: the pool's base size (was 1.25: about 3.2 u across with its lobes). Its widest reach is
         /// KnockOutPoolReach x size, about one fighter's footprint (1.2 u across) at Full; Reduced scales it by 0.7; Off
@@ -758,6 +764,7 @@ namespace CriticalMass.Runtime.View.Effects
             }
 
             DrawKaijuState(w, ground, air, now);
+            DrawSwingTelegraphs(w, ground);
             DrawShields(w, air, now);
             BuildBoomGround(now, ground);
 
@@ -1076,6 +1083,48 @@ namespace CriticalMass.Runtime.View.Effects
                     air.Star(p, Vector3.right, Vector3.up, 0.16f * (1 - ph) + 0.04f, 0.45f, 4, 0.785f, A(Navy, 1 - ph));
                     air.Star(p, Vector3.right, Vector3.up, 0.12f * (1 - ph), 0.45f, 4, 0.785f, A(Berserk, 1 - ph));
                 }
+            }
+        }
+
+        /// <summary>
+        /// b15 combat feel (view half of item A): every fighter's wind-up draws its real hit shape on the ground for the
+        /// whole wind-up: a wedge of the class row's AttackRange and AttackArcDeg (GameConfig.Class, the numbers ResolveSwing
+        /// uses) along the locked SwingFacing, from the swinger's body; a body touching the drawn edge is hit. The fill
+        /// grows from the body to the edge as the wind-up runs out. Quiet for everyone (threat tier 2); brighter and
+        /// orange-edged when the local fighter is inside an enemy's wedge (tier 1: "this one is coming at you"). Drawn only
+        /// while CombatFeel is on (with it off the 0.10 s wind-ups are too short to read).
+        /// </summary>
+        private void DrawSwingTelegraphs(World w, FxMeshBuilder ground)
+        {
+            if (!CombatFeel.On(w.Config)) return;
+            Vector3 gr = Vector3.right, gu = Vector3.forward;
+            int me = LocalSeat.Actor;
+            for (int i = 0; i < w.ActorCount; i++)
+            {
+                Actor a = w.Actors[i];
+                if (!a.Alive || !a.SwingPending || a.SwingWindup <= 0) continue;
+                int left = a.SwingTick + a.SwingWindup - w.Tick;
+                if (left <= 0) continue;
+                ClassConfig cc = _cfg.Class(a.Cls);
+                float reach = (float)cc.AttackRange, half = (float)(cc.AttackArcDeg * 0.5 * Math.PI / 180);
+                float p = Mathf.Clamp01((float)((a.SwingWindup - left + Alpha) / a.SwingWindup));
+                double x = w.PrevX[i] + (w.X[i] - w.PrevX[i]) * Alpha, z = w.PrevZ[i] + (w.Z[i] - w.PrevZ[i]) * Alpha;
+                Vector3 c = W(x, Ground(x, z) + 0.035, z);
+                float ang = -(float)a.SwingFacing; // sim (cos f, sin f) is world (cos f, -sin f)
+                bool atMe = false;
+                if (me >= 0 && me < w.ActorCount && me != i && w.Actors[me].Alive && w.Actors[me].Team != a.Team)
+                {
+                    double dx = w.X[me] - w.X[i], dz = w.Z[me] - w.Z[i], d = Math.Sqrt(dx * dx + dz * dz);
+                    double off = Math.Abs(Math.IEEERemainder(Math.Atan2(dz, dx) - a.SwingFacing, Math.PI * 2));
+                    atMe = d <= reach + _cfg.Class(w.Actors[me].Cls).Radius && off <= half;
+                }
+                Color32 team = a.Team == TeamId.Azure ? AzureC : CrimsonC;
+                float k = atMe ? 1f : 0.55f;
+                int seg = Mathf.Clamp((int)(cc.AttackArcDeg / 9), 6, 16);
+                ground.Ring(c, gr, gu, 0.3f, reach, ang - half, ang + half, seg, A(atMe ? WarnHot : team, 0.07f * k), A(atMe ? Warn : team, 0.16f * k));
+                if (p > 0.02f) ground.Ring(c, gr, gu, 0.3f, Mathf.Max(0.32f, reach * p), ang - half, ang + half, seg, A(atMe ? WarnHot : team, 0.16f * k), A(atMe ? Warn : team, 0.3f * k));
+                ground.Ring(c, gr, gu, reach - 0.07f, reach + 0.02f, ang - half, ang + half, seg, A(Navy, 0.55f * k));
+                ground.Ring(c, gr, gu, reach - 0.05f, reach, ang - half, ang + half, seg, A(atMe ? WarnHot : team, 0.75f * k));
             }
         }
 
