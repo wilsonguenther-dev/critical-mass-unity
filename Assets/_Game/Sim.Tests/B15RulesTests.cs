@@ -90,7 +90,9 @@ namespace CriticalMass.Sim.Tests
             // switches; sim run 44880553461 at a7433909; was 0x2B40BAD073394FD6 / 0x4E92D5071F543577).
             // b16 mechanics fixes: re-pinned with the Full row (keep-out, type refs, hill count, the idle post are not behind these switches;
             // sim run 44937275234; was 0x2C933299522970D2 / 0xA3A7DED99EA6EFAC).
-            const ulong Base16 = 0xCF5BEEF5B78200AEUL, Base5 = 0xB73024191643D64CUL;
+            // batch 16 combine: the 5v5 row follows the flat hill cap and the two extra feeders (not behind these switches; sim run
+            // 44955919924; was 0xB73024191643D64C). The 16v16 row is unchanged.
+            const ulong Base16 = 0xCF5BEEF5B78200AEUL, Base5 = 0x12C9DB6E50B37453UL;
             Action<GameConfig> off = c =>
             {
                 c.ApplyRules(RulesProfile.Full);
