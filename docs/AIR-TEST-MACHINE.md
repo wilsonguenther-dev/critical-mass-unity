@@ -61,7 +61,7 @@ charger, the owner's apps left open (about 14.6 GB of swap already in use before
 | slow set (64 tests) | GitHub 44881963787 | 1 | 58 min job, 3,440 s of tests | | 57 pass, 7 fail |
 | slow set, run 1 | Air, as CI | 1 | 53.9 min (3,235 s) | 178 MB, one core at 100 % | identical |
 | slow set, run 2 | Air, through the gate | 1 | 54.1 min (3,247 s), 55 min gate | 460 MB with the build | identical |
-| slow set | Air, through the gate | 2 | E_WALL | E_MEM | identical |
+| slow set | Air, through the gate | 2 | 27.7 min (1,664 s) | 182 MB | identical |
 | slow set | Air, through the gate | 3 | 20.6 min (1,236 s) | 279 MB | identical |
 | slow set | Air, through the gate | 4 | **16.6 min (995 s)**, 17 min gate | 339 MB | identical |
 
@@ -74,7 +74,7 @@ Determinism: in every run, every test has the same result as on GitHub, and ever
 tests (wins, blowouts, lead changes, kill rates, shares) is identical to the digit between Linux x64 and macOS arm64.
 Only timing numbers differ (microseconds per tick, seconds, cost ratios). One timing sub-check is load-sensitive:
 `B15RulesSoakTests.ComebackAndHutChoices...` prints "both on sim cost +1.8 % (limit +3 %) PASS" on GitHub, +2.9 % and
-+2.5 % PASS with one process on the Air, and +3.6 % FAIL (3 processes) and +13.5 % FAIL (4 processes) in the splits. That test fails on every machine for other
++2.5 % PASS with one process on the Air, it passes with 2 processes, and fails at +3.6 % (3 processes) and +13.5 % (4 processes). That test fails on every machine for other
 reasons today; treat its cost line (and every tick-cost budget) as timing-flaky in a split run.
 
 ## Why not a GitHub self-hosted runner
