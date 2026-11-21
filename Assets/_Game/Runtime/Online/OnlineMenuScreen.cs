@@ -65,6 +65,8 @@ namespace CriticalMass.Runtime.Online
 
         public override void Back()
         {
+            if (OnlineChatHud.PanelOpen) { OnlineChatHud.ClosePanelFromMenu(); return; }   // b17-chat: BACK closes the chat settings first
+            if (OnlineChatHud.EatsKeys || OnlineChatHud.WheelOpen) return;   // ESC while typing (or the frame it closed) cancels the line only
             switch (_page)
             {
                 case Page.Join: Go(Page.Home); return;
@@ -132,7 +134,11 @@ namespace CriticalMass.Runtime.Online
         }
         Text _count, _nameText;
         MenuItem _name, _paste;
-        bool _naming;
+        bool _naming { get => s_naming; set { s_naming = value; if (!value) s_namingEnded = Time.frameCount; } }
+        static bool s_naming;
+        static int s_namingEnded = -10;
+        /// <summary>b17-chat: the room's name field is being typed in (or closed this frame): its letters are not chat keys.</summary>
+        public static bool TypingName => s_naming || Time.frameCount <= s_namingEnded + 1;
         string _nameTyped = "";
 
         protected override void BuildContent(RectTransform space)
@@ -205,6 +211,7 @@ namespace CriticalMass.Runtime.Online
             VectorShape chatBox = MenuUi.Shape(_room, "Chat Box", ShapeKind.RoundRect, ch.x, ch.y, ch.width, ch.height, CMTokens.WithAlpha(CMTokens.VoidNavy.Color, 0.75f), 12f);
             chatBox.OutlinePx = 2f;
             _leave = Btn(_room, "Leave", OnlineLayout.Leave, "LEAVE ROOM", Leave, UiScale.TypeHeading);
+            Btn(_room, "Chat Settings", OnlineLayout.ChatSettings, "CHAT SETTINGS", OnlineChatHud.ToggleSettings, UiScale.TypeBody);   // b17-chat
             DefaultFocus = _create;
             Go(Page.Home);
         }

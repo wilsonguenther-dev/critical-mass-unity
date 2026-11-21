@@ -47,6 +47,8 @@ namespace CriticalMass.Runtime.Tests
             for (int i = 0; i < controls.Count; i++)
                 for (int j = i + 1; j < controls.Count; j++) Assert.IsFalse(controls[i].Overlaps(controls[j]), $"controls {i} and {j} overlap");
             Assert.IsTrue(Inside(OnlineLayout.Leave, OnlineLayout.Footer));
+            Assert.IsTrue(Inside(OnlineLayout.ChatSettings, OnlineLayout.Footer));   // b17-chat
+            Assert.IsFalse(OnlineLayout.ChatSettings.Overlaps(OnlineLayout.Leave));
             Assert.IsTrue(Inside(OnlineLayout.ChatLane, OnlineLayout.Chat));
             foreach (Rect c in new[] { OnlineLayout.NameLabel, OnlineLayout.NameBox, OnlineLayout.CreateButton, OnlineLayout.JoinButton,
                          OnlineLayout.CodeLabel, OnlineLayout.CodeBig, OnlineLayout.CodeHint, OnlineLayout.PasteButton, OnlineLayout.JoinGo })
