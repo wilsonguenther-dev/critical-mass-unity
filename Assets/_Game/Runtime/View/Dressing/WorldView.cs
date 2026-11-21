@@ -784,6 +784,7 @@ namespace CriticalMass.Runtime.View.Dressing
         void ReleaseForLoad()
         {
             enabled = false;
+            if (ReferenceEquals(_live, this)) _live = null;
             _replanning = null;
             if (_building != null)
             {
@@ -796,6 +797,7 @@ namespace CriticalMass.Runtime.View.Dressing
 
         private void OnDestroy()
         {
+            if (ReferenceEquals(_live, this)) _live = null;   // integrator b15: a static to a dead view would keep its assets loaded
             _replanning = null;
             if (_building != null)
             {
