@@ -42,6 +42,10 @@ namespace CriticalMass.Sim.Config
         public CombatFeelConfig CombatFeel = new CombatFeelConfig();
         /// <summary>b15: the bot brain (a light team brain that hands out jobs, group-up before an assault, target choice); Bots/TeamBrain.cs.</summary>
         public BotBrainConfig BotBrain = new BotBrainConfig();
+        /// <summary>b15 rule A: the comeback rule (RALLY for the trailing team, the respawn curve). One switch: Comeback.Enabled.</summary>
+        public ComebackConfig Comeback = new ComebackConfig();
+        /// <summary>b15 rule B: each hut level is a team vote between two side-grades. One switch: HutChoices.Enabled.</summary>
+        public HutChoicesConfig HutChoices = new HutChoicesConfig();
 
         public DepthConfig Clone()
         {
@@ -61,6 +65,8 @@ namespace CriticalMass.Sim.Config
             c.TerrainHeight = TerrainHeight.Clone();
             c.CombatFeel = CombatFeel.Clone();
             c.BotBrain = BotBrain.Clone();
+            c.Comeback = Comeback.Clone();   // b15
+            c.HutChoices = HutChoices.Clone();   // b15
             return c;
         }
     }

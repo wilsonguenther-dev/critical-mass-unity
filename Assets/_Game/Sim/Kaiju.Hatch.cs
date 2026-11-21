@@ -148,6 +148,7 @@ namespace CriticalMass.Sim.Core
             {
                 k.Hp = 0;
                 k.KoIn = w.Config.Kaiju.KoSeconds;
+                Comeback.OnKaijuKo(w, sourceId);   // b15-hook: TURNCOAT (no-op off)
                 k.TelegraphIn = 0;
                 k.MeleeWindupIn = 0;
                 k.MeleeTargetId = -1;

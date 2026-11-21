@@ -183,6 +183,7 @@ namespace CriticalMass.Sim.Core
                 a.AiState = AiState.None;
 
                 ChooseSpawn(w, i, cc.Radius, out SpawnScratchX, out SpawnScratchZ);
+                Comeback.ForwardSpawn(w, i, cc.Radius, ref SpawnScratchX, ref SpawnScratchZ);   // b15-hook: FORWARD RETURN (no-op off)
                 w.X[i] = JsMath.F32(SpawnScratchX);
                 w.Z[i] = JsMath.F32(SpawnScratchZ);
                 w.PrevX[i] = w.X[i]; // no interpolation streak from the death spot

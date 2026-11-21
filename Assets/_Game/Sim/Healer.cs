@@ -119,7 +119,8 @@ namespace CriticalMass.Sim.Core
         public static int MendTarget(World w, int id, double aimX, double aimZ)
         {
             Actor a = w.Actors[id];
-            double range = CombatFeel.MendRange(w.Config); // b15 combat feel: CombatFeelConfig.MendRange (else HealerConfig.MendRange)
+            // b15 combat feel: CombatFeelConfig.MendRange (else HealerConfig.MendRange); b15 hut choices: WIDE MEND scales it.
+            double range = CombatFeel.MendRange(w.Config) * HutChoices.MendScale(w, a.Team);   // b15-hook: WIDE MEND (x 1 with the rule off)
             // b15 combat feel: a bot Healer mends the MOST HURT ally in range (lowest HP share, lowest id on a tie); a player
             // keeps the aim rule (the ally nearest her aim), so she chooses.
             bool mostHurt = !a.IsHuman && CombatFeel.On(w);

@@ -12,8 +12,9 @@ namespace CriticalMass.Sim
     public static class SimVersion
     {
         /// <summary>History: 1 = the browser port through batch 14 (never bumped); 2 = b15-rejoin full-state fingerprint;
-        /// 3 = b15 terrain height (MapDef.Lift is sim state; older replays are "from a different game version").</summary>
-        public const int Schema = 3;
+        /// 3 = b15 terrain height (MapDef.Lift is sim state; older replays are "from a different game version");
+        /// 4 = batch 15 wave two (combat feel, bot brain, comeback + hut choices: new hashed sim state and rules).</summary>
+        public const int Schema = 4;
 
         /// <summary>The reference-match digest this Schema was pinned for (printed by SimVersionTests).</summary>
         public const ulong RulesDigest = 0x6050C87B7902ACC9UL;   // batch 15 cand1 (schema 3): printed by sim run 44835452641

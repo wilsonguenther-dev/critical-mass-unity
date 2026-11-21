@@ -125,6 +125,11 @@
       "id": "tip-25",
       "text": "Anyone can carry a Builder's ladder or rope bridge, including the enemy. Guard your shortcuts.",
       "needsRule": "DG-24"
+    },
+    {
+      "id": "tip-26",
+      "text": "Your Kaiju fights for you, but while it stands on the hill your team scores nothing there.",
+      "needsRule": ""
     }
   ]
 }

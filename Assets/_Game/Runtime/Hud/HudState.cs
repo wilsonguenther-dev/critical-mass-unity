@@ -21,6 +21,8 @@ namespace CriticalMass.Runtime.Hud
         public HillState Hill;
         /// <summary>Azure's share of held hill time, 0.5 when nobody has held it yet.</summary>
         public float HillShareAzure;
+        /// <summary>b15 D0: the team (0 Azure, 1 Crimson) whose hill score its own Kaiju is cutting right now; -1 none.</summary>
+        public int KaijuBlocksHill = -1;
 
         // Kaiju second
         public KaijuState Kaiju;
@@ -61,7 +63,7 @@ namespace CriticalMass.Runtime.Hud
         {
             ClockRemaining = o.ClockRemaining; Ended = o.Ended; Winner = o.Winner;
             ScoreAzure = o.ScoreAzure; ScoreCrimson = o.ScoreCrimson; OnHillAzure = o.OnHillAzure; OnHillCrimson = o.OnHillCrimson;
-            Hill = o.Hill; HillShareAzure = o.HillShareAzure;
+            Hill = o.Hill; HillShareAzure = o.HillShareAzure; KaijuBlocksHill = o.KaijuBlocksHill;
             Kaiju = o.Kaiju; Hatched = o.Hatched; UntilHatch = o.UntilHatch; KaijuMeter01 = o.KaijuMeter01;
             Instability01 = o.Instability01; BerserkLocked = o.BerserkLocked; AllegianceAzure = o.AllegianceAzure; AllegianceCrimson = o.AllegianceCrimson;
             HasPlayer = o.HasPlayer; Team = o.Team; Cls = o.Cls; Alive = o.Alive; Hp = o.Hp; MaxHp = o.MaxHp;
@@ -94,6 +96,7 @@ namespace CriticalMass.Runtime.Hud
             s.Hill = m.HillState;
             double held = m.HillSeconds.Azure + m.HillSeconds.Crimson;
             s.HillShareAzure = held > 1e-6 ? (float)(m.HillSeconds.Azure / held) : 0.5f;
+            s.KaijuBlocksHill = Comeback.KaijuBlocking(w);   // b15 D0
 
             Kaiju k = w.Kaiju;
             s.Kaiju = k.State;
