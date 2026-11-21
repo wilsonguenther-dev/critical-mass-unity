@@ -58,6 +58,11 @@ namespace CriticalMass.Sim.Core
             return m;
         }
 
+        /// <summary>b15 wave two integrator: the shrine-goal cache is keyed on the shrine and ShrineInteractRange, so a world
+        /// on another map (another test, the next match) rebuilt it inside the first tick that needed it (536 B in DodgeTests'
+        /// 0 B window, probe 44856910630). Filled at world creation instead; it is derived from the map, never sim state.</summary>
+        internal static void Warm(World w) { if (w.Map != null && w.Map.Shrine != null) ShrineRing(w, w.Map); }
+
         /// <summary>Goal points for "reaches the shrine": every cell centre within ShrineInteractRange of the shrine centre.</summary>
         private static IReadOnlyList<PointXZ> ShrineRing(World world, MapDef map)
         {

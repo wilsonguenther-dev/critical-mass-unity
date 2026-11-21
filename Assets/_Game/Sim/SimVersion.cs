@@ -17,6 +17,6 @@ namespace CriticalMass.Sim
         public const int Schema = 4;
 
         /// <summary>The reference-match digest this Schema was pinned for (printed by SimVersionTests).</summary>
-        public const ulong RulesDigest = 0x6050C87B7902ACC9UL;   // batch 15 cand1 (schema 3): printed by sim run 44835452641
+        public const ulong RulesDigest = 0xC3FD3B160874096BUL;   // batch 15 wave two (schema 4): printed by sim run 44856207208 at 7fbcbddc
     }
 }
