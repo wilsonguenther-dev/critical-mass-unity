@@ -65,6 +65,8 @@ namespace CriticalMass.Runtime.Menu
         public const string MoveAssistKey = "cm.moveAssist";
         /// <summary>Easy movement: direction keys follow the map's grid instead of the screen, 1 on, 0 off (default).</summary>
         public const string KeysFollowMapKey = "cm.keysFollowMap";
+        /// <summary>b16: the CANCEL button (feint / hit-cancel) for this player, 1 on (default), 0 off.</summary>
+        public const string CancelButtonKey = "cm.cancelButton";
         /// <summary>feat/ground-camera: CAMERA HIGH (default) or GROUND (experimental, play from behind the fighter).</summary>
         public const string GroundCameraKey = "cm.camera.ground";
         // feat/follow-camera-1: the play view (0 top-down, 1 third person, 2 first person), the follow mode (auto behind the
@@ -81,7 +83,7 @@ namespace CriticalMass.Runtime.Menu
         public static readonly string[] AllKeys =
         {
             MasterKey, MusicKey, EffectsKey, MuteMusicKey, MuteEffectsKey, MuteInBackgroundKey, AnnouncerKey, LessSoundKey, ColourBlindTeamsKey, WidthKey, HeightKey, FullScreenKey, VSyncKey, QualityKey, ShakeKey,
-            DamageNumbersKey, BloodKey, GoreKey, FpsCapKey, BgThrottleKey, MoveAssistKey, KeysFollowMapKey, GroundCameraKey, "cm.camera.heading", CameraViewKey, CameraManualKey, CameraSensKey, CameraFovKey, CameraInvertYKey, PrefsVersionKey,
+            DamageNumbersKey, BloodKey, GoreKey, FpsCapKey, BgThrottleKey, MoveAssistKey, KeysFollowMapKey, CancelButtonKey, GroundCameraKey, "cm.camera.heading", CameraViewKey, CameraManualKey, CameraSensKey, CameraFovKey, CameraInvertYKey, PrefsVersionKey,
             ShakeScaleKey, ReduceFlashingKey, IntenseFlashingKey, ReduceMotionKey, IntroAtLaunchKey, IntroSubtitlesKey,
         };
 
@@ -221,6 +223,9 @@ namespace CriticalMass.Runtime.Menu
         /// of screen up, left, down and right. The controller stick stays screen-relative.
         /// </summary>
         public static bool KeysFollowMap { get => GetB(KeysFollowMapKey, false); set => SetB(KeysFollowMapKey, value); }
+        /// <summary>b16 "Cancel button (feint)" (cm.cancelButton, default on): with it off this player's cancel presses never reach
+        /// the sim (HumanInputState.CancelButton). The rule itself (CombatFeelConfig.CancelEnabled) is in the match config.</summary>
+        public static bool CancelButton { get => GetB(CancelButtonKey, true); set => SetB(CancelButtonKey, value); }
         /// <summary>A low view (third or first person) is chosen: the "low view on" switch, kept for the ground view's
         /// callers and older saves. Turning it on brings back the last low view (third person if none was chosen).</summary>
         public static bool GroundCamera { get => GetB(GroundCameraKey, false); set => SetB(GroundCameraKey, value); }
