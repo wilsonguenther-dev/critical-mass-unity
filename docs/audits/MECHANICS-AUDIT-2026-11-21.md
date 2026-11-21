@@ -80,14 +80,26 @@ dead time: a third of the match is travel, and the Healer spends 0.38 to 0.46 of
 ### Match length
 Always exactly 480 s (all 72). Nothing can end a match early and nothing extends a close one.
 
-### 5v5 (Quick Match) is a different, worse game (control5, 200 matches)
-- Blowouts **0.445** (16v16: 0.125), median margin 103 s, lead changes median 1, leader at half wins **0.865**, 82% of
-  matches decided before 2:00 (median "decided at" 28 s).
-- Quick Match is 5v5 (`Runtime/Flow/PlayModes.cs`), and so is the guided first match, so the mode a new player meets first is
-  the least balanced one. All b15 tuning was done at 16v16.
+### Quick Match (240 s, hatch at 120 s, 5 or 8 a side; `Runtime/Flow/PlayModes.cs:90,170`), 200 matches each
 
-> Correction to the 5v5 note above: Quick Match runs 240 s with the hatch at 120 s (`Runtime/Flow/PlayModes.cs:86-90`,
-> sizes 5 or 8). The control5 arm used the 480 s clock; the Quick clock is measured in section 5b (round 2).
+| arm | Azure win | blowout | lead changes med | leader at half wins | decided at (med s) | margin (med s) | ends within 15 s | Kaiju owner wins | trailer at hatch got the Kaiju |
+|---|---|---|---|---|---|---|---|---|---|
+| Quick 5v5 | 0.450 (0.38-0.52) | 0.200 | 2 | 0.595 | 172 | 19 | 0.375 | 0.576 | 157 of 191 |
+| Quick 8v8 | **0.415 (0.35-0.48)** | 0.205 | 3 | 0.515 | 155 | 27 | 0.305 | 0.806 | 125 of 196 |
+| Quick 5v5, comeback off | 0.435 | 0.265 | 1 | 0.645 | 28 | 36 | | 0.487 | |
+| Quick 5v5, RALLY off | 0.440 | **0.460** | 1 | 0.822 | 23 | 48 | | 0.296 | |
+| Quick 5v5, owner-approved comeback numbers | 0.485 | 0.255 | 1 | 0.789 | 23 | 31 | | 0.335 | |
+
+- **Quick Match is healthy** on today's rules: blowouts 0.20, median margin 19 s, 37% of 5v5 matches end within 15 s.
+  It depends on RALLY far more than 16v16 does (RALLY off: blowouts 0.46, decided at 23 s).
+- The 5v5 arm on the 480 s clock (blowouts 0.445, decided at 28 s, n 200) is not a mode anyone plays (Practice is 5 a
+  side on a 1,200 s clock, `PlayModes.cs:92`), so it is not a finding. It was the clock the "idle team wins 110 of 200"
+  probe used; see section 5.
+- Quick 8v8 favours Crimson (0.585, interval clear of 0.5 at n 200), Quick 5v5 leans the same way, and 16v16 leans
+  Azure (0.639 at n 72, inside the noise). A side bias that flips with team size points at spawn or node layout per
+  size, not at a rule. Worth a 400-seed check before anyone tunes on side shares.
+- Kaiju type at Quick: Grove 102, Timber 50, Mire 44, Brute 4 of 200 (5v5): the type picker behaves very differently by
+  size (section 4).
 
 ---
 
@@ -133,7 +145,7 @@ Approved 2026-11-17 (growth decision A): RALLY x1.25 capped at 45 s, respawn 3 s
 15 s and x1.25), respawn **2 to 5 s**. Each change has a measured reason in the b15 sweep, but the owner never saw the
 final set, and the in-code explanation of the threshold no longer matches the value. Round 2 measures the approved set.
 
-### "A team with one idle player wins too often" (5v5, 200 matches; actor 0 gets no input at all)
+### "A team with one idle player wins too often" (5v5 on the 480 s clock, 200 matches; actor 0 gets no input at all)
 
 | arm (idle team = Azure) | idle team wins | blowout |
 |---|---|---|
@@ -154,9 +166,15 @@ the hill (`BotDirector.cs:186`). The normal plan sends `round(0.25 x 5) = 1` fee
 ahead (`AdvantageExtra = 2`) or 10 s behind (`GambitExtra = 2`), i.e. 3 of 5 bots away from the hill for most of the time before the hatch.
 Those extras are absolute numbers tuned at 16v16 (6 of 16). So at 5v5 "four bots on the hill" beats "five players with
 three at the egg". At 16v16 one idle player is 6%, under the threshold, and nothing happens (0.500).
-**Rule fix (S, sim):** make the two extras a share of the team (`ceil(0.12 x team)`: 2 at 16, 1 at 5), and treat an idle
-human as absent outright: after `InactiveSeconds` hand the fighter to the autopilot (the same call the online drop uses,
-`Sim/Bots/MatchTick.cs:95-101`), which is also the missing AFK rule online (section 10).
+**On the real Quick clock the effect reverses.** Quick 5v5 (240 s, hatch 120 s) with actor 0 idle: the idle team wins
+**0.080** (0.05-0.13, n 200), blowouts 0.400, and the enemy gets the Kaiju (owner wins 0.945). With the hatch at 2:00 the
+short-handed plan's single feeder loses the egg race, and the Kaiju decides the match. So the 110-of-200 number was a
+480 s-clock artefact; no mode a person plays rewards going idle. What is real in both clocks: one idle human swings a
+small match hard (to 0.53 one way at 480 s, to 0.08 the other at 240 s), because the bot plan changes shape around him.
+**Rule fix (S, sim):** make the two extra feeders a share of the team (`ceil(0.12 x team)`: 2 at 16, 1 at 5) so the plan
+does not flip at 5 a side, and hand an idle human's fighter to the autopilot after `InactiveSeconds` (the same call the
+online drop uses, `Sim/Bots/MatchTick.cs` `HandToBot`), which is also the missing AFK rule online (section 10). With the
+autopilot taking over, an AFK teammate costs his team nothing and gains it nothing.
 
 ### Hut-lead snowball
 Hut levels at 6:00 differ in only 13 of 72 matches, and the higher team wins 11 of 13 (0.85; hut votes off: 13 of 13;
@@ -170,6 +188,26 @@ sign flips of the cumulative difference; HOLD FATIGUE and RALLY already cut the 
 lead is small but rarely flips. Recommendation: replace the target with "share of matches within 30 s at 6:00" (control:
 measured in round 2) or "lead at 2:00 wins 0.55-0.70" — both say what the owner cares about (the early game matters, the
 end is not certain).
+
+### 5b. Fix candidates (16v16, 72 matches each, round 2; round 3 below)
+
+| arm | Azure win | blowout | lead changes med / mean | leader at half wins | lead at 2:00 / 4:00 wins | decided at | margin | within 30 s at 6:00 | Kaiju owner wins |
+|---|---|---|---|---|---|---|---|---|---|
+| control (shipped) | 0.639 | 0.125 | 4 / 4.29 | 0.458 | 0.46 / 0.46 | 326 | 40 | 0.583 | 0.883 |
+| owner-approved set (x1.25, cap 45, trail 15 s, respawn 3 to 8) | 0.583 | 0.194 | 3 / 3.00 | **0.681** | **0.61 / 0.68** | 128 | 34 | 0.375 | **0.690** |
+| RALLY x1.25 only | 0.528 | 0.208 | 3 / 3.58 | 0.542 | 0.51 / 0.54 | 256 | 53 | | 0.857 |
+| fatigue floor 50% (was 25%) | 0.625 | 0.181 | 4 / 4.24 | 0.556 | 0.48 / 0.56 | 299 | 64 | 0.500 | 0.850 |
+| RALLY off + floor 50% | 0.472 | 0.208 | 3 / 3.29 | 0.639 | 0.64 / 0.65 | 146 | 45 | | 0.678 |
+| FORWARD RETURN for the trailing team only | 0.681 | **0.042** | **5 / 4.74** | 0.414 | 0.46 / 0.41 | 360 | 31 | 0.639 | 0.903 |
+| RALLY x1.25 + forward for trailing only | 0.556 | **0.069** | 4 / 3.89 | 0.569 | 0.51 / 0.57 | 286 | **28** | 0.514 | **0.750** |
+| Kaiju type reference re-pinned | 0.653 | 0.111 | 4 / 4.08 | 0.500 | 0.49 / 0.50 | 296 | 41 | | 0.883 |
+| bots do not focus Healers | 0.583 | 0.264 | 5 / 4.78 | 0.639 | 0.51 / 0.64 | 268 | 53 | | 0.817 |
+
+Reading: the owner-approved set is the only one that makes the first half matter and cuts the Kaiju's say (owner wins
+0.69), but it lets more matches run away (blowouts 0.194, decided at 128 s) and it is worse at Quick 5v5 (blowouts
+0.255, decided at 23 s). "Forward for the trailing team only" is the best single anti-blowout lever measured (0.042,
+lead changes 5 for the first time) but leaves the Kaiju in charge. "RALLY x1.25 + forward for trailing only" is the best
+balance in round 2 (blowouts 0.069, margin 28 s, Kaiju owner 0.75), still with a flat first half.
 
 ---
 
@@ -208,6 +246,7 @@ Actor 0 (the player's seat) starts as a Warrior (`Sim.Tests/Harness/BalanceProbe
 | no Builder, 1 more Warrior (6 4 2 2 0 2) | 0.576 | |
 | one Warrior swapped for a Builder | 0.458 | |
 | all 16 Warriors | **0.035** | |
+| **all 16 Farmers** (round 2) | **0.847** | blowouts 0.000, decided at 11 s: the fastest body wins the disc and the egg race at once |
 | all 16 Demolitions | 0.201 | |
 
 **What this says.** In the team game the Warrior is the weakest body to add and the Healer the strongest. Every arm that
@@ -317,7 +356,9 @@ is 0.759 plant, 0.173 meat, 0.027 wood, 0.041 water, so plant scores 0.84 and ca
 **any wood over 1% or water over 2% beats it** (31 and 23 of 72 matches). Elder needs every score under 1.02
 (`ElderBelowScore`), which a meat share of 0.17 never allows. So the type is decided by one or two off-kind deliveries:
 a single Farmer trip of 3 wood out of ~130 units makes a Timber. At 5v5 all five appear (Grove 44, Elder 21 of 200),
-because small teams feed small, lumpy mixes. Round 2 measures `RefShare` re-pinned to today's mix.
+because small teams feed small, lumpy mixes. Round 2: `RefShare` re-pinned to today's mix (0.76, 0.17, 0.03, 0.04) gives
+Grove 13, Brute 13, Timber 26, Mire 20, Elder 0 of 72, with no change to who owns it or who wins (owner wins 0.883);
+round 3 adds `ElderBelowScore` 1.3.
 
 ### Behaviour and death
 - Sided and up 149 s of its 240 s; 66 s of that inside the hill ring; the owner's score is zeroed 60 s a match.
@@ -387,8 +428,8 @@ own wins 12 of 34. There is no way to steal or turn it (TURNCOAT is off, `Comeba
   2 answer HELP, and they obey at once (`Sim/PingRules.cs:83,100`, `Sim/Bots/BotFsm.cs:833-849`, `DepthConfig.cs:177-191`).
   Not measured here (the probe sends no human pings). This is a strength for a human leader; keep it.
 - **Roles they fill:** hill quota `ceil(0.3 x team)`, egg duty `round(0.25 x team)` + 2 when ahead or 10 s behind
-  (`BotDirector.cs:11,183-190`). At 16 that is 6 feeders; at 5 it is 3 of 5 (the idle side effect in section 5).
-- **Healer focus:** `TargetHealersFirst` (`Sim/Bots/TeamBrain.cs:279`) scores a Healer as if she stood at 1% of her
+  (`BotDirector.cs:11,183-190`). At 16 that is 6 feeders; at 5 it is 3 of 5 (why one idle human flips a small match, section 5).
+- **Healer focus** (measured in round 2, arm off: Healer deaths 18.0 to 13.6 a match, the others +2 to +6%; Azure 0.583, blowouts 0.125 to 0.264, lead changes 4 to 5): `TargetHealersFirst` (`Sim/Bots/TeamBrain.cs:279`) scores a Healer as if she stood at 1% of her
   distance, so every bot in range targets her first: 18 deaths a match against 7.9-13.6 for the others. Round 2 measures
   the arm with it off. The design advisor asked for "target healers / lowest health" (2026-11-19/20), so the rule is on
   purpose; the size of it is the question.
@@ -434,12 +475,12 @@ worst body to stack. The biggest learning gap is the one with the biggest effect
 
 | # | exploit | how tested | result | who could use it | fix |
 |---|---|---|---|---|---|
-| 1 | **Go idle on a small team** | scripted: actor 0 sends no input, 200 matches at 5v5 | idle team wins 0.530 (0.46-0.60), and 0.615 with the comeback rules off; blowouts fall 0.445 to 0.145. At 16v16 no effect (0.500) | anyone in Quick Match; online there is no AFK rule at all | section 5: team-share extras and hand an idle human to the autopilot after 15 s (S, sim) |
+| 1 | **Go idle on a small team** | scripted: actor 0 sends no input, 200 matches at 5v5 on both clocks | 480 s clock: idle team wins 0.530 (0.615 with comeback off). Real Quick clock: idle team wins **0.080**. Not an exploit; an AFK teammate ruins a Quick Match, and online nothing replaces him | nobody gains; 9 teammates lose | team-share extras + autopilot after 15 s idle (S, sim) |
 | 2 | **Quit to hide a loss** | code | a match left before the end records nothing: no loss, no history row (`Runtime/Progression/MatchRewards.cs:112,160`, `MetaRecorder.cs:84`); a host who quits ends the match for all 32 (`Net/LockstepSession.cs:443-464`), so a losing host voids everyone's result | any player now; matters the day ranked or a public win count exists | record a leave as a loss for the leaver; a host-left match as "no result" for the rest (S, view/meta) |
 | 3 | **Wall the outer half of the hill** | code (bots never aim walls; not scriptable in the probe) | walls are refused only within 3 u of the centre (`Sim/Config/BuildConfig.cs:24`) on a 6 u disc; bot walls alone move Kaiju-owner wins 0.733 to 0.883 | a skilled Builder | keep-out = hill radius + 1 u (S, sim) |
 | 4 | Pick the Kaiju type with one delivery | measured | any wood over 1% of the feed makes a TIMBER (31 of 72); one Farmer trip of 3 wood decides it | a skilled Farmer | re-pin `RefShare` (round 2) |
 | 5 | Never feed, play only the hill | scripted, 144 matches | loses: 0.271 even with a 101 s lead at the hatch | nobody | none needed |
-| 6 | Stack one class | scripted | all-Warrior 0.035, all-Demolitions 0.201, no-Warrior (9 Farmers) **0.861** | a premade team of humans | the Warrior job (ranked item 3) |
+| 6 | **Stack Farmers** | scripted, 144 matches each | **16 Farmers beat the standard lineup 0.847** (blowouts 0, decided at 11 s); no Warriors (9 Farmers) 0.861; all-Warrior 0.035, all-Demolitions 0.201 | a premade team of humans, or anyone who reads this table | the Warrior job plus a class cap per team (ranked items 2 and 4) |
 
 ---
 
@@ -472,14 +513,13 @@ worst body to stack. The biggest learning gap is the one with the biggest effect
 |---|---|---|---|
 | 1 | A reason to care about the first four minutes | leading at 2:00 or 4:00 wins 0.46: the early hill fight is wasted effort | M |
 | 2 | A Warrior job that turns damage into score | the default class is the worst team pick (all-Warrior 0.035; one more Warrior 0.292) | M |
-| 3 | A Quick Match that is not decided in the first minute | 5v5 median "decided at" 28 s, blowouts 0.445 | M |
-| 4 | An AFK rule (online and in the sim plan) | idle side wins at 5v5; 31 people stuck with an AFK teammate | S |
-| 5 | "Why we lost" on the results screen | the Kaiju hatch race decides 0.88 of matches and is never named | S |
-| 6 | Bots that switch class and use the verbs | 0 class switches, 0 digs or raises, 0 purifies; a bot team without a Healer stays without | M |
-| 7 | A reason to leave the centre | 0.3% of time in the enemy half; flanks are Farmer paths | L (map work) |
-| 8 | A coin and water sink | 648 coins and 7 water per team, spent on nothing | S to M |
-| 9 | A tutorial for the scoring rules | trial does not teach fatigue, rally, the hill rule, the feed race or votes | M |
-| 10 | Host migration | one crash ends 32 people's match | L |
-| 11 | Overtime or a mercy rule | 21% of 16v16 matches end within 15 s (good), 12.5% are blowouts with nothing to play for | S |
-| 12 | Per-team bot difficulty and a ladder | allies are always Normal; there is no way to make a 1-human team feel carried or tested | S |
+| 3 | An AFK rule (online and in the sim plan) | an idle human drops his Quick team to 0.08; nothing takes his seat | S |
+| 4 | "Why we lost" on the results screen | the Kaiju hatch race decides 0.88 of matches and is never named | S |
+| 5 | Bots that switch class and use the verbs | 0 class switches, 0 digs or raises, 0 purifies; a bot team without a Healer stays without | M |
+| 6 | A reason to leave the centre | 0.3% of time in the enemy half; flanks are Farmer paths | L (map work) |
+| 7 | A coin and water sink | 648 coins and 7 water per team, spent on nothing | S to M |
+| 8 | A tutorial for the scoring rules | trial does not teach fatigue, rally, the hill rule, the feed race or votes | M |
+| 9 | Host migration | one crash ends 32 people's match | L |
+| 10 | Overtime or a mercy rule | 21% of 16v16 matches end within 15 s (good), 12.5% are blowouts with nothing to play for | S |
+| 11 | Per-team bot difficulty and a ladder | allies are always Normal; there is no way to make a 1-human team feel carried or tested | S |
 
