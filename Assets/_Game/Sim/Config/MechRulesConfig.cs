@@ -25,7 +25,10 @@ namespace CriticalMass.Sim.Config
         public double AfkSeconds = 15;
         /// <summary>The director's two extra Kaiju feeders (ahead, or 10 s behind) become a share of the team:
         /// ceil(FeedExtraShare x team size) = 2 at 16, 1 at 8, 1 at 5 (before: 2 at every size, 3 of 5 bots off the hill at 5v5).</summary>
-        public bool FeedExtrasShare = true;
+        // b16 combine: OFF (two extras at every size, as before b16). On, 5v5 and 8v8 blowouts rose and the Kaiju owner won 0.976 of
+        // 5v5 matches; off with the flat hill cap: 8v8 blowouts 0.417 -> 0.250, 5v5 0.417 -> 0.208, 5v5 Kaiju owner 0.976 -> 0.667
+        // (probe 44954708867). The audit's "3 of 5 bots off the hill at 5v5" comes back; listed.
+        public bool FeedExtrasShare = false;
         public double FeedExtraShare = 0.12;
 
         // ---- HUT VOTE: bots wait for humans (audit ranked #7)
@@ -46,7 +49,7 @@ namespace CriticalMass.Sim.Config
         public int HillCapReferenceTeam = 16;
         /// <summary>b16 combine (D, blowouts): false = the cap is HillContributorCap at every team size (the design ruling's
         /// "at most 10 units per team"), so it bites at 16 a side only; true = scaled by team size as above.</summary>
-        public bool HillCapScalesWithSize = true;
+        public bool HillCapScalesWithSize = false;
         /// <summary>Bots on a team already at the cap do something else: hill-job bots past it take the INTERCEPT job (stand on
         /// the enemy's approach, InterceptAlong u of path from the hill toward the enemy pad, and fight whoever comes).</summary>
         public bool HillCapBotsOffHill = true;

@@ -149,11 +149,15 @@ namespace CriticalMass.Sim.Tests
         public void TheExtraKaijuFeedersAreAShareOfTheTeam()
         {
             var got = new List<string>();
+            // b16 combine: the share is OFF by default (it doubled the 5v5 / 8v8 blowouts with the scaled hill cap, probe
+            // 44954708867): two extras at every size; the switch on still gives the share.
             foreach (int size in new[] { 16, 8, 5 }) got.Add(size + ":" + MechRules.FeedExtra(Make(Full(), 1, size), 2));
+            Func<GameConfig> on = () => { GameConfig c = Full(); c.Depth.Mech.FeedExtrasShare = true; return c; };
+            foreach (int size in new[] { 16, 8, 5 }) got.Add("on" + size + ":" + MechRules.FeedExtra(Make(on(), 1, size), 2));
             got.Add("classic16:" + MechRules.FeedExtra(Make(GameConfig.CreateBrowser5v5().ApplyRules(RulesProfile.Classic), 1, 16), 2));
             string s = string.Join(" ", got);
-            Line("extra feeders by team size", s, "16:2 8:1 5:1 classic16:2");
-            Assert.AreEqual("16:2 8:1 5:1 classic16:2", s);
+            Line("extra feeders by team size", s, "16:2 8:2 5:2 on16:2 on8:1 on5:1 classic16:2");
+            Assert.AreEqual("16:2 8:2 5:2 on16:2 on8:1 on5:1 classic16:2", s);
         }
 
         // ------------------------------------------------------------------ 3. the hut vote waits for people
@@ -337,16 +341,20 @@ namespace CriticalMass.Sim.Tests
             Assert.AreEqual(HillState.Contested, Case("12 Farmers v 10 Farmers (cap 10)", full, 16, w => { OnHill(w, TeamId.Azure, ClassId.Farmer, 12, 0); OnHill(w, TeamId.Crimson, ClassId.Farmer, 10, 0); }));
             Assert.AreEqual(HillState.Azure, Case("12 Farmers v 9 Farmers", full, 16, w => { OnHill(w, TeamId.Azure, ClassId.Farmer, 12, 0); OnHill(w, TeamId.Crimson, ClassId.Farmer, 9, 0); }));
             Assert.AreEqual(HillState.Contested, Case("6 Warriors (12, capped 10) v 10 Farmers", full, 16, w => { OnHill(w, TeamId.Azure, ClassId.Warrior, 6, 0); OnHill(w, TeamId.Crimson, ClassId.Farmer, 10, 0); }));
-            Assert.AreEqual(HillState.Contested, Case("8v8: 7 Farmers v 5 Farmers (cap 5)", full, 8, w => { OnHill(w, TeamId.Azure, ClassId.Farmer, 7, 0); OnHill(w, TeamId.Crimson, ClassId.Farmer, 5, 0); }));
-            Assert.AreEqual(HillState.Contested, Case("5v5: 2 Warriors (4, capped 3) v 3 Farmers (cap 3)", full, 5, w => { OnHill(w, TeamId.Azure, ClassId.Warrior, 2, 0); OnHill(w, TeamId.Crimson, ClassId.Farmer, 3, 0); }));
+            // b16 combine: the cap is the ruling's flat 10 at every size (HillCapScalesWithSize false: the scaled 5 / 3 caps doubled
+            // the 8v8 and 5v5 blowouts, probe 44954708867), so below 16 a side the weights decide.
+            Assert.AreEqual(HillState.Azure, Case("8v8: 7 Farmers v 5 Farmers (flat cap 10)", full, 8, w => { OnHill(w, TeamId.Azure, ClassId.Farmer, 7, 0); OnHill(w, TeamId.Crimson, ClassId.Farmer, 5, 0); }));
+            Assert.AreEqual(HillState.Azure, Case("5v5: 2 Warriors (4) v 3 Farmers (flat cap 10)", full, 5, w => { OnHill(w, TeamId.Azure, ClassId.Warrior, 2, 0); OnHill(w, TeamId.Crimson, ClassId.Farmer, 3, 0); }));
             GameConfig classic = GameConfig.CreateBrowser5v5().ApplyRules(RulesProfile.Classic);
             Assert.AreEqual(HillState.Contested, Case("Classic: 1 Warrior v 1 Farmer", classic, 16, w => { OnHill(w, TeamId.Azure, ClassId.Warrior, 1, 0); OnHill(w, TeamId.Crimson, ClassId.Farmer, 1, 0); }));
             Assert.AreEqual(HillState.Azure, Case("Classic: 12 Farmers v 10 Farmers", classic, 16, w => { OnHill(w, TeamId.Azure, ClassId.Farmer, 12, 0); OnHill(w, TeamId.Crimson, ClassId.Farmer, 10, 0); }));
             MechRulesConfig k = new MechRulesConfig();
             string caps = MechRules.CapFor(k, 16) + "/" + MechRules.CapFor(k, 8) + "/" + MechRules.CapFor(k, 5);
             foreach (string l in lines) Line("hill count", l, "weights first, then the cap");
-            Line("cap at 16 / 8 / 5 a side", caps, "10/5/3");
-            Assert.AreEqual("10/5/3", caps);
+            Line("cap at 16 / 8 / 5 a side", caps, "10/10/10 (flat; scaled would be 10/5/3)");
+            Assert.AreEqual("10/10/10", caps);
+            k.HillCapScalesWithSize = true;
+            Assert.AreEqual("10/5/3", MechRules.CapFor(k, 16) + "/" + MechRules.CapFor(k, 8) + "/" + MechRules.CapFor(k, 5), "the scaled switch");
         }
 
         [Test]
