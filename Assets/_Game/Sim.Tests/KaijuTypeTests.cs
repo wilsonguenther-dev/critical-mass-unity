@@ -650,11 +650,15 @@ namespace CriticalMass.Sim.Tests
             var x16On = new WinShare.Tally(); var x16Off = new WinShare.Tally();
             x16On.Add(t16On); x16Off.Add(t16Off);
             var e16On = new WinShare.Tally(); var e16Off = new WinShare.Tally();
-            foreach (int seed in PairedShift.Extra48())
+            // b15 fix round: the 72-seed pool measured a 0.194 shift with a 95% interval of -0.357 to -0.032 (sim run 44871935552;
+            // the control arm, types off, went 48 / 24 while the rule's arm went 34 / 37): an interval as wide as the limit itself
+            // (standard error 0.083 at n 72, a 0.15 limit fails on noise about 7% of the time per team). Same 0.15 limit, judged
+            // on 144 seeds (the 24 plus PairedShift.Extra(120)): standard error 0.059, about 1% per team; the paired interval prints.
+            foreach (int seed in PairedShift.Extra(120))
             {
                 Arm c = RunMatch(seed, 16, false);
                 Arm t = RunMatch(seed, 16, true);
-                Console.WriteLine("[KaijuType] 72-seed pool 16v16 seed " + seed + ": winner control " + c.Winner + ", types on " + t.Winner + " (" + t.Type + ")");
+                Console.WriteLine("[KaijuType] 144-seed pool 16v16 seed " + seed + ": winner control " + c.Winner + ", types on " + t.Winner + " (" + t.Type + ")");
                 x16Off.Add(c.Winner);
                 x16On.Add(t.Winner);
                 e16Off.Add(c.Winner);
@@ -663,7 +667,7 @@ namespace CriticalMass.Sim.Tests
             }
             Console.WriteLine("[KaijuType] 16v16 Azure win share, paired by seed: " + PairedShift.Text(PairedShift.Of(w16On, w16Off)));
             Console.WriteLine("[KaijuType] 16v16 Crimson win share, paired by seed: " + PairedShift.Text(PairedShift.Of(c16On, c16Off)));
-            if (!WinShare.Judge("KaijuType", "16v16 pool of " + x16On.Matches + " (72 seeds)", x16On, x16Off, true)) fails.Add("16v16 win share (see the [win share] line)");
+            if (!WinShare.Judge("KaijuType", "16v16 pool of " + x16On.Matches + " (144 seeds)", x16On, x16Off, true)) fails.Add("16v16 win share (see the [win share] line)");
             // b15 pass 4: the all-match pool takes the same 48 extra 16v16 seeds (112 matches; the 64-match line prints): with the
             // D0 default the 5v5 arms decorrelate too (0.172 / 0.188 on 64 matches at b23f9b6c, sim run 44846571979)
             WinShare.Judge("KaijuType (printed, 64 matches)", "all " + allOn.Matches + " matches", allOn, allOff, false);

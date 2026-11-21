@@ -69,16 +69,21 @@ namespace CriticalMass.Sim.Bots
             double ux = dx / l, uz = dz / l;
             double ex = x + ux * look, ez = z + uz * look;
             if (!SegmentClear.Clear(w.Map, x, z, ex, ez)) return false;
-            double r = w.Config.Class(w.Actors[id].Cls).Radius;
-            double px = -uz * r, pz = ux * r;
+            // b15 fix round: the body is the collider's SQUARE (Collide.BoxFits, half side ActorRadius), so every sample tests
+            // the square's four corners, not two edge points one radius to each side of the line: a diagonal line past a void
+            // corner passed the edge-point test while the square's corner hit the void, and the Miner pressed there for good
+            // (16v16 balance 72 seeds: Miner Task episodes at the bridge mouths (15, 43), (33, 53) and mirrors were 0.62 of all).
+            double r = Collide.ActorRadius(w, id);
             MapDef m = w.Map;
             int n = (int)Math.Ceiling(look / WalkStep);
             for (int k = 1; k <= n; k++)
             {
                 double t = k * look / n, sx = x + ux * t, sz = z + uz * t;
                 if (!MapGrid.IsWalkable(m, JsMath.FloorToInt(sx), JsMath.FloorToInt(sz))) return false;
-                if (!MapGrid.IsWalkable(m, JsMath.FloorToInt(sx + px), JsMath.FloorToInt(sz + pz))) return false;
-                if (!MapGrid.IsWalkable(m, JsMath.FloorToInt(sx - px), JsMath.FloorToInt(sz - pz))) return false;
+                if (!MapGrid.IsWalkable(m, JsMath.FloorToInt(sx + r), JsMath.FloorToInt(sz + r))) return false;
+                if (!MapGrid.IsWalkable(m, JsMath.FloorToInt(sx + r), JsMath.FloorToInt(sz - r))) return false;
+                if (!MapGrid.IsWalkable(m, JsMath.FloorToInt(sx - r), JsMath.FloorToInt(sz + r))) return false;
+                if (!MapGrid.IsWalkable(m, JsMath.FloorToInt(sx - r), JsMath.FloorToInt(sz - r))) return false;
             }
             return true;
         }
@@ -93,11 +98,38 @@ namespace CriticalMass.Sim.Bots
             // Round 1 followed the route whenever there was one (a hit line over a hole or a cliff edge pressed Miners into
             // the base edge), which halved the ore rate (21 ore per Miner bot against 44, 0 of 6 16v16 seeds at L5).
             if (route == null || StraightWalk(w, id, x, z, gx, gz)) return;
-            if (route != null && FlowField.SampleFlowDir(route, w.Map, x, z, out double dx, out double dz))
+            if (route != null && RouteStep(route, w.Map, x, z, out double dx, out double dz))
             {
                 tx = x + dx * Carrot;
                 tz = z + dz * Carrot;
             }
+        }
+
+        /// <summary>
+        /// b15 fix round: the route's step as a heading to the CENTRE of the next cell (the flow field's 8-way step from the
+        /// bot's cell), not the raw 8-way direction. The raw direction kept an off-centre body on its line: at a bridge mouth a
+        /// Miner 0.1 u off the cell centre walked straight along the column while its square clipped the void beside the next
+        /// cell, the corner nudge (CornerNudgeMax) could not take the overlap, and it pressed there (probe 44878610540: 190 of
+        /// 305 stuck episodes in 24 matches, all Miner bots on Task, at fixed points like (15.65, 43.55) and (33.55, 53.32)).
+        /// Heading to the next centre moves the body onto the lane the field's step is legal for. False = the field has no step.
+        /// </summary>
+        static bool RouteStep(FlowField route, MapDef map, double x, double z, out double mx, out double mz)
+        {
+            mx = 0;
+            mz = 0;
+            if (!FlowField.SampleFlowDir(route, map, x, z, out double fx, out double fz)) return false;
+            int nx = JsMath.FloorToInt(x) + (fx > 1e-9 ? 1 : fx < -1e-9 ? -1 : 0);
+            int nz = JsMath.FloorToInt(z) + (fz > 1e-9 ? 1 : fz < -1e-9 ? -1 : 0);
+            double hx = nx + 0.5 - x, hz = nz + 0.5 - z, l = Math.Sqrt(hx * hx + hz * hz);
+            if (l < 1e-9)
+            {
+                mx = fx;
+                mz = fz;
+                return true;
+            }
+            mx = hx / l;
+            mz = hz / l;
+            return true;
         }
 
         /// <summary>Offers the Miner's task utilities (BotFsm.ConsiderExternal) before the state is chosen.</summary>
@@ -320,7 +352,7 @@ namespace CriticalMass.Sim.Bots
             }
             // Walk on: the route's step (or straight at a clear goal), and the steering point moves with the bot.
             double mx = gx - x, mz = gz - z;
-            if (route != null && !StraightWalk(w, id, x, z, gx, gz) && FlowField.SampleFlowDir(route, w.Map, x, z, out double fx, out double fz))
+            if (route != null && !StraightWalk(w, id, x, z, gx, gz) && RouteStep(route, w.Map, x, z, out double fx, out double fz))
             {
                 mx = fx;
                 mz = fz;

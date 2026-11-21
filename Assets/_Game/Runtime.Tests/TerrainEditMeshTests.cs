@@ -32,6 +32,25 @@ namespace CriticalMass.Runtime.Tests
         static byte[] All(byte t, int n = W * H) => Enumerable.Repeat(t, n).ToArray();
         static double[] Heights(int n = W * H) => Enumerable.Repeat(G, n).ToArray();
 
+        /// <summary>b15 fix round: the rebuild cost as the MEDIAN of Batches batch means (PerBatch builds each), so one stall of
+        /// the shared CI runner (GC, the editor's own work) does not decide the check; the limit is unchanged. Same code measured
+        /// 4.70 to 4.80 ms on unity-ci 44857982412 and 5.93 to 6.15 ms on 44862751989 / 44872173510 (the wave-one square-pit
+        /// path too, and the usual chunk +38%): runner speed, not the mesh code.</summary>
+        static double MedianBatchMs(Action build, int batches, int perBatch, out string spread)
+        {
+            var means = new double[batches];
+            var sw = new Stopwatch();
+            for (int b = 0; b < batches; b++)
+            {
+                sw.Restart();
+                for (int k = 0; k < perBatch; k++) build();
+                means[b] = sw.Elapsed.TotalMilliseconds / perBatch;
+            }
+            Array.Sort(means);
+            spread = $"min {means[0]:0.###} median {means[batches / 2]:0.###} max {means[batches - 1]:0.###} over {batches} batches of {perBatch}";
+            return means[batches / 2];
+        }
+
         static void Print(string what, double value, string limit) =>
             Debug.Log($"[TerrainEdits] {what}: {value:0.####} (limit {limit})");
 
@@ -298,12 +317,11 @@ namespace CriticalMass.Runtime.Tests
             var m = new TerrainEditMesh();
             var mesh = new Mesh();
             for (int k = 0; k < 3; k++) { m.Build(N, N, cells, h, pristine, touched, 16, 16, 32, 32); m.Upload(mesh); m.Build(N, N, cells, h, pristine, touched, 32, 16, 48, 32); }
-            const int Runs = 50;
-            var sw = Stopwatch.StartNew();
+            const int Runs = 50, Batches = 9, PerBatch = 10;
             long before = GC.GetAllocatedBytesForCurrentThread();
             for (int k = 0; k < Runs; k++) m.Build(N, N, cells, h, pristine, touched, 16, 16, 32, 32);
             long alloc = GC.GetAllocatedBytesForCurrentThread() - before;
-            double ms = sw.Elapsed.TotalMilliseconds / Runs;
+            double ms = MedianBatchMs(() => m.Build(N, N, cells, h, pristine, touched, 16, 16, 32, 32), Batches, PerBatch, out string spread);
             long beforeUp = GC.GetAllocatedBytesForCurrentThread();
             m.Upload(mesh);
             long allocUp = GC.GetAllocatedBytesForCurrentThread() - beforeUp;
@@ -317,16 +335,15 @@ namespace CriticalMass.Runtime.Tests
             c2[25 * N + 20] = c2[25 * N + 21] = c2[25 * N + 22] = Cell.LowWall;
             byte[] p2 = All(Cell.Floor, N * N);
             for (int k = 0; k < 3; k++) m.Build(N, N, c2, h, p2, t2, 16, 16, 32, 32);
-            sw.Restart();
             long before2 = GC.GetAllocatedBytesForCurrentThread();
             for (int k = 0; k < Runs; k++) m.Build(N, N, c2, h, p2, t2, 16, 16, 32, 32);
             long alloc2 = GC.GetAllocatedBytesForCurrentThread() - before2;
-            double ms2 = sw.Elapsed.TotalMilliseconds / Runs;
+            double ms2 = MedianBatchMs(() => m.Build(N, N, c2, h, p2, t2, 16, 16, 32, 32), Batches, PerBatch, out string spread2);
 
             Print($"worst chunk ({pits} pits of 256 cells, {walls} short walls): managed bytes over {Runs} rebuilds", alloc, "== 0");
-            Print("worst chunk rebuild mean ms (CI editor, managed build only)", ms, "< 5.0 (15% of a 33.3 ms frame)");
+            Print("worst chunk rebuild ms, median of batch means (CI editor, managed build only; " + spread + ")", ms, "< 5.0 (15% of a 33.3 ms frame)");
             Print("usual chunk (3x3 dig, a fill, 3 blocks): managed bytes over " + Runs + " rebuilds", alloc2, "== 0");
-            Print("usual chunk rebuild mean ms", ms2, "< 1.0");
+            Print("usual chunk rebuild ms, median of batch means (" + spread2 + ")", ms2, "< 1.0");
             Print("mesh upload managed bytes (printed, not asserted)", allocUp, "info");
             Print("worst chunk triangles", worstTris, "info (draw calls added: one per chunk with edits)");
             Print("usual chunk triangles", m.Tris.Count / 3, "info");

@@ -46,10 +46,15 @@ namespace CriticalMass.Sim.Tests.Harness
             + r.Hi.ToString("+0.000;-0.000", CultureInfo.InvariantCulture) + ", n " + r.N + ")";
 
         /// <summary>The 48 16v16 seeds after WinShare.Seeds16 that make the 72-seed pool (B15SweepTests.Seeds72's tail).</summary>
-        public static int[] Extra48()
+        public static int[] Extra48() => Extra(48);
+
+        /// <summary>b15 fix round: the first `count` 16v16 seeds after WinShare.Seeds16 on the same scheme (Extra(48) is the
+        /// 72-seed pool's tail; Extra(120) makes the 144-seed pool: standard error of a win-share shift sqrt(0.5 / 144) = 0.059,
+        /// so a 0.15 limit fails on noise alone about 1% of the time per team).</summary>
+        public static int[] Extra(int count)
         {
-            var s = new int[48];
-            for (int i = 0; i < 48; i++) s[i] = 50000 + (i + 24) * 7919;
+            var s = new int[count];
+            for (int i = 0; i < count; i++) s[i] = 50000 + (i + 24) * 7919;
             return s;
         }
     }
