@@ -41,12 +41,13 @@ namespace CriticalMass.Runtime.View.Effects
         // ---- palette (sRGB; three flat tone steps per material, Void Navy outline) ----
         public static readonly Color32 Navy = new Color32(24, 35, 59, 255);
         // b15 combat feel (routed patch from PR #222, blind-spot audit P5 / A2): hit colour stays out of the team hues. The blood
-        // tones are the FULL-gore violet-brown of View.Effects.ImpactPalette (GoreLight / GoreMid / GoreDark, PR #222): at least
-        // 30 degrees of hue from Azure, Crimson and the colour-blind pair. Same values, inlined until #222 lands on this base.
-        public static readonly Color32 BloodLight = new Color32(128, 62, 100, 255), BloodMid = new Color32(96, 44, 74, 255), BloodDark = new Color32(62, 28, 48, 255);
-        /// <summary>Hit sparks and impact dust (ImpactPalette.SparkHot / SparkMid / SparkEdge / DustLight / DustDark, PR #222): neutral, under 0.25 saturation.</summary>
-        public static readonly Color32 SparkHot = new Color32(255, 250, 236, 255), SparkMid = new Color32(255, 240, 200, 255), SparkEdge = new Color32(238, 222, 184, 255);
-        public static readonly Color32 DustLight = new Color32(200, 190, 172, 255), DustDark = new Color32(128, 120, 108, 255);
+        // tones ARE the FULL-gore violet-brown of ImpactPalette (GoreLight / GoreMid / GoreDark): at least 30 degrees of hue from
+        // Azure, Crimson and the colour-blind pair. Wave-two combine: read from ImpactPalette (one source), and the duplicate
+        // DustLight / DustDark the inlined copy declared next to the puff dust below (CS0102) is gone.
+        public static readonly Color32 BloodLight = ImpactPalette.GoreLight, BloodMid = ImpactPalette.GoreMid, BloodDark = ImpactPalette.GoreDark;
+        /// <summary>Hit sparks (ImpactPalette, PR #222): neutral cream / white, under 0.25 saturation (the old SparkYellow sat
+        /// beside the colour-blind Crimson amber #FFB000).</summary>
+        public static readonly Color32 SparkHot = ImpactPalette.SparkHot, SparkMid = ImpactPalette.SparkMid, SparkEdge = ImpactPalette.SparkEdge;
         // World around arena 1 (2026-11-13): marks left ON THE GROUND by hits and knock-outs (splats, drips, the stamped
         // paint) are a neutral dark ink, not red. Red ground paint read as "Crimson team" under every fight, which breaks
         // the bible's reserved-hue rule (art direction 2026-11-12: ground decals for hits and knock-outs are neutral marks
@@ -670,7 +671,7 @@ namespace CriticalMass.Runtime.View.Effects
             float up = kind == 3 ? 3.2f : kind == 5 ? 2.4f + R01(seed, k + 204) * 2f : kind == 6 ? 4f + R01(seed, k + 204) * 2.5f : 1.5f + R01(seed, k + 202) * 2.5f;
             s.V = dir * sp + Vector3.up * up;
             s.Size = (kind == 3 ? 0.12f : kind == 6 ? 0.1f : 0.09f) + R01(seed, k + 203) * 0.06f;
-            s.Col = kind == 2 ? Steel : kind == 3 ? BiomassC : kind == 5 ? FireOrange : kind == 6 ? WaterMid : kind == 7 ? DirtMid : SparkYellow;
+            s.Col = kind == 2 ? Steel : kind == 3 ? BiomassC : kind == 5 ? FireOrange : kind == 6 ? WaterMid : kind == 7 ? DirtMid : kind == 1 ? SparkMid : SparkYellow;   // b15: a hit spark (kind 1) is ImpactPalette neutral
             s.Kind = kind;
             s.Life = SparkLife * (kind == 3 ? 2.2 : kind == 5 ? 3.6 : kind == 6 ? 1.8 : 1.0);
         }
@@ -883,13 +884,15 @@ namespace CriticalMass.Runtime.View.Effects
                     }
                     default:
                     {
-                        Color32 mid = b.Kind == 2 ? Steel : b.Kind == 3 ? BiomassC : SparkYellow;
+                        // b15 wave two: a hit burst (kinds 0 and 1) is ImpactPalette neutral (cream body, warm-sand core), no
+                        // yellow / orange that reads as the colour-blind Crimson amber; block steel and biomass keep their tones.
+                        Color32 mid = b.Kind == 2 ? Steel : b.Kind == 3 ? BiomassC : b.Kind <= 1 ? SparkMid : SparkYellow;
                         int pts = b.Kind == 2 ? 6 : 8;
-                        if (b.Kind == 1) Slash(air, p, sR, sU, b.Size * 1.1f, 0.15f, t, fade, SparkYellow, SparkWhite, 1.0f);
+                        if (b.Kind == 1) Slash(air, p, sR, sU, b.Size * 1.1f, 0.15f, t, fade, SparkMid, SparkWhite, 1.0f);
                         air.Star(p, camRight, camUp, s * 1.22f + 0.04f, 0.42f, pts, b.Rot, A(Navy, fade));
                         air.Star(p, camRight, camUp, s, 0.42f, pts, b.Rot, A(mid, fade));
                         air.Star(p, camRight, camUp, s * 0.62f, 0.5f, pts, b.Rot + 0.2f, A(SparkWhite, fade));
-                        if (b.Kind == 0 || b.Kind == 1) air.Blob(p, camRight, camUp, s * 0.24f, null, 8, 0, A(SparkOrange, fade));
+                        if (b.Kind == 0 || b.Kind == 1) air.Blob(p, camRight, camUp, s * 0.24f, null, 8, 0, A(SparkEdge, fade));
                         break;
                     }
                 }

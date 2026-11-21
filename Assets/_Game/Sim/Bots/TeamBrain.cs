@@ -310,12 +310,49 @@ namespace CriticalMass.Sim.Bots
         }
 
         /// <summary>
-        /// (d) HOOK for TerrainHeight (PR #211: stacked blocks, walkable pits, height ladders). Not on this base, so nothing
-        /// can be called. When #211 lands: behind its TerrainHeight.Enabled check, a Builder bot whose hill route is blocked
-        /// stacks a step, and a Miner on a lost hill (JobCalled) digs a pit in the enemy's approach. Until then a no-op.
+        /// (d) HOOK for TerrainHeight (PR #211: stacked blocks, walkable pits, height ladders). Wired at the wave-two combine,
+        /// movement verbs only: a 1-level step needs nothing (WalkUp), and a bot walking at a ledge exactly a CLIMB high
+        /// (more than WalkUp, at most JumpUp levels above its own level, not a ladder or deck) JUMPS it instead of pushing
+        /// ClimbTicks into the wall (an airborne mover passes JumpUp levels, TerrainHeight.SweepBegin). The route field already
+        /// sends bots up such edges (EdgeExtra PathCostStep2). Same probe and jump cadence as BotReflex.JumpOverLowWall; no RNG,
+        /// no allocation, nothing without the layer or the dodge/jump rule. Not built here (follow-up): a Builder bot that
+        /// STACKS a step on a blocked route, a Miner that DIGS a pit in the enemy's approach.
         /// </summary>
         internal static void TerrainVerbsHook(World w, BotsState st, int id, InputFrame output)
         {
+            MapDef map = w.Map;
+            if (map.Lift == null || !Dodge.On(w) || output.Jump) return;
+            Actor a = w.Actors[id];
+            if (!a.Alive || a.AirLen > 0 || a.StandUp > 0) return;
+            double mx = output.MoveX, mz = output.MoveZ;
+            double ml = Math.Sqrt(mx * mx + mz * mz);
+            if (!(ml > 0.3)) return;
+            DodgeState s = w.Dodges;
+            s.Ensure(w);
+            DodgeConfig dc = w.Config.Depth.Dodge;
+            if (w.Tick - s.LastJump[id] < dc.JumpEveryTicks) return;
+            TerrainHeightConfig hc = w.Config.Depth.TerrainHeight;
+            int own = TerrainHeight.ActorLevel(w, id);
+            mx /= ml;
+            mz /= ml;
+            double x = w.X[id], z = w.Z[id];
+            int here = JsMath.FloorToInt(z) * map.Width + JsMath.FloorToInt(x);
+            for (int q = 1; q <= 2; q++)
+            {
+                double d = dc.JumpProbe * q * 0.5;
+                int cx = JsMath.FloorToInt(x + mx * d), cz = JsMath.FloorToInt(z + mz * d);
+                if (!MapGrid.InBounds(map, cx, cz)) return;
+                int i = cz * map.Width + cx;
+                if (i == here) continue;
+                if (!TerrainHeight.IsLiftType(map.Cells[i])) return;   // a wall, void, a ladder or deck (a ramp): not a jump
+                int rise = map.Lift[i] - own;
+                if (rise <= hc.WalkUp) continue;   // level or a step: walk on
+                if (rise > hc.JumpUp) return;      // too high to jump: the route goes round
+                output.Jump = true;
+                s.LastJump[id] = w.Tick;
+                st.TerrainJumps++;
+                return;
+            }
         }
     }
 }

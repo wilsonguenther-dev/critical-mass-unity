@@ -424,10 +424,17 @@ namespace CriticalMass.Runtime.View.Anim
                 // sail): no body tint, no painted glow pattern (the plates and vents are modelled, code 2), and a half lift
                 // (its palette is authored a value step above the old dark slate). The soft fresnel in the type hue stays.
                 bool parts = m.Spec?.Variants != null && m.Spec.Variants.Length > 0;
-                Vector4 body = parts ? Vector4.one : KaijuTypeLook.BodyRatio(type);
-                _typeBlock.SetVector("_MidRatio", body * (parts ? KaijuTypeLook.PartsMidLift : KaijuTypeLook.MidLift));
-                _typeBlock.SetVector("_ShadowRatio", body * (parts ? KaijuTypeLook.PartsShadowLift : KaijuTypeLook.ShadowLift));
-                _typeBlock.SetFloat("_LitMultiplier", parts ? KaijuTypeLook.PartsLitLift : KaijuTypeLook.LitLift);
+                // b15 wave-two combine (one lift, not two): the world look's character band + gain (CMToon charW, rim above
+                // 0) already lifts every character, the Kaiju included, so a parts model takes NO extra band lift here (the
+                // material's own ratios and lit multiplier stand), and a model without part sets keeps only its type tint
+                // (BodyRatio) without the b14 value lift (LitLift / MidLift / ShadowLift). The lift constants are kept for the
+                // in-Editor value probe (EDITOR-CHECKLIST: Kaiju brightness) in case the world look's lift alone reads flat.
+                if (!parts)
+                {
+                    Vector4 body = KaijuTypeLook.BodyRatio(type);
+                    _typeBlock.SetVector("_MidRatio", body);
+                    _typeBlock.SetVector("_ShadowRatio", body);
+                }
                 Color g = ArtMaterials.Hex(KaijuTypeLook.GlowHex(type));
                 g.a = KaijuTypeLook.GlowStrength;
                 _typeBlock.SetColor("_KaijuGlow", g);

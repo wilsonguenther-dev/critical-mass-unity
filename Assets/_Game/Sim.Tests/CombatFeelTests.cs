@@ -640,15 +640,23 @@ namespace CriticalMass.Sim.Tests
         [Test]
         public void TheRuleOffIsTheShippedFullGameBitForBit()
         {
-            // SimPhysicsSoakTests.Golden Full row before b15 (b14-c, sim run 44159219254).
-            ulong off = MatchHash.Run(1, 16, 3600, ClassId.Warrior, null, c => { c.ApplyRules(RulesProfile.Full); c.Depth.CombatFeel.Enabled = false; });
+            // Batch 15 wave-two combine: with the four wave-two switches off (combat feel, bot brain, comeback, hut choices) the
+            // Full game is wave one's, bit for bit: SimPhysicsSoakTests.Golden Full row of batch 15 cand1 (sim run 44835452641).
+            ulong off = MatchHash.Run(1, 16, 3600, ClassId.Warrior, null, c =>
+            {
+                c.ApplyRules(RulesProfile.Full);
+                c.Depth.CombatFeel.Enabled = false;
+                c.Depth.BotBrain.Enabled = false;
+                c.Depth.Comeback.Enabled = false;
+                c.Depth.HutChoices.Enabled = false;
+            });
             ulong on = MatchHash.Run(1, 16, 3600, ClassId.Warrior, null, c => c.ApplyRules(RulesProfile.Full));
             ulong on2 = MatchHash.Run(1, 16, 3600, ClassId.Warrior, null, c => c.ApplyRules(RulesProfile.Full));
             ulong cls = MatchHash.Run(1, 16, 3600, ClassId.Warrior, null, c => c.ApplyRules(RulesProfile.Classic));
             ulong phys = MatchHash.Run(1, 16, 3600, ClassId.Warrior, null, c => c.ApplyRules(RulesProfile.PhysicsOnly));
             Console.WriteLine("{\"item\":\"b15 hashes\",\"fullOff\":\"0x" + off.ToString("X16") + "\",\"fullOn\":\"0x" + on.ToString("X16") + "\",\"classic\":\"0x" + cls.ToString("X16") +
                               "\",\"physicsOnly\":\"0x" + phys.ToString("X16") + "\"}");
-            Assert.AreEqual(0xC0111682BA7C9FD6UL, off, "CombatFeel.Enabled = false is the b14 Full game");
+            Assert.AreEqual(0x2B40BAD073394FD6UL, off, "the wave-two switches off are the batch 15 cand1 (wave one) Full game");
             Assert.AreEqual(0x5C912AEED16BC302UL, cls, "Classic unchanged");
             Assert.AreEqual(0x0836DA5FD21C4854UL, phys, "PhysicsOnly unchanged");
             Assert.AreEqual(on, on2, "same seed, same match (determinism)");

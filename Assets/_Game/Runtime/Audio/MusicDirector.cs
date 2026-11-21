@@ -82,8 +82,17 @@ namespace CriticalMass.Runtime.Audio
         /// berserk play the layered Skybreak score (ScoreMix, Resources CMScore/), so they have no single track.</summary>
         public static readonly string[] TrackNames = { null, "music-title", null, null, null, "music-title" };
         /// <summary>b15: the rally hook for the comeback rule (feat/b15-comeback-hut): true while the local player's team has
-        /// its rally on. Null (no rule) = never rally.</summary>
-        public static Func<World, bool> RallyProbe;
+        /// its rally on. Null = never rally. Wired at the wave-two combine: the local team is earning RALLY credit
+        /// (Comeback.Earning, the same read as the HUD's RALLY tag; false with the rule off).</summary>
+        public static Func<World, bool> RallyProbe = LocalTeamRallies;
+
+        static bool LocalTeamRallies(World w)
+        {
+            if (w == null || w.ActorCount <= 0 || w.Rally == null) return false;
+            int seat = LocalSeat.Actor;
+            if (seat < 0 || seat >= w.ActorCount) return false;
+            return CriticalMass.Sim.Core.Comeback.Earning(w, w.Actors[seat].Team);
+        }
         /// <summary>b15: the score's current target (tests, captures; default before the first match).</summary>
         public static ScoreTarget CurrentScore => Instance != null ? Instance._target : default;
 

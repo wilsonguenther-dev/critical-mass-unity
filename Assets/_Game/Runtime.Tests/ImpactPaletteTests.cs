@@ -52,11 +52,15 @@ namespace CriticalMass.Runtime.Tests
                                       GoreShots.CrimsonLike(c) + " -> " + (ok ? "PASS" : "FAIL"));
                 Assert.IsTrue(ok, Hex(c) + " reads as a team colour");
             }
-            // Today's FxScene blood is what this replaces: it fails the same rule (printed so the routed patch has a reason).
-            double old = ImpactPalette.NearestTeamHueGap(FxScene.BloodMid);
-            TestContext.WriteLine("current FxScene.BloodMid " + Hex(FxScene.BloodMid) + ": nearest team hue gap=" + old.ToString("0.0") +
-                                  " deg (routed to feat/b15-combat-feel: use ImpactPalette.GoreMid)");
+            // The old FxScene blood red (150,18,34) fails the same rule: the measure really catches a crimson-like red. Since the
+            // wave-two combine FxScene's blood IS ImpactPalette's gore (feat/b15-combat-feel took the routed patch).
+            var oldRed = new Color32(150, 18, 34, 255);
+            double old = ImpactPalette.NearestTeamHueGap(oldRed);
+            TestContext.WriteLine("old FxScene.BloodMid " + Hex(oldRed) + ": nearest team hue gap=" + old.ToString("0.0") +
+                                  " deg; FxScene.BloodMid now " + Hex(FxScene.BloodMid) + " (ImpactPalette.GoreMid " + Hex(ImpactPalette.GoreMid) + ")");
             Assert.Less(old, ImpactPalette.MinTeamHueGapDeg, "the measure really catches a crimson-like red");
+            Assert.AreEqual(Hex(ImpactPalette.GoreMid), Hex(FxScene.BloodMid), "FxScene blood is ImpactPalette's gore");
+            Assert.AreEqual(Hex(ImpactPalette.SparkMid), Hex(FxScene.SparkMid), "FxScene hit sparks are ImpactPalette's neutral");
         }
     }
 }
