@@ -307,9 +307,25 @@ namespace CriticalMass.Sim.Tests
             {
                 // b13 r3 integrator: 16v16 on 24 seeds (was 6: hill lead changes swung 18/14 to 9/22 with dodge-unrelated rules; the
                 // walls owner ruling, 24 seeds at 16v16, applies the same way)
-                int[] seeds = size == 16 ? WinShare.Seeds16 : new[] { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20 };
+                // b15 wave two (the sized pool of PR #219, Sim.Tests/Harness/PairedShift.cs; limits unchanged): the 16v16 lines are
+                // judged on the 72-seed pool (WinShare.Seeds16 + PairedShift.Extra48). With the b15 comeback rule matches are close
+                // and a close match flips on any perturbation, so the same-seed arms decorrelate: the noise of a 24-seed win-share
+                // shift is up to sqrt(0.5 / 24) = 0.144 against the 0.15 limit, 0.083 at 72. The 24-seed lines still print.
+                int[] seeds = size == 16 ? Concat(WinShare.Seeds16, PairedShift.Extra48()) : new[] { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20 };
                 var arms = new[] { new Arm(), new Arm() };
-                foreach (int seed in seeds) for (int a = 0; a < 2; a++) PlayMatch(seed, size, a == 0, arms[a]);
+                var lcOn = new List<double>();
+                var lcOff = new List<double>();
+                for (int si = 0; si < seeds.Length; si++)
+                {
+                    int lc0 = arms[0].LeadChanges, lc1 = arms[1].LeadChanges;
+                    for (int a = 0; a < 2; a++) PlayMatch(seeds[si], size, a == 0, arms[a]);
+                    lcOn.Add(arms[0].LeadChanges - lc0);
+                    lcOff.Add(arms[1].LeadChanges - lc1);
+                    if (size == 16 && si == WinShare.Seeds16.Length - 1)
+                        Console.WriteLine("{\"item\":\"b13-jd 16v16 first 24 seeds (printed, judged on the 72-seed pool)\",\"leadChangesOn\":" + arms[0].LeadChanges + ",\"leadChangesControl\":" + arms[1].LeadChanges +
+                                          ",\"azureWinsOn\":" + arms[0].Wins[0] + ",\"azureWinsControl\":" + arms[1].Wins[0] + ",\"crimsonWinsOn\":" + arms[0].Wins[1] + ",\"crimsonWinsControl\":" + arms[1].Wins[1] + "}");
+                }
+                Console.WriteLine("{\"item\":\"b13-jd lead changes paired\",\"size\":" + size + ",\"line\":\"" + PairedShift.Text(PairedShift.Of(lcOn, lcOff), "0.00") + "\"}");
                 for (int a = 0; a < 2; a++) { all[a].Matches += arms[a].Matches; for (int t = 0; t < 3; t++) all[a].Wins[t] += arms[a].Wins[t]; }
                 string tag = size + "v" + size;
                 double kOn = arms[0].Kills / Math.Max(1e-9, arms[0].Minutes), kOff = arms[1].Kills / Math.Max(1e-9, arms[1].Minutes);
@@ -340,6 +356,14 @@ namespace CriticalMass.Sim.Tests
             }
             if (!WinShare.Judge("b13-jd dodge", "all " + all[0].Matches + " matches", TallyOf(all[0]), TallyOf(all[1]), false)) failures.Add("all-match win share (see the [win share] line)");
             Assert.IsEmpty(failures, string.Join("\n", failures));
+        }
+
+        private static int[] Concat(int[] a, int[] b)
+        {
+            var r = new int[a.Length + b.Length];
+            a.CopyTo(r, 0);
+            b.CopyTo(r, a.Length);
+            return r;
         }
 
         private static WinShare.Tally TallyOf(Arm a) => new WinShare.Tally { Azure = a.Wins[0], Crimson = a.Wins[1], Draws = a.Wins[2] };
@@ -394,7 +418,9 @@ namespace CriticalMass.Sim.Tests
             var scratches = new InputFrame[2];
             for (int arm = 0; arm < 2; arm++)
             {
-                worlds[arm] = World.CreateWorld(new WorldOptions { Seed = 4242, TeamSize = 16, HumanTeam = TeamId.Azure, HumanClass = ClassId.Warrior, Config = MatchConfig(16, arm == 0) });
+                GameConfig ac = MatchConfig(16, arm == 0);
+                ac.Depth.CombatFeel.Enabled = false; // b15: whole-tick bytes compare the b13 fights; CombatFeelTests holds the feel rule's own calls to 0 B
+                worlds[arm] = World.CreateWorld(new WorldOptions { Seed = 4242, TeamSize = 16, HumanTeam = TeamId.Azure, HumanClass = ClassId.Warrior, Config = ac });
                 scratches[arm] = SimInput.EmptyInput();
                 for (int t = 0; t < Warm; t++) MatchTick.Advance(worlds[arm], null, scratches[arm]);
             }

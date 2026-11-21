@@ -101,7 +101,7 @@ namespace CriticalMass.Runtime.PlayTests
                 yield return Send(new KeyboardState(Key.Space));
                 Assert.IsTrue(StoryIntro.IsPlaying, "Space on the first frame does not skip (story intro 2)");
                 yield return Send(new KeyboardState());
-                yield return WaitFilmTime(1.0);
+                yield return WaitFilmTime(SkipGate.LockSeconds * 0.5);   // b15: the lock is 1 s now
                 Assert.IsTrue(StoryIntro.IsPlaying);
                 yield return Send(new KeyboardState(Key.Space));   // pressed inside the lock and held through it
                 yield return WaitFilmTime(SkipGate.LockSeconds + 0.3);

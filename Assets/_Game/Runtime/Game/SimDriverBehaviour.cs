@@ -204,7 +204,7 @@ namespace CriticalMass.Runtime.Game
         }
 
         /// <summary>b13-replay: ReplayPlayback's interpolation fraction for this frame.</summary>
-        internal void ReplayAlpha(double alpha) => Alpha = alpha;
+        internal void ReplayAlpha(double alpha) => Alpha = ViewAlpha.Hold(alpha, ViewAlpha.Ended(World));   // b15: still after the end
 
         private void ForwardTicked(World w)
         {
@@ -254,7 +254,7 @@ namespace CriticalMass.Runtime.Game
             {
                 float cd = Time.captureDeltaTime;
                 FrameDt = Math.Min(cd > 0f ? cd : Time.unscaledDeltaTime, MaxFrameDt);
-                Alpha = _online.Alpha;   // the session ticks in OnlineRunner; never paused, never sped up
+                Alpha = ViewAlpha.Hold(_online.Alpha, ViewAlpha.Ended(World));   // the session ticks in OnlineRunner; never paused, never sped up (b15: still after the end)
                 return;
             }
             if (CriticalMass.Runtime.Game.LoadTimer.Armed) CriticalMass.Runtime.Game.LoadTimer.FirstUpdate();   // perf/start-hitch-1: every Start() of the load frame has run
@@ -271,7 +271,7 @@ namespace CriticalMass.Runtime.Game
             // perf-smooth-1: no tick while the world art is still building over frames (a player's match start, behind the
             // loading screen): the match starts from the same state, only later in wall time.
             // first-run-warm-2: nor while the first-run warm-up runs (FirstRunWarm.HoldsSim, capped), the automated match included.
-            bool paused = (input != null && input.State.Paused) || View.Dressing.WorldView.Building || FirstRunWarm.HoldsSim ||
+            bool paused = (input != null && input.State.Paused) || View.Dressing.WorldView.Building || View.Dressing.WorldView.AwaitsWorld(World) || FirstRunWarm.HoldsSim ||
                           BackdropHeld(Request != null && Request.Backdrop, CriticalMass.Runtime.Hud.TitleBackdrop.Frozen);
             // DG-60: after a hitch at most SimClock.TickCap ticks run this frame and the rest of the backlog is dropped
             // (counted), so one slow frame never makes the next one slow too. Same inputs per tick: determinism holds.
@@ -279,7 +279,7 @@ namespace CriticalMass.Runtime.Game
             for (int i = 0; i < ticks; i++) Tick(input);
             RuntimeCounters.SimDroppedSeconds = _clock.DroppedSimSeconds;
             RuntimeCounters.SimDroppedTicks = _clock.DroppedTicks;
-            Alpha = _clock.Alpha(_dt);
+            Alpha = ViewAlpha.Hold(_clock.Alpha(_dt), ViewAlpha.Ended(World));   // b15 world look: no shiver behind the result screen
         }
 
         /// <summary>

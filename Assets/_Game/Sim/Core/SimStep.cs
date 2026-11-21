@@ -47,6 +47,7 @@ namespace CriticalMass.Sim.Core
             Blacksmith.HutSystem(w);   // b13-hook: CM b13 [H]
             SimProfile.Begin?.Invoke(SimProfile.KaijuHill);   // fix/frame-cost-1: "CM.KaijuHill" in the player (timing only)
             Kaiju.KaijuSystem(w, dt);
+            TerrainHeight.HeightSystem(w); // b15 terrain height: the Kaiju smashes stacks of 2+ under its body (no-op without the rule)
             SimProfile.End?.Invoke(SimProfile.KaijuHill);
             Stations.StationSystem(w); // U-065: upgrade purchases at the base station
             PingRules.PingSystem(w); // U-067: pings in, orders out, the bots' own calls

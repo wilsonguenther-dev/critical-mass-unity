@@ -104,6 +104,11 @@ namespace CriticalMass.Runtime.View
             {
                 var pivot = new GameObject("Pillar " + k).transform;
                 pivot.SetParent(_root, false);
+                _pivots[k] = pivot;
+                // b15 (WORLD-AUDIT W04): the column is the environment kit's modelled ruin column (the one the world plan
+                // places at the pillar, which WorldView no longer draws so it is not doubled), scaled to PillarHeight; it
+                // topples here. The Unity cylinder stays only as the fallback when the kit is not imported.
+                if (KitColumn(pivot)) continue;
                 GameObject col = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
                 Destroy(col.GetComponent<Collider>());
                 col.name = "Column";
@@ -112,7 +117,6 @@ namespace CriticalMass.Runtime.View
                 col.transform.localScale = new Vector3(PillarWidth, PillarHeight * 0.5f, PillarWidth);
                 col.transform.localPosition = new Vector3(0, PillarHeight * 0.5f, 0);
                 col.GetComponent<Renderer>().sharedMaterial = stone;
-                _pivots[k] = pivot;
             }
 
             // Fall markers: a warm arrow on the ground toward the ramp side, a red one toward the wall side.
@@ -149,7 +153,48 @@ namespace CriticalMass.Runtime.View
             }
         }
 
-        /// <summary>A flat ground arrow from the pillar foot along dir: a shaft and a diamond head (no colliders).</summary>
+        /// <summary>The kit piece drawn as the knock-down pillar.</summary>
+        public const string ColumnPiece = "env_ruin_column_intact";
+        /// <summary>True: the pillar is the kit's modelled column (WorldView then leaves the plan's "decor" column undrawn).</summary>
+        public static bool DrawsKitColumn = true;
+
+        /// <summary>Instantiates the kit column under the pivot, foot on the pivot, scaled uniformly to PillarHeight. False when
+        /// the kit or the piece is missing.</summary>
+        private static bool KitColumn(Transform pivot)
+        {
+            if (!DrawsKitColumn) return false;
+            var cat = Dressing.WorldKitCatalog.Load();
+            GameObject model = cat != null ? cat.Find(ColumnPiece) : null;
+            if (model == null) return false;
+            float lo = float.MaxValue, hi = float.MinValue;
+            foreach (MeshFilter mf in model.GetComponentsInChildren<MeshFilter>(true))
+            {
+                if (mf.sharedMesh == null) continue;
+                Matrix4x4 m = model.transform.worldToLocalMatrix * mf.transform.localToWorldMatrix;
+                Bounds b = mf.sharedMesh.bounds;
+                for (int c = 0; c < 8; c++)
+                {
+                    Vector3 v = b.center + Vector3.Scale(b.extents, new Vector3((c & 1) == 0 ? -1 : 1, (c & 2) == 0 ? -1 : 1, (c & 4) == 0 ? -1 : 1));
+                    float y = m.MultiplyPoint3x4(v).y;
+                    lo = Mathf.Min(lo, y); hi = Mathf.Max(hi, y);
+                }
+            }
+            if (!(hi > lo + 0.1f)) return false;
+            GameObject go = Instantiate(model, pivot, false);
+            go.name = "Column";
+            foreach (Collider c in go.GetComponentsInChildren<Collider>(true)) Destroy(c);
+            float s = PillarHeight / (hi - lo);
+            go.transform.localScale = Vector3.one * s;
+            go.transform.localPosition = new Vector3(0f, -lo * s, 0f);
+            go.transform.localRotation = Quaternion.identity;
+            return true;
+        }
+
+        /// <summary>
+        /// A flat ground arrow from the pillar foot along dir (no colliders). b15 (W04): one modelled mesh per colour instead
+        /// of two Unity cubes (a shaft box and a 45-degree box as the head): a tapered shaft and a true triangular head, 4 cm
+        /// thick with a bevelled edge, shared by every arrow of the map.
+        /// </summary>
         private static void Arrow(Transform parent, CellDir dir, Material mat, string name)
         {
             var a = new GameObject(name).transform;
@@ -157,21 +202,74 @@ namespace CriticalMass.Runtime.View
             var dirWorld = new Vector3(dir.Dx, 0, -dir.Dz);
             if (dirWorld.sqrMagnitude < 1e-4f) dirWorld = Vector3.forward;
             a.localRotation = Quaternion.LookRotation(dirWorld.normalized, Vector3.up);
-            GameObject shaft = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            Destroy(shaft.GetComponent<Collider>());
-            shaft.name = "Shaft";
-            shaft.transform.SetParent(a, false);
-            shaft.transform.localScale = new Vector3(0.32f, 0.06f, 1.5f);
-            shaft.transform.localPosition = new Vector3(0, 0.05f, 1.35f);
-            shaft.GetComponent<Renderer>().sharedMaterial = mat;
-            GameObject head = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            Destroy(head.GetComponent<Collider>());
-            head.name = "Head";
-            head.transform.SetParent(a, false);
-            head.transform.localScale = new Vector3(0.75f, 0.06f, 0.75f);
-            head.transform.localPosition = new Vector3(0, 0.05f, 2.25f);
-            head.transform.localRotation = Quaternion.Euler(0, 45f, 0);
-            head.GetComponent<Renderer>().sharedMaterial = mat;
+            a.gameObject.AddComponent<MeshFilter>().sharedMesh = ArrowMesh;
+            a.gameObject.AddComponent<MeshRenderer>().sharedMaterial = mat;
+        }
+
+        private static Mesh _arrowMesh;
+
+        /// <summary>The ground arrow (local +Z forward): shaft 0.6 to 2.0 u from the foot, head 2.0 to 2.75 u.</summary>
+        public static Mesh ArrowMesh => _arrowMesh != null ? _arrowMesh : (_arrowMesh = BuildArrow());
+
+        private static Mesh BuildArrow()
+        {
+            // Outline (x, z) counter-clockwise seen from above; top at 0.06, bevel to 0.02 at the outline, base at 0.
+            Vector2[] o =
+            {
+                new Vector2(-0.13f, 0.6f), new Vector2(0.13f, 0.6f), new Vector2(0.17f, 2.0f), new Vector2(0.42f, 1.95f),
+                new Vector2(0f, 2.75f), new Vector2(-0.42f, 1.95f), new Vector2(-0.17f, 2.0f),
+            };
+            const float top = 0.06f, edge = 0.03f, inset = 0.05f;
+            var v = new System.Collections.Generic.List<Vector3>();
+            var n = new System.Collections.Generic.List<Vector3>();
+            var t = new System.Collections.Generic.List<int>();
+            Vector2 c = Vector2.zero;
+            foreach (Vector2 p in o) c += p;
+            c /= o.Length;
+            // Top: the outline pulled in by `inset` toward the centre line of its own part, as a fan from the head's base and the shaft.
+            var inner = new Vector2[o.Length];
+            for (int i = 0; i < o.Length; i++)
+            {
+                Vector2 p = o[i];
+                Vector2 toward = p.y >= 1.95f ? new Vector2(0f, 2.2f) : new Vector2(0f, p.y);
+                Vector2 d = toward - p;
+                inner[i] = d.magnitude > inset ? p + d.normalized * inset : toward;
+            }
+            // Shaft top quad and head top triangle (inner points).
+            AddQuad(v, n, t, P(inner[0], top), P(inner[1], top), P(inner[2], top), P(inner[6], top), Vector3.up);
+            AddQuad(v, n, t, P(inner[6], top), P(inner[2], top), P(inner[3], top), P(inner[5], top), Vector3.up);
+            AddTri(v, n, t, P(inner[5], top), P(inner[3], top), P(inner[4], top), Vector3.up);
+            for (int i = 0; i < o.Length; i++)
+            {
+                int j = (i + 1) % o.Length;
+                Vector2 e = o[j] - o[i];
+                var outN = new Vector3(e.y, 0f, -e.x).normalized;
+                AddQuad(v, n, t, P(inner[i], top), P(inner[j], top), P(o[j], edge), P(o[i], edge), (outN + Vector3.up).normalized);
+                AddQuad(v, n, t, P(o[i], edge), P(o[j], edge), P(o[j], 0f), P(o[i], 0f), outN);
+            }
+            var m = new Mesh { name = "DG-09 fall arrow" };
+            m.SetVertices(v);
+            m.SetNormals(n);
+            m.SetTriangles(t, 0);
+            m.RecalculateBounds();
+            return m;
+        }
+
+        private static Vector3 P(Vector2 p, float y) => new Vector3(p.x, y, p.y);
+
+        private static void AddQuad(System.Collections.Generic.List<Vector3> v, System.Collections.Generic.List<Vector3> n, System.Collections.Generic.List<int> t, Vector3 a, Vector3 b, Vector3 c, Vector3 d, Vector3 nn)
+        {
+            AddTri(v, n, t, a, b, c, nn);
+            AddTri(v, n, t, a, c, d, nn);
+        }
+
+        private static void AddTri(System.Collections.Generic.List<Vector3> v, System.Collections.Generic.List<Vector3> n, System.Collections.Generic.List<int> t, Vector3 a, Vector3 b, Vector3 c, Vector3 nn)
+        {
+            int i = v.Count;
+            v.Add(a); v.Add(b); v.Add(c);
+            n.Add(nn); n.Add(nn); n.Add(nn);
+            if (Vector3.Dot(Vector3.Cross(b - a, c - a), nn) >= 0) { t.Add(i); t.Add(i + 1); t.Add(i + 2); }
+            else { t.Add(i); t.Add(i + 2); t.Add(i + 1); }
         }
 
         private void DrawPillars(World w, float alpha)

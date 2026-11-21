@@ -26,6 +26,7 @@ namespace CriticalMass.Runtime.View.B13
             go.AddComponent<DodgeView>();
             go.AddComponent<KaijuTypeView>();
             go.AddComponent<CorruptionView>();
+            go.AddComponent<HeightView>();   // b15 terrain height: the pip over a character in a pit
             return go;
         }
     }

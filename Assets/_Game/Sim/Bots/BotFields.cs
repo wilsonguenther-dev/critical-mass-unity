@@ -300,7 +300,15 @@ namespace CriticalMass.Sim.Bots
                     if (k >= 4)
                     {
                         if (!Passable(cells[cz * W + nx], miner) || !Passable(cells[nz * W + cx], miner)) continue;
+                        if (map.Lift != null && !FlowField.LiftStepOk(map, c, ni, k, cz * W + nx, nz * W + cx)) continue;   // b15
                         step = Math.Sqrt(2.0);
+                    }
+                    else if (map.Lift != null && MapGrid.IsWalkableType(cells[c]) && MapGrid.IsWalkableType(t))
+                    {
+                        // b15 terrain height: a step costs a little, a climb more, 3+ levels are closed.
+                        double extra = TerrainHeight.EdgeExtra(map, c, ni);
+                        if (extra < 0) continue;
+                        step += extra;
                     }
                     // Cost is paid for leaving a breakable cell toward the goal (equals paying it on entry along any path).
                     if (miner && IsBreakable(cells[c])) step += MinerBreakableCost;
@@ -375,6 +383,7 @@ namespace CriticalMass.Sim.Bots
                 double d = dist[nz * W + nx];
                 if (!(d < best)) continue;
                 if (k >= 4 && (!Passable(cells[cz * W + nx], miner) || !Passable(cells[nz * W + cx], miner))) continue;
+                if (w.Map.Lift != null && !FlowField.LiftStepOk(w.Map, cz * W + cx, nz * W + nx, k, cz * W + nx, nz * W + cx)) continue;   // b15
                 best = d;
                 bk = k;
             }

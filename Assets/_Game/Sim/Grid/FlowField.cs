@@ -114,6 +114,19 @@ namespace CriticalMass.Sim.Grid
             return top;
         }
 
+        /// <summary>
+        /// b15 (W6): FlowField buffers allocated so far in this process (by ComputeFlowField without a reusable output, or by
+        /// RouteFields.Preallocate). Counted only; nothing in the Sim reads it. One field on the 112x72 map is 64,568 B.
+        /// </summary>
+        public static int Allocations;
+
+        /// <summary>A new, unfilled field of n cells (counted in Allocations).</summary>
+        public static FlowField Allocate(int n)
+        {
+            Allocations++;
+            return new FlowField { Dist = new double[n], Version = 0 };
+        }
+
         /// <summary>Dijkstra distance from the nearest goal to every walkable cell; unwalkable or out-of-map goals are ignored; reuses output when its size matches.</summary>
         public static FlowField ComputeFlowField(MapDef map, IReadOnlyList<PointXZ> goals, FlowField output = null, int version = 0)
         {
@@ -122,7 +135,7 @@ namespace CriticalMass.Sim.Grid
             int H = map.Height;
             int n = W * H;
             byte[] cells = map.Cells;
-            FlowField field = output != null && output.Dist.Length == n ? output : new FlowField { Dist = new double[n], Version = 0 };
+            FlowField field = output != null && output.Dist.Length == n ? output : Allocate(n);
             field.Version = version;
             double[] dist = field.Dist;
             Array.Fill(dist, double.PositiveInfinity);
@@ -161,12 +174,29 @@ namespace CriticalMass.Sim.Grid
                     {
                         // No corner cutting: both orthogonal cells must be walkable.
                         if (!MapGrid.IsWalkableType(cells[cz * W + nx]) || !MapGrid.IsWalkableType(cells[nz * W + cx])) continue;
+                        // b15 terrain height: no diagonal across a height change.
+                        if (map.Lift != null && !TerrainHeight.DiagonalLevel(map, c, ni, cz * W + nx, nz * W + cx)) continue;
                         step = Sqrt2;
+                    }
+                    else if (map.Lift != null)
+                    {
+                        // b15 terrain height: 1 or 2 levels cost extra (a step, a climb), 3 or more are closed (a ramp excepted).
+                        double extra = TerrainHeight.EdgeExtra(map, c, ni);
+                        if (extra < 0) continue;
+                        step += extra;
                     }
                     PushOrDecrease(ni, d + step);
                 }
             }
             return field;
+        }
+
+        /// <summary>b15 terrain height: the field step from cell c to neighbour n (k = neighbour slot; a, b = the diagonal's orthogonal cells) is open.</summary>
+        public static bool LiftStepOk(MapDef map, int c, int n, int k, int a, int b)
+        {
+            if (!MapGrid.IsWalkableType(map.Cells[c]) || !MapGrid.IsWalkableType(map.Cells[n])) return true;
+            if (k >= 4) return TerrainHeight.DiagonalLevel(map, c, n, a, b);
+            return TerrainHeight.EdgeExtra(map, c, n) >= 0;
         }
 
         /// <summary>Unit direction from the cell containing (x, z) toward its lowest-distance neighbour; (0, 0) and false at a goal or when no neighbour is closer.</summary>
@@ -191,6 +221,7 @@ namespace CriticalMass.Sim.Grid
                 double d = field.Dist[nz * W + nx];
                 if (!(d < best)) continue;
                 if (k >= 4 && (!MapGrid.IsWalkableType(cells[cz * W + nx]) || !MapGrid.IsWalkableType(cells[nz * W + cx]))) continue;
+                if (map.Lift != null && !LiftStepOk(map, cz * W + cx, nz * W + nx, k, cz * W + nx, nz * W + cx)) continue;   // b15
                 best = d;
                 bk = k;
             }

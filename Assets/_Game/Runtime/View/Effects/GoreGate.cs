@@ -2,14 +2,15 @@ using System;
 
 namespace CriticalMass.Runtime.View.Effects
 {
-    /// <summary>The GORE setting's three intensity levels (GameSettings.Gore, PlayerPrefs cm.gore). Full is the default.</summary>
+    /// <summary>The GORE setting's three intensity levels (GameSettings.Gore, PlayerPrefs cm.gore). Off is the default (b15).</summary>
     public enum GoreLevel : byte
     {
-        /// <summary>No blood, bones or body parts anywhere: a bright silhouette flash, a star burst and sparks on a hit; a sparkle poof on a knock-out.</summary>
+        /// <summary>The default (b15): no blood, bones or body parts anywhere: a bright silhouette flash, a star burst and
+        /// neutral sparks (ImpactPalette) on a hit; a sparkle poof on a knock-out.</summary>
         Off = 0,
         /// <summary>Smaller and fewer: half the drops, smaller splats that fade in 4 s, no knock-out pool, no drips, no bones or body parts, nothing builds up on the ground.</summary>
         Reduced = 1,
-        /// <summary>Today's look (the default).</summary>
+        /// <summary>The full look (opt-in since b15; the default from 2026-11-14 to b15).</summary>
         Full = 2,
     }
 
@@ -45,7 +46,8 @@ namespace CriticalMass.Runtime.View.Effects
     }
 
     /// <summary>
-    /// The one gore switch (owner, 2026-11-14: "make it a setting and a level of intensity"; Full stays the default).
+    /// The one gore switch (owner, 2026-11-14: "make it a setting and a level of intensity"; b15 safe defaults, owner-approved
+    /// 2026-11-17: OFF is the default, matching the bible's "competitive chaos without gore"; FULL stays an option).
     /// Every hit, death, Kaiju, status, decal, world-dressing and menu path that can show blood, bones or body parts asks
     /// Allows(piece) here, and the registry below is the complete list of such pieces (GoreSettingTests enumerate it, so a
     /// new gore piece must be added here and gated to exist at all). View only: nothing here reaches the sim, so the
@@ -55,6 +57,9 @@ namespace CriticalMass.Runtime.View.Effects
     {
         /// <summary>Every gore piece (the registry the tests enumerate).</summary>
         public static readonly GorePiece[] All = (GorePiece[])Enum.GetValues(typeof(GorePiece));
+
+        /// <summary>The level a player who never changed the setting gets (b15: Off).</summary>
+        public const GoreLevel DefaultLevel = GoreLevel.Off;
 
         /// <summary>Levels in menu order (the stepper cycles through them).</summary>
         public static readonly GoreLevel[] Levels = { GoreLevel.Full, GoreLevel.Reduced, GoreLevel.Off };

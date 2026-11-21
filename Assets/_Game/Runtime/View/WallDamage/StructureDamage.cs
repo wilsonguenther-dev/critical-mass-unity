@@ -274,7 +274,8 @@ namespace CriticalMass.Runtime.View.WallDamage
                 if (p.T0 > s.LastHitT0)
                 {
                     s.LastHitT0 = p.T0;
-                    CriticalMass.Runtime.Audio.Sound.SoundDirector.PlayCueAt(DamageLook.CueFor(DamageMaterial.Wood, false), x, z);
+                    // b15: a Builder wall chips like stone (sb_wall_hit); a barricade keeps its wood knock
+                    CriticalMass.Runtime.Audio.Sound.SoundDirector.PlayStructureHit(i, x, z);
                 }
             }
             Transform t = m.Transform;

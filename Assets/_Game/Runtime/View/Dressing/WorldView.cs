@@ -187,6 +187,11 @@ namespace CriticalMass.Runtime.View.Dressing
                     if (m != null && m.GetShaderPassEnabled("SRPDefaultUnlit") != outline) m.SetShaderPassEnabled("SRPDefaultUnlit", outline);
             foreach (Chunk ch in _groups.Values)
                 if (ch.Shadow != null) ch.Shadow.enabled = shadows;
+            foreach (GameObject go in _skirtObjects)   // b15 island skirt: scenery shadows follow the tier like the chunks
+            {
+                var r = go != null ? go.GetComponent<MeshRenderer>() : null;
+                if (r != null) r.shadowCastingMode = shadows ? ShadowCastingMode.On : ShadowCastingMode.Off;
+            }
         }
 
         /// <summary>True when groups built for quality "built" are wrong for quality "now" (levels built or clutter
@@ -233,7 +238,7 @@ namespace CriticalMass.Runtime.View.Dressing
                 ChunksAtLevel[show]++;
                 shown += ch.Tris[show];
             }
-            LastTriangles = shown + _groundTris;
+            LastTriangles = shown + _groundTris + SkirtTriangles;
         }
 
         /// <summary>The nearest level to "want" that quality q builds (pure; tests).</summary>
@@ -262,6 +267,25 @@ namespace CriticalMass.Runtime.View.Dressing
         {
             _driver = GetComponent<SimDriverBehaviour>();
             if (_driver == null) _driver = FindAnyObjectByType<SimDriverBehaviour>();
+            _live = this;
+        }
+
+        private static WorldView _live;
+
+        /// <summary>
+        /// integrator b15: the live world view has not taken its driver's new world yet. It starts the build in LateUpdate,
+        /// after the driver's Update, so without this the load frame could run a tick before Building turns on
+        /// (PerfSmoothPlayTests "no sim tick ran while the world built" read 1 on the combined candidate). Holds one frame at
+        /// most: the next LateUpdate always starts the build. View timing only; the match is the same. Sliced builds only.
+        /// </summary>
+        public static bool AwaitsWorld(Sim.Core.World w)
+        {
+            // Only where the build is sliced (players; the editor with SliceInEditor): the editor's one-frame build never
+            // spans a tick, and holding there moved two editor PlayMode measurements by one frame (unity-ci 44843284722).
+            if (Application.isEditor && !SliceInEditor) return false;
+            WorldView v = _live;
+            return w != null && v != null && v.isActiveAndEnabled && v._building == null && v._driver != null
+                   && ReferenceEquals(v._driver.World, w) && (!ReferenceEquals(w, v._world) || !ReferenceEquals(w.Map, v._map));
         }
 
         private void LateUpdate() { var cost = CriticalMass.Runtime.Game.FrameCost.Enter(); LateUpdateCost(); CriticalMass.Runtime.Game.FrameCost.Exit(CriticalMass.Runtime.Game.FrameCost.Slot.World, cost); }
@@ -431,6 +455,7 @@ namespace CriticalMass.Runtime.View.Dressing
                     if (go != null) go.transform.SetParent(_root, false);
                 _groups[kv.Key] = kv.Value;
             }
+            if (IslandSkirt.Signature(Plan.Rim) != _skirtSig) BuildSkirt();
             _dressed = Plan.Dressed;
             _dressedTypes = Plan.CellsAtPlan;
             DressVersion++;
@@ -449,6 +474,7 @@ namespace CriticalMass.Runtime.View.Dressing
             Plan = next;
             foreach (int g in changed) DestroyGroup(g);
             BuildGroups(changed);
+            if (IslandSkirt.Signature(Plan.Rim) != _skirtSig) BuildSkirt();
             _dressed = Plan.Dressed;
             _dressedTypes = Plan.CellsAtPlan;
             DressVersion++;
@@ -593,6 +619,8 @@ namespace CriticalMass.Runtime.View.Dressing
             foreach (WorldPlacement p in Plan.Placements)
             {
                 if (p.Piece == "env_ground_cell") continue; // drawn per chunk by BuildGroundChunk
+                if (SkirtDraws(p.Piece)) continue;          // b15: the continuous island skirt replaces the per-cell kit edge
+                if (p.Cat == "decor" && CriticalMass.Runtime.View.DecorationView.DrawsKitColumn) continue;   // b15 W04: DecorationView draws (and topples) it
                 if (_catalog.Find(p.Piece) == null) continue;
                 if (!SceneryLod.KeepClutter(p.Piece, p.SimX, p.SimZ, q)) continue;
                 int chunk = GroupOf(p);
@@ -756,6 +784,7 @@ namespace CriticalMass.Runtime.View.Dressing
         void ReleaseForLoad()
         {
             enabled = false;
+            if (ReferenceEquals(_live, this)) _live = null;
             _replanning = null;
             if (_building != null)
             {
@@ -768,6 +797,7 @@ namespace CriticalMass.Runtime.View.Dressing
 
         private void OnDestroy()
         {
+            if (ReferenceEquals(_live, this)) _live = null;   // integrator b15: a static to a dead view would keep its assets loaded
             _replanning = null;
             if (_building != null)
             {
@@ -807,6 +837,7 @@ namespace CriticalMass.Runtime.View.Dressing
             _root = null;
             _groundChunks.Clear();
             _groundTris = 0;
+            DestroySkirt();
             _builtQuality = -1;
             for (int l = 0; l < SceneryLod.Levels; l++) TrianglesAtLevel[l] = ChunksAtLevel[l] = 0;
             _breakables.Clear();
@@ -925,6 +956,7 @@ namespace CriticalMass.Runtime.View.Dressing
             double tField = st.Elapsed.TotalMilliseconds;
             Triangles = 0;
             Renderers = 0;
+            _skirtCounted = false;   // b15: the counters restart; the old skirt (if any) is no longer in them
             _buildDone++;
             yield return null;
 
@@ -949,6 +981,8 @@ namespace CriticalMass.Runtime.View.Dressing
                 _buildDone++;
                 yield return null;
             }
+            BuildSkirt();
+            yield return null;
             double tGround = st.Elapsed.TotalMilliseconds;
             LastStages = $"catalog+bases+kit warm {tLoad:0}, plan {tPlan - tLoad:0}, field start {tField - tPlan:0} (then waited {tFieldWait:0}), groups {tGroups - tField:0} (collect {_collectMs:0}, combine {_combineMs:0}), ground {tGround - tGroups:0} ms";
             foreach (WorldBreakable b in Plan.Breakables)
@@ -1137,6 +1171,70 @@ namespace CriticalMass.Runtime.View.Dressing
         {
             ColorUtility.TryParseHtmlString(hex, out Color c);
             return c;
+        }
+
+        // ------------------------------------------------------------------------------------------- b15 island skirt
+        private readonly List<GameObject> _skirtObjects = new List<GameObject>();
+        private long _skirtSig = long.MinValue;
+        private bool _skirtCounted;
+        private readonly IslandSkirt _skirt = new IslandSkirt();
+
+        /// <summary>Triangles of the island skirt drawn now, and the wall time of its last build (ms).</summary>
+        public int SkirtTriangles { get; private set; }
+        public double SkirtBuildMs { get; private set; }
+        /// <summary>The skirt's builder after the last build (tests read its stats).</summary>
+        public IslandSkirt Skirt => _skirt;
+
+        /// <summary>True for a kit edge piece the island skirt draws instead (env_cliff_*, env_lip_rim_*; IslandSkirt.On).
+        /// The plan keeps them as its record of the rim (tests, captures), the view does not draw them.</summary>
+        public static bool SkirtDraws(string piece) =>
+            IslandSkirt.On && (piece.StartsWith("env_cliff_", StringComparison.Ordinal) || piece.StartsWith("env_lip_rim_", StringComparison.Ordinal));
+
+        /// <summary>Builds the continuous island skirt from the plan's rim, one renderer per ground chunk it touches.</summary>
+        private void BuildSkirt()
+        {
+            DestroySkirt();
+            if (!IslandSkirt.On || Plan == null || _root == null) return;
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            _skirt.Build(Plan);
+            _skirtSig = IslandSkirt.Signature(Plan.Rim);
+            Material mat = CriticalMass.Runtime.View.TerrainEditMesh.Material();
+            ShadowCastingMode cast = RenderTier.Policy(RenderTier.Level).sceneryShadows ? ShadowCastingMode.On : ShadowCastingMode.Off;
+            foreach (var kv in _skirt.Parts)
+            {
+                if (kv.Value.T.Count == 0) continue;
+                var mesh = new Mesh { name = "Island skirt " + kv.Key };
+                IslandSkirt.Upload(kv.Value, mesh);
+                mesh.UploadMeshData(true);
+                var go = new GameObject("Island skirt " + kv.Key);
+                go.transform.SetParent(_root, false);
+                go.AddComponent<MeshFilter>().sharedMesh = mesh;
+                var r = go.AddComponent<MeshRenderer>();
+                r.sharedMaterial = mat;
+                r.shadowCastingMode = cast;
+                _skirtObjects.Add(go);
+                SkirtTriangles += kv.Value.Tris;
+                Triangles += kv.Value.Tris;
+                Renderers++;
+            }
+            _skirtCounted = true;
+            SkirtBuildMs = sw.Elapsed.TotalMilliseconds;
+        }
+
+        private void DestroySkirt()
+        {
+            foreach (GameObject go in _skirtObjects)
+            {
+                if (go == null) continue;
+                MeshFilter mf = go.GetComponent<MeshFilter>();
+                if (mf != null && mf.sharedMesh != null) Destroy(mf.sharedMesh);
+                Destroy(go);
+            }
+            if (_skirtCounted) { Triangles -= SkirtTriangles; Renderers -= _skirtObjects.Count; }
+            _skirtCounted = false;
+            _skirtObjects.Clear();
+            SkirtTriangles = 0;
+            _skirtSig = long.MinValue;
         }
 
         // ------------------------------------------------------------------------------------------- combining

@@ -52,10 +52,37 @@ namespace CriticalMass.Net.Relay
         public bool ChatTeam;
         /// <summary>Drop off the network with no goodbye at this tick (-1 = never), to test the bot handover.</summary>
         public int DropAt = -1;
+        /// <summary>b15-rejoin (-rejoin-after MS): after DropAt, wait this long, connect again with the same seat secret, replay
+        /// the match from the host's log and take the fighter back (-1 = stay dropped). Its fingerprints after the rejoin
+        /// (tick 0 to the end, the replayed ticks included) go to HashLogPath + ".rejoin".</summary>
+        public int RejoinAfterMs = -1;
         public string Build = "headless";
         public Action<string> Log = Console.WriteLine;
         /// <summary>Tests: use this in-process relay instead of the network (same rules as server/relay).</summary>
         public LocalRelay Local;
+        /// <summary>b15-zero-cost (-direct-port P), host: also take direct joiners (local network, typed address) on TCP port P
+        /// (0 = any free port; -1 = off). The room is the same room: relay and direct players play one match.</summary>
+        public int DirectPort = -1;
+        /// <summary>b15-zero-cost (-no-relay), host: direct joiners only; no relay room is made (costs the relay nothing).</summary>
+        public bool NoRelay;
+        /// <summary>b15-zero-cost (-direct HOST:PORT), joiner: connect straight to the host; if it cannot be reached and a
+        /// room code is given too, join the same room through the relay instead.</summary>
+        public string DirectAddr;
+        /// <summary>b15-zero-cost (-lan), host: announce the room on the local network (LanBeacon).</summary>
+        public bool Lan;
+        /// <summary>b15-zero-cost: counts what this peer sends and receives (the relay leg only, on a host that has one).</summary>
+        public MeteredTransport Meter => _meter;
+        /// <summary>b15-zero-cost: Meter's counts when the match started (lobby = before, match = after).</summary>
+        public TrafficCounts SentAtStart { get; private set; }
+        public TrafficCounts ReceivedAtStart { get; private set; }
+        /// <summary>b15-zero-cost: "relay", "direct" or "relay+direct" (a host taking both).</summary>
+        public string PathUsed { get; private set; } = "relay";
+        /// <summary>b15-zero-cost: the TCP port the direct listener got (0: none).</summary>
+        public int DirectPortBound => _direct != null ? _direct.Port : 0;
+        public DirectHost DirectListener => _direct;
+        /// <summary>b15-zero-cost, tests: the lockstep tuning for this peer's session (null = the shipped defaults;
+        /// LockstepOptions.PreB15() = the sending before b15, for before/after measurements).</summary>
+        public LockstepOptions Options;
 
         public int ExitCode { get; private set; } = -1;
         /// <summary>Every fingerprint so far (tick 0 first), for tests.</summary>
@@ -63,12 +90,24 @@ namespace CriticalMass.Net.Relay
 
         private GameConfig _cfg;
         private ITransport _t;
+        private MeteredTransport _meter;
+        private ITransport _relayRaw;
+        private DirectHost _direct;
+        private LanBeacon _beacon;
         private RoomHost _room;
         private RoomClient _client;
         private LockstepSession _session;
         private readonly List<KeyValuePair<int, ulong>> _hashes = new List<KeyValuePair<int, ulong>>();
         private AutoplayPilot _pilot;
         private bool _picked, _readyLogged, _chatSent, _dropped;
+        private bool _dropDone, _liveLogged;
+        private long _rejoinAt = -1, _droppedAtMs = -1;
+        private ulong _secret;
+        private readonly List<KeyValuePair<int, ulong>> _rejoinHashes = new List<KeyValuePair<int, ulong>>();
+        /// <summary>b15-rejoin: the fingerprints of the rejoined session, for tests.</summary>
+        public IReadOnlyList<KeyValuePair<int, ulong>> RejoinHashes => _rejoinHashes;
+        /// <summary>b15-rejoin: the session (the rejoined one after a rejoin), for tests.</summary>
+        public LockstepSession Session => _session;
         // b12 (X2 follow-up): one "ONLINE LEAD" line per second of match (30 ticks at the shipped 30 Hz) so a log shows how the
         // adaptive lead moved, not only the SUMMARY's range. LeadPolicy/LockstepSession already expose these; no wire change.
         private const int LeadLineEveryTicks = 30;
@@ -98,16 +137,20 @@ namespace CriticalMass.Net.Relay
             _pilot = new AutoplayPilot((uint)(Host ? 101 : 202) ^ (uint)(Name ?? "").Length);
             try
             {
-                if (Host && string.IsNullOrEmpty(Code))
+                if (Host && !NoRelay && string.IsNullOrEmpty(Code))
                 {
                     (string newCode, string hostKey) = Local != null ? Local.CreateRoom()
                         : RelayTransport.CreateRoomAsync(RelayUrl, CancellationToken.None).GetAwaiter().GetResult();
                     Code = newCode;
                     Key = hostKey;
                 }
-                Code = RelayTransport.CleanCode(Code);
-                if (Code == null) return Fail(5, "that is not a room code");
-                if (Host) Log("ROOM CODE " + Code);
+                if (Host && NoRelay) Code = null;
+                else
+                {
+                    Code = RelayTransport.CleanCode(Code);
+                    if (Code == null && (Host || string.IsNullOrEmpty(DirectAddr))) return Fail(5, "that is not a room code");
+                }
+                if (Host) Log("ROOM CODE " + (Code ?? "none (direct only)"));
                 Connect();
                 return true;
             }
@@ -115,15 +158,46 @@ namespace CriticalMass.Net.Relay
             catch (Exception e) { return Fail(5, e.ToString()); }
         }
 
+        private ITransport RelayLeg(bool host)
+        {
+            _relayRaw = Local != null ? Local.Connect(Code, host ? Key : null) : RelayTransport.Connect(RelayUrl, Code, host ? Key : null);
+            return _relayRaw;
+        }
+
         private void Connect()
         {
-            _t = Local != null ? Local.Connect(Code, Host ? Key : null) : RelayTransport.Connect(RelayUrl, Code, Host ? Key : null);
+            if (Host)
+            {
+                // b15-zero-cost: the relay leg (metered: what the relay bills), plus the direct listener when asked for.
+                ITransport relay = NoRelay ? null : (_meter = new MeteredTransport(RelayLeg(true)));
+                if (DirectPort >= 0 || NoRelay)
+                {
+                    if (_direct == null)
+                    {
+                        _direct = DirectHost.Start(DirectPort >= 0 ? DirectPort : DirectHost.DefaultPort, relay == null);
+                        Log("ROOM DIRECT port " + _direct.Port + " addresses " + string.Join(",", DirectAddress.LocalAddresses()));
+                    }
+                    if (relay == null) _meter = new MeteredTransport(_direct);
+                    _t = relay != null ? new HostMux(relay, _direct) : (ITransport)_meter;
+                    PathUsed = relay != null ? "relay+direct" : "direct";
+                    if (Lan && _beacon == null) _beacon = new LanBeacon(_direct.Port, Code, Name, Humans, Build);
+                }
+                else { _t = relay; PathUsed = "relay"; }
+            }
+            else if (!string.IsNullOrEmpty(DirectAddr) && DirectAddress.TryParse(DirectAddr, out string dh, out int dp))
+            {
+                Func<ITransport> viaRelay = Code == null ? (Func<ITransport>)null : () => RelayLeg(false);
+                _t = _meter = new MeteredTransport(new FallbackTransport(DirectClient.Connect(dh, dp), viaRelay));
+                PathUsed = "direct";
+            }
+            else { _t = _meter = new MeteredTransport(RelayLeg(false)); PathUsed = "relay"; }
             if (Host)
             {
                 _room = new RoomHost(_t, _cfg, Name, Build) { TeamSize = TeamSize, Pace = Pace };
                 return;
             }
-            _client = new RoomClient(_t, _cfg, Name, Build);
+            if (_secret != 0) { _client = new RoomClient(_t, _cfg, Name, Build, _secret) { Options = Options }; return; }   // b15-rejoin: ask for the seat back
+            _client = new RoomClient(_t, _cfg, Name, Build) { Options = Options };
             _client.SetPick(Team, Class);
             _client.SetReady(true);
         }
@@ -152,6 +226,16 @@ namespace CriticalMass.Net.Relay
                 _retryAt = -1;
                 Connect();
             }
+            if (_rejoinAt >= 0)
+            {
+                // b15-rejoin: back after the drop: a new connection, the same seat secret.
+                if (now < _rejoinAt) return null;
+                _rejoinAt = -1;
+                _tries = 0;
+                Connect();
+                _dropped = false;
+                Log($"ONLINE REJOINING after {now - _droppedAtMs} ms");
+            }
             if (Host)
             {
                 if (!_picked && _t.LocalPeer == Peers.Host)
@@ -159,12 +243,12 @@ namespace CriticalMass.Net.Relay
                     _room.SetLocalPick(Team, Class);
                     _picked = true;
                     Log("ROOM READY " + Code);
-                    if (!string.IsNullOrEmpty(CodeOutPath)) File.WriteAllText(CodeOutPath, Code + "\n");
+                    if (!string.IsNullOrEmpty(CodeOutPath)) File.WriteAllText(CodeOutPath, (Code ?? "direct") + "\n");
                 }
                 _room.Update(now);
                 if (_session == null && _room.Members.Count >= Humans && _room.CanStart(out _))
                 {
-                    _session = _room.Start(now, null, Seed);
+                    _session = _room.Start(now, Options, Seed);
                     if (_session != null) Hook(_session);
                 }
                 if (_session == null && _room.Phase == RoomPhase.Closed) { Fail(3, _room.Notice); return Finish(); }
@@ -211,11 +295,28 @@ namespace CriticalMass.Net.Relay
                 _nextLeadLine = _session.Stepped + LeadLineEveryTicks;
                 Log($"ONLINE LEAD tick {_session.Stepped} lead {_session.Lead} leadmin {_session.LeadMin} leadmax {_session.LeadMax} late {_session.LateInputs}");
             }
-            if (DropAt >= 0 && _session.Stepped >= DropAt)
+            if (_session.IsRejoin && !_liveLogged && _session.RejoinLiveTick >= 0)
+            {
+                _liveLogged = true;
+                Log($"ONLINE REJOINED live at tick {_session.RejoinLiveTick} after {_session.RejoinLiveMs - _session.RejoinStartMs} ms in the match " +
+                    $"({now - _droppedAtMs} ms after the drop): log {_session.LogBytes} B on the wire for {_session.LogRawBytes} B of bundles, " +
+                    $"{_session.RejoinVerified} log fingerprints checked, catch-up stepping {_session.CatchUpStepMs:F0} ms");
+            }
+            if (DropAt >= 0 && !_dropDone && _session.Stepped >= DropAt)
             {
                 _dropped = true;
+                _dropDone = true;
                 Log("ONLINE DROPPED on purpose at tick " + _session.Stepped);
-                (_t as RelayTransport)?.Abort();   // the local relay: simply never heard from again
+                AbortLink();   // the socket dies, as a crashed game's does
+                if (RejoinAfterMs >= 0 && _client != null)
+                {
+                    _secret = _client.Secret;
+                    _session = null;
+                    _client = null;
+                    _droppedAtMs = now;
+                    _rejoinAt = now + RejoinAfterMs;
+                    return null;
+                }
                 ExitCode = 0;
                 return Finish();
             }
@@ -245,12 +346,50 @@ namespace CriticalMass.Net.Relay
             _chatSeen = total;
         }
 
+        /// <summary>Drops this peer's own connection with no goodbye (relay or direct), for the drop and rejoin tests.</summary>
+        private void AbortLink()
+        {
+            ITransport u = _t is MeteredTransport m ? m.Inner : _t;
+            if (u is FallbackTransport f) u = f.Current;
+            (u as RelayTransport)?.Abort();
+            (u as DirectClient)?.Abort();
+            // b15-zero-cost: the in-process relay closes the socket as the real one does when a game's connection dies (its
+            // TCP reset reaches Cloudflare): the seat's socket leaves the room. Before, it stayed, so a full 32-human room
+            // refused the rejoin ("That room is full."), which the real relay does not.
+            (u as LocalRelayTransport)?.Close();
+        }
+
+        /// <summary>b15-zero-cost: "ONLINE TRAFFIC ..." lines: what this peer sent and received in the lobby and in the match,
+        /// and per minute of match (each sent message is one message the relay bills, on the relay path).</summary>
+        private void TrafficLog()
+        {
+            if (_meter == null) return;
+            if (_t is MeteredTransport mt && mt.Inner is FallbackTransport ft) PathUsed = ft.Path;
+            TrafficCounts lobbyS = SentAtStart ?? _meter.Sent, lobbyR = ReceivedAtStart ?? _meter.Received;
+            TrafficCounts matchS = _meter.Sent.Since(SentAtStart ?? _meter.Sent), matchR = _meter.Received.Since(ReceivedAtStart ?? _meter.Received);
+            double sec = _session != null ? _session.Stepped / Math.Max(1e-9, _cfg.SimHz * LockstepSession.WallPace(_session.Setup, _cfg)) : 0;
+            double perMin = sec > 0 ? 60.0 / sec : 0;
+            Log($"ONLINE TRAFFIC peer {LocalPeer} path {PathUsed} lobby sent {lobbyS.TotalMessages} msg {lobbyS.TotalBytes} B recv {lobbyR.TotalMessages} msg {lobbyR.TotalBytes} B");
+            Log($"ONLINE TRAFFIC peer {LocalPeer} path {PathUsed} match {sec:F1} s sent {matchS.TotalMessages} msg {matchS.TotalBytes} B ({matchS.Describe()}) recv {matchR.TotalMessages} msg {matchR.TotalBytes} B");
+            Log($"ONLINE TRAFFIC peer {LocalPeer} path {PathUsed} per-minute sent {matchS.TotalMessages * perMin:F0} msg {matchS.TotalBytes * perMin:F0} B recv {matchR.TotalMessages * perMin:F0} msg {matchR.TotalBytes * perMin:F0} B" +
+                (_session != null ? $" packet-ticks {_session.TicksPerPacket}" : ""));
+            if (_t is HostMux hm && hm.RelayLostReason != null) Log("ONLINE RELAY LOST, the room went on direct: " + hm.RelayLostReason);
+        }
+
         private void Hook(LockstepSession s)
         {
+            if (_meter != null) { SentAtStart = _meter.Sent.Copy(); ReceivedAtStart = _meter.Received.Copy(); }
             s.Sampler = _pilot.Fill;
             _hashes.Add(new KeyValuePair<int, ulong>(0, s.MyWorldHash0));
             s.HashRecorded = (tick, h) => _hashes.Add(new KeyValuePair<int, ulong>(tick, h));
             s.HumanToBot += (slot, actor, tick) => Log($"ONLINE TOBOT slot {slot} actor {actor} at tick {tick}");   // += : the room posts its notice too
+            s.BotToHuman += (slot, actor, tick) => Log($"ONLINE TOHUMAN slot {slot} actor {actor} at tick {tick}");   // b15-rejoin
+            if (s.IsRejoin)
+            {
+                // b15-rejoin: the rejoined session's own log (tick 0 to the end); the first session's stays in _hashes.
+                _rejoinHashes.Add(new KeyValuePair<int, ulong>(0, s.MyWorldHash0));
+                s.HashRecorded = (tick, h) => { _hashes.Add(new KeyValuePair<int, ulong>(tick, h)); _rejoinHashes.Add(new KeyValuePair<int, ulong>(tick, h)); };
+            }
             Log($"ONLINE SETUP peer {_t.LocalPeer} actor {s.LocalActor} humans {s.Setup.Humans.Length} seed {s.Setup.Seed} " +
                 $"config 0x{s.MyConfigHash:X16} world0 0x{s.MyWorldHash0:X16} host config 0x{s.Setup.ConfigHash:X16} host world0 0x{s.Setup.WorldHash0:X16}");
         }
@@ -283,8 +422,16 @@ namespace CriticalMass.Net.Relay
                 var sb = new StringBuilder();
                 foreach (KeyValuePair<int, ulong> kv in _hashes) sb.Append(kv.Key).Append(' ').Append(kv.Value.ToString("X16")).Append('\n');
                 File.WriteAllText(HashLogPath, sb.ToString());
+                if (_rejoinHashes.Count > 0)
+                {
+                    sb.Clear();
+                    foreach (KeyValuePair<int, ulong> kv in _rejoinHashes) sb.Append(kv.Key).Append(' ').Append(kv.Value.ToString("X16")).Append('\n');
+                    File.WriteAllText(HashLogPath + ".rejoin", sb.ToString());
+                }
             }
-            if (_t != null && !_dropped) { _t.Close(); (_t as RelayTransport)?.WaitClosed(1500); }
+            TrafficLog();
+            _beacon?.Dispose();
+            if (_t != null && !_dropped) { _t.Close(); (_relayRaw as RelayTransport)?.WaitClosed(1500); }
             Log("ONLINE EXIT " + ExitCode);
             return ExitCode;
         }
@@ -335,7 +482,12 @@ namespace CriticalMass.Net.Relay
                     case "onlinechattext": case "chat-text": p.ChatText = next; i++; break;
                     case "onlinechatteam": case "chat-team": p.ChatTeam = true; break;
                     case "onlinedropat": case "drop-at": int.TryParse(next, System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out p.DropAt); i++; break;
+                    case "onlinerejoinafter": case "rejoin-after": int.TryParse(next, System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out p.RejoinAfterMs); i++; break;
                     case "onlinebuild": case "build": p.Build = next; i++; break;
+                    case "onlinedirectport": case "direct-port": int.TryParse(next, System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out p.DirectPort); i++; break;
+                    case "onlinenorelay": case "no-relay": p.NoRelay = true; break;
+                    case "onlinedirect": case "direct": p.DirectAddr = next; i++; break;
+                    case "onlinelan": case "lan": p.Lan = true; break;
                 }
             }
             return p;

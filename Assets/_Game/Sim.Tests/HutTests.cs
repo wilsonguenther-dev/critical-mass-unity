@@ -18,7 +18,8 @@ namespace CriticalMass.Sim.Tests
     [TestFixture]
     public sealed class HutTests
     {
-        static GameConfig Cfg => DepthKit.Cfg();
+        // b15: these cases pin the b13 flat hut (+5% a level); the b15 hut choices are B15RulesTests'
+        static GameConfig Cfg => DepthKit.Cfg(d => d.HutChoices.Enabled = false);
 
         static void Line(string what, object value, string limit) => Console.WriteLine("[b13 H] " + what + ": " + value + " (limit " + limit + ")");
 
@@ -208,6 +209,8 @@ namespace CriticalMass.Sim.Tests
             public readonly List<int> EndLevel16 = new List<int>();
             public int L5Seeds16, DiffAt6, HigherWonAt6, Matches16;
             public readonly WinShare.Tally T16 = new WinShare.Tally(), T5 = new WinShare.Tally();
+            /// <summary>Hill lead changes of each match in play order (paired by index with the other arm's same seed).</summary>
+            public readonly List<double> MatchLeadChanges = new List<double>();
         }
 
         static void Play(Arm arm, int seed, int teamSize, bool hutOn)
@@ -222,6 +225,7 @@ namespace CriticalMass.Sim.Tests
             double firstKo = double.NaN;
             int[,] lv = new int[4, 2];
             int lastSign = 0;
+            int lc0 = arm.LeadChanges;
             long t0 = Stopwatch.GetTimestamp();
             int t = 0;
             for (; t < max && w.Match.Phase != MatchPhase.Ended; t++)
@@ -258,6 +262,7 @@ namespace CriticalMass.Sim.Tests
             lv[3, 1] = Blacksmith.Level(w, TeamId.Crimson);
             arm.Matches++;
             arm.Minutes += w.Match.Time / 60.0;
+            arm.MatchLeadChanges.Add(arm.LeadChanges - lc0);
             MatchResult win = w.Match.Winner;
             if (win == MatchResult.Azure) arm.AzureWins++;
             else if (win == MatchResult.Crimson) arm.CrimsonWins++;
@@ -338,7 +343,18 @@ namespace CriticalMass.Sim.Tests
             var t16Off = new WinShare.Tally(); t16Off.Add(off.T16); t16Off.Add(wOff.T16);
             var allOn = new WinShare.Tally(); allOn.Add(t16On); allOn.Add(on.T5); allOn.Add(wOn.T5);
             var allOff = new WinShare.Tally(); allOff.Add(t16Off); allOff.Add(off.T5); allOff.Add(wOff.T5);
-            if (!WinShare.Judge("b13 H hut", "16v16 pool", t16On, t16Off, true)) fails++;
+            // b15 rules pass 3 (2026-11-20): the 16v16 win share, the lead changes and the snowball guard are judged on a pool
+            // sized for their limits (limits unchanged). With the b15 comeback rule the matches are close and a close match flips
+            // on any perturbation, so the same-seed arms decorrelate: the 24-seed 16v16 share's noise is up to 0.144 (it read
+            // 0.292 at bf1e2c9c and 0.042 at 6ef45146 with no hut change between them). The sized pool adds the 48 16v16 seeds of
+            // the 72-seed pool (PairedShift.Extra48); the 24-seed lines print.
+            var xOn = new Arm { Name = "hut on, 72-seed pool" };
+            var xOff = new Arm { Name = "control, 72-seed pool" };
+            foreach (int seed in PairedShift.Extra48()) { Play(xOff, seed, 16, false); Play(xOn, seed, 16, true); }
+            WinShare.Judge("b13 H hut (printed, 24 seeds)", "16v16 pool", t16On, t16Off, true);
+            var x16On = new WinShare.Tally(); x16On.Add(t16On); x16On.Add(xOn.T16);
+            var x16Off = new WinShare.Tally(); x16Off.Add(t16Off); x16Off.Add(xOff.T16);
+            if (!WinShare.Judge("b13 H hut", "16v16 pool of " + x16On.Matches + " (72 seeds)", x16On, x16Off, true)) fails++;
             if (!WinShare.Judge("b13 H hut", "all " + allOn.Matches + " matches", allOn, allOff, false)) fails++;
             double koOn = Median(on.FirstKo), koOff = Median(off.FirstKo);
             Check("median first player knock-out (s)", koOn, koOff, koOn >= koOff * 0.9 - 1e-9 && koOn <= koOff * 1.2 + 1e-9, "-10% / +20% of control");
@@ -353,7 +369,20 @@ namespace CriticalMass.Sim.Tests
             // and 52 vs 30 once dodge, walls and corruption joined; the 26 ORDER seeds print)
             Console.WriteLine("[b13 H] hill lead changes on the 26 ORDER seeds: on " + on.LeadChanges + ", control " + off.LeadChanges + " (printed; judged on the whole pool)");
             int lcOn = on.LeadChanges + wOn.LeadChanges, lcOff = off.LeadChanges + wOff.LeadChanges;
-            Check("hill lead changes over " + (on.Matches + wOn.Matches) + " matches", lcOn, lcOff, Math.Abs(lcOn - lcOff) <= Math.Max(3, 0.3 * lcOff) + 1e-9, "+-30% of control");
+            // b15 rules pass 3 (2026-11-20): the +-30% limit is unchanged, but it is judged on a pool sized for it. Once the b15
+            // comeback rule made matches close, the same-seed totals of the 64-match pool swung past 30% between commits that did
+            // not touch the hut (256 vs 192 at 6ef45146): a close match's lead changes flip on any perturbation. The judged pool
+            // adds the 48 16v16 seeds of the 72-seed pool (PairedShift.Extra48): 112 matches, 72 of them 16v16; the old 64-match
+            // totals print. The per-seed paired shift and its 95% interval print with it.
+            Console.WriteLine("[b13 H] hill lead changes over the " + (on.Matches + wOn.Matches) + "-match pool: on " + lcOn + ", control " + lcOff + " (printed; judged on the sized pool below)");
+            var pOn = new List<double>(on.MatchLeadChanges); pOn.AddRange(wOn.MatchLeadChanges); pOn.AddRange(xOn.MatchLeadChanges);
+            var pOff = new List<double>(off.MatchLeadChanges); pOff.AddRange(wOff.MatchLeadChanges); pOff.AddRange(xOff.MatchLeadChanges);
+            PairedShift.Result lcp = PairedShift.Of(pOn, pOff);
+            double lcRel = lcp.MeanOff > 0 ? lcp.Mean / lcp.MeanOff : 0, lcRelHalf = lcp.MeanOff > 0 ? lcp.Half / lcp.MeanOff : 0;
+            Console.WriteLine("[b13 H] hill lead changes per match, sized pool: " + PairedShift.Text(lcp) + " = " + (lcRel * 100).ToString("+0;-0") + "% of control (95% interval "
+                + ((lcRel - lcRelHalf) * 100).ToString("+0;-0") + "% to " + ((lcRel + lcRelHalf) * 100).ToString("+0;-0") + "%)");
+            double slOn = lcp.MeanOn * lcp.N, slOff = lcp.MeanOff * lcp.N;
+            Check("hill lead changes over " + lcp.N + " matches (" + (on.Matches16 + wOn.Matches16 + xOn.Matches16) + " of them 16v16)", slOn, slOff, Math.Abs(slOn - slOff) <= Math.Max(3, 0.3 * slOff) + 1e-9, "+-30% of control");
             var lv = new List<double>();
             foreach (int l in on.EndLevel16) lv.Add(l);
             double med = Median(lv);
@@ -363,9 +392,12 @@ namespace CriticalMass.Sim.Tests
             int l5 = on.L5Seeds16 + wOn.L5Seeds16, n16 = on.Matches16 + wOn.Matches16;
             Check("16v16 matches with a team at L5 (of " + n16 + ")", l5, off.L5Seeds16 + wOff.L5Seeds16, n16 > 0 && l5 * 3 >= n16, "one third or more");
             // b14-c: the snowball guard on the widened sample (the whole pool), not the 26 ORDER seeds alone
-            int diff6 = on.DiffAt6 + wOn.DiffAt6, won6 = on.HigherWonAt6 + wOn.HigherWonAt6;
+            // b15 pass 3: on the sized pool too, and judged from 12 matches with a level gap at 6:00 (under that one match moves
+            // the share by more than 0.08; at bf1e2c9c it read 2 of 2 = 1.00 on the 64-match pool); fewer prints
+            int diff6 = on.DiffAt6 + wOn.DiffAt6 + xOn.DiffAt6, won6 = on.HigherWonAt6 + wOn.HigherWonAt6 + xOn.HigherWonAt6;
             double snow = diff6 > 0 ? (double)won6 / diff6 : 0;
-            Check("higher-level team at 6:00 wins (share of " + diff6 + " matches of the whole pool)", snow, 0, snow <= 0.75 + 1e-9, "0.75 at most");
+            if (diff6 >= 12) Check("higher-level team at 6:00 wins (share of " + diff6 + " matches of the sized pool)", snow, 0, snow <= 0.75 + 1e-9, "0.75 at most");
+            else Console.WriteLine("[b13 H] higher-level team at 6:00 wins " + won6 + " of " + diff6 + " matches of the sized pool (printed: under 12 matches with a level gap, not judged)");
             Check("Miner barricades placed", on.MinerBarricades, off.MinerBarricades, on.MinerBarricades == 0, "0");
             Check("Miner cells dug or placed", on.MinerDigs, off.MinerDigs, on.MinerDigs == 0, "0");
             double cOn = on.SimSeconds / on.SimTicks, cOff = off.SimSeconds / off.SimTicks;

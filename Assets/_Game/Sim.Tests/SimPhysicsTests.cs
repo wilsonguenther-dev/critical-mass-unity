@@ -205,6 +205,7 @@ namespace CriticalMass.Sim.Tests
         public void DG68TheOnScreenTimingTableAtTheDefaultPaceMatchesTheCheckedInTable()
         {
             GameConfig c = GameConfig.CreateDefault();
+            c.Depth.CombatFeel.Enabled = false; // b15: this is the shipped physics-lane table; CombatFeelTests prints the combat feel table
             // Owner 2026-11-12: the default pace is 1x; 2x is the "Fast" match option (WorldOptions.Pace = 2).
             World w1 = World.CreateWorld(new WorldOptions { Seed = 1, TeamSize = 16, HumanTeam = TeamId.Azure, HumanClass = ClassId.Warrior, Config = c });
             Assert.AreEqual(1, w1.Dur.Pace);

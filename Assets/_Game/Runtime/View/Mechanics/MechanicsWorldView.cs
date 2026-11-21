@@ -45,7 +45,10 @@ namespace CriticalMass.Runtime.View.Mechanics
         static readonly Color32 Brass = CMTokens.ToolBrass.Color, BrassDark = new Color32(150, 112, 40, 255);
         static readonly Color32 TntRed = new Color32(200, 53, 46, 255), TntDark = new Color32(132, 30, 28, 255), TntLight = new Color32(232, 96, 80, 255);
         static readonly Color32 Danger = CMTokens.MeterOrange.Color, Cream = CMTokens.WarmCream.Color, Spark = new Color32(255, 214, 72, 255);
-        static readonly Color32 Heal = CMTokens.Biomass.Color, Seam = CMTokens.EggSeam.Color, Hurt = CMTokens.Crimson.Color;
+        // b15 world look (WORLD-AUDIT W08, AD reserve hues): the Healer's heal reads in its own mint (hue 133), never the
+        // reserved Biomass lime (hue 80) or the Azure team cyan (hue 181). Biomass drops keep Biomass (BiomassDrop).
+        public static readonly Color32 HealMint = new Color32(95, 224, 122, 255);
+        static readonly Color32 Heal = HealMint, BiomassDrop = CMTokens.Biomass.Color, Seam = CMTokens.EggSeam.Color, Hurt = CMTokens.Crimson.Color;
 
         // perf/start-hitch-1: timed for the scene-start report (LoadTimer).
         void Start() { long t0 = CriticalMass.Runtime.Game.LoadTimer.Now(); StartBody(); CriticalMass.Runtime.Game.LoadTimer.Part("MechanicsWorldView.Start", t0); }
@@ -245,6 +248,29 @@ namespace CriticalMass.Runtime.View.Mechanics
                 Vector3 c = P(p.X, p.Z, 0.02f);
                 float len = Mathf.Max(0.5f, (float)p.HalfLen * 2f);
                 float half = (float)(pc.WidthCells * 0.5) - 0.12f;
+                // b15 terrain height: a height ladder (laid on a pit ledge or the side of a stack) leans flat against the face, from
+                // the low cell's ground to the top of the cell it is laid on (the authored ladder spans flat rock, so not here).
+                if (p.Kind == BuiltPieces.Ladder && p.Count == 1 && p.Cells != null && w.Map.Lift != null && TerrainHeight.LadderGround(w, p.Cells[0], out _))
+                {
+                    int W = w.Map.Width, ci = p.Cells[0];
+                    double fx = ci % W + 0.5 - p.Dx * 0.5, fz = ci / W + 0.5 - p.Dz * 0.5;   // the face between the two cells
+                    float yLo = (float)GroundHeight.At(w.Map, fx - p.Dx * 0.5, fz - p.Dz * 0.5);
+                    float yHi = (float)GroundHeight.At(w.Map, fx + p.Dx * 0.5, fz + p.Dz * 0.5);
+                    if (yHi < yLo) { float tmp = yHi; yHi = yLo; yLo = tmp; }
+                    Vector3 foot = SimSpace.ToWorld(fx - p.Dx * 0.32, yLo, fz - p.Dz * 0.32), head = SimSpace.ToWorld(fx - p.Dx * 0.04, yHi + 0.18f, fz - p.Dz * 0.04);
+                    Vector3 rise = head - foot;
+                    float rail = rise.magnitude;
+                    Quaternion lean = Quaternion.LookRotation(rise / Mathf.Max(1e-4f, rail), along);
+                    Color32 hl = Warm(WoodLight, warn, blink), hm = Warm(WoodMid, warn, blink), hd = Warm(WoodDark, warn, blink);
+                    for (int s2 = -1; s2 <= 1; s2 += 2)
+                        _solid.Chunk((foot + head) * 0.5f + across * (0.32f * s2), lean, new Vector3(0.06f, 0.06f, rail * 0.5f), 0.02f, hl, hm, hd, Navy);
+                    int rungs = Mathf.Clamp(Mathf.RoundToInt(rail / 0.3f), 2, 10);
+                    for (int r2 = 0; r2 < rungs; r2++)
+                        _solid.Chunk(Vector3.Lerp(foot, head, (r2 + 0.5f) / rungs), lean, new Vector3(0.3f, 0.035f, 0.04f), 0.015f, hl, hm, hd, Navy);
+                    _solid.Chunk(head + Vector3.up * 0.05f, lean, new Vector3(0.09f, 0.03f, 0.09f), 0.02f, team, team, Mix(team, Navy, 0.4f), Navy);
+                    Countdown(head + Vector3.up * 0.4f, 0.42f, 0.08f, left, ringCol, blink);
+                    continue;
+                }
                 // feat/staged-building-1: the authored ladder or rope bridge model, with its construction sequence; the
                 // procedural planks below stay as the fallback when the art is missing.
                 if (_staged != null && _staged.DrawPiece(w, k, p, c, along, len, (float)pc.WidthCells, warn && blink < 0.5f && !reduceFlash,
@@ -526,7 +552,7 @@ namespace CriticalMass.Runtime.View.Mechanics
                         break;
                     case MechFeed.BurstDrop:
                         if (age > 0.3f) break;
-                        GroundRing(c, Mathf.Max(0f, R * age / 0.3f - 0.1f), R * age / 0.3f + 0.02f, 0f, Mathf.PI * 2f, 20, A(Heal, 0.8f * (1f - age / 0.3f)));
+                        GroundRing(c, Mathf.Max(0f, R * age / 0.3f - 0.1f), R * age / 0.3f + 0.02f, 0f, Mathf.PI * 2f, 20, A(BiomassDrop, 0.8f * (1f - age / 0.3f)));
                         break;
                     case MechFeed.BurstDodge:
                         if (age > 0.4f) break;
@@ -630,6 +656,7 @@ namespace CriticalMass.Runtime.View.Mechanics
             if (driver.GetComponent<DepthWorldView>() == null) driver.gameObject.AddComponent<DepthWorldView>();
             CriticalMass.Runtime.View.B13.B13Views.EnsureOn(driver);   // b13-hook: the batch 13 item views (H, B, J, K, C)
             if (driver.GetComponent<CriticalMass.Runtime.Hud.Mechanics.DepthHud>() == null) driver.gameObject.AddComponent<CriticalMass.Runtime.Hud.Mechanics.DepthHud>();
+            if (driver.GetComponent<CriticalMass.Runtime.Hud.Mechanics.B15RulesHud>() == null) driver.gameObject.AddComponent<CriticalMass.Runtime.Hud.Mechanics.B15RulesHud>();   // b15-hook
             if (driver.GetComponent<CriticalMass.Runtime.Hud.Mechanics.StationPanel>() == null) driver.gameObject.AddComponent<CriticalMass.Runtime.Hud.Mechanics.StationPanel>();
             return v;
         }

@@ -626,6 +626,8 @@ namespace CriticalMass.Sim.Core
             world.Depth.Reset(world); // U-063 onward
             // CM b13: every item state resets with the world (InitWorld runs for CreateWorld and ResetWorld).
             world.Hut.Reset(world);   // b13-hook
+            world.Rally.Reset(world);   // b15-hook: the comeback rule
+            world.HutVote.Reset(world);   // b15-hook: the hut choices
             world.Walls.Reset(world);   // b13-hook
             world.Dodges.Reset(world);   // b13-hook
             world.KaijuKind.Reset(world);   // b13-hook
@@ -858,6 +860,8 @@ namespace CriticalMass.Sim.Core
                 Dur = Durations.Create(cfg),
                 Depth = DepthState.Create(cfg, map),
                 Hut = new HutState(),   // b13-hook
+                Rally = new ComebackState(),   // b15-hook
+                HutVote = new HutChoiceState(),   // b15-hook
                 Walls = new WallsState(),   // b13-hook
                 Dodges = new DodgeState(),   // b13-hook
                 KaijuKind = new KaijuTypeState(),   // b13-hook
@@ -865,6 +869,8 @@ namespace CriticalMass.Sim.Core
             };
             // CM b13: the item states allocate once here, after the actor arrays exist (no per-tick allocation).
             world.Hut.Init(world);   // b13-hook
+            world.Rally.Init(world);   // b15-hook
+            world.HutVote.Init(world);   // b15-hook
             world.Walls.Init(world);   // b13-hook
             world.Dodges.Init(world);   // b13-hook
             world.KaijuKind.Init(world);   // b13-hook
@@ -872,6 +878,11 @@ namespace CriticalMass.Sim.Core
             InitWorld(world, opts);
             // b14-c: the Kaiju clearance build state exists from the start, so the route guard's first pre-hatch refresh allocates nothing.
             Kaiju.WarmClearanceBuild(world);
+            // b15 (W6): every lazily filled bot route field gets its buffer now, so no first use allocates mid-match (no rule change).
+            RouteFields.Preallocate(world);
+            Jump.Warm(world.Config);   // b15 wave two: the jump planner's buffers exist before the first tick (no first-jump allocation)
+            CriticalMass.Sim.Core.Terraform.Warm(world);    // b15 wave two: the shrine-goal caches match this map before the first tick (no first-dig allocation)
+            CriticalMass.Sim.Core.Barricades.Warm(world);
             return world;
         }
 
@@ -996,6 +1007,10 @@ namespace CriticalMass.Sim.Core
         // CM b13 (S0 scaffold): one state object per batch 13 item; each class lives in its item's stub file (Sim/B13/).
         /// <summary>CM b13 [H]: the Blacksmith huts (Sim/B13/Blacksmith.cs).</summary>
         public HutState Hut;   // b13-hook
+        /// <summary>b15 rule A: the comeback rule's RALLY credit (Sim/B15/Comeback.cs).</summary>
+        public ComebackState Rally;   // b15-hook
+        /// <summary>b15 rule B: the hut vote and the side-grades each team chose (Sim/B15/HutChoices.cs).</summary>
+        public HutChoiceState HutVote;   // b15-hook
         /// <summary>CM b13 [B]: the Builder walls (Sim/B13/BuilderWalls.cs).</summary>
         public WallsState Walls;   // b13-hook
         /// <summary>CM b13 [J]: the dodges (Sim/B13/Dodge.cs).</summary>

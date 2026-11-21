@@ -75,6 +75,7 @@ namespace CriticalMass.Runtime.PlayTests
                 s.editorInputBehaviorInPlayMode = _savedEditorBehaviour;
                 _settingsSaved = false;
             }
+            if (_driver != null && _driver.Config != null) _driver.Config.Depth.TerrainHeight.Enabled = true;   // b15: Need1 / Need3 pin it off
             _driver = null;
         }
 
@@ -227,6 +228,9 @@ namespace CriticalMass.Runtime.PlayTests
         [UnityTest]
         public IEnumerator Need1_BuilderDigsWithF_TheHoleIsReal_CarriesTheBlock_PlacesItAtTheEdge_WalksOnIt()
         {
+            // b15 terrain height: this need is the Void dig (a hole you jump over / fill); with height a dig is a walkable pit
+            // (TerrainHeightTests covers that), so this run pins the old rule. The restart below applies it.
+            _driver.Config.Depth.TerrainHeight.Enabled = false;
             Restart(ClassId.Builder, 5);   // b13 r2: dig / place is the Builder's (owner decision)
             PadDef pad = W.Map.Pads[(int)TeamId.Azure];
             Assert.IsTrue(OpenSpot(pad.X + 7, pad.Z, out int sx, out int sz), "an open floor patch on the base island");
@@ -499,6 +503,9 @@ namespace CriticalMass.Runtime.PlayTests
         [UnityTest]
         public IEnumerator Need3_SpaceAndTheGamepadButtonJumpOverAOneCellGapAndOntoAOneStepLedge()
         {
+            // b15 terrain height: this need is the Void dig (a hole you jump over / fill); with height a dig is a walkable pit
+            // (TerrainHeightTests covers that), so this run pins the old rule. The restart below applies it.
+            _driver.Config.Depth.TerrainHeight.Enabled = false;
             Restart(ClassId.Builder, 5);   // b13 r2: the Builder digs the trench (owner decision)
             var notes = new List<string>();
             // A one-cell gap: dig one with the Builder (the creator's own combo: dig a trench, jump it) in open ground.

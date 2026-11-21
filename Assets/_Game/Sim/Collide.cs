@@ -56,7 +56,8 @@ namespace CriticalMass.Sim.Core
         private static bool CellBlocks(World w, int cx, int cz, bool air)
         {
             MapDef map = w.Map;
-            if (MapGrid.IsWalkable(map, cx, cz)) return false;
+            // b15 terrain height: a walkable cell too far above the mover blocks it (TerrainHeight.SweepStep set the mover).
+            if (MapGrid.IsWalkable(map, cx, cz)) return map.Lift != null && TerrainHeight.BlocksMover(map, cz * map.Width + cx);
             // CM-32: airborne actors pass over in-map VOID. CM b13: and over a short wall (Cell.LowWall); walking does not.
             return !(air && MapGrid.InBounds(map, cx, cz) && (map.Cells[cz * map.Width + cx] == Cell.Void || map.Cells[cz * map.Width + cx] == Cell.LowWall));   // b13-hook
         }
@@ -329,7 +330,9 @@ namespace CriticalMass.Sim.Core
         public static void MoveActor(World w, int id, double dx, double dz, bool air = false)
         {
             if (!(dx == dx) || !(dz == dz)) return; // NaN guard
+            TerrainHeight.ClimbSeen = false;   // b15: did this move meet a climbable ledge?
             SweepActor(w, id, w.X[id], w.Z[id], dx, dz, air, out double x, out double z);
+            if (TerrainHeight.ClimbSeen) TerrainHeight.NoteClimb(w, id);
             w.X[id] = JsMath.F32(x);
             w.Z[id] = JsMath.F32(z);
         }
@@ -347,8 +350,11 @@ namespace CriticalMass.Sim.Core
             double sz = dz / steps;
             double px = x0;
             double pz = z0;
+            bool lift = w.Map.Lift != null;   // b15 terrain height (null in Classic / PhysicsOnly: nothing below changes)
+            if (lift) TerrainHeight.SweepBegin(w, id, air);
             for (int s = 0; s < steps; s++)
             {
+                if (lift) TerrainHeight.SweepStep(w.Map, px, pz, r);
                 // The plain axis-separated push-out (resolve X, then Z): bit-identical to the pre-CM-33 sweep.
                 double lx = px;
                 double lz = pz;
@@ -644,6 +650,7 @@ namespace CriticalMass.Sim.Core
             }
             if (Neighbours.Length < w.Hash.Capacity) Neighbours = new int[w.Hash.Capacity];
             double reach = 2 * MaxRadius(w.Config);
+            bool feelLadder = CombatFeel.On(w) && w.Depth.Feel.LadderCount > 0;
             for (int i = 0; i < n; i++) SepMoved[i] = 0;
             for (int iter = 0; iter < p.SeparationIterations; iter++)
             {
@@ -689,6 +696,8 @@ namespace CriticalMass.Sim.Core
                         double overlap = (rr - d) * p.SeparationRelax;
                         if (ai.Team == aj.Team)
                         {
+                            // b15 combat feel: teammates pass through each other on a ladder lane (two-way traffic, no blocker).
+                            if (feelLadder && CombatFeel.AllyPasses(w, i, j)) continue;
                             overlap *= p.AllyPushShare;
                             // U-071: a retreating bot and an ally heading into it pass (no head-on jam in a one-cell corridor).
                             if (p.AllyPassOpposing && (ai.AiState == AiState.Retreat || aj.AiState == AiState.Retreat))

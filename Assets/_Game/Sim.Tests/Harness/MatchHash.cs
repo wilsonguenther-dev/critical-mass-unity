@@ -39,6 +39,7 @@ namespace CriticalMass.Sim.Tests.Harness
             Mix(w.WallVersion);
             Mix(w.EventHead);
             for (int i = 0; i < w.Map.Cells.Length; i++) Mix(w.Map.Cells[i]);
+            if (w.Map.Lift != null) for (int i = 0; i < w.Map.Lift.Length; i++) Mix(w.Map.Lift[i]);   // b15 (null outside Full)
             for (int i = 0; i < w.ActorCount; i++)
             {
                 Actor a = w.Actors[i];
@@ -56,6 +57,8 @@ namespace CriticalMass.Sim.Tests.Harness
             Mix(BitConverter.DoubleToInt64Bits(w.Match.Delivered[0].Biomass));
             Mix(BitConverter.DoubleToInt64Bits(w.Match.Delivered[1].Biomass));
             Mix((long)w.Match.Winner);
+            if (Comeback.On(w)) { Mix(w.Rally.BonusMilli[0]); Mix(w.Rally.BonusMilli[1]); Mix(w.Rally.HoldStreak[0]); Mix(w.Rally.HoldStreak[1]); Mix(w.Rally.KoTeam); Mix(w.Rally.Turns); }   // b15 (off outside Full)
+            if (HutChoices.On(w)) { Mix(w.HutVote.Mask[0]); Mix(w.HutVote.Mask[1]); }   // b15 (off outside Full)
             return h;
         }
     }

@@ -21,8 +21,10 @@ namespace CriticalMass.Sim.Core
         /// </summary>
         public static double DamageScale(World w, int source, int target, DamageCause cause)
         {
-            if (!(source >= 0 && source < w.ActorCount)) return 1.0;
-            return Blacksmith.StatScale(w, w.Actors[source].Team);
+            // b15 rule B: x the hut side-grades (SHIELD WALL, BLAST GUARD, KAIJU HUNTERS; exactly 1 with the rule off)
+            double choice = HutChoices.DamageScale(w, source, target, cause);
+            if (!(source >= 0 && source < w.ActorCount)) return choice;
+            return Blacksmith.StatScale(w, w.Actors[source].Team) * choice;
         }
 
         /// <summary>Heal.HealSystem (the fountain: the healed actor) and Healer.Restore: the healer's team StatScale; 1 for none.</summary>
@@ -33,7 +35,7 @@ namespace CriticalMass.Sim.Core
         }
 
         /// <summary>Movement: the walk speed multiplier beside Pickups.SpeedScale (H's HAUL x C's crystal carrier).</summary>
-        public static double SpeedScale(World w, int id) => Blacksmith.SpeedScale(w, id) * Corruption.SpeedScale(w, id);
+        public static double SpeedScale(World w, int id) => Blacksmith.SpeedScale(w, id) * Corruption.SpeedScale(w, id) * HutChoices.SpeedScale(w, id);   // b15: SWIFT FEET (1 with the rule off)
 
         /// <summary>Movement, for a living grounded actor before its walk update: true = J's dodge moved it this tick.</summary>
         public static bool DodgeStep(World w, int id, double dt) => Dodge.Step(w, id, dt);

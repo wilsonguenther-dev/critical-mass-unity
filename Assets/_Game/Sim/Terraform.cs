@@ -55,6 +55,11 @@ namespace CriticalMass.Sim.Core
         private static readonly byte[] OneType = new byte[1];
         private static byte[] OldTypes = new byte[16];
 
+        /// <summary>b15 wave two integrator: the shrine-goal cache is keyed on the shrine and ShrineInteractRange, so a world
+        /// on another map (another test, the next match) rebuilt it inside the first tick that needed it (536 B in DodgeTests'
+        /// 0 B window, probe 44856910630). Filled at world creation instead; it is derived from the map, never sim state.</summary>
+        internal static void Warm(World w) { if (w.Map != null && w.Map.Shrine != null) ShrineRing(w); }
+
         /// <summary>Goal points for "reaches the shrine": every cell centre within ShrineInteractRange of the shrine centre.</summary>
         private static PointXZ[] ShrineRing(World w)
         {
@@ -137,6 +142,9 @@ namespace CriticalMass.Sim.Core
             /// <summary>The whole grid the verdict was worked out on (exact compare: a raw cell write without a GridVersion bump, as
             /// the tests paint, still misses).</summary>
             public byte[] Grid = new byte[CriticalMass.Sim.Maps.SkybreakBasinMap.MapWidth * CriticalMass.Sim.Maps.SkybreakBasinMap.MapHeight];   // the shipped map: no allocation in play
+            /// <summary>integrator b15: the terrain-height layer the verdict was worked out on (the proof respects height).</summary>
+            public sbyte[] Lift = new sbyte[CriticalMass.Sim.Maps.SkybreakBasinMap.MapWidth * CriticalMass.Sim.Maps.SkybreakBasinMap.MapHeight];
+            public bool HasLift;
             public long Epoch;
             /// <summary>What the Kaiju route guard read (Used false: the verdict did not depend on the Kaiju: pads cut, nothing narrowed, guard off).</summary>
             public Kaiju.GuardKey Guard;
@@ -170,6 +178,9 @@ namespace CriticalMass.Sim.Core
                 if (!same) continue;
                 byte[] cells = w.Map.Cells;
                 if (m.Grid.Length != cells.Length || !new ReadOnlySpan<byte>(m.Grid).SequenceEqual(cells)) continue;
+                sbyte[] lift = w.Map.Lift;
+                if (m.HasLift != (lift != null)) continue;
+                if (lift != null && (m.Lift.Length != lift.Length || !new ReadOnlySpan<sbyte>(m.Lift).SequenceEqual(lift))) continue;   // integrator b15
                 if (!m.Guard.Used || Kaiju.RouteMemoSameKaiju(w, in m.Guard)) return e;
             }
             return -1;
@@ -184,6 +195,13 @@ namespace CriticalMass.Sim.Core
             byte[] cells = w.Map.Cells;
             if (m.Grid.Length != cells.Length) m.Grid = new byte[cells.Length];   // once per map size
             Array.Copy(cells, m.Grid, cells.Length);
+            sbyte[] lift = w.Map.Lift;   // integrator b15
+            m.HasLift = lift != null;
+            if (lift != null)
+            {
+                if (m.Lift.Length != lift.Length) m.Lift = new sbyte[lift.Length];   // once per map size
+                Array.Copy(lift, m.Lift, lift.Length);
+            }
             m.Epoch = Kaiju.ClearEpoch;
             m.Guard = Kaiju.LastGuard;
             m.N = n;
@@ -285,12 +303,46 @@ namespace CriticalMass.Sim.Core
             return kj.State != KaijuState.Egg && CircleHitsCell(kj.X, kj.Z, cfg.Kaiju.Radius + margin, cx, cz);
         }
 
-        /// <summary>0 when cell (cx, cz) may be dug right now (ignoring carry and rate cap), else a Refused* code.</summary>
+        /// <summary>
+        /// 0 when cell (cx, cz) may be dug right now (ignoring carry and rate cap), else a Refused* code. b15 terrain height:
+        /// a Floor / BreakableDestroyed cell under the height rule loses one level instead (TerrainHeight.DigRefusalBeforeRoute,
+        /// then the lift route guard); every other cell, and every cell without the rule, keeps the Void dig (VoidDigRefusal).
+        /// </summary>
         public static int DigRefusal(World w, int cx, int cz)
         {
-            int why = DigRefusalBeforeRoute(w, cx, cz);
+            if (LiftDig(w, cx, cz))
+            {
+                int hw = TerrainHeight.DigRefusalBeforeRoute(w, cx, cz);
+                if (hw != 0) return hw;
+                int i = cz * w.Map.Width + cx;
+                if (w.Map.Cells[i] == Cell.Bridge)
+                {
+                    // a height ladder: the proof runs with its ground back and one level off a raised cell
+                    TerrainHeight.LadderGround(w, i, out byte prev);
+                    int l = w.Map.Lift[i];
+                    return LiftKeepsRoutes(w, i, (sbyte)(l > 0 ? l - 1 : l), prev) ? 0 : RefusedRoute;
+                }
+                return TerrainHeight.KeepsRoutes(w, i, w.Map.Lift[i] - 1) ? 0 : RefusedRoute;
+            }
+            return VoidDigRefusal(w, cx, cz);
+        }
+
+        /// <summary>The pre-b15 dig rule: cell (cx, cz) may become Void now (TNT craters use it with the height rule on too).</summary>
+        public static int VoidDigRefusal(World w, int cx, int cz)
+        {
+            int why = VoidRefusalBeforeRoute(w, cx, cz);
             if (why != 0) return why;
             return DigKeepsRoutes(w, cz * w.Map.Width + cx) ? 0 : RefusedRoute;
+        }
+
+        /// <summary>b15: a dig on (cx, cz) changes its level (the height rule is on and the cell carries a lift).</summary>
+        public static bool LiftDig(World w, int cx, int cz)
+        {
+            MapDef map = w.Map;
+            if (map.Lift == null || cx < 0 || cz < 0 || cx >= map.Width || cz >= map.Height) return false;
+            int i = cz * map.Width + cx;
+            if (map.Cells[i] == Cell.Bridge) return TerrainHeight.LadderGround(w, i, out _);   // a height ladder: it comes down
+            return TerrainHeight.IsLiftType(map.Cells[i]);
         }
 
         /// <summary>
@@ -298,6 +350,13 @@ namespace CriticalMass.Sim.Core
         /// on the grid alone, so the view caches it per World.GridVersion; DigRefusal = this, then DigKeepsRoutes).
         /// </summary>
         public static int DigRefusalBeforeRoute(World w, int cx, int cz)
+        {
+            if (LiftDig(w, cx, cz)) return TerrainHeight.DigRefusalBeforeRoute(w, cx, cz);   // b15
+            return VoidRefusalBeforeRoute(w, cx, cz);
+        }
+
+        /// <summary>The pre-b15 DigRefusalBeforeRoute (the Void dig): every rule but the route guard.</summary>
+        public static int VoidRefusalBeforeRoute(World w, int cx, int cz)
         {
             MapDef map = w.Map;
             if (cx < 0 || cz < 0 || cx >= map.Width || cz >= map.Height) return RefusedOutside;
@@ -347,6 +406,62 @@ namespace CriticalMass.Sim.Core
             return 0;
         }
 
+        /// <summary>
+        /// b15: 0 when a PLACE on (cx, cz) may happen now (carry and rate cap aside): a hole (PlaceRefusal) or, under the height
+        /// rule, one more level on a lift cell (TerrainHeight.StackRefusal, then the lift route guard).
+        /// </summary>
+        public static int PlaceVerdict(World w, int cx, int cz)
+        {
+            if (!LiftDig(w, cx, cz)) return PlaceRefusal(w, cx, cz);
+            int why = TerrainHeight.StackRefusal(w, cx, cz);
+            if (why == BuilderWalls.RefusedOutside) return RefusedOutside;
+            if (why == BuilderWalls.RefusedGround) return RefusedTarget;
+            if (why == BuilderWalls.RefusedKeepOut) return RefusedOccupied;
+            if (why != 0) return why;
+            int i = cz * w.Map.Width + cx;
+            return TerrainHeight.KeepsRoutes(w, i, w.Map.Lift[i] + 1) ? 0 : RefusedRoute;
+        }
+
+        /// <summary>
+        /// b15 route guard for a lift change: with cell i at lift next, both pads still reach the hill and no pad that reaches
+        /// the shrine ring now loses it (the fields respect height). The tentative write is restored before returning. The
+        /// Kaiju ignores height, so its route is not part of this proof.
+        /// </summary>
+        public static bool LiftKeepsRoutes(World w, int i, sbyte next, byte cellType = 255)
+        {
+            MapDef map = w.Map;
+            sbyte[] lift = map.Lift;
+            sbyte old = lift[i];
+            byte oldCell = map.Cells[i];
+            lift[i] = next;
+            if (cellType != 255) map.Cells[i] = cellType;   // b15 height ladder: the proof with its ground back
+            bool ok = false;
+            try
+            {
+                ok = PadsReachHill(map);
+                if (ok)
+                {
+                    // integrator b15: #213 replaced the scratch flow fields with GridReach (now height-aware, the same yes/no)
+                    int after = PadsReached(map, ShrineRing(w));
+                    bool aAfter = (after & 1) != 0;
+                    bool cAfter = (after & 2) != 0;
+                    if (!aAfter || !cAfter)
+                    {
+                        lift[i] = old;
+                        map.Cells[i] = oldCell;
+                        int g = PadsReached(map, ShrineRing(w));
+                        if ((!aAfter && (g & 1) != 0) || (!cAfter && (g & 2) != 0)) ok = false;
+                    }
+                }
+            }
+            finally
+            {
+                lift[i] = old;
+                map.Cells[i] = oldCell;
+            }
+            return ok;
+        }
+
         private static int Refuse(World w, int id, int i, double x, double z, int code)
         {
             World.PushEvent(w, SimEventType.Terraform, id, i, x, z, code);
@@ -393,7 +508,8 @@ namespace CriticalMass.Sim.Core
             if (WaitTicks(w, a.Team) > 0) return Refuse(w, id, i, cx + 0.5, cz + 0.5, RefusedRate);
             int why = DigRefusal(w, cx, cz);
             if (why != 0) return Refuse(w, id, i, cx + 0.5, cz + 0.5, why);
-            Commit(w, id, cx, cz, Cell.Void);
+            if (LiftDig(w, cx, cz)) TerrainHeight.CommitDig(w, id, cx, cz);   // b15: one level off (a top block, or a pit one deeper)
+            else Commit(w, id, cx, cz, Cell.Void);
             t.Carried[id]++;
             if (t.Carried[id] >= CarryMax(w.Config)) t.Mode[id] = (byte)TerraformMode.Place; // DG-09: a full carry switches to Place
             World.PushEvent(w, SimEventType.Terraform, id, i, cx + 0.5, cz + 0.5, Dug);
@@ -414,9 +530,10 @@ namespace CriticalMass.Sim.Core
             if (!TargetCell(w, id, aimX, aimZ, out int cx, out int cz)) return Refuse(w, id, -1, ax, az, RefusedOutside);
             int i = cz * w.Map.Width + cx;
             if (WaitTicks(w, a.Team) > 0) return Refuse(w, id, i, cx + 0.5, cz + 0.5, RefusedRate);
-            int why = PlaceRefusal(w, cx, cz);
+            int why = PlaceVerdict(w, cx, cz);   // b15: a hole as before, or one more level on a lift cell
             if (why != 0) return Refuse(w, id, i, cx + 0.5, cz + 0.5, why);
-            Commit(w, id, cx, cz, Cell.Floor);
+            if (LiftDig(w, cx, cz)) TerrainHeight.CommitStack(w, id, cx, cz);
+            else Commit(w, id, cx, cz, Cell.Floor);
             t.Carried[id]--;
             if (t.Carried[id] == 0) t.Mode[id] = (byte)TerraformMode.Dig; // DG-09: an empty carry switches back to Dig
             World.PushEvent(w, SimEventType.Terraform, id, i, cx + 0.5, cz + 0.5, Placed);

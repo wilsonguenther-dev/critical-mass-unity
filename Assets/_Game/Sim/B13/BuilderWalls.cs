@@ -259,6 +259,8 @@ namespace CriticalMass.Sim.Core
         /// <summary>The one word the view shows for a verdict.</summary>
         public static string Word(int why)
         {
+            string hw = TerrainHeight.Word(why, null);   // b15: too high / too deep / level ground only / someone is standing there
+            if (hw != null) return hw;
             switch (why)
             {
                 case 0: return "BUILD";
@@ -472,6 +474,20 @@ namespace CriticalMass.Sim.Core
                     if (Terraform.WaitTicks(w, a.Team) > 0) return RefusedRate;
                     return 0;
                 }
+                if (TerrainHeight.On(w))
+                {
+                    // b15 terrain height: a BLOCK on ground, a block or a pit is one more level (wood, the build lock, the shared
+                    // terrain rate cap, then the route guard when the new step would wall something off).
+                    tall = false;
+                    int hw = TerrainHeight.StackRefusal(w, cx, cz);
+                    if (hw != 0) return hw;
+                    if (Wood(w, a.Team) < b.CostBlock) return RefusedWood;
+                    if (w.Tick < s.ReadyTick[id]) return RefusedLock;
+                    if (Terraform.WaitTicks(w, a.Team) > 0) return RefusedRate;
+                    int ci = cz * map.Width + cx;
+                    if (!TerrainHeight.KeepsRoutes(w, ci, map.Lift[ci] + 1)) return RefusedRoute;
+                    return 0;
+                }
             }
             else
             {
@@ -486,6 +502,8 @@ namespace CriticalMass.Sim.Core
             for (int k = -half; k < len - half; k++)
             {
                 int why = CellRefusal(w, cx + k * dx, cz + k * dz);
+                // b15 terrain height: walls stand on level-0 ground only (stacks and pits are for blocks).
+                if (why == 0 && TerrainHeight.LiftAt(map, cx + k * dx, cz + k * dz) != 0) why = TerrainHeight.RefusedLevelOnly;
                 if (why != 0 && (worst == 0 || why > worst)) worst = why;
             }
             if (worst != 0) return worst;
@@ -594,6 +612,20 @@ namespace CriticalMass.Sim.Core
                 s.BotRule[id] = 0;
                 return Filled;
             }
+            if (piece == BuildPiece.Block && TerrainHeight.On(w))
+            {
+                // b15 terrain height: the block becomes one more level of the cell (permanent until dug, blown or smashed).
+                Spend(w, a.Team, b.CostBlock);
+                TerrainHeight.CommitStack(w, id, cx, cz);
+                s.ReadyTick[id] = w.Tick + Durations.T30(w.Config, b.LockTicks);
+                s.Builds++;
+                s.Built[id]++;
+                s.BuiltByRule[(int)a.Team * 4 + (s.BotRule[id] & 3)]++;
+                s.BotRule[id] = 0;
+                int ci = cz * map.Width + cx;
+                World.PushEvent(w, SimEventType.Terraform, id, ci, cx + 0.5, cz + 0.5, Terraform.Placed);
+                return Built;
+            }
 
             // The cap: building past MaxCellsPerBuilder crumbles his oldest pieces; first prove the pool can take the piece.
             int max = (int)b.MaxCellsPerBuilder;
@@ -625,6 +657,8 @@ namespace CriticalMass.Sim.Core
             byte cell = tall ? Cell.Barricade : Cell.LowWall;
             double hp = !tall ? b.ShortHp : Tier(w, a.Team) >= 2 ? b.TallHp2 : b.TallHp;
             double life = Durations.T30(w.Config, tall ? b.TallLifeTicks : b.ShortLifeTicks) / w.Config.SimHz;
+            double tough = HutChoices.WallScale(w, a.Team);   // b15-hook: TOUGH WALLS (exactly 1 with the rule off)
+            if (tough != 1.0) { hp *= tough; life *= tough; }
             int half = len / 2;
             int first = (cz - half * dz) * map.Width + (cx - half * dx);
             s.POwner[pieceSlot] = id;

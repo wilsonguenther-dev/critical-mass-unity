@@ -58,17 +58,20 @@ namespace CriticalMass.Sim.Grid
                 if (c == tb) got |= 2;
                 if (got == want) return got;
                 int cx = c % W, cz = c / W;
-                if (cx + 1 < W) Visit(cells, c + 1, stamp, ref tail);
-                if (cx > 0) Visit(cells, c - 1, stamp, ref tail);
-                if (cz + 1 < H) Visit(cells, c + W, stamp, ref tail);
-                if (cz > 0) Visit(cells, c - W, stamp, ref tail);
+                if (cx + 1 < W) Visit(map, cells, c, c + 1, stamp, ref tail);
+                if (cx > 0) Visit(map, cells, c, c - 1, stamp, ref tail);
+                if (cz + 1 < H) Visit(map, cells, c, c + W, stamp, ref tail);
+                if (cz > 0) Visit(map, cells, c, c - W, stamp, ref tail);
             }
             return got;
         }
 
-        private static void Visit(byte[] cells, int i, int stamp, ref int tail)
+        private static void Visit(MapDef map, byte[] cells, int c, int i, int stamp, ref int tail)
         {
             if (Seen[i] == stamp || !MapGrid.IsWalkableType(cells[i])) return;
+            // integrator b15: with the terrain-height layer the step must be open exactly as ComputeFlowField opens it
+            // (TerrainHeight.EdgeExtra >= 0), or this BFS and a finite field distance disagree (#213 x #211).
+            if (map.Lift != null && TerrainHeight.EdgeExtra(map, c, i) < 0) return;
             Seen[i] = stamp;
             Queue[tail++] = i;
         }

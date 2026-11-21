@@ -21,6 +21,8 @@ namespace CriticalMass.Runtime.Hud
         public HillState Hill;
         /// <summary>Azure's share of held hill time, 0.5 when nobody has held it yet.</summary>
         public float HillShareAzure;
+        /// <summary>b15 D0: the team (0 Azure, 1 Crimson) whose hill score its own Kaiju is cutting right now; -1 none.</summary>
+        public int KaijuBlocksHill = -1;
 
         // Kaiju second
         public KaijuState Kaiju;
@@ -61,7 +63,7 @@ namespace CriticalMass.Runtime.Hud
         {
             ClockRemaining = o.ClockRemaining; Ended = o.Ended; Winner = o.Winner;
             ScoreAzure = o.ScoreAzure; ScoreCrimson = o.ScoreCrimson; OnHillAzure = o.OnHillAzure; OnHillCrimson = o.OnHillCrimson;
-            Hill = o.Hill; HillShareAzure = o.HillShareAzure;
+            Hill = o.Hill; HillShareAzure = o.HillShareAzure; KaijuBlocksHill = o.KaijuBlocksHill;
             Kaiju = o.Kaiju; Hatched = o.Hatched; UntilHatch = o.UntilHatch; KaijuMeter01 = o.KaijuMeter01;
             Instability01 = o.Instability01; BerserkLocked = o.BerserkLocked; AllegianceAzure = o.AllegianceAzure; AllegianceCrimson = o.AllegianceCrimson;
             HasPlayer = o.HasPlayer; Team = o.Team; Cls = o.Cls; Alive = o.Alive; Hp = o.Hp; MaxHp = o.MaxHp;
@@ -94,6 +96,7 @@ namespace CriticalMass.Runtime.Hud
             s.Hill = m.HillState;
             double held = m.HillSeconds.Azure + m.HillSeconds.Crimson;
             s.HillShareAzure = held > 1e-6 ? (float)(m.HillSeconds.Azure / held) : 0.5f;
+            s.KaijuBlocksHill = Comeback.KaijuBlocking(w);   // b15 D0
 
             Kaiju k = w.Kaiju;
             s.Kaiju = k.State;
@@ -112,7 +115,7 @@ namespace CriticalMass.Runtime.Hud
             s.HasPlayer = localId >= 0 && localId < w.ActorCount;
             if (!s.HasPlayer) return;
             Actor a = w.Actors[localId];
-            ClassConfig cc = c.Classes[(int)a.Cls];
+            ClassConfig cc = c.Class(a.Cls); // b15: the live row (combat feel rows in Full)
             s.Team = a.Team;
             s.Cls = a.Cls;
             s.Alive = a.Alive;
@@ -123,13 +126,14 @@ namespace CriticalMass.Runtime.Hud
             double atkCd = lw != null && a.Cls != ClassId.Healer ? lw.CooldownSeconds : cc.AttackCooldown;
             s.AttackCd01 = atkCd > 0 ? Clamp01((float)(a.AttackCd / atkCd)) : 0f;
             bool aim = localId < w.HasAim.Length && w.HasAim[localId] == 1;
-            s.HealerLantern = a.Cls == ClassId.Healer && lw != null && a.Alive
+            s.HealerLantern = a.Cls == ClassId.Healer && (lw != null || CombatFeel.On(c)) && a.Alive
                 && Healer.MendTarget(w, localId, aim ? w.Inputs[localId].AimX : double.NaN, aim ? w.Inputs[localId].AimZ : double.NaN) < 0;
             DemolitionsTntConfig tnt = c.Abilities.DemolitionsTnt;
             s.DemoTntOnAttack = a.Cls == ClassId.Demolitions && tnt.ThrowOnAttack && !c.Depth.Classic;
             int tntWait = s.DemoTntOnAttack && w.Demolitions != null ? Demolitions.TntWaitTicks(w, localId) : 0;
             s.DemoTntReady = s.DemoTntOnAttack && tntWait <= 0;
-            s.DemoTntCd01 = s.DemoTntOnAttack && tnt.CooldownTicks > 0 ? Clamp01((float)(tntWait / tnt.CooldownTicks)) : 0f;
+            double tntCdTicks = CombatFeel.TntCooldown(c); // b15: the combat feel TNT cooldown in Full (sim ticks)
+            s.DemoTntCd01 = s.DemoTntOnAttack && tntCdTicks > 0 ? Clamp01((float)(tntWait / tntCdTicks)) : 0f;
             s.DemoTntSeconds = s.DemoTntOnAttack ? (float)(tntWait / c.SimHz) : 0f;
             s.AbilityCd01 = cc.AbilityCooldown > 0 ? Clamp01((float)(a.AbilityCd / cc.AbilityCooldown)) : 0f;
             s.AbilityCdSeconds = (float)Math.Max(0, a.AbilityCd);

@@ -38,6 +38,7 @@ namespace CriticalMass.Runtime.View
         private World _world;
         private MapDef _map;
         private byte[] _cellsCopy;
+        private sbyte[] _liftCopy;   // b15 terrain height: the lift layer as last drawn (null without the rule)
         private int _seenGridVersion;
         private int _chunksX;
         private int _chunksZ;
@@ -130,6 +131,7 @@ namespace CriticalMass.Runtime.View
                 // A new map or a repaint (World.Epoch): every chunk again, so filled blocks of the last match go away.
                 _seenEditCaptures = TerrainEdits.Captures;
                 System.Array.Copy(w.Map.Cells, _cellsCopy, _cellsCopy.Length);
+                if (_liftCopy != null && w.Map.Lift != null) System.Array.Copy(w.Map.Lift, _liftCopy, _liftCopy.Length);
                 _seenGridVersion = w.GridVersion;
                 for (int c = 0; c < _dirty.Length; c++) { _dirty[c] = false; RebuildChunk(c); }
                 return;
@@ -148,6 +150,17 @@ namespace CriticalMass.Runtime.View
                 // chunk within two cells rebuilds (still only the chunks around the edit, never the whole map).
                 MarkDirtyAround(i % width, i / width);
                 any = true;
+            }
+            sbyte[] lift = w.Map.Lift;   // b15: a level change rebuilds the chunks around it too
+            if (lift != null && _liftCopy != null)
+            {
+                for (int i = 0; i < lift.Length; i++)
+                {
+                    if (lift[i] == _liftCopy[i]) continue;
+                    _liftCopy[i] = lift[i];
+                    MarkDirtyAround(i % width, i / width);
+                    any = true;
+                }
             }
             if (!any) return;
             for (int c = 0; c < _dirty.Length; c++)
@@ -178,6 +191,7 @@ namespace CriticalMass.Runtime.View
             _world = w;
             _map = w.Map;
             _cellsCopy = (byte[])_map.Cells.Clone();
+            _liftCopy = _map.Lift != null ? (sbyte[])_map.Lift.Clone() : null;
             _seenGridVersion = w.GridVersion;
             TerrainEdits.Sync(w);
             _seenEditCaptures = TerrainEdits.Captures;
@@ -274,7 +288,7 @@ namespace CriticalMass.Runtime.View
                     // b14: changed terrain and short walls are TerrainEditMesh's (a barricade on an edited cell keeps its
                     // grey-box body when the barricade model is not imported).
                     byte cur = _cellsCopy[i];
-                    TerrainEdits.Kind kind = pristine != null ? TerrainEdits.Classify(pristine[i], cur, touched[i]) : TerrainEdits.Kind.None;
+                    TerrainEdits.Kind kind = pristine != null ? TerrainEdits.Classify(pristine[i], cur, touched[i], _liftCopy != null ? _liftCopy[i] : (sbyte)0) : TerrainEdits.Kind.None;
                     if (TerrainEditMesh.Owns(cur, kind) && !(cur == Cell.Barricade && !BarricadeModelShown)) continue;
                     if (Dressing.WorldView.Draws(i, _cellsCopy[i])) continue;
                     // b14 bridge fix: a built rope bridge draws its own deck from bank to bank (StagedBuildView); the flat
@@ -295,6 +309,8 @@ namespace CriticalMass.Runtime.View
             for (int k = 0; k < _tris.Length; k++) mesh.SetTriangles(_tris[k], k, false);
             mesh.RecalculateBounds();
 
+            _edit.Lift = _liftCopy;   // b15
+            _edit.StepU = _map.LiftStepU > 0 ? _map.LiftStepU : 0.45;
             _edit.Build(_map.Width, _map.Height, _cellsCopy, _map.Height01, pristine, touched, x0, z0, x1, z1);
             if (_edit.Tris.Count > 0 || _editMeshes[c] != null)
             {

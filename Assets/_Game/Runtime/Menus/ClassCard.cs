@@ -157,7 +157,9 @@ namespace CriticalMass.Runtime.Menus
                     if (index != null)
                     {
                         int i = int.TryParse(index, out int n) ? n : (int)Enum.Parse(typeof(ClassId), index);
-                        o = ((IList)o)[i];
+                        // b15 wave two: a class row is the row the match plays (GameConfig.Class: the combat feel's rows while
+                        // that rule is on), not the base array (the card said 160 health; the Warrior plays 115)
+                        o = o == (object)cfg.Classes && o is ClassConfig[] ? cfg.Class((ClassId)i) : ((IList)o)[i];
                     }
                     if (o == null) return false;
                 }
@@ -427,7 +429,7 @@ namespace CriticalMass.Runtime.Menus
         public const string BuilderBio = "Flat cap, pencil behind the ear. Give the Builder wood and a gap, and he hands you a wall, a ladder or a bridge.";
         public const string BuilderBuild = "F uses the selected tool where the outline shows. Right click does the same.";
         public const string BuilderSwitch = "One wheel: dig, place, ladder, bridge, short wall, tall wall (hut level 2), block. The wheel or 1-7 picks.";
-        public const string BuilderStairs = "A LADDER climbs the rock wall you face (rock walls stand on the hill); a BRIDGE spans straight out from your edge.";
+        public const string BuilderStairs = "A LADDER climbs the wall, ledge or stack you face (a rock wall on the hill, a pit wall, a stack side); a BRIDGE spans straight out from your edge.";
         /// <summary>b13 r2 (owner decision: terrain belongs to the Builder and the Demolitionist): the Builder's F while the hut rule is on.</summary>
         public const string BuilderDig = "With DIG on the wheel, F digs a block of ground; with PLACE, F at an edge or a hole puts it back.";
         public const string BuilderDigSwitch = "The wheel or LB picks the next tool: dig, place, ladder, bridge.";
@@ -576,7 +578,7 @@ namespace CriticalMass.Runtime.Menus
 
         protected override void DoStateTransition(SelectionState state, bool instant)
         {
-            _focus = state == SelectionState.Selected || state == SelectionState.Highlighted || state == SelectionState.Pressed;
+            _focus = state == SelectionState.Selected || state == SelectionState.Pressed;   // integrator b15: hover alone never lights a second card (OnPointerEnter selects the tile, so hover still lights it)
             if (Body == null) return;
             Body.SetRim(_focus ? CMTokens.ToolBrass.Color : CMTokens.WarmCream.Color);
             float rim = _focus ? 5f : 2f;
@@ -628,6 +630,10 @@ namespace CriticalMass.Runtime.Menus
         Text _name, _role, _bio, _hotkey, _diffLabel;
         readonly VectorShape[] _pips = new VectorShape[3];
         Text _tileKey, _tileAbility;
+        // b15 profile: the local player's mastery look for the card's class (frame ring on the disc, emblem, title ribbon)
+        VectorShape _disc, _lookEmblem, _lookPlate;
+        Text _lookTitle;
+        float _discOutline;
         readonly AbilityRow[] _rows = new AbilityRow[3];
         ClassWords _words;
 
@@ -680,6 +686,10 @@ namespace CriticalMass.Runtime.Menus
             disc.RimPx = 0f;
             disc.OutlinePx = 3f;
             _portrait = HudIcon.Make(Root, "Portrait", (_w - p) * 0.5f, 14f, p, p);
+            _disc = disc;
+            _discOutline = 3f;
+            float eb = Mathf.Round(p * 0.3f);
+            _lookEmblem = Progression.LookView.Emblem(Root, "Look Emblem", (_w + p) * 0.5f - eb * 0.6f, 10f + p + 8f - eb, eb);
             float y = 18f + p + 4f;
             _name = MenuUi.Label(Root, "Name", CMTokens.Display, _w > 290f ? 26 : 22, Cream, TextAnchor.MiddleCenter, 6f, y, _w - 12f, 32f, "", 3f);
             y += 32f;
@@ -726,6 +736,13 @@ namespace CriticalMass.Runtime.Menus
             disc.RimPx = 0f;
             disc.OutlinePx = 4f;
             _portrait = HudIcon.Make(Root, "Portrait", 36f, 34f, p, p);
+            _disc = disc;
+            _discOutline = 4f;
+            _lookEmblem = Progression.LookView.Emblem(Root, "Look Emblem", 30f + p + 12f - 58f, 28f, 58f);
+            _lookPlate = MenuUi.Shape(Root, "Look Title Plate", ShapeKind.RoundRect, 30f, 28f + p - 22f, p + 12f, 32f, CMTokens.WithAlpha(Navy, 0.88f), 10f);
+            _lookPlate.RimPx = 0f;
+            _lookTitle = MenuUi.Fit(MenuUi.Label(_lookPlate.transform, "Title", CMTokens.Display, UiScale.TypeSmall, Brass, TextAnchor.MiddleCenter, 4f, 0f, p + 4f, 32f, "", 2f), 11);
+            _lookPlate.gameObject.SetActive(false);
             float tx = 30f + p + 40f, tw = _w - tx - 30f;
             _name = MenuUi.Label(Root, "Name", CMTokens.Display, UiScale.TypeDisplay, Cream, TextAnchor.MiddleLeft, tx, 28f, tw, 70f, "", 4f);
             _role = MenuUi.Label(Root, "Role", CMTokens.Ui, UiScale.TypeButton, Brass, TextAnchor.MiddleLeft, tx, 98f, tw, 38f, "", 3f);
@@ -822,6 +839,7 @@ namespace CriticalMass.Runtime.Menus
             int c = (int)cls, t = (int)team;
             _portrait.Set(UiIcons.Portrait[c, t], TierFor(_portraitPx, 106f, canvasScale));
             HudText.Set(_name, _words.Name.ToUpperInvariant());
+            BindLook(cls);
             // owner walk 1: the small tile shows the one-line role only (the role tag after it was cut on every tile); the
             // detail card keeps the full line with the tag. Integration batch 5: on ONE line ("Feeds the egg.   FEEDER"): two
             // lines in the 38 px row were cut at the bottom on every class (Bind runs on a class change, not per frame)
@@ -867,6 +885,19 @@ namespace CriticalMass.Runtime.Menus
         }
 
         /// <summary>Key glyphs from the current bindings for a device.</summary>
+        /// <summary>b15 profile: the local player's look for cls (cosmetic only; the plain look draws the card as before).</summary>
+        public void BindLook(ClassId cls)
+        {
+            CriticalMass.Net.CosmeticLook look = Progression.LookRegistry.Local(cls);
+            Progression.LookView.Ring(_disc, look.Frame, _discOutline, CMTokens.VoidNavy.Color);
+            Progression.LookView.SetEmblem(_lookEmblem, cls, look.Emblem);
+            if (_lookPlate == null) return;
+            string title = Progression.LookView.Title(cls, look);
+            bool on = title.Length > 0;
+            if (_lookPlate.gameObject.activeSelf != on) _lookPlate.gameObject.SetActive(on);
+            if (on) HudText.Set(_lookTitle, title);
+        }
+
         public void RefreshGlyphs(ControlDevice device)
         {
             if (_words == null) return;

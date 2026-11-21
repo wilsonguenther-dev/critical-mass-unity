@@ -96,7 +96,7 @@ namespace CriticalMass.Sim.Tests.Net
         }
 
         /// <summary>Records an online-style room: actor 0 plus extra humans with wire-quantised frames; one leaves at handTick.</summary>
-        static ReplayData RecordOnline(int seed, int teamSize, int[] extra, int ticks, int handTick, out ulong liveFinal, out int[] liveFp)
+        static ReplayData RecordOnline(int seed, int teamSize, int[] extra, int ticks, int handTick, out ulong liveFinal, out int[] liveFp, int backTick = -1)
         {
             ReplayStart s = Start(seed, teamSize, (int)RulesProfile.Full, extra);
             World w = World.CreateWorld(s.ToWorldOptions(s.BuildConfig()));
@@ -126,6 +126,14 @@ namespace CriticalMass.Sim.Tests.Net
                     left = true;
                     frames[extra[0]] = null;
                 }
+                if (t == backTick && left && extra.Length > 0)
+                {
+                    // b15-rejoin: the player who left rejoined and takes the fighter back at this tick.
+                    MatchTick.BotToHuman(w, extra[0]);
+                    left = false;
+                    Scripted(w, extra[0], t, own[extra[0]], true);
+                    frames[extra[0]] = own[extra[0]];
+                }
                 MatchTick.AdvanceHumans(w, frames, scratch);
             }
             MatchTick.Tap = null;
@@ -152,6 +160,22 @@ namespace CriticalMass.Sim.Tests.Net
             Assert.IsTrue(p.FinalMatches);
             Assert.AreEqual(live, StateHash.Of(p.World), "final checksum");
             Assert.AreEqual(d.Header.FinalHash, live);
+        }
+
+        [Test]
+        public void PlaybackOfARoomWhereAPlayerLeftAndRejoinedMatchesEveryFingerprint()
+        {
+            int[] extra = { 1, 17 };
+            ReplayData d = RecordOnline(7, 16, extra, 2400, 900, out ulong live, out _, 1500);
+            var p = new ReplayPlayer(d);
+            p.RunToEnd();
+            Console.WriteLine($"[replay] b15-rejoin: 3 humans 16v16 seed 7 1:20, actor 1 to the bot at tick 900 and back at 1500: ticks {p.TicksPlayed}, " +
+                              $"fingerprints {p.FingerprintsChecked}/{d.FingerprintCount}, final live 0x{live:X16} replay 0x{StateHash.Of(p.World):X16}, " +
+                              $"actor 1 human at the end: {p.World.Actors[1].IsHuman} (limit: identical, human)");
+            Assert.IsFalse(p.Desynced, "desynced at tick " + p.DesyncTick);
+            Assert.AreEqual(d.FingerprintCount, p.FingerprintsChecked);
+            Assert.AreEqual(live, StateHash.Of(p.World));
+            Assert.IsTrue(p.World.Actors[1].IsHuman, "the hand-back replayed");
         }
 
         [Test]
@@ -306,6 +330,7 @@ namespace CriticalMass.Sim.Tests.Net
             public void OnAdvanceHumans(World w, InputFrame[] frames) { Bind(w); Rec.OnAdvanceHumans(w, frames); }
             public void OnAdvanceNoHuman(World w) { Bind(w); Rec.OnAdvanceNoHuman(w); }
             public void OnHandToBot(World w, int id) { Bind(w); Rec.OnHandToBot(w, id); }
+            public void OnBotToHuman(World w, int id) { Bind(w); Rec.OnBotToHuman(w, id); }
         }
 
         [Test]

@@ -136,6 +136,9 @@ namespace CriticalMass.Runtime.View
             _barricades = new ModelView[w.Barricades != null ? w.Barricades.Length : 0];
 
             GameObject hill = CreatePrimitive(PrimitiveType.Cube, "Hill");
+            // b15 (WORLD-AUDIT W02): the hill's zone plate was a Unity cube scaled flat (a square slab on a round dais);
+            // now a round plate with a softly uneven edge, same size (unit diameter, scaled to 2R) and same material.
+            hill.GetComponent<MeshFilter>().sharedMesh = HillDisc.Mesh;
             _hill = hill.transform;
             hill.GetComponent<Renderer>().sharedMaterial = ToonMaterials.Prop(Palette.Brass);
 
@@ -373,7 +376,7 @@ namespace CriticalMass.Runtime.View
             double x = hasFx && fx.Corpse ? fx.CorpseX : Lerp(w.PrevX[i], w.X[i], a);
             double z = hasFx && fx.Corpse ? fx.CorpseZ : Lerp(w.PrevZ[i], w.Z[i], a);
             if (_stressHill) StressPlace(map.Hill, i, ref x, ref z);
-            double h = GroundHeight(map, x, z);
+            double h = CriticalMass.Runtime.GroundHeight.Body(map, x, z);   // b15: on the pit floor / on top of a stack (+ b14 bridge deck)
             // b12-jz / b14 ladder fix: up the near ladder, along the rock top, down the far ladder; on the rungs the fighter
             // faces the ladder (the wall), going up and coming down
             bool onLadder = CriticalMass.Runtime.View.Mechanics.LadderClimb.Sample(w, x, z, out float ladderLift, out bool onRungs, out double rungYaw);
@@ -443,7 +446,7 @@ namespace CriticalMass.Runtime.View
             // feat/hit-feel-1 step-in plus the reaction shift, horizontally capped (fix/hit-feel-3: HitFeel.MaxViewOffset).
             m.Transform.localPosition = basePos + Anim.HitFeel.ClampOffset((hasFx ? fx.Nudge : Vector3.zero) + Anim.HitFeel.Lunge(w, i, a))
                 + JumpLift.Offset(w, map, i, a, x, z); // DG-02 jump arc
-            Material teamMat = ArtMaterials.ForTeam(m.Spec, actor.Team);
+            Material teamMat = CriticalMass.Runtime.Progression.TrimMaterials.ForActor(ArtMaterials.ForTeam(m.Spec, actor.Team), i);   // b15 profile: colour trim (fixed colours only; cached, no allocation)
             m.SetMaterial(hasFx && fx.Flash ? _fx.FlashMaterial(teamMat) : teamMat);
             // Animation pass: clips, timing, facing spring, squash and the level of detail live in Anim.ActorAnimator.
             slot.Anim.Pose(m, w, cfg, i, a, simTime, dSim, basePos, _fx, hasFx, in fx, ref _poseState);
@@ -711,6 +714,54 @@ namespace CriticalMass.Runtime.View
         {
             if (m != null) m.SetActive(on);
         }
+
+        /// <summary>
+        /// b15 world look, item 5 (WORLD-AUDIT "post-hatch spikes": 3.5 and 24 MB, 40+ ms frames on the hatch): the hatchling
+        /// and adult are inactive until the hatch, so nothing before it ever drew them: their pipeline states, their glow x
+        /// expression materials (ArtMaterials.ForGlow builds and caches each on first use, and loads its face atlas) and
+        /// their first pose all landed on the hatch frame. FirstRunWarm's wide render calls this with on = true just before
+        /// it renders (both stages shown at the egg, every glow x face material built, each worn once so the renderers'
+        /// material arrays exist) and with on = false right after; the next Sync puts the real stage back. View only.
+        /// Returns the materials it built or found (tests, the warm log).
+        /// </summary>
+        public int PrewarmKaiju(bool on)
+        {
+            if (!on)
+            {
+                _kaijuPrewarm = false;
+                SetActive(_hatchling, false);
+                SetActive(_adult, false);
+                return 0;
+            }
+            _kaijuPrewarm = true;
+            int n = 0;
+            var glows = new[] { ArtMapping.GlowNeutral, ArtMapping.GlowAzure, ArtMapping.GlowCrimson, ArtMapping.GlowBerserk };
+            var faces = (KaijuExpression[])Enum.GetValues(typeof(KaijuExpression));
+            Vector3 at = _egg != null ? _egg.Transform.localPosition : Vector3.zero;
+            foreach (ModelView m in new[] { _hatchling, _adult })
+            {
+                if (m == null) continue;
+                m.Transform.localPosition = at;
+                m.SetActive(true);
+                foreach (string g in glows)
+                    foreach (KaijuExpression f in faces)
+                    {
+                        Material mat = ArtMaterials.ForGlow(m.Spec, g, f);
+                        if (mat == null) continue;
+                        m.SetMaterial(mat);
+                        n++;
+                    }
+                m.SetMaterial(ArtMaterials.ForGlow(m.Spec, ArtMapping.GlowNeutral, KaijuExpression.Neutral));
+            }
+            foreach (ModelView m in new[] { _shards, _spikes })
+                if (m != null)
+                    foreach (string g in glows) { if (ArtMaterials.ForGlow(m.Spec, g) != null) n++; }
+            return n;
+        }
+
+        bool _kaijuPrewarm;
+        /// <summary>True between PrewarmKaiju(true) and PrewarmKaiju(false).</summary>
+        public bool KaijuPrewarming => _kaijuPrewarm;
 
         /// <summary>Height of the grid view's block above the ground at a sim point (GridChunkMeshView.CellBox: walls and intact breakables 1.5 u).</summary>
         private static double RaisedTop(MapDef map, double x, double z)

@@ -166,6 +166,9 @@ Shader "CM/WorldGround"
                     col = lerp(col, paint.rgb, saturate(paint.a / 0.3h));
                 }
 
+                // b15 world look: the ground grade (paving and seams toward the grass value, the ground a band under the fighters).
+                col = CMTodGroundGrade(col);
+
                 // Flat; cast shadows only.
                 float4 shadowCoord = TransformWorldToShadowCoord(i.positionWS);
                 half atten = MainLightRealtimeShadow(shadowCoord);

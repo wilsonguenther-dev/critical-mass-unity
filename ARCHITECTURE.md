@@ -353,3 +353,72 @@ modules nothing references. Whether to remove unused modules from the manifest i
 | Character rig and 76 clips | KayKit Adventurers 1.0 (path in section 6) | CC0 | shipped in build |
 | 42 sounds (Phase 3) | the browser's Kenney SFX bank (D-044) | CC0 | shipped in build |
 | Fonts Bungee, Nunito Sans, JetBrains Mono (bible p05, D-064) | **OPEN**: not yet in the repo; source and licence file to be added with the HUD work | not recorded | shipped in build |
+
+## 9. Online: full fingerprint, versions, drop, rejoin, host leaving (b15-rejoin)
+
+**Fingerprint.** `Net/StateHash` mixes every instance field reachable from `World` and the bots' `BotsState`, in name
+order; the per-type code is `Net/StateHash.Generated.cs`, written by `StateHashCoverageTests` from the Sim's types. A
+new sim field that is not hashed or excluded (with a reason, in `StateHashCoverageTests.Excluded`) fails that test with
+its name; a second test changes every leaf of a played 16v16 world one at a time and fails if any change leaves the
+fingerprint as it was. View-written state (the Builder ghost's verdict and route memo, `BotsState.LastTick`) and
+derived caches are excluded, each with its reason. The golden checksum rows use `Sim.Tests/Harness/MatchHash`, not this.
+
+**Versions.** `SimVersion.Schema` and `SimVersion.RulesDigest` (a fold of the full fingerprint over fixed reference
+matches) are pinned by `Net/SimVersionTests`; a sim change fails it with the exact bump to paste. A replay from another
+schema is refused in plain words; HELLO carries schema, digest and the seat secret (protocol 4), and the host refuses
+other rules in plain words.
+
+**Drop.** Unchanged in kind: the host hands a silent or closed seat to a bot at a tick it sequences (FlagToBot), every
+machine at the same tick; "NAME left: a bot took over."
+
+**Rejoin (input-log replay, not a state snapshot).** Each client makes a random 64-bit seat secret and gives it only to
+the host. The host no longer locks the relay room; a stranger is refused "The match already started." A rejoiner sends
+REJOIN with its secret and versions; the host answers with the setup and feeds the whole bundle log from tick 0
+(`LockstepSession` MsgLog, `LogCodec`: XOR with the previous tick plus zero runs, about 38 % of raw) with its own
+fingerprint for every second of it, at 40 packets a second for all rejoiners together (under the relay's 90 a second).
+The rejoiner steps the log as fast as it arrives, checking each fingerprint, then sends inputs; the host hands the
+fighter back at the next tick it sequences (FlagToHuman, `MatchTick.BotToHuman`, recorded in replays), the same tick
+on every machine: "NAME is back." Nobody waits for the rejoiner. Measured (sim tests): 9000 ticks of 16v16 = 110 KB on
+the wire, live 2.3 s after the accept, 0.7 s of stepping CPU on the CI runner.
+
+**Trust model.** The host is already the trusted sequencer of every input; it is trusted for the log too. A garbage or
+tampered log is caught at the next host fingerprint and only the rejoiner stops ("Could not rejoin ... Try again."). A
+rejoiner's fingerprints and desync reports are ignored until it has its fighter back, so a bad rejoiner cannot stop the
+match. Not built: a second-peer witness (other clients sending their fingerprints to the rejoiner) to catch a lying host.
+
+**Host leaving.** The relay closes the room when the host's socket goes (server/relay), so every client ends the match
+("The host left the match or lost their connection.") and saves the match so far as a replay at once. Host migration
+(designed only): the relay would have to keep the room and promote the lowest live peer id instead of closing it; the
+new host already has every bundle up to the last one it stepped and its own fingerprints, so it would announce itself,
+collect each peer's last stepped tick, re-sequence from the highest common tick and resend missing bundles from its log
+(the same feed as rejoin). It needs a relay protocol change (out of scope for b15, "relay usage stays as today").
+
+Sources: input lockstep and input-only replays (Game Developer, "Synchronous RTS engines and a tale
+of desyncs", https://www.gamedeveloper.com/design/opinion-synchronous-rts-engines-and-a-tale-of-desyncs); the Blizzard
+engine's reconnect replays the match ("their own computer has to replay everything that happened",
+https://eu.forums.blizzard.com/en/heroes/t/why-does-reconnecting-take-so-long/2686); the 2026-11-17 systems audit M6
+(input-log replay over world serialisation).
+
+## 10. Online on zero spend: three paths, one protocol (b15-zero-cost)
+
+Every online path carries the same relay frames (`server/relay/src/protocol.js`) and the same lockstep, room, chat and
+rejoin messages; only the pipe differs:
+
+| Path | Pipe | Cost | Code |
+|---|---|---|---|
+| Room code | WebSocket to the Cloudflare relay (one Durable Object a room) | the free plan's 100,000 requests a day (incoming messages count 20 to 1) | `Net/Relay/RelayTransport.cs` |
+| Same network | TCP to the host's game (port 47800), found by a UDP beacon (port 47801) | free | `Net/Relay/DirectNet.cs` (`DirectHost`, `DirectClient`, `LanBeacon`, `LanListener`) |
+| Typed address | TCP to the host's game, through the host's port forwarding | free | same |
+
+The host's game IS the relay for direct joiners (`DirectHost` stamps senders, forwards broadcasts, enforces the same
+size and rate limits, peer numbers 200 to 254). `HostMux` lets one room take relay and direct players together and
+keeps the room alive if the relay leg dies (relay players become bots at one tick on every machine; direct players
+play on). `FallbackTransport` tries direct first and joins the same room by code if the host cannot be reached.
+
+Traffic rules (they never change what a tick computes; checksum rows unchanged): joiners send inputs two ticks a packet,
+aligned on the tick number so the host's bundles go out in the same pairs; the host reports each joiner's margin from
+when its newest group arrived (ticks before the group's first tick is needed), since a send-time margin right after a
+group completes reads "just in time" for everyone; fingerprints travel once on reliable links.
+`MeteredTransport` counts every message and byte by kind; `RelayBudget` turns rates into matches a day; the sim gate's
+`ZeroCostOnlineTests` measure both and guard them (+10%). Numbers, hosting how-to and the free tier's walls:
+`docs/online/ZERO-COST-ONLINE.md`.

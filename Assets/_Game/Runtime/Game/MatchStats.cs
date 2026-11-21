@@ -25,6 +25,28 @@ namespace CriticalMass.Runtime.Game
         /// <summary>Kaiju knock-outs credited to this actor.</summary>
         public int KaijuKOs;
         public int Points;
+
+        // ---- b15 item 2: role counters, view side, from sim events (MatchStats.Consume); nothing in the sim holds them ----
+        /// <summary>HP this actor's heals restored (HealLanded, B = the Healer; herself included).</summary>
+        public double HealingDone;
+        /// <summary>Heals that landed on another ally below SaveHpFraction of max HP.</summary>
+        public int Saves;
+        /// <summary>Walls, blocks, ladders and bridges this actor put down (WallBuilt that succeeded, PiecePlaced).</summary>
+        public int StructuresBuilt;
+        /// <summary>Wall cells in the walls built (WallBuilt Value).</summary>
+        public int WallCells;
+        /// <summary>Ore this actor banked at the hut (BankDeposit, Bio = Ore).</summary>
+        public int OreBanked;
+        /// <summary>Hut levels this actor's bank completed (HutLevel, B = the banker).</summary>
+        public int HutLevelsFunded;
+        /// <summary>Loads handed to an allied feeder (Handoff, A = the giver).</summary>
+        public int Handoffs;
+        /// <summary>Enemy walls and pieces broken inside this actor's blast in the same tick (Explosion with WallBroken / PieceDestroyed).</summary>
+        public int StructuresBlown;
+        /// <summary>Blasts that hurt two or more fighters (Explosion Value &gt;= 2).</summary>
+        public int MultiHits;
+        /// <summary>The job points inside Points (RoleAwards.RolePoints).</summary>
+        public int RolePoints;
     }
 
     /// <summary>
@@ -51,6 +73,16 @@ namespace CriticalMass.Runtime.Game
         public readonly int[] KaijuKOsByTeam = new int[2];
         /// <summary>Players of each team the Kaiju knocked out.</summary>
         public readonly int[] KaijuKillsOfTeam = new int[2];
+        /// <summary>b15 item 1: the lead graph's samples and marks (view side).</summary>
+        public MatchTimeline Timeline = MatchTimeline.Begin(480);
+        /// <summary>A heal on an ally below this share of max HP (before the heal) counts as a save.</summary>
+        public const double SaveHpFraction = 0.3;
+        /// <summary>A structure this far outside a blast's radius (u) still counts for it (a wall event names its first cell).</summary>
+        public const double BlastSlack = 2.0;
+        const int BlastCap = 16;
+        readonly int[] _blastOwner = new int[BlastCap];
+        readonly double[] _blastX = new double[BlastCap], _blastZ = new double[BlastCap], _blastR = new double[BlastCap];
+        int _blastCount;
         public bool HatchSeen;
         public KaijuState HatchState = KaijuState.Egg;
         /// <summary>Allegiance and instability the moment the egg hatched.</summary>
@@ -74,6 +106,7 @@ namespace CriticalMass.Runtime.Game
                 ActorCount = w.ActorCount,
                 Actors = new ActorStats[w.ActorCount],
                 _head = w.EventHead,
+                Timeline = MatchTimeline.Begin(w.Config != null ? w.Config.MatchSeconds : 480),
             };
             for (int i = 0; i < w.ActorCount; i++)
                 s.Actors[i] = new ActorStats { Id = i, Team = w.Actors[i].Team, Cls = w.Actors[i].Cls };
@@ -92,11 +125,66 @@ namespace CriticalMass.Runtime.Game
                 EventsMissed += head - _head - World.EventCapacity;
                 _head = head - World.EventCapacity;
             }
+            // b15: this batch's blasts first, so a wall that broke in the same tick credits the blast whichever came first
+            _blastCount = 0;
+            for (int k = _head; k < head; k++)
+            {
+                SimEvent e = w.Events[k % World.EventCapacity];
+                if (e.Type != SimEventType.Explosion || _blastCount >= BlastCap) continue;
+                _blastOwner[_blastCount] = e.A;
+                _blastX[_blastCount] = e.X;
+                _blastZ[_blastCount] = e.Z;
+                _blastR[_blastCount] = e.Radius;
+                _blastCount++;
+            }
             for (; _head < head; _head++)
             {
                 SimEvent e = w.Events[_head % World.EventCapacity];
                 switch (e.Type)
                 {
+                    case SimEventType.HealLanded:
+                        if (Valid(w, e.B) && e.B < ActorCount && e.Value > 0)
+                        {
+                            Actors[e.B].HealingDone += e.Value;
+                            if (e.A != e.B && Valid(w, e.A))
+                            {
+                                Actor t = w.Actors[e.A];
+                                if (t.MaxHp > 0 && t.Hp - e.Value < t.MaxHp * SaveHpFraction) Actors[e.B].Saves++;
+                            }
+                        }
+                        break;
+                    case SimEventType.WallBuilt:
+                        if (e.B >= 0 && e.Value > 0 && Valid(w, e.A) && e.A < ActorCount)
+                        {
+                            Actors[e.A].StructuresBuilt++;
+                            Actors[e.A].WallCells += (int)Math.Round(e.Value);
+                        }
+                        break;
+                    case SimEventType.PiecePlaced:
+                        if (Valid(w, e.A) && e.A < ActorCount) Actors[e.A].StructuresBuilt++;
+                        break;
+                    case SimEventType.BankDeposit:
+                        if (e.Bio == BiomassType.Ore && Valid(w, e.A) && e.A < ActorCount) Actors[e.A].OreBanked += (int)Math.Round(e.Value);
+                        break;
+                    case SimEventType.HutLevel:
+                        if (Valid(w, e.B) && e.B < ActorCount) Actors[e.B].HutLevelsFunded++;
+                        if (e.A == 0 || e.A == 1)
+                            Timeline.AddMark(new TimelineMark
+                            {
+                                Kind = TimelineMarkKind.HutLevel, Time = w.Match.Time, Team = (TeamId)e.A, Code = (int)Math.Round(e.Value),
+                                Azure = w.Match.HillSeconds.Azure, Crimson = w.Match.HillSeconds.Crimson,
+                            });
+                        break;
+                    case SimEventType.Handoff:
+                        if (Valid(w, e.A) && e.A < ActorCount) Actors[e.A].Handoffs++;
+                        break;
+                    case SimEventType.Explosion:
+                        if (e.Value >= 2 && Valid(w, e.A) && e.A < ActorCount) Actors[e.A].MultiHits++;
+                        break;
+                    case SimEventType.WallBroken:
+                    case SimEventType.PieceDestroyed:
+                        CreditBlast(w, e);
+                        break;
                     case SimEventType.Hit:
                         if (Valid(w, e.B) && e.B < ActorCount) Actors[e.B].Damage += e.Value;
                         break;
@@ -119,11 +207,33 @@ namespace CriticalMass.Runtime.Game
                     case SimEventType.Hatch:
                         HatchSeen = true;
                         HatchState = w.Kaiju.State;
+                        Timeline.AddMark(new TimelineMark
+                        {
+                            Kind = TimelineMarkKind.Hatch, Time = w.Match.Time, Team = w.Kaiju.State == KaijuState.Crimson ? TeamId.Crimson : TeamId.Azure,
+                            Code = (int)w.Kaiju.State, Azure = w.Match.HillSeconds.Azure, Crimson = w.Match.HillSeconds.Crimson,
+                        });
                         HatchAllegianceAzure = w.Match.Allegiance.Azure;
                         HatchAllegianceCrimson = w.Match.Allegiance.Crimson;
                         HatchInstability = w.Match.Instability;
                         break;
                 }
+            }
+            if (w.Match != null) Timeline.Observe(w.Match.Time, w.Match.HillSeconds.Azure, w.Match.HillSeconds.Crimson);
+        }
+
+        /// <summary>b15: an enemy wall or piece that broke inside a blast of this batch credits the blast's owner.</summary>
+        void CreditBlast(World w, SimEvent e)
+        {
+            int owner = e.A;
+            for (int b = 0; b < _blastCount; b++)
+            {
+                int by = _blastOwner[b];
+                if (!Valid(w, by) || by >= ActorCount) continue;
+                if (Valid(w, owner) && w.Actors[owner].Team == w.Actors[by].Team) continue;
+                double dx = e.X - _blastX[b], dz = e.Z - _blastZ[b], r = _blastR[b] + BlastSlack;
+                if (dx * dx + dz * dz > r * r) continue;
+                Actors[by].StructuresBlown++;
+                return;
             }
         }
 
@@ -155,11 +265,26 @@ namespace CriticalMass.Runtime.Game
                 s.Points = PointsFor(s);
             }
             Finished = w.Match.Phase == MatchPhase.Ended;
+            Timeline.Close(w.Match.Time, w.Match.HillSeconds.Azure, w.Match.HillSeconds.Crimson);
         }
 
-        public static int PointsFor(ActorStats s) =>
-            s.Kills * PointsPerKill + (int)Math.Round(s.HillSeconds * PointsPerHillSecond) + s.Biomass * PointsPerBiomass +
-            s.Corruption * PointsPerCorruption + s.KaijuKOs * PointsPerKaijuKO;
+        /// <summary>
+        /// MVP points: the fight (knock-outs, Kaiju knock-outs), the hill, the egg, and since b15 the job points of every role
+        /// (RoleAwards.RolePoints: healing and saves, structures built, ore banked and hut levels, structures blown and
+        /// multi-hits), so a Healer or a Builder who did the job can be the MVP without a knock-out.
+        /// </summary>
+        public static int PointsFor(ActorStats s)
+        {
+            s.RolePoints = RoleAwards.RolePoints(s);
+            return s.Kills * PointsPerKill + (int)Math.Round(s.HillSeconds * PointsPerHillSecond) + s.Biomass * PointsPerBiomass +
+                   s.Corruption * PointsPerCorruption + s.KaijuKOs * PointsPerKaijuKO + s.RolePoints;
+        }
+
+        /// <summary>b15 item 2: the six awards of this match.</summary>
+        public AwardResult[] Awards() => RoleAwards.Pick(Actors, ActorCount);
+
+        /// <summary>b15 item 2: actor id's best award stat.</summary>
+        public BestStat BestOf(int id) => RoleAwards.BestOf(Actors, ActorCount, id);
 
         /// <summary>The team's most valuable player (-1 when the team has nobody).</summary>
         public int Mvp(TeamId team)
@@ -261,6 +386,8 @@ namespace CriticalMass.Runtime.Game
             int kos = KaijuKOsByTeam[0] + KaijuKOsByTeam[1];
             sum.KaijuKOLine = kos == 0 ? "Never knocked out."
                 : $"Knocked out {kos}x: Azure {KaijuKOsByTeam[0]}, Crimson {KaijuKOsByTeam[1]}.";
+            // b15 item 1: the turning point in one plain sentence
+            sum.TurningPoint = Timeline.TurningPoint(sum.Winner, m.HillSeconds.Azure, m.HillSeconds.Crimson);
             return sum;
         }
     }
@@ -280,6 +407,8 @@ namespace CriticalMass.Runtime.Game
         public string KaijuCaption;
         public string KaijuReason;
         public string KaijuKOLine;
+        /// <summary>b15 item 1: "Crimson took the lead at 3:12 and never lost it."</summary>
+        public string TurningPoint;
     }
 
     /// <summary>
@@ -318,6 +447,14 @@ namespace CriticalMass.Runtime.Game
         }
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-        static void ResetOnPlay() => Current = null;
+        static void ResetOnPlay()
+        {
+            Current = null;
+            // integrator b15: the profile's match history (feat/b15-profile-mastery) takes the results screen's turning point
+            CriticalMass.Runtime.Progression.MetaHooks.TurningPoint = TurningPointNow;
+        }
+
+        /// <summary>The turning-point sentence of the match being recorded (null when no match is recorded).</summary>
+        public static string TurningPointNow(World w) => Current != null && w != null ? Current.Summarize(w).TurningPoint : null;
     }
 }

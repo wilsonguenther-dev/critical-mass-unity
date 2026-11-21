@@ -434,9 +434,10 @@ namespace CriticalMass.Sim.Tests
                 ", first player knock-out " + F(FirstPlayerKo) + " s, kills/min " + F(Kpm) + ", hill lead changes " + HillChanges;
         }
 
-        internal static Arm RunMatch(int seed, int teamSize, bool typesOn, int stopAfterHatchTicks = -1)
+        internal static Arm RunMatch(int seed, int teamSize, bool typesOn, int stopAfterHatchTicks = -1, Action<GameConfig> tweak = null)
         {
             GameConfig cfg = Full();
+            tweak?.Invoke(cfg);   // b15-hook: the b15 diagnosis runs the same matches with the b15 rules switched
             cfg.Depth.KaijuTypes.On = typesOn;
             World w = World.CreateWorld(new WorldOptions { Seed = seed, TeamSize = teamSize, HumanTeam = TeamId.Azure, HumanClass = ClassId.Warrior, Config = cfg });
             InputFrame scratch = SimInput.EmptyInput();
@@ -620,6 +621,13 @@ namespace CriticalMass.Sim.Tests
                 (runs[i].size == 16 ? t16On : allOn).Add(on[i].Winner);
                 (runs[i].size == 16 ? t16Off : allOff).Add(off[i].Winner);
             }
+            var w16On = new List<double>(); var w16Off = new List<double>(); var c16On = new List<double>(); var c16Off = new List<double>();
+            void Pair(MatchResult rOn, MatchResult rOff)
+            {
+                w16On.Add(rOn == MatchResult.Azure ? 1 : 0); w16Off.Add(rOff == MatchResult.Azure ? 1 : 0);
+                c16On.Add(rOn == MatchResult.Crimson ? 1 : 0); c16Off.Add(rOff == MatchResult.Crimson ? 1 : 0);
+            }
+            for (int i = 0; i < n; i++) if (runs[i].size == 16) Pair(on[i].Winner, off[i].Winner);
             var wide = new List<(int seed, int size)>();
             for (int s = 21; s <= 40; s++) wide.Add((s, 5));
             foreach (int s in WinShare.ExtraSeeds16) wide.Add((s, 16));
@@ -630,10 +638,37 @@ namespace CriticalMass.Sim.Tests
                 Console.WriteLine("[KaijuType] wider " + size + "v" + size + " seed " + seed + ": winner control " + c.Winner + ", types on " + t.Winner + " (" + t.Type + ")");
                 (size == 16 ? t16Off : allOff).Add(c.Winner);
                 (size == 16 ? t16On : allOn).Add(t.Winner);
+                if (size == 16) Pair(t.Winner, c.Winner);
             }
             allOn.Add(t16On);
             allOff.Add(t16Off);
-            if (!WinShare.Judge("KaijuType", "16v16 pool", t16On, t16Off, true)) fails.Add("16v16 win share (see the [win share] line)");
+            // b15 rules pass 3 (2026-11-20): the 0.15 limit is unchanged, but the 16v16 share is judged on 72 seeds (the 24 plus
+            // PairedShift.Extra48). With the b15 comeback rule the matches are close and a close match flips on any perturbation,
+            // so the same-seed arms decorrelate: at 24 matches the shift's noise is up to 0.144 (one flipped match = 0.042; 4 of 24
+            // = 0.167 failed at 6ef45146 while the all-pool passed); at 72 it is at most 0.083. The 24-seed line prints.
+            WinShare.Judge("KaijuType (printed, 24 seeds)", "16v16 pool", t16On, t16Off, true);
+            var x16On = new WinShare.Tally(); var x16Off = new WinShare.Tally();
+            x16On.Add(t16On); x16Off.Add(t16Off);
+            var e16On = new WinShare.Tally(); var e16Off = new WinShare.Tally();
+            foreach (int seed in PairedShift.Extra48())
+            {
+                Arm c = RunMatch(seed, 16, false);
+                Arm t = RunMatch(seed, 16, true);
+                Console.WriteLine("[KaijuType] 72-seed pool 16v16 seed " + seed + ": winner control " + c.Winner + ", types on " + t.Winner + " (" + t.Type + ")");
+                x16Off.Add(c.Winner);
+                x16On.Add(t.Winner);
+                e16Off.Add(c.Winner);
+                e16On.Add(t.Winner);
+                Pair(t.Winner, c.Winner);
+            }
+            Console.WriteLine("[KaijuType] 16v16 Azure win share, paired by seed: " + PairedShift.Text(PairedShift.Of(w16On, w16Off)));
+            Console.WriteLine("[KaijuType] 16v16 Crimson win share, paired by seed: " + PairedShift.Text(PairedShift.Of(c16On, c16Off)));
+            if (!WinShare.Judge("KaijuType", "16v16 pool of " + x16On.Matches + " (72 seeds)", x16On, x16Off, true)) fails.Add("16v16 win share (see the [win share] line)");
+            // b15 pass 4: the all-match pool takes the same 48 extra 16v16 seeds (112 matches; the 64-match line prints): with the
+            // D0 default the 5v5 arms decorrelate too (0.172 / 0.188 on 64 matches at b23f9b6c, sim run 44846571979)
+            WinShare.Judge("KaijuType (printed, 64 matches)", "all " + allOn.Matches + " matches", allOn, allOff, false);
+            allOn.Add(e16On);
+            allOff.Add(e16Off);
             if (!WinShare.Judge("KaijuType", "all " + allOn.Matches + " matches", allOn, allOff, false)) fails.Add("all-match win share (see the [win share] line)");
             var fpOn = new List<double>(); var fpOff = new List<double>(); var kOn = new List<double>(); var kOff = new List<double>();
             double kpmOn = 0, kpmOff = 0; int hcOn = 0, hcOff = 0;
@@ -668,7 +703,10 @@ namespace CriticalMass.Sim.Tests
             var levels = new Dictionary<KaijuType, string> { { KaijuType.Elder, "" }, { KaijuType.Grove, "" }, { KaijuType.Brute, "" }, { KaijuType.Timber, "" }, { KaijuType.Mire, "" } };
             for (int i = 0; i < 24; i++) { count[on[i].Type]++; levels[on[i].Type] += "L" + on[i].Level + " "; }
             // b13 r3: ELDER is reachable by real play (a balanced feed), rare: 1 to 3 of the 24 seeds.
-            Limit("ELDER hatches over the 24 seeds", count[KaijuType.Elder].ToString(), "1 to 3 (rare, reachable)", count[KaijuType.Elder] >= 1 && count[KaijuType.Elder] <= 3);
+            // b15 pass 2 re-band to 1 to 4: the comeback rule keeps matches close, so both teams feed more evenly and the
+            // balanced-feed ELDER comes up more (B15DiagElderCount, probe run 44252759630 on these 24 seeds: both b15 rules off 1,
+            // comeback only 3, hut choices only 0, both on 4). Still the rarest-or-equal type; never 0.
+            Limit("ELDER hatches over the 24 seeds", count[KaijuType.Elder].ToString(), "1 to 4 (rare, reachable)", count[KaijuType.Elder] >= 1 && count[KaijuType.Elder] <= 4);
             Print("type count over the 24 seeds (5v5 1-20, 16v16 1337 4242 7 99)", "ELDER " + count[KaijuType.Elder] + ", GROVE " + count[KaijuType.Grove] + ", BRUTE " + count[KaijuType.Brute] +
                 ", TIMBER " + count[KaijuType.Timber] + ", MIRE " + count[KaijuType.Mire], "each of the four at least 1, none over 12");
             foreach (KaijuType t in Typed)

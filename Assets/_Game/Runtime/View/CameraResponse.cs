@@ -13,7 +13,8 @@ namespace CriticalMass.Runtime.View.Reactions
     /// listener that never moves the view. For the local player (actor 0) it turns each force's Shock, falling off with
     /// distance (full within radius + 3 u, nothing at 30 u), into:
     /// <list type="bullet">
-    /// <item>a screen-edge flash on the side the force came from (felt above 0.3; at most 3 per second, WCAG 2.3.1;
+    /// <item>a screen-edge flash on the side the force came from (felt above 0.3; at most 3 per second, WCAG 2.3.1, and by
+    /// default inside the one flash budget the big moments share, FlashSafety;
     /// fades in 0.25 s; reduced motion quarters it);</item>
     /// <item>controller rumble, low motor by felt, high motor by sharpness, 60 to 180 ms (Input System Gamepad);</item>
     /// <item>a low-frequency hook for the audio owner (LowFrequency event, felt above 0.25) so big hits get a bass layer.</item>
@@ -114,7 +115,8 @@ namespace CriticalMass.Runtime.View.Reactions
         private void Flash(float felt, Vector3 src, World w)
         {
             float now = Time.unscaledTime;
-            if (now - _flashAt < MinFlashGap) return; // never 3 or more a second
+            // never 3 or more a second; b15 safe defaults: by default also inside the budget shared with the big moments (FlashSafety)
+            if (!CriticalMass.Runtime.View.Moments.FlashSafety.EdgeFlashAllowed(now, _flashAt, MinFlashGap)) return;
             UnityEngine.Camera cam = UnityEngine.Camera.main;
             Vector2 dir = Vector2.zero;
             if (cam != null)

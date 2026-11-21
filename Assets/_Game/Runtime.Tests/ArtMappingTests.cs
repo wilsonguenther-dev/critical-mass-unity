@@ -1,4 +1,5 @@
 using System.Linq;
+using CriticalMass.Runtime.View.Anim;
 using CriticalMass.Runtime.View.Art;
 using CriticalMass.Sim.Config;
 using CriticalMass.Sim.Core;
@@ -10,6 +11,28 @@ namespace CriticalMass.Runtime.Tests
     /// <summary>The one sim-to-model mapping table (ArtMapping) and the team materials it hands the views (2026-11-12).</summary>
     public sealed class ArtMappingTests
     {
+        /// <summary>b15 Kaiju parts: the adult is five part sets on one rig; each type draws its own set, ELDER the default.</summary>
+        [Test]
+        public void TheKaijuAdultCarriesOnePartSetPerType()
+        {
+            ModelSpec adult = ArtMapping.Spec(ArtMapping.KaijuAdult);
+            CollectionAssert.AreEqual(new[] { "Grove", "Brute", "Timber", "Mire" }, adult.Variants);
+            Assert.AreEqual("Kaiju_Hero", adult.Meshes[0], "ELDER's Hero is the body measured for Height");
+            Assert.AreEqual(20, adult.Meshes.Length, "Hero, LOD0, LOD1, Shadow for ELDER and each of the four types");
+            CollectionAssert.AllItemsAreUnique(adult.Meshes);
+            CollectionAssert.IsSubsetOf(new[] { 2, 8 }, adult.MaskCodes, "modelled vents/plates (code 2) and team plates (code 8)");
+            foreach (string role in new[] { "Hero", "LOD0", "LOD1", "Shadow" })
+            {
+                Assert.AreEqual(0, ModelView.VariantIndex(adult, "Kaiju_" + role), "ELDER is the default set: " + role);
+                for (int k = 0; k < adult.Variants.Length; k++)
+                    Assert.AreEqual(k + 1, ModelView.VariantIndex(adult, "Kaiju_" + adult.Variants[k] + "_" + role), adult.Variants[k] + " " + role);
+            }
+            Assert.IsNull(KaijuTypeLook.Variant(KaijuType.Elder));
+            foreach (KaijuType t in new[] { KaijuType.Grove, KaijuType.Brute, KaijuType.Timber, KaijuType.Mire })
+                CollectionAssert.Contains(adult.Variants, KaijuTypeLook.Variant(t), t + " picks its own part set");
+            Assert.AreEqual(0, ModelView.VariantIndex(ArtMapping.Spec(ArtMapping.KaijuHatchling), "Kaiju_Grove_LOD0"), "no variants on the hatchling");
+        }
+
         [Test]
         public void EveryClassHasItsModelNoClassKeepsTheCapsule()
         {

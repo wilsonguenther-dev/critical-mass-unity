@@ -85,6 +85,27 @@ namespace CriticalMass.Sim.Bots
         public double[] TaskUntil;   // b13-hook
         /// <summary>CM b13: who owns the task (B13Hooks.BotTaskAct routes it): 1-9 H, 10-19 B, 20-29 C, 30-39 K; 0 = none.</summary>
         public byte[] TaskKind;   // b13-hook
+        /// <summary>b15 combat feel, the steering unjam: position and tick at the start of the current pressed window.</summary>
+        public double[] JamX, JamZ;
+        public int[] JamTick;
+        /// <summary>b15: a side-step in progress until this tick (World.Tick), along (SideX, SideZ).</summary>
+        public int[] SideUntil;
+        /// <summary>b15: side-steps started this match (a counter the tests print).</summary>
+        public int Unjams;
+        public double[] SideX, SideZ;
+        /// <summary>b15 pass 4: the side-step budget: the first tick of the bot's current budget window and the side-steps it started in it.</summary>
+        public int[] UnjamWindowStart, UnjamCount;
+        /// <summary>b15 bot brain (TeamBrain): the job the team brain gave each bot (TeamBrain.Job*), its group-up step
+        /// (TeamBrain.Rally*) and since when, the deaths count it last saw (a respawn starts a rally), and per team index the
+        /// living bodies on the hill disc this tick.</summary>
+        public byte[] Job, Rally;
+        public double[] RallySince;
+        public int[] SeenDeaths;
+        public int[] HillBodies;
+        /// <summary>b15 bot brain: rally steps started and group releases (counters the tests print).</summary>
+        public int Rallies, Releases, Escorts;   // Escorts: KAIJU HOLDS NOTHING escort jobs handed out (TeamBrain.EscortJobs)
+        /// <summary>b15 wave two: jumps up a CLIMB-high ledge through TeamBrain.TerrainVerbsHook (tests print it).</summary>
+        public int TerrainJumps;
 
         /// <summary>Browser createBotsState: allocate every per-actor array at ActorCapacity (no reset).</summary>
         public static BotsState CreateBotsState(World w)
@@ -139,6 +160,19 @@ namespace CriticalMass.Sim.Bots
                 TaskZ = new double[cap],   // b13-hook
                 TaskUntil = new double[cap],   // b13-hook
                 TaskKind = new byte[cap],   // b13-hook
+                JamX = new double[cap],
+                JamZ = new double[cap],
+                JamTick = new int[cap],
+                SideUntil = new int[cap],
+                SideX = new double[cap],
+                SideZ = new double[cap],
+                UnjamWindowStart = new int[cap],
+                UnjamCount = new int[cap],
+                Job = new byte[cap],
+                Rally = new byte[cap],
+                RallySince = new double[cap],
+                SeenDeaths = new int[cap],
+                HillBodies = new int[2],
             };
         }
 
@@ -192,7 +226,26 @@ namespace CriticalMass.Sim.Bots
                 st.TaskZ[id] = 0;   // b13-hook
                 st.TaskUntil[id] = 0;   // b13-hook
                 st.TaskKind[id] = 0;   // b13-hook
+                st.JamX[id] = w.X[id];
+                st.JamZ[id] = w.Z[id];
+                st.JamTick[id] = w.Tick;
+                st.SideUntil[id] = 0;
+                st.Unjams = 0;
+                st.SideX[id] = 0;
+                st.SideZ[id] = 0;
+                st.UnjamWindowStart[id] = w.Tick;
+                st.UnjamCount[id] = 0;
+                st.Job[id] = 0;
+                st.Rally[id] = 0;
+                st.RallySince[id] = 0;
+                st.SeenDeaths[id] = id < w.ActorCount ? w.Actors[id].Deaths : 0;
             }
+            st.HillBodies[0] = 0;
+            st.HillBodies[1] = 0;
+            st.Rallies = 0;
+            st.Releases = 0;
+            st.TerrainJumps = 0;
+            st.Escorts = 0;
             BotFields.ResetFields(st.Fields, w);
             BotFields.BuildAllFields(st.Fields, w);
         }

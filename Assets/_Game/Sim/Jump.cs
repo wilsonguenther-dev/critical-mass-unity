@@ -27,6 +27,19 @@ namespace CriticalMass.Sim.Core
         private static double[] PathX = new double[19];
         private static double[] PathZ = new double[19];
 
+        /// <summary>b15 wave two: World.CreateWorld touches the planner's static buffers so their one-time type initialisation
+        /// (2 x double[19], 352 B) happens at world creation, not inside the first tick a bot jumps (DodgeTests' 0 B window
+        /// caught it once bots jumped ledges through TeamBrain.TerrainVerbsHook). Grows them for this config too.</summary>
+        internal static void Warm(GameConfig c)
+        {
+            int need = AirTicks(c) + 1;
+            if (PathX.Length < need || PathZ.Length < need)
+            {
+                PathX = new double[need];
+                PathZ = new double[need];
+            }
+        }
+
         /// <summary>J, airborne ticks of a full jump (18 at the browser config).</summary>
         public static int AirTicks(GameConfig c) => Durations.T30(c, c.Jump.AirTicks);
 

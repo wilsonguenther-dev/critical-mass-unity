@@ -59,6 +59,10 @@ namespace CriticalMass.Runtime.View.Art
         private readonly Material[][] _slots;
         private readonly FighterLod.Role[] _roles;
         private readonly bool[] _isBody;
+        // b15 Kaiju parts: the part set each renderer belongs to (0 = the default set, k = Spec.Variants[k - 1]) and the set
+        // drawn now; a renderer of another set never draws (SetVariant).
+        private readonly int[] _variantOf;
+        private int _variant;
         private readonly bool _hasProxy, _hasLod0, _hasLod1, _hasHero;
         private int _tierApplied = int.MinValue;
         private bool _justActivated = true;
@@ -138,12 +142,14 @@ namespace CriticalMass.Runtime.View.Art
             _slots = new Material[Renderers.Length][];
             _roles = new FighterLod.Role[Renderers.Length];
             _isBody = new bool[Renderers.Length];
+            _variantOf = new int[Renderers.Length];
             string body = Spec != null && Spec.Meshes != null && Spec.Meshes.Length > 0 ? Spec.Meshes[0] : null;
             for (int i = 0; i < Renderers.Length; i++)
             {
                 Renderer r = Renderers[i];
                 _slots[i] = r.sharedMaterials;
                 _roles[i] = FighterLod.RoleOf(r.name);
+                _variantOf[i] = VariantIndex(Spec, r.name);
                 FighterLod.Role role = _roles[i];
                 _isBody[i] = role == FighterLod.Role.Hero || role == FighterLod.Role.Lod0 || role == FighterLod.Role.Lod1 ||
                              (body != null && r.name == body);
@@ -337,7 +343,7 @@ namespace CriticalMass.Runtime.View.Art
                 if (r.shadowCastingMode != mode) r.shadowCastingMode = mode;
                 if (_roles[i] == FighterLod.Role.Shadow)
                 {
-                    bool on = FighterLod.ProxyEnabled(row.FighterShadows) && !_hero;
+                    bool on = FighterLod.ProxyEnabled(row.FighterShadows) && !_hero && _variantOf[i] == _variant;
                     if (r.enabled != on) r.enabled = on;
                 }
             }
@@ -385,9 +391,37 @@ namespace CriticalMass.Runtime.View.Art
                 Renderer r = Renderers[i];
                 if (r == null || _roles[i] == FighterLod.Role.Shadow) continue;
                 if (_roles[i] == FighterLod.Role.Shared && Spec != null && Spec.Kind == ArtKind.Prop) continue;   // barricade states
-                bool on = FighterLod.Draws(_roles[i], _hero, _lod < 0 ? 0 : _lod, _hasLod0, _hasLod1, _hasHero);
+                bool on = FighterLod.Draws(_roles[i], _hero, _lod < 0 ? 0 : _lod, _hasLod0, _hasLod1, _hasHero) && _variantOf[i] == _variant;
                 if (r.enabled != on) r.enabled = on;
             }
+        }
+
+        /// <summary>The part set drawn now: null for the default set, else one of Spec.Variants.</summary>
+        public string Variant => _variant > 0 && Spec?.Variants != null ? Spec.Variants[_variant - 1] : null;
+
+        /// <summary>
+        /// b15 Kaiju parts: draws the part set named (one of Spec.Variants; null or unknown = the default set) and hides the
+        /// others, LODs and shadow proxy included. No-op on a model without variants or when the set is already drawn.
+        /// </summary>
+        public void SetVariant(string variant)
+        {
+            if (Spec?.Variants == null || Spec.Variants.Length == 0) return;
+            int v = 0;
+            for (int k = 0; k < Spec.Variants.Length; k++) if (Spec.Variants[k] == variant) { v = k + 1; break; }
+            if (v == _variant) return;
+            _variant = v;
+            _tierApplied = int.MinValue;
+            ApplyTier();
+            ApplyDraws();
+        }
+
+        /// <summary>The part set a renderer name belongs to: k + 1 when it holds "_" + Variants[k] + "_", else 0 (default).</summary>
+        public static int VariantIndex(ModelSpec spec, string rendererName)
+        {
+            if (spec?.Variants == null || rendererName == null) return 0;
+            for (int k = 0; k < spec.Variants.Length; k++)
+                if (rendererName.Contains("_" + spec.Variants[k] + "_")) return k + 1;
+            return 0;
         }
 
 

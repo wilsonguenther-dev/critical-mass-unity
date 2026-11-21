@@ -94,6 +94,8 @@ namespace CriticalMass.Runtime.Menu
         // skills page
         LevelBar _bar;
         Text _coins, _record, _next;
+        /// <summary>b15 item 4: the coin icon beside the total (hidden with it while coins have no sink).</summary>
+        VectorShape _coinIcon;
 
         // ---- static API ----
 
@@ -436,15 +438,14 @@ namespace CriticalMass.Runtime.Menu
         {
             Color cream = CMTokens.WarmCream.Color;
             _bar = LevelBar.Build(page, "Level Bar", PX + 40f, CY, PW - 80f);
-            ProgressionUi.Coin(page, "Coin", PX + 40f, CY + 116f, 40f);
+            _coinIcon = ProgressionUi.Coin(page, "Coin", PX + 40f, CY + 116f, 40f);
             _coins = MenuUi.Label(page, "Coins", CMTokens.Display, UiScale.TypeHeading, CMTokens.ToolBrass.Color, TextAnchor.MiddleLeft, PX + 96f, CY + 110f, 600f, 52f, "", 3f);
             _record = MenuUi.Label(page, "Record", CMTokens.Ui, UiScale.TypeBody, cream, TextAnchor.MiddleLeft, PX + 40f, CY + 176f, PW - 80f, 40f, "", 2f);
             MenuUi.Label(page, "Next Head", CMTokens.Display, UiScale.TypeBody, CMTokens.ToolBrass.Color, TextAnchor.MiddleLeft, PX + 40f, CY + 246f, PW - 80f, 40f,
                 ProgressionWords.NextUnlock, 2f);
             _next = ProgressionUi.Wrap(MenuUi.Label(page, "Next", CMTokens.Ui, UiScale.TypeBody, cream, TextAnchor.UpperLeft, PX + 40f, CY + 292f, PW - 80f, 200f, "", 2f));
             ProgressionUi.Wrap(MenuUi.Label(page, "How", CMTokens.Ui, UiScale.TypeSmall, CMTokens.StoneInk.Color, TextAnchor.UpperLeft, PX + 40f, CY + 520f, PW - 80f, 70f,
-                "Knock-outs, deliveries to the egg, time on the hill and knocking out the Kaiju earn skill points and coins at the end of every match. " +
-                "Levels unlock looks only, never strength.", 0f));
+                DeadSystemViews.CoinsShown() ? MatchWords.HowSkillCoins : MatchWords.HowSkill, 0f));   // b15 items 4 and 6: no coin promise while coins buy nothing
         }
 
         // ---- navigation ----
@@ -510,8 +511,8 @@ namespace CriticalMass.Runtime.Menu
             HudText.Set(_className, ProgressionWords.ClassName(c));
             RefreshChips();
             HudText.Set(_role, ProgressionWords.RoleLines[ci]);
-            HudText.Set(_headerInfo, ProgressionWords.Level + " " + p.Level.ToString(CultureInfo.InvariantCulture) + "   " +
-                                     ProgressionUi.Thousands(p.Coins) + " " + ProgressionWords.Coins);
+            HudText.Set(_headerInfo, ProgressionWords.Level + " " + p.Level.ToString(CultureInfo.InvariantCulture) +
+                                     (CriticalMass.Runtime.Hud.DeadSystemViews.CoinsShown() ? "   " + ProgressionUi.Thousands(p.Coins) + " " + ProgressionWords.Coins : string.Empty));
             if (_classStep.Value != null) HudText.Set(_classStep.Value, ProgressionWords.ClassName(c));
 
             // character
@@ -538,7 +539,7 @@ namespace CriticalMass.Runtime.Menu
                 opts.AddRange(CosmeticItems.WithExtras(c, slot, Cosmetics.ArtIds(c, slot)));
                 // Polish pass 1: a look with no model in this build is left out of the list, never shown as coming soon.
                 for (int oi = opts.Count - 1; oi >= 0; oi--)
-                    if (opts[oi] != null && !Cosmetics.Has(c, slot, opts[oi].Id)) opts.RemoveAt(oi);
+                    if (opts[oi] != null && !UnlockHonesty.Real(opts[oi])) opts.RemoveAt(oi);   // b15 item 6: one art check for every list
                 string saved = slot == CosmeticSlot.Head ? l.Head : slot == CosmeticSlot.Emblem ? l.Emblem : l.Emote;
                 _browse[s] = Mathf.Max(0, IndexOf(opts, string.IsNullOrEmpty(saved) && slot != CosmeticSlot.Head ? DefaultId(c, slot) : saved));
                 _slotItems[s].interactable = _editable;
@@ -547,7 +548,8 @@ namespace CriticalMass.Runtime.Menu
             HudText.Set(_nameItem.Value, p.PlayerName);
             _nameItem.interactable = _editable;
             _randomItem.interactable = _editable;
-            HudText.Set(_outfitNote, _editable ? "Choose a look for each class. New pieces unlock as you level up." : ProgressionWords.ChangeBetweenMatches);
+            // b15 item 6: the level-up promise only while a real look is still to come, else "More looks are coming." once
+            HudText.Set(_outfitNote, _editable ? UnlockHonesty.OutfitNote(c, p.Level) : ProgressionWords.ChangeBetweenMatches);
 
             // tools
             InputActionMap map = ControlBindings.Map(InputSystem.actions);
@@ -575,6 +577,9 @@ namespace CriticalMass.Runtime.Menu
             // skills
             _bar.Set(p.SkillPoints);
             HudText.Set(_coins, ProgressionUi.Thousands(p.Coins) + " " + ProgressionWords.Coins);
+            bool coinsOn = CriticalMass.Runtime.Hud.DeadSystemViews.CoinsShown();   // b15 item 4: coins have no sink
+            if (_coins.gameObject.activeSelf != coinsOn) _coins.gameObject.SetActive(coinsOn);
+            if (_coinIcon != null && _coinIcon.gameObject.activeSelf != coinsOn) _coinIcon.gameObject.SetActive(coinsOn);
             HudText.Set(_record, p.MatchesPlayed.ToString(CultureInfo.InvariantCulture) + " MATCHES   " +
                                  p.Wins.ToString(CultureInfo.InvariantCulture) + " WINS   " +
                                  p.Draws.ToString(CultureInfo.InvariantCulture) + " DRAWS   " +
@@ -593,29 +598,24 @@ namespace CriticalMass.Runtime.Menu
         }
 
         /// <summary>What the next level that unlocks anything unlocks for this class.</summary>
-        public static string NextUnlockText(ClassId c, int level)
-        {
-            for (int l = level + 1; l <= Leveling.MaxLevel; l++)
-            {
-                var names = new List<string>();
-                foreach (CosmeticItem it in CosmeticItems.UnlockedAtLevel(l))
-                    if (it.Class == c) names.Add(it.DisplayName + " (" + SlotNames[(int)it.Slot].ToLowerInvariant() + ")");
-                if (names.Count > 0)
-                    return ProgressionWords.Level + " " + l.ToString(CultureInfo.InvariantCulture) + ": " + string.Join(", ", names);
-            }
-            return ProgressionWords.NothingNext;
-        }
+        public static string NextUnlockText(ClassId c, int level) => UnlockHonesty.NextLine(c, level, SlotNames);   // b15 item 6: real looks only
 
         void ShowSlot(int s)
         {
             List<CosmeticItem> opts = _options[s];
-            if (opts.Count == 0) return;
+            if (opts.Count == 0)
+            {
+                // b15 item 6: a slot with no look in the build says so plainly (and never keeps another class's name)
+                HudText.Set(_slotItems[s].Value, MatchWords.NoLookYet);
+                HudText.Set(_slotStatus[s], string.Empty);
+                return;
+            }
             CosmeticItem it = opts[Mathf.Clamp(_browse[s], 0, opts.Count - 1)];
             HudText.Set(_slotItems[s].Value, it == null ? ProgressionWords.NoHeadgear : it.DisplayName);
             int level = Profile.Current.Level;
             string status;
             Color col = CMTokens.StoneInk.Color;
-            if (it == null || (CosmeticItems.Unlocked(it, level) && Cosmetics.Has(ShownClass, (CosmeticSlot)s, it.Id)))
+            if (it == null || (CosmeticItems.Unlocked(it, level) && UnlockHonesty.Real(it)))
             {
                 bool equipped = IsEquipped(s, it);
                 status = equipped ? ProgressionWords.Equipped : string.Empty;
@@ -643,7 +643,7 @@ namespace CriticalMass.Runtime.Menu
             _browse[s] = (_browse[s] + d + opts.Count) % opts.Count;
             CosmeticItem it = opts[_browse[s]];
             int level = Profile.Current.Level;
-            bool usable = it == null || (CosmeticItems.Unlocked(it, level) && Cosmetics.Has(ShownClass, (CosmeticSlot)s, it.Id));
+            bool usable = it == null || (CosmeticItems.Unlocked(it, level) && UnlockHonesty.Real(it));
             if (usable)
             {
                 ClassLoadout l = Profile.Current.Loadout(ShownClass);

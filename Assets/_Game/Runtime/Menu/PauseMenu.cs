@@ -1330,8 +1330,11 @@ namespace CriticalMass.Runtime.Menu
                 Stepper(tab, 3, "MUTE MUSIC", () => GameSettings.MuteMusic ? "ON" : "OFF", d => GameSettings.MuteMusic = !GameSettings.MuteMusic),
                 Stepper(tab, 4, "MUTE SOUND EFFECTS", () => GameSettings.MuteEffects ? "ON" : "OFF", d => GameSettings.MuteEffects = !GameSettings.MuteEffects),
                 Stepper(tab, 5, "MUTE WHEN IN BACKGROUND", () => GameSettings.MuteInBackground ? "ON" : "OFF", d => GameSettings.MuteInBackground = !GameSettings.MuteInBackground),
+                // b15: the announcer's own level, and LESS SOUND (your own sounds, threats and big moments only; a lighter score)
+                Slider(tab, 6, "ANNOUNCER", () => GameSettings.AnnouncerVolume, v => GameSettings.AnnouncerVolume = v),
+                Stepper(tab, 7, "LESS SOUND", () => GameSettings.LessSound ? "ON" : "OFF", d => GameSettings.LessSound = !GameSettings.LessSound),
             };
-            Note(tab, 6, "Routed through the game's audio mixer (Master, Music, Effects). A mute keeps the slider's level.");
+            Note(tab, 8, "A mute keeps the slider's level. Less sound keeps your own sounds, threats and big moments.");
             ChainInTab(items);
             return tab.gameObject;
         }
@@ -1374,7 +1377,7 @@ namespace CriticalMass.Runtime.Menu
                 // Owner, 2026-11-14: GORE intensity FULL (default) / REDUCED / OFF, one switch (View.Effects.GoreGate), live in a match.
                 Stepper(tab, 1, "GORE", () => global::CriticalMass.Runtime.View.Effects.GoreGate.Label(GameSettings.Gore), d => GameSettings.Gore = global::CriticalMass.Runtime.View.Effects.GoreGate.Step(GameSettings.Gore, d)),
                 // Owner, 2026-11-13: the story intro plays at every launch; this turns that off, WATCH INTRO plays it now.
-                Stepper(tab, 2, "PLAY INTRO AT LAUNCH", () => GameSettings.IntroAtLaunch ? "ON" : "OFF", d => GameSettings.IntroAtLaunch = !GameSettings.IntroAtLaunch),
+                Stepper(tab, 2, "PLAY INTRO AT EVERY LAUNCH", () => GameSettings.IntroAtLaunch ? "ON" : "OFF", d => GameSettings.IntroAtLaunch = !GameSettings.IntroAtLaunch),
                 // controls-1 round 2: blue / amber teams for colour-blind players (HUD, rings, team text).
                 Stepper(tab, 3, "COLOUR-BLIND TEAMS", () => GameSettings.ColourBlindTeams ? "BLUE / AMBER" : "OFF", d => GameSettings.ColourBlindTeams = !GameSettings.ColourBlindTeams),
                 Stepper(tab, 4, "INTRO SUBTITLES", () => GameSettings.IntroSubtitles ? "ON" : "OFF", d => GameSettings.IntroSubtitles = !GameSettings.IntroSubtitles),

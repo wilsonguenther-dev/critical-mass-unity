@@ -201,6 +201,7 @@ namespace CriticalMass.Runtime.Tests
         public void TheSwingDrawsTheWeaponsOwnArcAndTheShoveIsRead()
         {
             GameConfig on = GameConfig.CreateDefault();
+            on.Depth.CombatFeel.Enabled = false; // b15: combat feel supersedes the light weapons (its class rows carry every strike)
             Assert.AreEqual(on.Depth.LightWeapons.Healer.Range, LightWeaponView.Range(on, ClassId.Healer), 1e-9);
             Assert.AreEqual(on.Depth.LightWeapons.Demolitions.ArcDeg, LightWeaponView.ArcDeg(on, ClassId.Demolitions), 1e-9);
             Assert.AreEqual(on.Class(ClassId.Warrior).AttackArcDeg, LightWeaponView.ArcDeg(on, ClassId.Warrior), 1e-9);

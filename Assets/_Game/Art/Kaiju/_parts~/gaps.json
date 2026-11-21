@@ -1,0 +1,441 @@
+{
+ "Elder": {
+  "rest_gap": {
+   "Hips>Spine": 0.025,
+   "Spine>Spine2": 0.085,
+   "Spine2>Spine3": 0.052,
+   "Spine3>Chest": 0.038,
+   "Chest>Neck": 0.106,
+   "Neck>Head": 0.125,
+   "Head>Jaw": 0.021,
+   "Head>Crystal1": 0.239,
+   "Chest>Shoulder_L": 0.097,
+   "Shoulder_L>Arm_L": 0.114,
+   "Arm_L>Forearm_L": 0.046,
+   "Forearm_L>Fist_L": 0.084,
+   "Fist_L>Knuckle1_L": 0.195,
+   "Fist_L>Knuckle2_L": 0.149,
+   "Fist_L>Knuckle3_L": 0.185,
+   "Chest>Shoulder_R": 0.069,
+   "Shoulder_R>Arm_R": 0.114,
+   "Arm_R>Forearm_R": 0.046,
+   "Forearm_R>Fist_R": 0.091,
+   "Fist_R>Knuckle1_R": 0.195,
+   "Fist_R>Knuckle2_R": 0.149,
+   "Fist_R>Knuckle3_R": 0.185,
+   "Chest>Crystal2": 0.031,
+   "Chest>Crystal3": 0.059,
+   "Spine3>Crystal4": 0.071,
+   "Spine3>Crystal5": 0.091,
+   "Spine3>Crystal6": 0.122,
+   "Spine2>Crystal7": 0.082,
+   "Spine>Crystal8": 0.064,
+   "Hips>Tail1": 0.129,
+   "Tail1>Tail2": 0.059,
+   "Tail2>Tail3": 0.064,
+   "Tail3>Tail4": 0.028,
+   "Tail4>Tail5": 0.02,
+   "Tail5>Tail6": 0.015,
+   "Tail6>Tail7": 0.004,
+   "Hips>Thigh_L": 0.079,
+   "Thigh_L>Shin_L": 0.045,
+   "Shin_L>Foot_L": 0.073,
+   "Foot_L>Toes_L": 0.073,
+   "Hips>Thigh_R": 0.119,
+   "Thigh_R>Shin_R": 0.045,
+   "Shin_R>Foot_R": 0.078,
+   "Foot_R>Toes_R": 0.073
+  },
+  "worst_gap_increase": {
+   "Head>Jaw": [
+    0.097,
+    "Roar",
+    31
+   ],
+   "Thigh_L>Shin_L": [
+    0.096,
+    "KO",
+    31
+   ],
+   "Spine3>Crystal5": [
+    0.094,
+    "Walk",
+    16
+   ],
+   "Thigh_R>Shin_R": [
+    0.092,
+    "WalkSqueeze",
+    16
+   ],
+   "Chest>Crystal3": [
+    0.088,
+    "Berserk",
+    31
+   ],
+   "Hips>Thigh_L": [
+    0.087,
+    "WalkSqueeze",
+    1
+   ],
+   "Tail1>Tail2": [
+    0.069,
+    "Roar",
+    31
+   ],
+   "Arm_L>Forearm_L": [
+    0.062,
+    "KO",
+    1
+   ]
+  }
+ },
+ "Grove": {
+  "rest_gap": {
+   "Hips>Spine": 0.054,
+   "Spine>Spine2": 0.039,
+   "Spine2>Spine3": 0.025,
+   "Spine3>Chest": 0.05,
+   "Chest>Neck": 0.056,
+   "Neck>Head": 0.078,
+   "Head>Jaw": 0.021,
+   "Head>Crystal1": 0.047,
+   "Chest>Shoulder_L": 0.075,
+   "Shoulder_L>Arm_L": 0.076,
+   "Arm_L>Forearm_L": 0.04,
+   "Forearm_L>Fist_L": 0.063,
+   "Fist_L>Knuckle1_L": 0.195,
+   "Fist_L>Knuckle2_L": 0.144,
+   "Fist_L>Knuckle3_L": 0.201,
+   "Chest>Shoulder_R": 0.075,
+   "Shoulder_R>Arm_R": 0.076,
+   "Arm_R>Forearm_R": 0.041,
+   "Forearm_R>Fist_R": 0.088,
+   "Fist_R>Knuckle1_R": 0.194,
+   "Fist_R>Knuckle2_R": 0.145,
+   "Fist_R>Knuckle3_R": 0.2,
+   "Chest>Crystal2": 0.146,
+   "Chest>Crystal3": 0.39,
+   "Spine3>Crystal4": 0.357,
+   "Spine3>Crystal5": 0.04,
+   "Spine3>Crystal6": 0.035,
+   "Spine2>Crystal7": 0.146,
+   "Spine>Crystal8": 0.649,
+   "Hips>Tail1": 0.039,
+   "Tail1>Tail2": 0.034,
+   "Tail2>Tail3": 0.039,
+   "Tail3>Tail4": 0.011,
+   "Tail4>Tail5": 0.015,
+   "Tail5>Tail6": 0.012,
+   "Tail6>Tail7": 0.018,
+   "Hips>Thigh_L": 0.079,
+   "Thigh_L>Shin_L": 0.045,
+   "Shin_L>Foot_L": 0.073,
+   "Foot_L>Toes_L": 0.088,
+   "Hips>Thigh_R": 0.119,
+   "Thigh_R>Shin_R": 0.045,
+   "Shin_R>Foot_R": 0.068,
+   "Foot_R>Toes_R": 0.09
+  },
+  "worst_gap_increase": {
+   "Spine3>Crystal4": [
+    0.124,
+    "KO",
+    46
+   ],
+   "Thigh_L>Shin_L": [
+    0.102,
+    "WalkSqueeze",
+    31
+   ],
+   "Thigh_R>Shin_R": [
+    0.102,
+    "WalkSqueeze",
+    16
+   ],
+   "Head>Jaw": [
+    0.097,
+    "Roar",
+    31
+   ],
+   "Hips>Thigh_L": [
+    0.078,
+    "WalkSqueeze",
+    8
+   ],
+   "Arm_R>Forearm_R": [
+    0.057,
+    "KO",
+    16
+   ],
+   "Forearm_L>Fist_L": [
+    0.05,
+    "SlamWindup",
+    16
+   ],
+   "Spine3>Crystal5": [
+    0.049,
+    "Berserk",
+    31
+   ]
+  }
+ },
+ "Brute": {
+  "rest_gap": {
+   "Hips>Spine": 0.054,
+   "Spine>Spine2": 0.046,
+   "Spine2>Spine3": 0.036,
+   "Spine3>Chest": 0.032,
+   "Chest>Neck": 0.029,
+   "Neck>Head": 0.088,
+   "Head>Jaw": 0.021,
+   "Head>Crystal1": 0.025,
+   "Chest>Shoulder_L": 0.058,
+   "Shoulder_L>Arm_L": 0.147,
+   "Arm_L>Forearm_L": 0.052,
+   "Forearm_L>Fist_L": 0.113,
+   "Fist_L>Knuckle1_L": 0.241,
+   "Fist_L>Knuckle2_L": 0.151,
+   "Fist_L>Knuckle3_L": 0.121,
+   "Chest>Shoulder_R": 0.054,
+   "Shoulder_R>Arm_R": 0.142,
+   "Arm_R>Forearm_R": 0.077,
+   "Forearm_R>Fist_R": 0.154,
+   "Fist_R>Knuckle1_R": 0.241,
+   "Fist_R>Knuckle2_R": 0.151,
+   "Fist_R>Knuckle3_R": 0.121,
+   "Chest>Crystal2": 0.204,
+   "Chest>Crystal3": 0.059,
+   "Spine3>Crystal4": 0.102,
+   "Spine3>Crystal5": 0.1,
+   "Spine3>Crystal6": 0.123,
+   "Spine2>Crystal7": 0.141,
+   "Spine>Crystal8": 0.108,
+   "Hips>Tail1": 0.074,
+   "Tail1>Tail2": 0.075,
+   "Tail2>Tail3": 0.084,
+   "Tail3>Tail4": 0.036,
+   "Hips>Thigh_L": 0.111,
+   "Thigh_L>Shin_L": 0.045,
+   "Shin_L>Foot_L": 0.073,
+   "Foot_L>Toes_L": 0.073,
+   "Hips>Thigh_R": 0.079,
+   "Thigh_R>Shin_R": 0.045,
+   "Shin_R>Foot_R": 0.078,
+   "Foot_R>Toes_R": 0.073
+  },
+  "worst_gap_increase": {
+   "Arm_L>Forearm_L": [
+    0.107,
+    "KO",
+    1
+   ],
+   "Chest>Crystal3": [
+    0.107,
+    "Flinch",
+    8
+   ],
+   "Head>Jaw": [
+    0.097,
+    "Roar",
+    31
+   ],
+   "Thigh_L>Shin_L": [
+    0.096,
+    "KO",
+    31
+   ],
+   "Thigh_R>Shin_R": [
+    0.092,
+    "WalkSqueeze",
+    16
+   ],
+   "Chest>Neck": [
+    0.086,
+    "Roar",
+    31
+   ],
+   "Shoulder_R>Arm_R": [
+    0.077,
+    "KO",
+    16
+   ],
+   "Shoulder_L>Arm_L": [
+    0.075,
+    "KO",
+    16
+   ]
+  }
+ },
+ "Timber": {
+  "rest_gap": {
+   "Hips>Spine": 0.041,
+   "Spine>Spine2": 0.01,
+   "Spine2>Spine3": 0.025,
+   "Spine3>Chest": 0.018,
+   "Chest>Neck": 0.028,
+   "Neck>Head": 0.094,
+   "Head>Jaw": 0.021,
+   "Head>Crystal1": 0.078,
+   "Chest>Shoulder_L": 0.032,
+   "Shoulder_L>Arm_L": 0.072,
+   "Arm_L>Forearm_L": 0.038,
+   "Forearm_L>Fist_L": 0.064,
+   "Fist_L>Knuckle1_L": 0.202,
+   "Fist_L>Knuckle2_L": 0.151,
+   "Fist_L>Knuckle3_L": 0.207,
+   "Chest>Shoulder_R": 0.061,
+   "Shoulder_R>Arm_R": 0.056,
+   "Arm_R>Forearm_R": 0.038,
+   "Forearm_R>Fist_R": 0.082,
+   "Fist_R>Knuckle1_R": 0.202,
+   "Fist_R>Knuckle2_R": 0.152,
+   "Fist_R>Knuckle3_R": 0.206,
+   "Hips>Tail1": 0.113,
+   "Tail1>Tail2": 0.045,
+   "Tail2>Tail3": 0.033,
+   "Tail3>Tail4": 0.025,
+   "Tail4>Tail5": 0.011,
+   "Tail5>Tail6": 0.017,
+   "Tail6>Tail7": 0.007,
+   "Hips>Thigh_L": 0.079,
+   "Thigh_L>Shin_L": 0.045,
+   "Shin_L>Foot_L": 0.069,
+   "Foot_L>Toes_L": 0.088,
+   "Hips>Thigh_R": 0.117,
+   "Thigh_R>Shin_R": 0.045,
+   "Shin_R>Foot_R": 0.068,
+   "Foot_R>Toes_R": 0.094
+  },
+  "worst_gap_increase": {
+   "Thigh_L>Shin_L": [
+    0.102,
+    "WalkSqueeze",
+    31
+   ],
+   "Thigh_R>Shin_R": [
+    0.102,
+    "WalkSqueeze",
+    16
+   ],
+   "Head>Jaw": [
+    0.097,
+    "Roar",
+    31
+   ],
+   "Shoulder_L>Arm_L": [
+    0.071,
+    "SlamWindup",
+    16
+   ],
+   "Shoulder_R>Arm_R": [
+    0.064,
+    "Berserk",
+    16
+   ],
+   "Hips>Thigh_L": [
+    0.06,
+    "WalkSqueeze",
+    24
+   ],
+   "Arm_L>Forearm_L": [
+    0.048,
+    "KO",
+    61
+   ],
+   "Tail4>Tail5": [
+    0.048,
+    "Berserk",
+    16
+   ]
+  }
+ },
+ "Mire": {
+  "rest_gap": {
+   "Hips>Spine": 0.029,
+   "Spine>Spine2": 0.043,
+   "Spine2>Spine3": 0.068,
+   "Spine3>Chest": 0.096,
+   "Chest>Neck": 0.108,
+   "Neck>Head": 0.125,
+   "Head>Jaw": 0.021,
+   "Chest>Shoulder_L": 0.134,
+   "Shoulder_L>Arm_L": 0.17,
+   "Arm_L>Forearm_L": 0.042,
+   "Forearm_L>Fist_L": 0.156,
+   "Fist_L>Knuckle1_L": 0.222,
+   "Fist_L>Knuckle2_L": 0.167,
+   "Fist_L>Knuckle3_L": 0.223,
+   "Chest>Shoulder_R": 0.11,
+   "Shoulder_R>Arm_R": 0.139,
+   "Arm_R>Forearm_R": 0.039,
+   "Forearm_R>Fist_R": 0.152,
+   "Fist_R>Knuckle1_R": 0.221,
+   "Fist_R>Knuckle2_R": 0.168,
+   "Fist_R>Knuckle3_R": 0.222,
+   "Chest>Crystal2": 0.253,
+   "Chest>Crystal3": 0.184,
+   "Spine3>Crystal4": 0.147,
+   "Spine3>Crystal5": 0.096,
+   "Spine3>Crystal6": 0.17,
+   "Spine2>Crystal7": 0.066,
+   "Spine>Crystal8": 0.151,
+   "Hips>Tail1": 0.031,
+   "Tail1>Tail2": 0.072,
+   "Tail2>Tail3": 0.048,
+   "Tail3>Tail4": 0.028,
+   "Tail4>Tail5": 0.014,
+   "Tail5>Tail6": 0.016,
+   "Tail6>Tail7": 0.008,
+   "Hips>Thigh_L": 0.054,
+   "Thigh_L>Shin_L": 0.045,
+   "Shin_L>Foot_L": 0.069,
+   "Foot_L>Toes_L": 0.106,
+   "Hips>Thigh_R": 0.09,
+   "Thigh_R>Shin_R": 0.045,
+   "Shin_R>Foot_R": 0.068,
+   "Foot_R>Toes_R": 0.106
+  },
+  "worst_gap_increase": {
+   "Spine2>Crystal7": [
+    0.127,
+    "Slam",
+    19
+   ],
+   "Spine3>Crystal6": [
+    0.104,
+    "Slam",
+    10
+   ],
+   "Thigh_L>Shin_L": [
+    0.102,
+    "WalkSqueeze",
+    31
+   ],
+   "Thigh_R>Shin_R": [
+    0.102,
+    "WalkSqueeze",
+    16
+   ],
+   "Spine3>Crystal4": [
+    0.102,
+    "KO",
+    31
+   ],
+   "Head>Jaw": [
+    0.097,
+    "Roar",
+    31
+   ],
+   "Hips>Tail1": [
+    0.086,
+    "Swipe",
+    28
+   ],
+   "Chest>Crystal2": [
+    0.079,
+    "Flinch",
+    12
+   ]
+  }
+ }
+}

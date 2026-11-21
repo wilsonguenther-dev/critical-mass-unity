@@ -194,6 +194,7 @@ namespace CriticalMass.Runtime.View.Anim
             KaijuType type = w.Match.Hatched ? KaijuTypes.Type(w) : KaijuType.Elder;
             s *= KaijuTypeLook.Scale(type);
             DrawnType = type;
+            if (m == adult) m.SetVariant(KaijuTypeLook.Variant(type));   // b15 Kaiju parts: the type's own part set (ELDER: default)
             ApplyTypeLook(m, type, k.State, w.Match.Hatched);
             Scale = s;
             m.Transform.localScale = m.BaseScale * s;   // fix/model-scale: set from the stored base, the Kaiju's own models only
@@ -419,16 +420,31 @@ namespace CriticalMass.Runtime.View.Anim
             _typeBlock.Clear();
             if (key != 0)
             {
-                Vector4 body = KaijuTypeLook.BodyRatio(type);
-                _typeBlock.SetVector("_MidRatio", body * KaijuTypeLook.MidLift);
-                _typeBlock.SetVector("_ShadowRatio", body * KaijuTypeLook.ShadowLift);
-                _typeBlock.SetFloat("_LitMultiplier", KaijuTypeLook.LitLift);
+                // b15 Kaiju parts: a model with part sets carries the type in its geometry and palette (bark, horns, logs,
+                // sail): no body tint, no painted glow pattern (the plates and vents are modelled, code 2), and a half lift
+                // (its palette is authored a value step above the old dark slate). The soft fresnel in the type hue stays.
+                bool parts = m.Spec?.Variants != null && m.Spec.Variants.Length > 0;
+                // b15 wave-two combine (one lift, not two): the world look's character band + gain (CMToon charW, rim above
+                // 0) already lifts every character, the Kaiju included, so a parts model takes NO extra band lift here (the
+                // material's own ratios and lit multiplier stand), and a model without part sets keeps only its type tint
+                // (BodyRatio) without the b14 value lift (LitLift / MidLift / ShadowLift). The lift constants are kept for the
+                // in-Editor value probe (EDITOR-CHECKLIST: Kaiju brightness) in case the world look's lift alone reads flat.
+                if (!parts)
+                {
+                    Vector4 body = KaijuTypeLook.BodyRatio(type);
+                    _typeBlock.SetVector("_MidRatio", body);
+                    _typeBlock.SetVector("_ShadowRatio", body);
+                }
                 Color g = ArtMaterials.Hex(KaijuTypeLook.GlowHex(type));
                 g.a = KaijuTypeLook.GlowStrength;
                 _typeBlock.SetColor("_KaijuGlow", g);
-                _typeBlock.SetFloat("_KaijuPattern", KaijuTypeLook.Pattern(type));
+                _typeBlock.SetFloat("_KaijuPattern", parts ? 0f : KaijuTypeLook.Pattern(type));
                 if (state == KaijuState.Neutral && type != KaijuType.Elder)
-                    _typeBlock.SetColor("_TeamGlow", ArtMaterials.Hex(KaijuTypeLook.CrystalHex(type)));
+                {
+                    Color crystal = ArtMaterials.Hex(KaijuTypeLook.CrystalHex(type));
+                    _typeBlock.SetColor("_TeamGlow", crystal);
+                    if (parts) _typeBlock.SetColor("_TeamCloth", crystal);   // the team plates (code 8) read the type while neutral
+                }
             }
             Renderer[] rs = m.Renderers;
             for (int i = 0; i < rs.Length; i++)
@@ -766,6 +782,11 @@ namespace CriticalMass.Runtime.View.Anim
         // GROVE leaf green crest, BRUTE amber back plates, TIMBER pale bark bands, MIRE blue-violet mist spots, ELDER gold spine.
         // Hues stay off both team hues (Azure cyan, Crimson red) and the corruption purple #8E3FD1.
         public const float LitLift = 1.22f, MidLift = 1.38f, ShadowLift = 1.55f, GlowStrength = 0.85f;
+        /// <summary>b15 Kaiju parts: half the b14 lift (the parts palette is authored lighter than the old slate).</summary>
+        public const float PartsLitLift = 1.10f, PartsMidLift = 1.19f, PartsShadowLift = 1.27f;
+        /// <summary>b15 Kaiju parts: the adult's part set for a type (ModelSpec.Variants); null = the default ELDER set.</summary>
+        public static string Variant(KaijuType t) =>
+            t == KaijuType.Grove ? "Grove" : t == KaijuType.Brute ? "Brute" : t == KaijuType.Timber ? "Timber" : t == KaijuType.Mire ? "Mire" : null;
         public const string GroveGlow = "#86F25A", BruteGlow = "#FF9A2E", TimberGlow = "#F3DDA8", MireGlow = "#9AB0FF", ElderGlow = "#FFD24A";
         /// <summary>Pattern ids of CMToonKaijuGlow: 1 crest, 2 plates, 3 bands, 4 spots, 5 spine.</summary>
         public static float Pattern(KaijuType t) =>

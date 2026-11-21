@@ -9,7 +9,7 @@ namespace CriticalMass.Net
     public static class NetVersion
     {
         /// <summary>Bumps whenever any packet layout or the lockstep rules change.</summary>
-        public const int Protocol = 3;   // 3 (online-rooms-9): bundles carry the host's tick and every slot's margin   // 2: the start message carries the config and tick 0 fingerprints
+        public const int Protocol = 4;   // 4 (b15-rejoin): HELLO carries the sim schema, the rules digest and a rejoin secret; REJOIN / REJOINED   // 3 (online-rooms-9): bundles carry the host's tick and every slot's margin   // 2: the start message carries the config and tick 0 fingerprints
     }
 
     /// <summary>A transport that can close its room to newcomers (the relay does; the loopback does not need to).</summary>
@@ -30,12 +30,26 @@ namespace CriticalMass.Net
         public int PingMs;
         /// <summary>Host side: the member's HELLO arrived and its version matches.</summary>
         public bool Confirmed;
+        /// <summary>b15-rejoin, host side: the secret the member sent in its HELLO (only the host ever sees it); a dropped
+        /// player who presents it again gets their seat back.</summary>
+        public ulong Secret;
+        /// <summary>b15 profile: the member's cosmetic look for LookClass (clamped on arrival; never part of the match setup).</summary>
+        public CosmeticLook Look = CosmeticLook.Default;
+        public ClassId LookClass;
+        /// <summary>The look for the class the member has picked now (Default until a look for that class arrives).</summary>
+        public CosmeticLook LookNow => LookClass == Class ? Look : CosmeticLook.Default;
     }
 
     /// <summary>Room message numbers (lockstep uses 1 and 2).</summary>
     internal static class RoomMsg
     {
         public const int Hello = 20, State = 21, Pick = 22, Ready = 23, Reject = 24, Start = 25, Ping = 26, Pong = 27;
+        /// <summary>b15-rejoin: a dropped player asks for its seat back (proto, build, schema, digest, secret); the host
+        /// answers Rejoined (the match setup with the new peer in the seat) or Reject.</summary>
+        public const int Rejoin = 28, Rejoined = 29;
+        /// <summary>b15 profile, cosmetic only: client to host [class, look]; host to all [n, (peer, look) x n]. (Integrator b15:
+        /// 40/41, because b15-rejoin took 28/29 and 30 to 39 are chat; TrafficCounts counts 40 to 49 as room.)</summary>
+        public const int Look = 40, Looks = 41;
         public const int NameMax = 16, BuildMax = 40, TextMax = 120;
 
         /// <summary>Display names follow the chat rules (letters, digits, space, '-' and '_'; filtered; at most 16).</summary>
@@ -56,6 +70,8 @@ namespace CriticalMass.Net
         public static string Joined(string name) => name + " joined.";
         public static string LeftRoom(string name) => name + " left the room.";
         public static string LeftMatch(string name) => name + " left: a bot took over.";
+        /// <summary>b15-rejoin: posted on every machine at the tick a rejoined player takes the fighter back.</summary>
+        public static string BackInMatch(string name) => name + " is back.";
 
         /// <summary>Posts the in-match leave notice on this machine when a human becomes a bot.</summary>
         public static void Hook(LockstepSession s, ChatChannel chat)
@@ -65,6 +81,11 @@ namespace CriticalMass.Net
             {
                 string name = slot >= 0 && slot < s.Setup.Humans.Length ? s.Setup.Humans[slot].Name : null;
                 chat.Notice(LeftMatch(string.IsNullOrEmpty(name) ? "A player" : name), s.NowMs);
+            };
+            s.BotToHuman += (slot, actor, tick) =>
+            {
+                string name = slot >= 0 && slot < s.Setup.Humans.Length ? s.Setup.Humans[slot].Name : null;
+                chat.Notice(BackInMatch(string.IsNullOrEmpty(name) ? "A player" : name), s.NowMs);
             };
         }
 
@@ -105,6 +126,16 @@ namespace CriticalMass.Net
         public LockstepSession Session { get; private set; }
         /// <summary>Room and match chat (the host routes and checks every line).</summary>
         public readonly ChatChannel Chat;
+        /// <summary>
+        /// b15-rejoin: a player who drops may come back to the same match (default on). The relay only lets newcomers into an
+        /// unlocked room, so with this on the host does not lock the room at the start; anyone else who knocks during the
+        /// match is refused here ("The match already started.") and nothing they send ever reaches the lockstep.
+        /// </summary>
+        public bool AllowRejoin = true;
+        /// <summary>b15-rejoin: the last rejoin request's outcome, one plain sentence (empty: none yet).</summary>
+        public string RejoinNotice { get; private set; } = "";
+        /// <summary>b15 profile: the host's own look for a class (null = Default). Cosmetic only.</summary>
+        public Func<ClassId, CosmeticLook> LookFor;
 
         private readonly ITransport _t;
         private readonly GameConfig _cfg;
@@ -139,6 +170,13 @@ namespace CriticalMass.Net
         {
             foreach (RoomMember m in Members) if (m.Peer == peer) return m;
             return null;
+        }
+
+        /// <summary>b15 profile: the look a member shows for the class it has picked (Default for unknown peers).</summary>
+        public CosmeticLook LookOf(int peer)
+        {
+            RoomMember m = Find(peer);
+            return m != null ? m.LookNow : CosmeticLook.Default;
         }
 
         public void SetLocalPick(TeamId team, ClassId cls)
@@ -229,13 +267,25 @@ namespace CriticalMass.Net
                     string build = r.Str(RoomMsg.BuildMax);
                     string name = r.Str(RoomMsg.NameMax);
                     if (r.Bad) return;
-                    if (proto != NetVersion.Protocol || build != _build)
+                    // b15-rejoin: the protocol first (an older game's HELLO is shorter), then the rules version.
+                    string why = proto != NetVersion.Protocol || build != _build ? VersionText(build, _build) : null;
+                    int schema = 0;
+                    ulong digest = 0, secret = 0;
+                    if (why == null)
                     {
-                        Reject(ev.From, "Your game is a different version from the host's (" + build + " vs " + _build + "). Both of you need the same update.");
+                        schema = r.I32();
+                        digest = r.U64();
+                        secret = r.U64();
+                        why = r.Bad ? VersionText(build, _build) : RulesText(schema, digest);
+                    }
+                    if (why != null)
+                    {
+                        Reject(ev.From, why);
                         Members.Remove(m);
                         Changed("");
                         return;
                     }
+                    m.Secret = secret;
                     m.Name = RoomMsg.CleanName(name);
                     m.Confirmed = true;
                     Changed(m.Name + " joined.");
@@ -261,6 +311,18 @@ namespace CriticalMass.Net
                     Changed("");
                     return;
                 }
+                case RoomMsg.Look:
+                {
+                    // b15 profile: cosmetic only. Clamped on arrival (ids out of range or above the claimed mastery become 0).
+                    int cls = r.U8();
+                    CosmeticLook look = CosmeticLook.Read(ref r);
+                    if (r.Bad || !m.Confirmed || cls >= ClassIds.All.Count) return;
+                    if (m.LookClass == (ClassId)cls && m.Look.Equals(look)) return;
+                    m.Look = look;
+                    m.LookClass = (ClassId)cls;
+                    Changed("");
+                    return;
+                }
                 case RoomMsg.Pong:
                 {
                     int sent = r.I32();
@@ -270,6 +332,57 @@ namespace CriticalMass.Net
                     return;
                 }
             }
+        }
+
+        /// <summary>b15-rejoin: the plain sentence for a different build or protocol.</summary>
+        public static string VersionText(string theirs, string ours) =>
+            "Your game is a different version from the host's (" + theirs + " vs " + ours + "). Both of you need the same update.";
+
+        /// <summary>b15-rejoin: null when a joiner's sim schema and rules digest are this game's, else the plain sentence.</summary>
+        public static string RulesText(int schema, ulong digest) =>
+            schema == CriticalMass.Sim.SimVersion.Schema && digest == CriticalMass.Sim.SimVersion.RulesDigest ? null
+                : "Your game plays by different match rules from the host's (rules version " + schema + " vs " + CriticalMass.Sim.SimVersion.Schema +
+                  "). Both of you need the same update.";
+
+        /// <summary>
+        /// b15-rejoin: room messages during the match. Chat as before; REJOIN from a dropped player who presents the secret
+        /// of its seat (same build, protocol, schema and rules digest) gets the seat back: the lockstep hands it the match
+        /// from tick 0 (LockstepSession.AcceptRejoin) and the host answers REJOINED with the setup, its new peer in the seat.
+        /// Anyone else is refused in plain words.
+        /// </summary>
+        private void InMatch(ref TransportEvent ev, long now)
+        {
+            if (ev.Data == null || ev.Length < 1) return;
+            int type = ev.Data[0];
+            if (type == ChatChannel.Msg) { Chat.Handle(ref ev, now); return; }
+            if (type == RoomMsg.Hello) { Reject(ev.From, "The match already started."); return; }
+            if (type != RoomMsg.Rejoin || Session == null) return;
+            var r = new WireReader(ev.Data, 1, ev.Length);
+            int proto = r.U8();
+            string build = r.Str(RoomMsg.BuildMax);
+            string why = r.Bad || proto != NetVersion.Protocol || build != _build ? VersionText(build, _build) : null;
+            ulong secret = 0;
+            if (why == null)
+            {
+                int schema = r.I32();
+                ulong digest = r.U64();
+                secret = r.U64();
+                why = r.Bad ? VersionText(build, _build) : RulesText(schema, digest);
+            }
+            int slot = -1;
+            if (why == null && secret != 0)
+                for (int i = 1; i < Members.Count && i < Session.Setup.Humans.Length; i++) if (Members[i].Secret == secret) slot = i;
+            if (why == null && slot < 0) why = "The match already started.";
+            if (why == null) why = Session.AcceptRejoin(slot, ev.From, now);
+            if (why != null) { RejoinNotice = why; Reject(ev.From, why); return; }
+            Members[slot].Peer = ev.From;
+            var w = new WireWriter(new byte[Peers.MaxPacket]);
+            w.U8(RoomMsg.Rejoined);
+            Session.Setup.Write(ref w);
+            if (w.Overflow) return;
+            _t.Send(ev.From, w.Buf, w.Pos);
+            RejoinNotice = Members[slot].Name + " is rejoining.";
+            Changed(RejoinNotice);
         }
 
         private void Reject(int peer, string text)
@@ -306,6 +419,28 @@ namespace CriticalMass.Net
                 w.U8((int)m.Class);
                 w.U8(m.Ready ? 1 : 0);
                 w.I16(Math.Min(m.PingMs, 9999));
+            }
+            if (!w.Overflow) _t.Send(Peers.Broadcast, _pkt, w.Pos);
+            SendLooks(n);
+        }
+
+        /// <summary>b15 profile: every confirmed member's look for its picked class, after each State. Cosmetic only.</summary>
+        private void SendLooks(int n)
+        {
+            RoomMember me = Members[0];
+            if (LookFor != null)
+            {
+                me.Look = CosmeticLook.Clamp(LookFor(me.Class));
+                me.LookClass = me.Class;
+            }
+            var w = new WireWriter(_pkt);
+            w.U8(RoomMsg.Looks);
+            w.U8(n);
+            foreach (RoomMember m in Members)
+            {
+                if (!m.Confirmed) continue;
+                w.U8(m.Peer);
+                m.LookNow.Write(ref w);
             }
             if (!w.Overflow) _t.Send(Peers.Broadcast, _pkt, w.Pos);
         }
@@ -349,7 +484,7 @@ namespace CriticalMass.Net
             // online-rooms-3: the match is built from the setup and a fresh default config only (never a config object an
             // earlier match or the offline game touched). The host builds first, then sends what it built from: the config
             // fingerprint and its tick 0 world fingerprint ride in the start message, and a client that differs refuses.
-            Session = new LockstepSession(_t, setup, GameConfig.CreateDefault(), options) { Other = Chat.Handle };
+            Session = new LockstepSession(_t, setup, GameConfig.CreateDefault(), options) { Other = InMatch };
             RoomNotices.Hook(Session, Chat);
             setup.ConfigHash = Session.MyConfigHash;
             setup.WorldHash0 = Session.MyWorldHash0;
@@ -358,7 +493,7 @@ namespace CriticalMass.Net
             setup.Write(ref w);
             if (w.Overflow) { Session = null; return null; }
             _t.Send(Peers.Broadcast, w.Buf, w.Pos);
-            (_t as ILockableTransport)?.Lock();
+            if (!AllowRejoin) (_t as ILockableTransport)?.Lock();
             Session.StartPacket = w.Buf;
             Session.StartPacketLength = w.Pos;
             Phase = RoomPhase.InMatch;
@@ -384,6 +519,15 @@ namespace CriticalMass.Net
         public LockstepOptions Options;
         /// <summary>Room and match chat (lines arrive from the host, already checked).</summary>
         public readonly ChatChannel Chat;
+        /// <summary>b15 profile: this player's own look for a class (null = Default). Cosmetic only.</summary>
+        public Func<ClassId, CosmeticLook> LookFor;
+        /// <summary>b15 profile: each member's look for its picked class, as the host last sent them (already clamped).</summary>
+        public readonly Dictionary<int, CosmeticLook> Looks = new Dictionary<int, CosmeticLook>();
+
+        /// <summary>b15-rejoin: this player's seat secret (random per room join; sent only to the host). Keep it to rejoin.</summary>
+        public ulong Secret { get; }
+        /// <summary>b15-rejoin: true when this client asks for a dropped seat back instead of joining the lobby.</summary>
+        public bool Rejoining { get; }
 
         private readonly ITransport _t;
         private readonly GameConfig _cfg;
@@ -396,13 +540,26 @@ namespace CriticalMass.Net
         private bool _pickSet;
         private long _lastHello = -100000;
 
-        public RoomClient(ITransport transport, GameConfig cfg, string name, string build)
+        public RoomClient(ITransport transport, GameConfig cfg, string name, string build) : this(transport, cfg, name, build, 0) { }
+
+        /// <summary>b15-rejoin: rejoinSecret != 0 asks the host for the seat that secret belongs to (the match in progress).</summary>
+        public RoomClient(ITransport transport, GameConfig cfg, string name, string build, ulong rejoinSecret)
         {
             _t = transport;
             _cfg = cfg;
             _name = RoomMsg.CleanName(name);
             _build = build ?? "";
             Chat = new ChatChannel(transport);
+            Rejoining = rejoinSecret != 0;
+            Secret = rejoinSecret != 0 ? rejoinSecret : NewSecret();
+        }
+
+        private static ulong NewSecret()
+        {
+            var b = new byte[8];
+            using (var rng = System.Security.Cryptography.RandomNumberGenerator.Create()) rng.GetBytes(b);
+            ulong v = System.BitConverter.ToUInt64(b, 0);
+            return v != 0 ? v : 1;
         }
 
         public RoomMember Me
@@ -423,6 +580,22 @@ namespace CriticalMass.Net
             w.U8(RoomMsg.Pick);
             w.U8((int)team);
             w.U8((int)cls);
+            _t.Send(Peers.Host, _pkt, w.Pos);
+            SendLook(cls);
+        }
+
+        /// <summary>b15 profile: the look a member shows (Default for an unknown peer).</summary>
+        public CosmeticLook LookOf(int peer) => Looks.TryGetValue(peer, out CosmeticLook l) ? l : CosmeticLook.Default;
+
+        /// <summary>b15 profile: sends this player's look for cls to the host (cosmetic only; the host clamps it again).</summary>
+        public void SendLook(ClassId cls)
+        {
+            if (LookFor == null) return;
+            CosmeticLook look = CosmeticLook.Clamp(LookFor(cls));
+            var w = new WireWriter(_pkt);
+            w.U8(RoomMsg.Look);
+            w.U8((int)cls);
+            look.Write(ref w);
             _t.Send(Peers.Host, _pkt, w.Pos);
         }
 
@@ -451,10 +624,22 @@ namespace CriticalMass.Net
                 _helloSent = true;
                 _lastHello = now;
                 var w = new WireWriter(_pkt);
-                w.U8(RoomMsg.Hello);
-                w.U8(NetVersion.Protocol);
-                w.Str(_build, RoomMsg.BuildMax);
-                w.Str(_name, RoomMsg.NameMax);
+                if (Rejoining)
+                {
+                    w.U8(RoomMsg.Rejoin);
+                    w.U8(NetVersion.Protocol);
+                    w.Str(_build, RoomMsg.BuildMax);
+                }
+                else
+                {
+                    w.U8(RoomMsg.Hello);
+                    w.U8(NetVersion.Protocol);
+                    w.Str(_build, RoomMsg.BuildMax);
+                    w.Str(_name, RoomMsg.NameMax);
+                }
+                w.I32(CriticalMass.Sim.SimVersion.Schema);
+                w.U64(CriticalMass.Sim.SimVersion.RulesDigest);
+                w.U64(Secret);
                 _t.Send(Peers.Host, _pkt, w.Pos);
             }
         }
@@ -508,9 +693,26 @@ namespace CriticalMass.Net
                     {
                         Phase = RoomPhase.Lobby;
                         if (_pickSet) SetPick(_team, _cls);
+                        else SendLook(Me.Class);
                         if (_ready) SetReady(true);
                     }
                     Version++;
+                    return;
+                }
+                case RoomMsg.Looks:
+                {
+                    int n = r.U8();
+                    if (r.Bad || n > MatchSetup.MaxHumans) return;
+                    var got = new Dictionary<int, CosmeticLook>(n);
+                    for (int i = 0; i < n; i++)
+                    {
+                        int peer = r.U8();
+                        CosmeticLook look = CosmeticLook.Read(ref r);
+                        if (r.Bad) return;
+                        got[peer] = look;
+                    }
+                    Looks.Clear();
+                    foreach (KeyValuePair<int, CosmeticLook> kv in got) Looks[kv.Key] = kv.Value;
                     return;
                 }
                 case RoomMsg.Ping:
@@ -529,8 +731,23 @@ namespace CriticalMass.Net
                     Fail(r.Bad ? "The host refused the connection." : text);
                     return;
                 }
+                case RoomMsg.Rejoined:
+                {
+                    if (!Rejoining || Session != null) return;
+                    MatchSetup setup = MatchSetup.Read(ref r, _cfg);
+                    if (setup == null) { Fail("The host sent a match this game cannot play."); return; }
+                    if (setup.SlotOfPeer(_t.LocalPeer) <= 0) { Fail("The host did not give your seat back."); return; }
+                    Session = LockstepSession.Rejoining(_t, setup, GameConfig.CreateDefault(), Options);
+                    Session.Other = Chat.Handle;
+                    RoomNotices.Hook(Session, Chat);
+                    Phase = RoomPhase.InMatch;
+                    Version++;
+                    Started?.Invoke(Session);
+                    return;
+                }
                 case RoomMsg.Start:
                 {
+                    if (Rejoining) return;   // b15-rejoin: the START a lobby joiner would get; a rejoiner waits for REJOINED
                     MatchSetup setup = MatchSetup.Read(ref r, _cfg);
                     if (setup == null) { Fail("The host sent a match this game cannot play."); return; }
                     if (setup.SlotOfPeer(_t.LocalPeer) < 0) { Fail("The match started without you."); return; }

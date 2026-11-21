@@ -361,11 +361,18 @@ namespace CriticalMass.Runtime.Tests
         [Test]
         public void UnlockTextsNameTheNextPieces()
         {
-            StringAssert.StartsWith("LEVEL 2: SUNBURST", CharacterPanel.NextUnlockText(ClassId.Warrior, 1));
-            StringAssert.StartsWith("LEVEL 3: HORNED HELM", CharacterPanel.NextUnlockText(ClassId.Warrior, 2));
-            Assert.AreEqual(ProgressionWords.NothingNext, CharacterPanel.NextUnlockText(ClassId.Warrior, Leveling.MaxLevel));
-            StringAssert.Contains("HORNED HELM", RewardsPanel.UnlockLine(3, 3));
-            Assert.AreEqual(string.Empty, RewardsPanel.UnlockLine(11, 12));
+            // b15 item 6: the unlock texts name only looks whose art is in the build; here every table look is given art
+            UnlockHonesty.HasArt = it => it != null;
+            UnlockHonesty.ArtIds = (c, sl) => new string[0];
+            try
+            {
+                StringAssert.StartsWith("LEVEL 2: SUNBURST", CharacterPanel.NextUnlockText(ClassId.Warrior, 1));
+                StringAssert.StartsWith("LEVEL 3: HORNED HELM", CharacterPanel.NextUnlockText(ClassId.Warrior, 2));
+                Assert.AreEqual("Levels past 9 unlock nothing yet.", CharacterPanel.NextUnlockText(ClassId.Warrior, Leveling.MaxLevel));
+                StringAssert.Contains("HORNED HELM", RewardsPanel.UnlockLine(3, 3));
+                Assert.AreEqual(string.Empty, RewardsPanel.UnlockLine(11, 12));
+            }
+            finally { UnlockHonesty.ResetProbes(); }
         }
 
         [Test]
@@ -375,7 +382,8 @@ namespace CriticalMass.Runtime.Tests
             StringAssert.Contains("2.5 s", ProgressionWords.AbilityText(cfg, ClassId.Warrior));
             StringAssert.Contains("60%", ProgressionWords.AbilityText(cfg, ClassId.Warrior));
             StringAssert.Contains("6 m", ProgressionWords.AbilityText(cfg, ClassId.Farmer));
-            StringAssert.Contains("22 damage", ProgressionWords.AttackText(cfg, ClassId.Warrior));
+            // b15 combat feel: the Warrior row is CombatFeelConfig's under the rule (27); the text reads whatever the config says.
+            StringAssert.Contains(cfg.Class(ClassId.Warrior).AttackDamage.ToString("0") + " damage", ProgressionWords.AttackText(cfg, ClassId.Warrior));
         }
 
         // ---- character panel build ----

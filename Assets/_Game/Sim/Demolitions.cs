@@ -471,9 +471,9 @@ namespace CriticalMass.Sim.Core
             b.FromX = w.X[id];
             b.FromZ = w.Z[id];
             b.ThrownTick = w.Tick;
-            b.BlastTick = w.Tick + Durations.T30(w.Config, cfg.FuseTicks);
+            b.BlastTick = w.Tick + Durations.T30(w.Config, cfg.FuseTicks * HutChoices.FuseScale(w, a.Team));   // b15-hook: SHORT FUSE (x 1 with the rule off)
             b.LandTick = Math.Min(b.BlastTick, w.Tick + Durations.T30(w.Config, cfg.FlightTicks));
-            s.TntReadyTick[id] = w.Tick + Durations.T30(w.Config, cfg.CooldownTicks);
+            s.TntReadyTick[id] = w.Tick + CombatFeel.TntCooldown(w.Config); // b15: the combat feel TNT cooldown under the rule (through Durations.T30)
             s.Stats.TntThrown++;
             a.AnimAction = 0;
             a.SpawnProtect = 0;
@@ -491,7 +491,9 @@ namespace CriticalMass.Sim.Core
             double bz = b.Z;
             bool gapOk = w.Tick - w.WallChangeTick >= Durations.T30(w.Config, w.Config.Abilities.MinerTerraform.MinGapTicks); // before this blast's own breaks
             s.Stats.TntBlasts++;
-            int hit = BlastActors(w, b.Owner, b.Team, bx, bz, cfg.BlastRadius, cfg.Damage);
+            double tntDamage = CombatFeel.On(w) ? w.Config.Depth.CombatFeel.TntDamage : cfg.Damage; // b15: CombatFeelConfig.TntDamage
+            int hit = BlastActors(w, b.Owner, b.Team, bx, bz, cfg.BlastRadius, tntDamage);
+            if (CombatFeel.On(w)) CombatFeel.TntSelfBlast(w, b.Owner, bx, bz, cfg.BlastRadius, tntDamage); // b15: self-risk
             Chain(w, bx, bz, cfg.BlastRadius);
             Kaiju k = w.Kaiju;
             if (k.State != KaijuState.Egg)
@@ -546,11 +548,14 @@ namespace CriticalMass.Sim.Core
                     {
                         int i = cz * map.Width + cx;
                         byte t = map.Cells[i];
-                        if (t != Cell.Floor && t != Cell.Bridge) continue;
+                        // b15: a raised cell, or a height ladder on one (false without the height rule)
+                        bool raised = TerrainHeight.Raised(map, i) || (map.Lift != null && map.Lift[i] > 0 && t == Cell.Bridge && TerrainHeight.LadderGround(w, i, out _));
+                        if (!raised && t != Cell.Floor && t != Cell.Bridge) continue;
                         double dx = cx + 0.5 - bx;
                         double dz = cz + 0.5 - bz;
                         if (dx * dx + dz * dz > C * C + 1e-9) continue;
-                        int why = Terraform.DigRefusal(w, cx, cz);
+                        if (raised && TerrainHeight.TntCell(w, b.Owner, cx, cz)) continue;   // b15: a stack loses TntLevels levels
+                        int why = Terraform.VoidDigRefusal(w, cx, cz);
                         if (why != 0)
                         {
                             if (why == Terraform.RefusedRoute) s.Stats.RouteRefusals++;
@@ -558,6 +563,7 @@ namespace CriticalMass.Sim.Core
                             continue;
                         }
                         MapGrid.SetCell(w, cx, cz, Cell.Void);
+                        TerrainHeight.ZeroLift(map, i);   // b15: a cratered pit starts again from level 0
                         s.Stats.CellsCarved++;
                         World.PushEvent(w, SimEventType.Terraform, b.Owner, i, cx + 0.5, cz + 0.5, Terraform.Dug);
                     }

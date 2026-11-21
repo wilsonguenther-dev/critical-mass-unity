@@ -147,8 +147,12 @@ namespace CriticalMass.Sim.Core
         /// <summary>U-068 counters.</summary>
         public int DropsClaimed;
         public int EggWindows;
+        /// <summary>b15: combat feel per-actor state (buffer, stagger windows, slow, sunder) and the ladder mask (CombatFeel.cs).</summary>
+        public CombatFeelState Feel;
         public int BridgesCollapsed;
         public int BridgesRepaired;
+        /// <summary>b15 terrain height: per-actor level, slow and climb state (null unless the rule is on; TerrainHeight.cs).</summary>
+        public TerrainHeightState Height;
 
         public static DepthState Create(GameConfig cfg, Grid.MapDef map)
         {
@@ -188,17 +192,29 @@ namespace CriticalMass.Sim.Core
                 DropSpots = Core.Pickups.PlaceCentreSpots(map, cfg.Depth.Events.DropSpotsZ),
                 DropProgress = new int[2],
                 BrokenIdx = new int[MapEvents.MaxBrokenCells],
+                Feel = CombatFeelState.Create(cfg, map),
             };
             for (int i = 0; i < s.Pickups.Length; i++) s.Pickups[i] = new Pickup { Source = -1, Spot = -1 };
             s.CoinSpotNextTick = new int[s.CoinSpots.Length];
             s.PingTicks = new int[cap * s.PingRing];
             s.PingFieldSerial = new int[s.PingFields.Length];
+            // b15 terrain height: the lift layer lives on the world's map and exists only while the rule is on (Full rules).
+            if (TerrainHeight.Enabled(cfg))
+            {
+                map.Lift = new sbyte[map.Width * map.Height];
+                map.LiftCost1 = cfg.Depth.TerrainHeight.PathCostStep1;
+                map.LiftCost2 = cfg.Depth.TerrainHeight.PathCostStep2;
+                map.LiftStepU = cfg.Depth.TerrainHeight.StepU;
+                map.LiftCostLadder = cfg.Depth.TerrainHeight.PathCostLadder;
+                s.Height = TerrainHeightState.Create(cap);
+            }
             return s;
         }
 
         /// <summary>Back to the start of a match, in place (World.InitWorld, after the map repaint and the actor spawn).</summary>
         public void Reset(World w)
         {
+            Feel.Reset(); // b15 combat feel
             Array.Clear(RefuseReadyTick, 0, RefuseReadyTick.Length);
             Array.Clear(PassUnits, 0, PassUnits.Length);
             Refusals = 0;
@@ -267,6 +283,25 @@ namespace CriticalMass.Sim.Core
             EggWindows = 0;
             BridgesCollapsed = 0;
             BridgesRepaired = 0;
+            // b15: the repaint restored every cell; every level goes back to the island's own. A restart honours the switch
+            // (a config turned off or on between matches drops or makes the layer; this allocates only on such a restart).
+            CriticalMass.Sim.Grid.MapDef rm = w.Map;
+            if (TerrainHeight.Enabled(w.Config))
+            {
+                if (rm.Lift == null || rm.Lift.Length != rm.Width * rm.Height) rm.Lift = new sbyte[rm.Width * rm.Height];
+                else Array.Clear(rm.Lift, 0, rm.Lift.Length);
+                rm.LiftCost1 = w.Config.Depth.TerrainHeight.PathCostStep1;
+                rm.LiftCost2 = w.Config.Depth.TerrainHeight.PathCostStep2;
+                rm.LiftCostLadder = w.Config.Depth.TerrainHeight.PathCostLadder;
+                rm.LiftStepU = w.Config.Depth.TerrainHeight.StepU;
+                if (Height == null || Height.Level.Length < WasAlive.Length) Height = TerrainHeightState.Create(WasAlive.Length);
+                else Height.Reset();
+            }
+            else
+            {
+                rm.Lift = null;
+                Height = null;
+            }
             for (int t = 0; t < 2; t++)
             {
                 w.Match.Delivered[t].Wood = 0;

@@ -36,7 +36,12 @@ namespace CriticalMass.Runtime.Online
         Action _onClosed;
         Page _page = Page.Home;
         RectTransform _home, _join, _room;
-        Text _title, _sub, _status, _code, _roomCode, _more, _startWhy;
+        Text _title, _sub, _status, _code, _roomCode, _more, _startWhy, _codeHint;
+        // b15-zero-cost: the join box also takes an address (192.168.1.5 or 1.2.3.4:47800); local-network rooms are listed.
+        const int TypedMax = 21;
+        const string CodeHintText = "Type the 6-character code from your friend's message, or press PASTE.";
+        float _lanShownAt = -10f;
+        bool _startWarned;
         MenuItem _create, _joinBtn, _backHome, _joinGo, _backJoin, _copy, _team, _class, _ready, _start, _leave;
         readonly List<Action> _refresh = new List<Action>();
         string _typed = "";
@@ -161,8 +166,8 @@ namespace CriticalMass.Runtime.Online
             MenuUi.Stretch(_join);
             L(_join, "Code Label", OnlineLayout.CodeLabel, CMTokens.Ui, UiScale.TypeSmall, CMTokens.WithAlpha(Cream, 0.85f), TextAnchor.MiddleLeft, "ROOM CODE", 1);
             _code = L(_join, "Code", OnlineLayout.CodeBig, CMTokens.Display, UiScale.TypeHero, Cream, TextAnchor.MiddleLeft, "", 1);
-            L(_join, "Code Hint", OnlineLayout.CodeHint, CMTokens.Ui, UiScale.TypeBody, CMTokens.WithAlpha(Cream, 0.85f), TextAnchor.MiddleLeft,
-                "Type the 6-character code from your friend's message, or press PASTE.", 1);
+            _codeHint = L(_join, "Code Hint", OnlineLayout.CodeHint, CMTokens.Ui, UiScale.TypeBody, CMTokens.WithAlpha(Cream, 0.85f), TextAnchor.MiddleLeft,
+                CodeHintText, 1);
             _paste = Btn(_join, "Paste", OnlineLayout.PasteButton, "PASTE", PasteCode, UiScale.TypeHeading);
             _joinGo = Btn(_join, "Join", OnlineLayout.JoinGo, "JOIN", JoinTyped, UiScale.TypeHeading);
             _backJoin = Btn(_join, "Back", OnlineLayout.Back, "BACK", () => Go(Page.Home), UiScale.TypeHeading);
@@ -229,6 +234,7 @@ namespace CriticalMass.Runtime.Online
             _room.gameObject.SetActive(p == Page.Room);
             if (p != Page.Home) StopNaming(false);
             if (p == Page.Join) StartTyping(); else StopTyping();
+            if (p != Page.Join) OnlineMatch.StopLanListening();   // b15-zero-cost: listen for local rooms only on the join page
             if (p == Page.Join) { _typed = ""; ShowCode(); }
             if (p == Page.Room) { _shownVersion = -1; RefreshRoom(); }
             if (p == Page.Home) ShowName();
@@ -297,6 +303,8 @@ namespace CriticalMass.Runtime.Online
         void PasteCode()
         {
             string pasted = RelayTransport.CleanCode(GUIUtility.systemCopyBuffer);
+            string raw = (GUIUtility.systemCopyBuffer ?? "").Trim();
+            if (pasted == null && raw.Length <= TypedMax && DirectAddress.TryParse(raw, out _, out _)) pasted = raw;   // b15-zero-cost: an address
             if (pasted == null) { SetStatus("The copied text is not a room code. Copy the 6-character code and try again."); return; }
             _typed = pasted;
             ShowCode();
@@ -335,10 +343,30 @@ namespace CriticalMass.Runtime.Online
 
         void JoinTyped()
         {
-            if (!OnlineConfig.Configured) { SetStatus("Online play is not switched on in this build yet."); return; }
             string code = RelayTransport.CleanCode(_typed);
-            if (code == null) { SetStatus("A room code is 6 letters and numbers, for example K7Q2PF."); return; }
-            RelayTransport t = RelayTransport.Connect(OnlineConfig.RelayUrl, code, null);
+            if (code == null && DirectAddress.TryParse(_typed, out string host, out int port))
+            {
+                // b15-zero-cost: straight to the host's computer, no room service at all.
+                OnlineMatch.JoinRoom(DirectClient.Connect(host, port, 5000), null, PlayerName());
+                SetStatus("Connecting to " + _typed.Trim() + "...");
+                Go(Page.Room);
+                return;
+            }
+            if (code == null) { SetStatus("A room code is 6 letters and numbers, for example K7Q2PF. Or type an address, for example 192.168.1.5."); return; }
+            ITransport t;
+            if (OnlineMatch.LanGames().Exists(g => g.Code == code))
+            {
+                // b15-zero-cost: the room is on this network: join it directly (free); the room service only if that fails.
+                LanGame g = OnlineMatch.LanGames().Find(x => x.Code == code);
+                string url = OnlineConfig.RelayUrl;
+                t = new FallbackTransport(DirectClient.Connect(g.Address, g.Port, 2000),
+                    OnlineConfig.Configured ? () => (ITransport)RelayTransport.Connect(url, code, null) : (Func<ITransport>)null);
+            }
+            else
+            {
+                if (!OnlineConfig.Configured) { SetStatus("Online play is not switched on in this build yet."); return; }
+                t = RelayTransport.Connect(OnlineConfig.RelayUrl, code, null);
+            }
             OnlineMatch.JoinRoom(t, code, PlayerName());
             SetStatus("Joining room " + code + "...");
             Go(Page.Room);
@@ -352,7 +380,15 @@ namespace CriticalMass.Runtime.Online
 
         void CopyCode()
         {
-            if (string.IsNullOrEmpty(OnlineMatch.Code)) return;
+            if (string.IsNullOrEmpty(OnlineMatch.Code))
+            {
+                // b15-zero-cost: a room for network friends only: copy the address they type.
+                System.Collections.Generic.List<string> a = DirectAddress.LocalAddresses();
+                if (OnlineMatch.Direct == null || a.Count == 0) return;
+                GUIUtility.systemCopyBuffer = a[0] + (OnlineMatch.Direct.Port != DirectHost.DefaultPort ? ":" + OnlineMatch.Direct.Port : "");
+                SetStatus("Address copied. Friends on your network choose JOIN ROOM and type it.");
+                return;
+            }
             GUIUtility.systemCopyBuffer = OnlineMatch.Code;
             SetStatus("Code copied. Send it to your friend.");
         }
@@ -389,6 +425,16 @@ namespace CriticalMass.Runtime.Online
 
         void StartMatch()
         {
+            // b15-zero-cost: when the day's online allowance is nearly used, say so once before starting (a second press
+            // starts anyway: players who came by code may be cut off if the room service stops; network players are not).
+            if (!_startWarned && OnlineMatch.Code != null && OnlineMatch.RelayUsedToday >= 0 && OnlineMatch.Host != null
+                && RelayBudget.MatchesLeft(Math.Max(2, OnlineMatch.Host.Members.Count), OnlineMatch.RelayUsedToday) < 1)
+            {
+                _startWarned = true;
+                SetStatus(RelayBudget.HostLine(OnlineMatch.Host.Members.Count, OnlineMatch.RelayUsedToday) + " Press START again to play anyway.");
+                return;
+            }
+            _startWarned = false;
             string why = OnlineMatch.StartAsHost();
             if (why != null) SetStatus(why);
         }
@@ -412,7 +458,7 @@ namespace CriticalMass.Runtime.Online
             ChainVertical(host ? new List<MenuItem> { _team, _class, _start, _copy, _leave } : new List<MenuItem> { _team, _class, _ready, _leave });
             if (version == _shownVersion) return;
             _shownVersion = version;
-            HudText.Set(_roomCode, OnlineMatch.Code != null ? "ROOM  " + Spaced(OnlineMatch.Code) : "");
+            HudText.Set(_roomCode, OnlineMatch.Code != null ? "ROOM  " + Spaced(OnlineMatch.Code) : host ? "ON YOUR NETWORK" : "");
             int shown = 0, count = members != null ? members.Count : 0, readyCount = 0;
             var confirmed = new List<RoomMember>(count);
             if (members != null) foreach (RoomMember rm in members) if (rm.Confirmed) confirmed.Add(rm);
@@ -436,11 +482,13 @@ namespace CriticalMass.Runtime.Online
             {
                 bool ok = OnlineMatch.Host.CanStart(out string why);
                 _start.interactable = ok;
-                HudText.Set(_startWhy, ok ? "Everyone is ready. Bots take the other seats." : why);
+                string ways = OnlineMatch.HostWaysLine();   // b15-zero-cost: the free ways in and the day's online allowance
+                HudText.Set(_startWhy, (ok ? "Everyone is ready. Bots take the other seats." : why) + (ways.Length > 0 ? " " + ways : ""));
                 // Joins and leaves are chat notices (the chat box); the status line keeps the instruction or a real problem.
                 string notice = OnlineMatch.Host.Notice;
                 bool roster = string.IsNullOrEmpty(notice) || notice.EndsWith(" joined.") || notice.EndsWith(" left the room.");
-                SetStatus(roster ? "Send the code to your friends. They choose JOIN ROOM and type it." : notice);
+                SetStatus(roster ? (OnlineMatch.Code != null ? "Send the code to your friends. They choose JOIN ROOM and type it."
+                    : "Online rooms are not available right now. Friends on your network choose JOIN ROOM and type your address.") : notice);
             }
             else if (OnlineMatch.Client != null)
             {
@@ -448,7 +496,7 @@ namespace CriticalMass.Runtime.Online
                 if (OnlineMatch.Client.Phase == RoomPhase.Lobby)
                     SetStatus(_myReady ? "You are ready. Waiting for the host to start the match." : "You are in. Pick a team and a class, then press READY.");
                 else if (OnlineMatch.Client.Phase == RoomPhase.Connecting || OnlineMatch.Retrying || OnlineMatch.WillRetry)
-                    SetStatus("Connecting to room " + Spaced(OnlineMatch.Code) + "...");
+                    SetStatus(OnlineMatch.Code != null ? "Connecting to room " + Spaced(OnlineMatch.Code) + "..." : "Connecting...");
             }
         }
 
@@ -472,13 +520,24 @@ namespace CriticalMass.Runtime.Online
                 if (t.IsFaulted || t.IsCanceled)
                 {
                     Exception e = t.Exception != null ? t.Exception.GetBaseException() : null;
-                    SetStatus(e is RoomException ? e.Message : "Could not make a room. Check your internet connection.");
-                    Go(Page.Home);
+                    // b15-zero-cost: no online room (offline, or the room service is full for the day): open a room that
+                    // friends on this network, or who type this computer's address, can still join.
+                    try
+                    {
+                        OnlineMatch.HostRoom(OnlineMatch.HostTransport(null), null, PlayerName());
+                        Go(Page.Room);
+                        SetStatus("Online rooms are not available right now. Friends on your network choose JOIN ROOM and type your address.");
+                    }
+                    catch (RoomException)
+                    {
+                        SetStatus(e is RoomException ? e.Message : "Could not make a room. Check your internet connection.");
+                        Go(Page.Home);
+                    }
                     return;
                 }
                 (string code, string key) = t.Result;
                 RelayTransport tr = RelayTransport.Connect(OnlineConfig.RelayUrl, code, key);
-                OnlineMatch.HostRoom(tr, code, PlayerName());
+                OnlineMatch.HostRoom(OnlineMatch.HostTransport(tr), code, PlayerName());
                 SetStatus("Send the code to your friend. They choose JOIN ROOM and type it.");
                 Go(Page.Room);
                 return;
@@ -516,6 +575,15 @@ namespace CriticalMass.Runtime.Online
                 }
                 return;
             }
+            if (_page == Page.Join && Time.unscaledTime - _lanShownAt > 0.5f)
+            {
+                // b15-zero-cost: rooms on this network, in the hint line (typing their code joins them directly, for free).
+                _lanShownAt = Time.unscaledTime;
+                List<LanGame> lan = OnlineMatch.LanGames();
+                HudText.Set(_codeHint, lan.Count == 0 ? CodeHintText
+                    : "On your network: " + ChatFilter.CleanName(lan[0].Name) + "'s room" + (string.IsNullOrEmpty(lan[0].Code) ? ", address " + lan[0].Address : ", code " + Spaced(lan[0].Code))
+                      + (lan.Count > 1 ? " and " + (lan.Count - 1) + " more" : "") + ". Type the code or the address.");
+            }
             if (_page == Page.Join)
             {
                 Keyboard kb = Keyboard.current;
@@ -528,7 +596,8 @@ namespace CriticalMass.Runtime.Online
                         string pasted = RelayTransport.CleanCode(GUIUtility.systemCopyBuffer);
                         if (pasted != null) { _typed = pasted; ShowCode(); }
                     }
-                    if ((kb.enterKey.wasPressedThisFrame || kb.numpadEnterKey.wasPressedThisFrame) && _typed.Length == RoomCodes.Length) JoinTyped();
+                    if ((kb.enterKey.wasPressedThisFrame || kb.numpadEnterKey.wasPressedThisFrame)
+                        && (RelayTransport.CleanCode(_typed) != null || DirectAddress.TryParse(_typed, out _, out _))) JoinTyped();
                 }
             }
         }
@@ -551,17 +620,25 @@ namespace CriticalMass.Runtime.Online
             if (Keyboard.current != null) Keyboard.current.onTextInput -= OnChar;
         }
 
+        /// <summary>b15-zero-cost: typed text that can only be an address (a dot, a colon, or 0 / 1, which codes never use).</summary>
+        static bool LooksLikeAddress(string t) => t.IndexOf('.') >= 0 || t.IndexOf(':') >= 0 || t.IndexOf('0') >= 0 || t.IndexOf('1') >= 0;
+
         void OnChar(char c)
         {
-            if (_page != Page.Join || _typed.Length >= RoomCodes.Length) return;
+            if (_page != Page.Join) return;
             char u = char.ToUpperInvariant(c);
-            if (RoomCodes.Alphabet.IndexOf(u) < 0) return;
-            _typed += u;
+            bool addrChar = (u >= '0' && u <= '9') || u == '.' || u == ':';
+            if (RoomCodes.Alphabet.IndexOf(u) < 0 && !addrChar) return;
+            string next = _typed + u;
+            if (next.Length > (LooksLikeAddress(next) ? TypedMax : RoomCodes.Length)) return;
+            if (LooksLikeAddress(next) && !addrChar) return;   // an address is digits, dots and a colon
+            _typed = next;
             ShowCode();
         }
 
         void ShowCode()
         {
+            if (LooksLikeAddress(_typed)) { HudText.Set(_code, _typed + "_"); SetStatus(""); return; }
             var cs = new char[RoomCodes.Length * 2 - 1];
             for (int i = 0; i < RoomCodes.Length; i++)
             {

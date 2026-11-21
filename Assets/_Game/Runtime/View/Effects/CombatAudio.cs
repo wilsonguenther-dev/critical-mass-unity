@@ -26,7 +26,8 @@ namespace CriticalMass.Runtime.View.Effects
         private static (string Id, string[] Files)[] BuildTable()
         {
             var rows = new List<(string, string[])>();
-            foreach (CueDef c in SoundTable.Cues) if (c.Files.Length > 0) rows.Add((c.Id, c.Files));
+            // b15: the original Skybreak effects (sb_*, Resources CMSfxScore) are not library files
+            foreach (CueDef c in SoundTable.Cues) if (c.Files.Length > 0 && !SoundTable.IsScoreFile(c.Files[0])) rows.Add((c.Id, c.Files));
             return rows.ToArray();
         }
 
@@ -61,8 +62,45 @@ namespace CriticalMass.Runtime.View.Effects
         /// <summary>Plays a named UI cue ("ui_click", "ability_denied", "hill_capture", ...) through the sound director.</summary>
         public static void PlayUi(string id) => SoundDirector.PlayNamed(id);
 
-        /// <summary>Per-frame hook CombatFx still calls: nothing to do (the director mixes in its own LateUpdate).</summary>
-        public void Update(double now, World w) { }
+        /// <summary>Per-frame hook CombatFx calls (the director mixes in its own LateUpdate). b15 wave two: the one combat-feel
+        /// beat the sim does not say, through Audio.Sound.CombatSoundHooks: <see cref="WindupWarning"/>.</summary>
+        public void Update(double now, World w) => WindupWarning(w);
+
+        /// <summary>Per actor: the SwingTick whose wind-up already played its warning (fixed pool, no allocation per frame).</summary>
+        private readonly int[] _windupCued = new int[256];
+        /// <summary>Gain of the wind-up warning (under a landed hit; the cue's own voice cap and cooldown still apply).</summary>
+        public const float WindupWarningGain = 0.55f;
+
+        /// <summary>
+        /// b15 combat feel x Skybreak sound: an enemy's wind-up that will reach the local fighter (the same reach + arc test as
+        /// FxScene.DrawSwingTelegraphs' orange "coming at you" wedge) plays one swing cue, once per wind-up, at the swinger, by
+        /// weight class (Warrior / Miner heavy, Builder / Healer light, others mid). The release and the hit keep their sim-event
+        /// sounds (SoundFeed), so nothing plays twice. Only while CombatFeel is on (its wind-ups are long enough to warn).
+        /// </summary>
+        private void WindupWarning(World w)
+        {
+            if (w == null || !CombatFeel.On(w.Config)) return;
+            int me = CriticalMass.Runtime.LocalSeat.Actor;
+            if (me < 0 || me >= w.ActorCount || !w.Actors[me].Alive) return;
+            Actor mine = w.Actors[me];
+            int n = Math.Min(w.ActorCount, _windupCued.Length);
+            for (int i = 0; i < n; i++)
+            {
+                Actor a = w.Actors[i];
+                if (i == me || !a.Alive || a.Team == mine.Team || !a.SwingPending || a.SwingWindup <= 0) continue;
+                if (_windupCued[i] == a.SwingTick + 1) continue;
+                if (a.SwingTick + a.SwingWindup - w.Tick <= 0) continue;
+                ClassConfig cc = w.Config.Class(a.Cls);
+                double dx = w.X[me] - w.X[i], dz = w.Z[me] - w.Z[i], d = Math.Sqrt(dx * dx + dz * dz);
+                if (d > cc.AttackRange + w.Config.Class(mine.Cls).Radius) continue;
+                double off = Math.Abs(Math.IEEERemainder(Math.Atan2(dz, dx) - a.SwingFacing, Math.PI * 2));
+                if (off > cc.AttackArcDeg * 0.5 * Math.PI / 180) continue;
+                _windupCued[i] = a.SwingTick + 1;
+                CombatCue cue = a.Cls == ClassId.Warrior || a.Cls == ClassId.Miner ? CombatCue.SwingHeavy
+                              : a.Cls == ClassId.Builder || a.Cls == ClassId.Healer ? CombatCue.SwingLight : CombatCue.SwingMid;
+                CombatSoundHooks.Play(cue, w.X[i], w.Z[i], false, WindupWarningGain);
+            }
+        }
 
         /// <summary>
         /// Nothing: sim events reach the director through its own ring decode, and view-injected effects (Effects.Splash,

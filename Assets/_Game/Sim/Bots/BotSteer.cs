@@ -81,6 +81,8 @@ namespace CriticalMass.Sim.Bots
             double tdz = dz != 0 ? Math.Abs(1 / dz) : double.PositiveInfinity;
             double tmx = dx > 0 ? (cx + 1 - x0) * tdx : dx < 0 ? (x0 - cx) * tdx : double.PositiveInfinity;
             double tmz = dz > 0 ? (cz + 1 - z0) * tdz : dz < 0 ? (z0 - cz) * tdz : double.PositiveInfinity;
+            sbyte[] lift = map.Lift;   // b15 terrain height: a cell 2+ levels above the one before is not a straight walk
+            int prev = cx >= 0 && cz >= 0 && cx < W && cz < H ? cz * W + cx : -1;
             for (int guard = 0; guard < 512; guard++)
             {
                 if (cx == tx && cz == tz) return -1;
@@ -97,6 +99,8 @@ namespace CriticalMass.Sim.Bots
                 if (cx < 0 || cz < 0 || cx >= W || cz >= H) return cz * W + cx;
                 int i = cz * W + cx;
                 if (!MapGrid.IsWalkableType(map.Cells[i])) return i;
+                if (lift != null && prev >= 0 && lift[i] - lift[prev] >= 2 && map.Cells[i] != Cell.Bridge) return i;
+                prev = i;
             }
             return -1;
         }
@@ -222,7 +226,10 @@ namespace CriticalMass.Sim.Bots
             Followed = ok;
             Mv.X = Fs.X;
             Mv.Z = Fs.Z;
-            if (ok) BlendFlow(st, w, field, w.X[id], w.Z[id]);
+            // b15 combat feel (audit stuck hot spots 75,52 and 65,45): in a narrow spot the raw next-cell step, not the blend,
+            // which steered into void corners at diagonal bridge ends and into the hill rock ring.
+            bool raw = ok && CombatFeel.On(w) && w.Config.Depth.CombatFeel.BotNarrowRawStep && CombatFeel.Narrow(w.Map, w.X[id], w.Z[id]);
+            if (ok && !raw) BlendFlow(st, w, field, w.X[id], w.Z[id]);
             return ok;
         }
 
@@ -422,6 +429,125 @@ namespace CriticalMass.Sim.Bots
             return true;
         }
 
+        /// <summary>b15 unjam: the pressed window (ticks at 30 Hz) and the side-step length (ticks).</summary>
+        public const int JamWindowTicks = 15, SideStepTicks = 12;
+
+        /// <summary>
+        /// b15 combat feel, the steering-level stuck detector (deterministic, no RNG): a bot whose own steer pressed at least
+        /// half speed for a whole JamWindowTicks window and covered under a quarter of the walk it asked for (a wall corner, a
+        /// bridge end, the hill crowd) side-steps for SideStepTicks along the perpendicular with the clear line and fewer bodies
+        /// (a tie: by id parity), slightly forward. The FSM's slower unstick (StuckSeconds) still runs behind it. True while it
+        /// steers the output.
+        /// </summary>
+        private static bool Unjam(World w, BotsState st, int id, ClassConfig cc, InputFrame output)
+        {
+            Actor a = w.Actors[id];
+            double x = w.X[id], z = w.Z[id];
+            if (w.Tick < st.SideUntil[id])
+            {
+                output.MoveX = st.SideX[id];
+                output.MoveZ = st.SideZ[id];
+                return true;
+            }
+            double mx = output.MoveX, mz = output.MoveZ;
+            double m2 = mx * mx + mz * mz;
+            // A fighter at reach (circle-strafing, its strafe pressed into the scrum) is fighting, not stuck: no side-step there
+            // (it read as Reversals in the shiver gate). Pass 4: no fighter at all. A chase into a moving scrum covers little of
+            // its walk without being stuck, and its side-step and the chase back read as Reversals (2-minute shiver gate, run
+            // 44837670714: 12 hard flags, every one a Crimson fighter chasing on the hill).
+            if (m2 < 0.25 || a.HitStunTicks > 0 || a.AirLen > 0 || a.StandUp > 0 || a.KVx != 0 || a.KVz != 0 ||
+                a.AiState == AiState.Fight)
+            {
+                st.JamX[id] = x;
+                st.JamZ[id] = z;
+                st.JamTick[id] = w.Tick;
+                return false;
+            }
+            int span = w.Tick - st.JamTick[id];
+            if (span < JamWindowTicks) return false;
+            double ex = x - st.JamX[id], ez = z - st.JamZ[id];
+            double want = cc.MoveSpeed * CombatFeel.SpeedScale(w, id) * span / w.Config.SimHz * 0.25;
+            st.JamX[id] = x;
+            st.JamZ[id] = z;
+            st.JamTick[id] = w.Tick;
+            if (ex * ex + ez * ez >= want * want) return false;
+            // b15 pass 3: no side-step against the Kaiju or on the hill disc. Side-stepping there walked the hill crowd off the disc,
+            // dragged the Kaiju's chase off the hill (KaijuHill on-disc share 0.03) and re-asked the route guard (RouteProofs).
+            CombatFeelConfig fc = w.Config.Depth.CombatFeel;
+            if (fc.BotUnjamKaijuClear > 0 && w.Match.Hatched && w.Kaiju.State != KaijuState.Egg)
+            {
+                double kx = w.Kaiju.X - x, kz = w.Kaiju.Z - z;
+                if (kx * kx + kz * kz <= fc.BotUnjamKaijuClear * fc.BotUnjamKaijuClear) return false;
+            }
+            if (fc.BotUnjamHillClear >= 0)
+            {
+                HillDef h = w.Map.Hill;
+                double hx = h.X - x, hz = h.Z - z, hr = h.R + fc.BotUnjamHillClear;
+                if (hx * hx + hz * hz <= hr * hr) return false;
+            }
+            if (fc.BotUnjamHillZone > 0 && w.Match.Hatched && w.Kaiju.State != KaijuState.Egg)
+            {
+                HillDef h = w.Map.Hill;
+                double hx = h.X - x, hz = h.Z - z;
+                if (hx * hx + hz * hz <= fc.BotUnjamHillZone * fc.BotUnjamHillZone) return false;
+            }
+            // Pass 4: bounded. A bot that has used its budget in the current window is left to the FSM's own unstick.
+            if (fc.BotUnjamBudget > 0)
+            {
+                int win = CombatFeel.Ticks(w, fc.BotUnjamBudgetSeconds);
+                if (w.Tick - st.UnjamWindowStart[id] >= win)
+                {
+                    st.UnjamWindowStart[id] = w.Tick;
+                    st.UnjamCount[id] = 0;
+                }
+                if (st.UnjamCount[id] >= fc.BotUnjamBudget) return false;
+                st.UnjamCount[id]++;
+            }
+            double inv = 1 / Math.Sqrt(m2);
+            mx *= inv;
+            mz *= inv;
+            double best = double.NegativeInfinity, bx = 0, bz = 0;
+            // Pass 4: the tie-break is mirror-fair. It reads the team-local slot, and Crimson (the mirrored half of the map) turns
+            // the other way, so both teams make the mirror image of the same choice. The raw id parity turned both teams to the
+            // same side of their walk, which is a different side on a mirrored map: 117 of 200 5v5 wins for the team with an idle
+            // player (RulesCombined idle floor, limit under 100; 96 with no side-step), run 44834829109.
+            int slot = World.TeamSlot(w, id);
+            double mirror = a.Team == TeamId.Crimson ? -1 : 1;
+            for (int s = 0; s < 2; s++)
+            {
+                double side = (((slot + s) & 1) == 0 ? 1 : -1) * mirror;
+                double px = -mz * side * 0.9 + mx * 0.3, pz = mx * side * 0.9 + mz * 0.3;
+                double score = (slot + s) & 1;   // the parity tie-break, under every real difference
+                // Sliding along a wall: keep the slide's side (a side-step against it would read as a reversal).
+                if (px * w.Vx[id] + pz * w.Vz[id] > 0.05) score += 5;
+                // Jammed again soon after a side-step: the same side as that one (the other way is a reversal).
+                if (w.Tick - st.SideUntil[id] <= 2 * JamWindowTicks && px * st.SideX[id] + pz * st.SideZ[id] > 0) score += 20;
+                if (FirstBlockedCell(w.Map, x, z, x + px * 1.2, z + pz * 1.2) >= 0) score -= 100;
+                int cnt = SpatialHash.QueryCircle(w.Hash, x + px * 0.9, z + pz * 0.9, 0.8, Mates);
+                for (int k = 0; k < cnt; k++)
+                {
+                    int j = Mates[k];
+                    if (j == id || j >= w.ActorCount || !w.Actors[j].Alive) continue;
+                    double qx = w.X[j] - (x + px * 0.9), qz = w.Z[j] - (z + pz * 0.9);
+                    if (qx * qx + qz * qz <= 0.64) score -= 10;
+                }
+                if (score > best)
+                {
+                    best = score;
+                    bx = px;
+                    bz = pz;
+                }
+            }
+            double l = Math.Sqrt(bx * bx + bz * bz);
+            st.SideX[id] = bx / l;
+            st.SideZ[id] = bz / l;
+            st.SideUntil[id] = w.Tick + SideStepTicks;
+            st.Unjams++;
+            output.MoveX = st.SideX[id];
+            output.MoveZ = st.SideZ[id];
+            return true;
+        }
+
         /// <summary>Steer bot `id` (state in actor.AiState and st) into `output`.</summary>
         public static void SteerBot(World w, BotsState st, int id, InputFrame output)
         {
@@ -461,6 +587,11 @@ namespace CriticalMass.Sim.Bots
                     Toward(w, id, st.UnstickX[id], st.UnstickZ[id], 0.2);
                     break;
                 case AiState.HoldHill:
+                    if (TeamBrain.On(w) && st.Job[id] == TeamBrain.JobEscort)
+                    {
+                        Escort(w, st, id, a);   // b15 bot brain: KAIJU HOLDS NOTHING, walk our Kaiju off the disc
+                        break;
+                    }
                     if (calm) HoldPost(w, st, id, x, z, mates);
                     else Toward(w, id, st.PostX[id], st.PostZ[id], 0.5);
                     break;
@@ -484,12 +615,15 @@ namespace CriticalMass.Sim.Bots
                         valid = true;
                         tx = w.X[t];
                         tz = w.Z[t];
-                        reach = cc.AttackRange + AttackSlack;
+                        reach = CombatFeel.BotReach(w, a.Cls, cc.AttackRange) + AttackSlack; // b15: the Healer keeps her stand-off
                         // DG-69: with a wind-up the bot swings at where the target will be on the contact tick.
                         int windup = w.Dur.AttackWindup[(int)a.Cls];
                         if (windup > 0)
                         {
-                            double lead = windup / cfg.SimHz;
+                            // b15 combat feel: the lead is capped at BotLeadSeconds. A 0.40 s wind-up led the whole way swung the
+                            // chase point across a knocked or strafing target, so the bot walked back and forth (shiver gate run
+                            // 44232708547: 18 hard flags, 1 with the shipped wind-ups); a heavy that misses a moving target is fair.
+                            double lead = (CombatFeel.On(w) ? Math.Min(windup, CombatFeel.Ticks(w, cfg.Depth.CombatFeel.BotLeadSeconds)) : windup) / cfg.SimHz;
                             tx += w.Vx[t] * lead;
                             tz += w.Vz[t] * lead;
                         }
@@ -509,6 +643,18 @@ namespace CriticalMass.Sim.Bots
                     // and the straight line counts only when the whole body fits along it (no route / line flip at a wall end).
                     bool wide = Phys.On(w, cfg.Physics.BotWideLine);
                     bool seen = !wide || !Phys.On(w, cfg.Physics.WallsBlockHits) || SegmentClear.Clear(map, x, z, tx, tz);
+                    // b15 bot brain (a): a kiter strikes the Kaiju from its side away from the hill, so the Kaiju's chase walks it
+                    // off the disc. Only while the straight line to that point is clear; else the plain fight steering below.
+                    if (t == BotsState.TargetKaiju && TeamBrain.On(w) && st.Job[id] == TeamBrain.JobKite)
+                    {
+                        TeamBrain.KitePoint(w, id, reach, out double kpx, out double kpz);
+                        if (wide ? WideLineClear(map, x, z, kpx, kpz, cc.Radius * 0.9, 0.5) : FirstBlockedCell(map, x, z, kpx, kpz) < 0)
+                        {
+                            if (d2 <= reach * reach && seen) output.Attack = InArc(w, id, tx, tz);
+                            Toward(w, id, kpx, kpz, 0.3);
+                            break;
+                        }
+                    }
                     if (calm)
                     {
                         FightCalm(w, st, id, t, tx, tz, reach, output);
@@ -704,6 +850,18 @@ namespace CriticalMass.Sim.Bots
                 }
                 default:
                 {
+                    // b15 bot brain (b): a respawned attacker waits at the staging ring until its group goes in together.
+                    if (a.AiState == AiState.ToHill && TeamBrain.On(w) && TeamBrain.HoldsAtStage(w, st, id))
+                    {
+                        aimX = map.Hill.X;
+                        aimZ = map.Hill.Z;
+                        break;
+                    }
+                    if (TeamBrain.On(w) && st.Job[id] == TeamBrain.JobEscort)
+                    {
+                        Escort(w, st, id, a);
+                        break;
+                    }
                     // toHill (and 'none' before the first think).
                     minerField = a.Cls == ClassId.Miner;
                     if (!Follow(w, st, id, minerField ? BotFields.FieldMinerHill : BotFields.FieldHill)) Toward(w, id, map.Hill.X, map.Hill.Z, 1);
@@ -920,9 +1078,14 @@ namespace CriticalMass.Sim.Bots
             if (output.Attack && BotSkill.HoldsSwing(w, id)) output.Attack = false;
             // Sim-physics lane (DG-84 / DG-85): a Hard bot steps out of a telegraphed claw cone or slam ring, and jumps a slam.
             BotSkillConfig dsk = BotSkill.Profile(w, id);
-            if (dsk != null && dsk.DodgeKaiju && Phys.On(w, true) && DodgeKaiju(w, id, output)) st.WantMove[id] = 1;
+            // b15 bot brain: a kiter uses the dodge step and the slam jump at every skill level.
+            bool kiter = TeamBrain.On(w) && st.Job[id] == TeamBrain.JobKite;
+            if (((dsk != null && dsk.DodgeKaiju) || kiter) && Phys.On(w, true) && DodgeKaiju(w, id, output)) st.WantMove[id] = 1;
             // b13 r3 [K]: a bot the SHROUD would blind leaves the cloud and skirts it, unless it is contesting the hill.
             if (BotKaijuFeed.AvoidCloud(w, id, output)) st.WantMove[id] = 1;
+            // b15 combat feel: a bot that has pressed for JamSeconds and covered under a quarter of its walk side-steps.
+            if (CombatFeel.On(w) && cfg.Depth.CombatFeel.BotUnjam && Unjam(w, st, id, cc, output)) st.WantMove[id] = 1;
+            if (TeamBrain.On(w)) TeamBrain.TerrainVerbsHook(w, st, id, output);   // b15 bot brain (d): TerrainHeight hook (PR #211), a no-op here
 
             // Ability press decided at think time.
             if (st.AbilityReq[id] == 1)
@@ -946,6 +1109,14 @@ namespace CriticalMass.Sim.Bots
                 output.AimX = x + output.MoveX * AimAhead;
                 output.AimZ = z + output.MoveZ * AimAhead;
             }
+        }
+
+        /// <summary>b15 bot brain, KAIJU HOLDS NOTHING escort: toward the enemy pad (its flow field), so the fights it meets
+        /// pull our Kaiju off the hill disc; straight at the Kaiju's far side if the field has no route.</summary>
+        private static void Escort(World w, BotsState st, int id, Actor a)
+        {
+            int field = a.Team == TeamId.Azure ? BotFields.FieldPadCrimson : BotFields.FieldPadAzure;
+            if (!Follow(w, st, id, field)) Toward(w, id, w.Kaiju.X, w.Kaiju.Z, 3);
         }
     }
 }

@@ -136,24 +136,27 @@ namespace CriticalMass.Runtime.Tests
             Assert.IsFalse(SettingsExtras.CleanHud);
             Assert.IsTrue(SettingsExtras.Subtitles);
             Assert.AreEqual(100, SettingsExtras.UiScalePercent);
-            Assert.IsFalse(SettingsExtras.ReduceFlashing);
+            Assert.IsTrue(SettingsExtras.ReduceFlashing, "b15: the safe flash look is the default");
+            Assert.IsFalse(SettingsExtras.IntenseFlashing, "INTENSE FLASHING defaults to off");
+            Assert.AreEqual(3, SettingsExtras.MaxFlashesPerSecond, "b15: 3 flashes a second by default");
             Assert.AreEqual(0, SettingsExtras.ShakeAmount, "camera shake defaults to 0");
 
             SettingsExtras.HideNames = true;
             SettingsExtras.CleanHud = true;
             SettingsExtras.Subtitles = false;
             SettingsExtras.UiScalePercent = 130;
-            SettingsExtras.ReduceFlashing = true;
+            SettingsExtras.IntenseFlashing = true;
             SettingsExtras.ShakeAmount = 35;
             Assert.AreEqual(1, PlayerPrefs.GetInt(SettingsExtras.HideNamesKey));
             Assert.AreEqual(1, PlayerPrefs.GetInt(SettingsExtras.CleanHudKey));
             Assert.AreEqual(0, PlayerPrefs.GetInt(SettingsExtras.SubtitlesKey));
             Assert.AreEqual(130, PlayerPrefs.GetInt(SettingsExtras.UiScaleKey));
-            Assert.AreEqual(1, PlayerPrefs.GetInt(SettingsExtras.ReduceFlashingKey));
+            Assert.AreEqual(1, PlayerPrefs.GetInt(SettingsExtras.IntenseFlashingKey));
+            Assert.IsFalse(SettingsExtras.ReduceFlashing, "opting in lifts the safe look");
             Assert.AreEqual(35, PlayerPrefs.GetInt(SettingsExtras.ShakeAmountKey));
             Assert.IsTrue(GameSettings.CameraShake, "the older on/off flag follows the amount");
             Assert.AreEqual(1.3f, SettingsExtras.UiScale, 1e-6f);
-            Assert.AreEqual(3, SettingsExtras.MaxFlashesPerSecond);
+            Assert.AreEqual(int.MaxValue, SettingsExtras.MaxFlashesPerSecond, "no cap only after opting in");
 
             SettingsExtras.ShakeAmount = 0;
             Assert.IsFalse(GameSettings.CameraShake);
@@ -162,6 +165,7 @@ namespace CriticalMass.Runtime.Tests
             SettingsExtras.ResetAll();
             Assert.AreEqual(100, SettingsExtras.UiScalePercent);
             Assert.IsTrue(SettingsExtras.Subtitles);
+            Assert.IsTrue(SettingsExtras.ReduceFlashing, "reset brings the safe flash look back");
         }
 
         [Test]

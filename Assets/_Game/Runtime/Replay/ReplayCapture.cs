@@ -67,6 +67,7 @@ namespace CriticalMass.Runtime.Replay
             public void OnAdvanceHumans(World w, InputFrame[] frames) { if (Watch(w)) Recorder.OnAdvanceHumans(w, frames); }
             public void OnAdvanceNoHuman(World w) { if (Watch(w)) Recorder.OnAdvanceNoHuman(w); }
             public void OnHandToBot(World w, int id) { if (Watch(w)) Recorder.OnHandToBot(w, id); }
+            public void OnBotToHuman(World w, int id) { if (Watch(w)) Recorder.OnBotToHuman(w, id); }   // b15-rejoin
         }
 
         /// <summary>Per tick: two reference compares for every world but a new one at tick 0.</summary>

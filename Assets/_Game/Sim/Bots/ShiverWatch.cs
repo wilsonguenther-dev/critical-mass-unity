@@ -144,10 +144,16 @@ namespace CriticalMass.Sim.Bots
                 // Stunned or getting up it cannot move however much it wants to: not "pressed". Slowed, it walks slower.
                 bool wants = bot && st.WantMove[i] != 0 && a.AiState != AiState.HoldHill && a.StandUp <= 0 && a.HitStunTicks <= 0;
                 double speed = w.Config.Class(a.Cls).MoveSpeed * (a.SlowTimer > 0 ? 0.5 : 1);
+                // b15 combat feel: a swing, a recovery or a stagger slow walks slower (CombatFeel.SpeedScale), and a body being
+                // knocked back is moved by the hit, not by its legs: that step is not a reversal (Knocked below).
+                bool feel = CombatFeel.On(w);
+                if (feel) speed *= CombatFeel.SpeedScale(w, i);
+                _knocked = feel && Knocked(a);
                 _contact = bot && a.AiState == AiState.Fight && InContact(w, st, i);
                 Sample(w, i, w.X[i], w.Z[i], w.PrevX[i], w.PrevZ[i], a.Facing, false, wants, speed, dt,
                     a.Cls, a.Team, a.AiState, bot ? st.Target[i] : -1);
                 _contact = false;
+                _knocked = false;
             }
             Kaiju k = w.Kaiju;
             bool hatched = w.Match.Hatched && k.State != KaijuState.Egg;
@@ -157,11 +163,17 @@ namespace CriticalMass.Sim.Bots
                 return;
             }
             bool kWants = k.TargetId >= 0 && k.TelegraphIn <= 0 && k.MeleeWindupIn <= 0 && KaijuWantsToWalk(w);
+            // b15 combat feel: while the Kaiju's target is knocked around (by fighters' hits) the Kaiju turning after it is the
+            // chase, not a door shiver.
+            _knocked = CombatFeel.On(w) && k.TargetId >= 0 && k.TargetId < n && Knocked(w.Actors[k.TargetId]);
             Sample(w, n, k.X, k.Z, k.PrevX, k.PrevZ, k.Facing, true, kWants, KaijuTypes.MoveSpeed(w), dt,
                 ClassId.Warrior, TeamId.Azure, AiState.None, k.TargetId);
+            _knocked = false;
         }
 
-        private bool _contact;
+        private bool _contact, _knocked;
+
+        private static bool Knocked(Actor a) => a.KVx != 0 || a.KVz != 0 || a.HitStunTicks > 0;
 
         private bool InContact(World w, BotsState st, int i)
         {
@@ -208,7 +220,13 @@ namespace CriticalMass.Sim.Bots
                 return;
             }
             _path[s] += step;
-            if (step >= MinStep)
+            if (_knocked)
+            {
+                _ldx[s] = 0; // the next step of its own is not compared with the knock
+                _ldz[s] = 0;
+                if (kaiju) _lastFacing[s] = facing;
+            }
+            else if (step >= MinStep)
             {
                 double ux = dx / step;
                 double uz = dz / step;
@@ -220,7 +238,7 @@ namespace CriticalMass.Sim.Bots
                 _ldx[s] = ux;
                 _ldz[s] = uz;
             }
-            if (kaiju)
+            if (kaiju && !_knocked)
             {
                 // The Kaiju's facing drives its drawn body: a facing flip over 120 degrees in one tick is a reversal too.
                 double df = Math.Abs(facing - _lastFacing[s]) % (2 * Math.PI);
