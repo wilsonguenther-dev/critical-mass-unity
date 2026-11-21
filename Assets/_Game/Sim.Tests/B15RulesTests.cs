@@ -88,7 +88,9 @@ namespace CriticalMass.Sim.Tests
             // another rule item moves that row.
             // b15 fix round: re-pinned with the Full row (Miner route steering and the Kaiju ladder squeeze are not behind the wave-two
             // switches; sim run 44880553461 at a7433909; was 0x2B40BAD073394FD6 / 0x4E92D5071F543577).
-            const ulong Base16 = 0x2C933299522970D2UL, Base5 = 0xA3A7DED99EA6EFACUL;
+            // b16 mechanics fixes: re-pinned with the Full row (keep-out, type refs, hill count, the idle post are not behind these switches;
+            // sim run 44937275234; was 0x2C933299522970D2 / 0xA3A7DED99EA6EFAC).
+            const ulong Base16 = 0xCF5BEEF5B78200AEUL, Base5 = 0xB73024191643D64CUL;
             Action<GameConfig> off = c =>
             {
                 c.ApplyRules(RulesProfile.Full);

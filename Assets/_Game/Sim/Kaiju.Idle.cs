@@ -21,6 +21,49 @@ namespace CriticalMass.Sim.Core
         /// (the first candidate cell that is a clearance cell and lies outside the ring). True = replaced; at the point it faces
         /// the hill centre. Allocation-free, no RNG; Full rules only (MechRulesConfig.KaijuIdleOffHill).
         /// </summary>
+        /// <summary>
+        /// b16 (r4 slow run: own-Kaiju blocking 52 s a match with the idle post alone): while its own team HOLDS the hill, a sided
+        /// Kaiju chasing a target inside the waiting ring stops on the rim instead (the rim point toward the target; toward
+        /// itself when the target is at the centre) and claws from there, so it no longer zeroes the team that owns it. When the
+        /// enemy holds or contests the hill it still walks in. Full rules only (MechRulesConfig.KaijuIdleOffHill).
+        /// </summary>
+        internal static void KeepOffOwnHill(World w, ref double gx, ref double gz, ref double stop)
+        {
+            Kaiju k = w.Kaiju;
+            if (!MechRules.KaijuIdleOn(w)) return;
+            HillState h = w.Match.HillState;
+            if (!((k.State == KaijuState.Azure && h == HillState.Azure) || (k.State == KaijuState.Crimson && h == HillState.Crimson))) return;
+            HillDef hill = w.Map.Hill;
+            double r = MechRules.KaijuIdleRadius(w);
+            double dx = gx - hill.X, dz = gz - hill.Z;
+            double d = Math.Sqrt(dx * dx + dz * dz);
+            if (d >= r) return;
+            if (d < 0.5)
+            {
+                dx = k.X - hill.X;
+                dz = k.Z - hill.Z;
+                d = Math.Sqrt(dx * dx + dz * dz);
+                if (d < 1e-6)
+                {
+                    dx = 1;
+                    dz = 0;
+                    d = 1;
+                }
+            }
+            gx = hill.X + dx / d * r;
+            gz = hill.Z + dz / d * r;
+            stop = Math.Max(0.05, w.Config.Depth.Mech.KaijuIdleStop);
+        }
+
+        /// <summary>b16 tests: (x, z) is at the Kaiju's waiting post on the rim (within 1.5 u outside the waiting ring's
+        /// inner edge), where a sided Kaiju with no target stands on purpose. False with the rule off.</summary>
+        public static bool AtIdlePost(World w, double x, double z)
+        {
+            if (!MechRules.KaijuIdleOn(w)) return false;
+            double dx = x - w.Map.Hill.X, dz = z - w.Map.Hill.Z, r = MechRules.KaijuIdleRadius(w) + 1.5;
+            return dx * dx + dz * dz <= r * r;
+        }
+
         internal static bool IdleOffHillGoal(World w, ref double gx, ref double gz, ref double stop)
         {
             Kaiju k = w.Kaiju;
