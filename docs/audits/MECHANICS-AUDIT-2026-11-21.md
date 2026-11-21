@@ -383,9 +383,9 @@ own wins 12 of 34. There is no way to steal or turn it (TURNCOAT is off, `Comeba
 
 ## 7. Bots as teammates and opponents
 
-- **Pings:** bots ping 102 times a match (directors' calls, "on the hill", "egg"). They never read a human's ping
-  (there is no ping input in the probe; in the code the bot director has no branch on human pings). A human cannot
-  ask his bots for anything.
+- **Pings:** bots ping 102 times a match. A human's ping is an order: up to 3 bots within 40 u answer ATTACK or DEFEND,
+  2 answer HELP, and they obey at once (`Sim/PingRules.cs:83,100`, `Sim/Bots/BotFsm.cs:833-849`, `DepthConfig.cs:177-191`).
+  Not measured here (the probe sends no human pings). This is a strength for a human leader; keep it.
 - **Roles they fill:** hill quota `ceil(0.3 x team)`, egg duty `round(0.25 x team)` + 2 when ahead or 10 s behind
   (`BotDirector.cs:11,183-190`). At 16 that is 6 feeders; at 5 it is 3 of 5 (the idle side effect in section 5).
 - **Healer focus:** `TargetHealersFirst` (`Sim/Bots/TeamBrain.cs:279`) scores a Healer as if she stood at 1% of her
@@ -427,4 +427,59 @@ What the HUD tells the player (`Runtime/Hud/Mechanics/B15RulesHud.cs:287-330`, `
 What a new player can infer from the screen in his first match: stand on the circle, hit people, the big monster is
 important. What he cannot: that feeding decides the Kaiju, that the Kaiju decides the match, and that a Warrior is the
 worst body to stack. The biggest learning gap is the one with the biggest effect on winning.
+
+---
+
+## 9. Exploits (top three tested where a script could do it)
+
+| # | exploit | how tested | result | who could use it | fix |
+|---|---|---|---|---|---|
+| 1 | **Go idle on a small team** | scripted: actor 0 sends no input, 200 matches at 5v5 | idle team wins 0.530 (0.46-0.60), and 0.615 with the comeback rules off; blowouts fall 0.445 to 0.145. At 16v16 no effect (0.500) | anyone in Quick Match; online there is no AFK rule at all | section 5: team-share extras and hand an idle human to the autopilot after 15 s (S, sim) |
+| 2 | **Quit to hide a loss** | code | a match left before the end records nothing: no loss, no history row (`Runtime/Progression/MatchRewards.cs:112,160`, `MetaRecorder.cs:84`); a host who quits ends the match for all 32 (`Net/LockstepSession.cs:443-464`), so a losing host voids everyone's result | any player now; matters the day ranked or a public win count exists | record a leave as a loss for the leaver; a host-left match as "no result" for the rest (S, view/meta) |
+| 3 | **Wall the outer half of the hill** | code (bots never aim walls; not scriptable in the probe) | walls are refused only within 3 u of the centre (`Sim/Config/BuildConfig.cs:24`) on a 6 u disc; bot walls alone move Kaiju-owner wins 0.733 to 0.883 | a skilled Builder | keep-out = hill radius + 1 u (S, sim) |
+| 4 | Pick the Kaiju type with one delivery | measured | any wood over 1% of the feed makes a TIMBER (31 of 72); one Farmer trip of 3 wood decides it | a skilled Farmer | re-pin `RefShare` (round 2) |
+| 5 | Never feed, play only the hill | scripted, 144 matches | loses: 0.271 even with a 101 s lead at the hatch | nobody | none needed |
+| 6 | Stack one class | scripted | all-Warrior 0.035, all-Demolitions 0.201, no-Warrior (9 Farmers) **0.861** | a premade team of humans | the Warrior job (ranked item 3) |
+
+---
+
+## 10. Online and meta rules
+
+- **Drop and rejoin:** a dropped player's fighter goes to the autopilot (`Sim/Bots/MatchTick.cs`, `HandToBot`) and comes
+  back on rejoin (`BotToHuman`); the cross-play smoke passes with a drop and rejoin (integrator RESUME, runs 44857984926
+  and 44887058125). Works.
+- **Late join:** refused, "The match already started." (`Net/Room.cs:132`). A match that loses a player stays short a
+  human for good (the autopilot fills the seat). Acceptable for now.
+- **Host leaving:** ends the match for everyone (`Net/LockstepSession.cs:443-464`, HostLeft). In a 16-human room the
+  host's crash or quit cancels 31 people's match and records nothing. Host migration is L; a "host left, result void"
+  screen is S.
+- **AFK:** nothing online. The sim already measures it (the bot director marks a human inactive after 15 s,
+  `BotDirector.cs:11`) but only to plan bot roles. See exploit 1.
+- **Profile vs mastery count mismatch, explained:** three counters with three rules. The profile's matches played and
+  W/D/L count every completed match, practice included (`MatchRewards.cs:160-168`). The class career counts completed
+  non-practice matches only (`MetaRecorder.cs:162`). The match history records every completed match, practice included
+  (`MetaRecorder.cs:84-100`). So "profile matches" = "history rows" = sum of class careers + practice matches. Fix: show
+  practice separately on the profile, or count it everywhere (S, view).
+- **Pay-to-win:** none found. Mastery gives cosmetics and titles only (`Runtime/Progression/Mastery.cs`), capped against
+  farming; an idle player earns no finish or win XP (no contribution), though standing on the hill counts as one.
+  Coins are picked up in the match (648 per team) and spent on nothing anywhere. Matches the owner's decision C.
+
+---
+
+## 11. What is missing (ranked)
+
+| rank | missing | one-line case | size |
+|---|---|---|---|
+| 1 | A reason to care about the first four minutes | leading at 2:00 or 4:00 wins 0.46: the early hill fight is wasted effort | M |
+| 2 | A Warrior job that turns damage into score | the default class is the worst team pick (all-Warrior 0.035; one more Warrior 0.292) | M |
+| 3 | A Quick Match that is not decided in the first minute | 5v5 median "decided at" 28 s, blowouts 0.445 | M |
+| 4 | An AFK rule (online and in the sim plan) | idle side wins at 5v5; 31 people stuck with an AFK teammate | S |
+| 5 | "Why we lost" on the results screen | the Kaiju hatch race decides 0.88 of matches and is never named | S |
+| 6 | Bots that switch class and use the verbs | 0 class switches, 0 digs or raises, 0 purifies; a bot team without a Healer stays without | M |
+| 7 | A reason to leave the centre | 0.3% of time in the enemy half; flanks are Farmer paths | L (map work) |
+| 8 | A coin and water sink | 648 coins and 7 water per team, spent on nothing | S to M |
+| 9 | A tutorial for the scoring rules | trial does not teach fatigue, rally, the hill rule, the feed race or votes | M |
+| 10 | Host migration | one crash ends 32 people's match | L |
+| 11 | Overtime or a mercy rule | 21% of 16v16 matches end within 15 s (good), 12.5% are blowouts with nothing to play for | S |
+| 12 | Per-team bot difficulty and a ladder | allies are always Normal; there is no way to make a 1-human team feel carried or tested | S |
 
