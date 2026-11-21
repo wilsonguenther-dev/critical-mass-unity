@@ -131,7 +131,7 @@ namespace CriticalMass.Runtime.Menus
             if (_pending != null && !_showing && _showAt >= 0f && Time.unscaledTime >= _showAt && !OverlayGuard.Active)
             {
                 _showAt = -1f;
-                Show();
+                TryShowFor(s);
             }
             if (_showing) UpdateCard();
         }
@@ -208,7 +208,42 @@ namespace CriticalMass.Runtime.Menus
                 if (to == FlowState.Match) FlushPending(false);   // straight into another match: never in the way
                 else _showAt = Time.unscaledTime + ShowDelay;
             }
+            // b15 view polish (Editor review item 6): a match starting while the card waits (results -> home -> match inside
+            // the show delay, or held back by another overlay) or while it is on screen used to leave it to pop up, or stay,
+            // over the match; the card never belongs to a match: close it (written as skipped) or drop the wait (not shown).
+            if (to == FlowState.Match)
+            {
+                _showAt = -1f;
+                if (_showing) Close();
+                else FlushPending(false);
+            }
             if (to == FlowState.Match || to == FlowState.Off) _tracking = false;
+        }
+
+        /// <summary>
+        /// b15 view polish (item 6): the one way the card opens. It needs a finished match's answers to fill (_pending) and
+        /// never opens during a match. Show() used to run with no pending answers when reached mid-match (the Editor review
+        /// invoked it there) and threw a NullReferenceException at _pending.Fun; now it is refused. True when shown.
+        /// </summary>
+        public bool TryShowFor(FlowState state)
+        {
+            if (_showing) return true;
+            if (_pending == null || state == FlowState.Match) return false;
+            Show();
+            return _showing;
+        }
+
+        /// <summary>The card is on screen (this instance; IsShowing reads Current).</summary>
+        public bool Showing => _showing;
+
+        /// <summary>Tests: the flow moved (OnStateChanged without the GameFlow singleton).</summary>
+        public void FlowChangedForTests(FlowState from, FlowState to) => OnStateChanged(from, to);
+
+        /// <summary>Tests: a finished match's answers are waiting (as at the results screen).</summary>
+        public void PendForTests()
+        {
+            FlushPending(false);
+            _pending = new MatchFeedback { Utc = DateTime.UtcNow, Build = BuildInfo.Version, Commit = BuildInfo.Commit, Class = "Warrior", Team = "azure", Result = "win" };
         }
 
         static string ReplayName(string path)
@@ -249,6 +284,7 @@ namespace CriticalMass.Runtime.Menus
 
         void Show()
         {
+            if (_pending == null) return;   // item 6: nothing to answer (mid-match); TryShowFor is the entry
             Build();
             _saved = false;
             _note = "";

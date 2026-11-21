@@ -707,7 +707,7 @@ namespace CriticalMass.Runtime.Audio.Sound
             }
             if (!_fallsFound && w != null && (Time.frameCount % 30) == 0 && _fallTries < 40) FindFalls(w);
             // b14 review: no sound caption over the Characters screen, Controls page or another menu that covers the match
-            _captions.Update(now, _paused || _title || CriticalMass.Runtime.View.Affordance.TerrainAffordanceView.MenuCovers);
+            _captions.Update(now, SoundCaptions.HiddenNow(_paused, _title));
         }
 
         private void UpdateListener(World w)
@@ -888,6 +888,10 @@ namespace CriticalMass.Runtime.Audio.Sound
         private readonly int[] _cue = new int[Lines];
         private readonly string[][] _words;
         private readonly float[] _last;
+
+        /// <summary>b15 view polish (item 4): captions hide while paused, on the title, or under ANY menu or overlay (the
+        /// shared MenuGate: they are a screen-space overlay canvas and drew over class select and the profile).</summary>
+        public static bool HiddenNow(bool paused, bool title) => paused || title || CriticalMass.Runtime.Menus.MenuGate.AnyOpen;
 
         public SoundCaptions(Transform parent)
         {

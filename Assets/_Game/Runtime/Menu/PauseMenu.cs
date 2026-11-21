@@ -94,7 +94,10 @@ namespace CriticalMass.Runtime.Menu
 
         public HumanInputSource Input;
         public Canvas Canvas { get; private set; }
-        public bool IsOpen { get; private set; }
+        public bool IsOpen { get => _isOpen; private set { _isOpen = value; AnyOpen = value; } }
+        bool _isOpen;
+        /// <summary>b15 view polish (item 4): the pause menu is open (MenuGate).</summary>
+        public static bool AnyOpen { get; private set; }
         public Page CurrentPage { get; private set; } = Page.Root;
         public Tab CurrentTab { get; private set; } = Tab.Controls;
         /// <summary>A rebinding is waiting for a key or button.</summary>
@@ -176,6 +179,7 @@ namespace CriticalMass.Runtime.Menu
             if (Input != null && Input.PauseHandler == (Func<bool>)OnPausePressed) Input.PauseHandler = null;
             ControlBindings.BindingsChanged -= RefreshCells;
             CancelRebind();
+            if (_isOpen) AnyOpen = false;   // a destroyed scene's menu never leaves the gate shut
         }
 
         // perf/start-hitch-1: timed for the scene-start report (LoadTimer).

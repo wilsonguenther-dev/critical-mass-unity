@@ -51,6 +51,7 @@ namespace CriticalMass.Runtime.Menus
         Text _turn, _awardsHeading, _bestTitle, _bestLine, _youBest, _axisTop, _axisMid, _axisZero;
         readonly Text[] _axisTimes = new Text[9];
         readonly GraphSwatch[] _swatches = new GraphSwatch[ResultsLayout.LegendItems];
+        readonly Text[] _legend = new Text[ResultsLayout.LegendItems];
         readonly VectorShape[] _awardPlates = new VectorShape[ResultsLayout.AwardRows];
         readonly HudIcon[] _awardPortrait = new HudIcon[ResultsLayout.AwardRows];
         readonly Text[] _awardTitle = new Text[ResultsLayout.AwardRows], _awardLine = new Text[ResultsLayout.AwardRows],
@@ -258,7 +259,6 @@ namespace CriticalMass.Runtime.Menus
             for (int i = 0; i < _axisTimes.Length; i++)
                 _axisTimes[i] = L(page, "Axis Time " + i, CMTokens.Mono, UiScale.TypeSmall, Cream, TextAnchor.MiddleCenter, new Rect(g.x - 28f, ax.y, 56f, ax.height), 2f);
 
-            string[] legend = { MatchWords.LegendAzure, MatchWords.LegendCrimson, MatchWords.LegendHatch, MatchWords.LegendHut, MatchWords.LegendLead };
             var styles = new[] { GraphSwatch.Style.Solid, GraphSwatch.Style.Dashed, GraphSwatch.Style.Diamond, GraphSwatch.Style.Square, GraphSwatch.Style.Circle };
             for (int i = 0; i < ResultsLayout.LegendItems; i++)
             {
@@ -269,7 +269,9 @@ namespace CriticalMass.Runtime.Menus
                 _swatches[i].Kind = styles[i];
                 _swatches[i].Ink = CMTokens.VoidNavy.Color;
                 _swatches[i].raycastTarget = false;
-                L(page, "Legend " + i, CMTokens.Ui, UiScale.TypeSmall, Cream, TextAnchor.MiddleLeft, new Rect(li.x + 60f, li.y, li.width - 64f, li.height), 2f).text = legend[i];
+                // b15 Editor review: written at build time the words were wiped by the label's fit (all five legend labels
+                // read ""); RefreshStory sets them through HudText like every other label on the page.
+                _legend[i] = L(page, "Legend " + i, CMTokens.Ui, UiScale.TypeSmall, Cream, TextAnchor.MiddleLeft, new Rect(li.x + 60f, li.y, li.width - 64f, li.height), 2f);
             }
 
             _awardsHeading = L(page, "Awards Heading", CMTokens.Display, UiScale.TypeHeading, Brass, TextAnchor.MiddleCenter, ResultsLayout.AwardsHeading, 3f, UiScale.TypeSmall);
@@ -309,6 +311,8 @@ namespace CriticalMass.Runtime.Menus
             _swatches[2].color = CMTokens.WarmCream.Color;
             _swatches[3].color = CMTokens.WarmCream.Color;
             _swatches[4].color = CMTokens.WarmCream.Color;
+            string[] legendWords = { MatchWords.LegendAzure, MatchWords.LegendCrimson, MatchWords.LegendHatch, MatchWords.LegendHut, MatchWords.LegendLead };
+            for (int i = 0; i < _legend.Length && i < legendWords.Length; i++) if (_legend[i] != null) HudText.Set(_legend[i], legendWords[i]);
             HudText.Set(_turn, _sum != null ? _sum.TurningPoint : string.Empty);
             HudText.Set(_axisTop, MatchWords.Fill(MatchWords.AxisSeconds, "s", MatchWords.N(_graph.MaxY)));
             HudText.Set(_axisMid, MatchWords.Fill(MatchWords.AxisSeconds, "s", MatchWords.N(_graph.MaxY * 0.5)));

@@ -59,6 +59,10 @@ namespace CriticalMass.Runtime.Tests
             Assert.AreEqual(top, LadderClimb.Profile(0, half, top));
             Assert.AreEqual(top, LadderClimb.Profile(-face, half, top), 1e-4);
             Assert.AreEqual(top * 0.5f, LadderClimb.Profile((face + foot) * 0.5, half, top), 1e-3);
+            // b15 Editor review: feet stay on the ground just inside the foot (the straight line floated 0.28 u here).
+            float nearFoot = LadderClimb.Profile(foot - 0.1, half, top);
+            Debug.Log($"[ladder fix] lift 0.1 u inside the foot: {nearFoot:F3} u (limit 0.10)");
+            Assert.That(nearFoot, Is.LessThanOrEqualTo(0.10f), "no visible float at the ladder foot");
             float last = top;
             for (double u = 0; u <= foot + 0.2; u += 0.05)
             {

@@ -330,6 +330,14 @@ namespace CriticalMass.Runtime.View.Art
         /// camera; 2 px matches the Kaiju's authored hull and keeps the silhouette readable.
         /// </summary>
         public const float CharacterHullPx = 2f;
+        /// <summary>
+        /// b15 view polish (Editor review item 1): the hatchling and the adult Kaiju carry the characters' team rim (0.6
+        /// authored, 0.3 drawn with the rim sharpness switch), in their allegiance glow colour (ArtMaterials.ForGlow). CM/Toon
+        /// treats "rim above 0" as a character: the world look's character lift (CharFill / CharGain) and the time-of-day
+        /// skip (CharacterLift) only apply to it. Without it the Kaiju took the full world grade (the night key on its body,
+        /// no fill, no gain) and read -0.19..0.00 against the hill at Day/Dusk; the comments in KaijuAnimator assumed it had one.
+        /// </summary>
+        public const float KaijuRim = 0.6f;
 
         // Swatches (sRGB). Warrior: cm_art/palette.py team_cloth / team_glow / team_dark and TEAM_SWAP.
         static readonly TeamSwatch WarriorAzure = new TeamSwatch("#2A95AE", "#4FE3F0", "#2A374D");
@@ -497,7 +505,7 @@ namespace CriticalMass.Runtime.View.Art
                 OutlinePx = CharacterHullPx, Authored = KaijuDefault(GlowNeutral), Height = 1.7f },
             new ModelSpec { Key = KaijuHatchling, AssetPath = "Assets/_Game/Art/Kaiju/Kaiju_Hatchling.fbx", Kind = ArtKind.Kaiju, Rigged = true,
                 Bones = 20, OwnClips = new[] { Idle, Walk, Roar, SlamWindup, Slam, Swipe, Berserk, KO }, Meshes = new[] { "Kaiju_Hero", "Kaiju_LOD0", "Kaiju_LOD1", "Kaiju_Shadow" },
-                MaskCodes = new[] { 0, 6 }, OutlinePx = CharacterHullPx, Authored = KaijuDefault(GlowNeutral), Height = 2.235f, FaceTexture = KaijuFace,
+                MaskCodes = new[] { 0, 6 }, OutlinePx = CharacterHullPx, Rim = KaijuRim, Authored = KaijuDefault(GlowNeutral), Height = 2.235f, FaceTexture = KaijuFace,
                 Expressions = KaijuExpressionTextures, ArtYawDeg = 180f },
             // rig-kaiju-2 (2026-11-14, owner: "Switch, I love it"): the green-crystal adult from art/gen-models-2, rigged by
             // script (Kaiju/_rig2~/kr2_build.py): KAIJU_ADULT_BONES bones (the old names kept: Root, Hips, Spine, Chest, Neck,
@@ -509,7 +517,7 @@ namespace CriticalMass.Runtime.View.Art
             new ModelSpec { Key = KaijuAdult, AssetPath = "Assets/_Game/Art/Kaiju/Kaiju_Adult.fbx", Kind = ArtKind.Kaiju, Rigged = true,
                 Bones = KaijuAdultBones,
                 OwnClips = new[] { Idle, Walk, Roar, SlamWindup, Slam, Swipe, Berserk, KO }, Meshes = KaijuAdultMeshes(),
-                MaskCodes = new[] { 0, 2, 6, 8 }, OutlinePx = CharacterHullPx, Authored = KaijuDefault(GlowNeutral), Height = 5.0f,
+                MaskCodes = new[] { 0, 2, 6, 8 }, OutlinePx = CharacterHullPx, Rim = KaijuRim, Authored = KaijuDefault(GlowNeutral), Height = 5.0f,
                 VertexColourFace = true, ArtYawDeg = 180f, Variants = KaijuAdultVariants },
             new ModelSpec { Key = KaijuShards, AssetPath = "Assets/_Game/Art/Kaiju/Kaiju_BerserkShards.fbx", Kind = ArtKind.Kaiju,
                 Meshes = new[] { "Kaiju_BerserkShards" }, MaskCodes = new[] { 6 }, OutlinePx = 0f, Authored = KaijuDefault(GlowAzure) },

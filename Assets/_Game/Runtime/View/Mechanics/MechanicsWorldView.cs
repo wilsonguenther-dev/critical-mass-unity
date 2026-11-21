@@ -499,8 +499,12 @@ namespace CriticalMass.Runtime.View.Mechanics
 
         // ------------------------------------------------------------------ feed-driven moments
 
+        /// <summary>b15 view polish (item 7): heal motes drawn this frame (capture logs, tests).</summary>
+        public int HealMotesDrawn { get; private set; }
+
         void DrawFeed(World w, double alpha, Vector3 camFwd)
         {
+            HealMotesDrawn = 0;
             MechFeed f = Feed;
             double now = SimNow;
             int n = w.ActorCount;
@@ -532,9 +536,12 @@ namespace CriticalMass.Runtime.View.Mechanics
                     case MechFeed.BurstPulse:
                         if (age > 0.45f) break;
                         {
+                            // b15 view polish (item 7): a ring on the ground with a soft inner edge (HealFx.RingInnerAlpha)
+                            // over a faint soft fill, no hard disc edge
                             float t = age / 0.45f, r = Mathf.Lerp(0.3f, R, FeedEase(t));
-                            GroundRing(c, Mathf.Max(0f, r - 0.22f), r, 0f, Mathf.PI * 2f, 36, A(Heal, 0.85f * (1f - t)));
-                            _ground.Blob(c, Vector3.right, Vector3.forward, r, null, 28, 0f, A(Heal, 0.14f * (1f - t)));
+                            _ground.Ring(c, Vector3.right, Vector3.forward, Mathf.Max(0f, r - Mathf.Max(0.22f, r * HealFx.RingBand)), r, 0f, Mathf.PI * 2f, 36,
+                                A(Heal, 0.85f * (1f - t) * HealFx.RingInnerAlpha), A(Heal, 0.85f * (1f - t)));
+                            _ground.Ring(c, Vector3.right, Vector3.forward, 0f, r, 0f, Mathf.PI * 2f, 28, A(Heal, 0f), A(Heal, 0.14f * (1f - t)));
                         }
                         break;
                     case MechFeed.BurstPurify:
@@ -567,21 +574,29 @@ namespace CriticalMass.Runtime.View.Mechanics
                         break;
                 }
             }
-            // heal sparkles (0.6 s): a plus sign rising over the healed actor
+            // heal motes (b15 view polish, item 7): soft mint motes rising off the healed actor (HealFx; was a plus sign of
+            // two flat quads), billboarded to the camera, additive so they glow without a hard edge
+            Vector3 mR = Vector3.Cross(Vector3.up, camFwd);
+            if (mR.sqrMagnitude < 1e-6f) mR = Vector3.right;
+            mR.Normalize();
+            Vector3 mU = Vector3.Cross(camFwd, mR).normalized;
             for (int i = 0; i < MechFeed.Sparkles; i++)
             {
                 MechFeed.Sparkle s = f.SparkleRing[i];
                 float age = (float)f.Wall(now - s.T);
-                if (age < 0f || age > 0.6f || s.Actor < 0 || s.Actor >= n) continue;
-                float t = age / 0.6f, k = 1f - t;
-                Vector3 at = ActorPos(w, s.Actor, alpha, 1.8f + 0.6f * t);
-                Vector3 right = Vector3.Cross(Vector3.up, camFwd);
-                if (right.sqrMagnitude < 1e-6f) right = Vector3.right;
-                right.Normalize();
-                Vector3 up = Vector3.Cross(camFwd, right).normalized;
-                float sz = 0.16f + 0.06f * Mathf.Clamp01((float)(s.Amount / 30));
-                _air.Quad(at, right * sz, up * sz * 0.3f, A(Heal, 0.95f * k), A(Heal, 0.95f * k));
-                _air.Quad(at, right * sz * 0.3f, up * sz, A(Heal, 0.95f * k), A(Heal, 0.95f * k));
+                if (age < 0f || age > HealFx.MoteLife || s.Actor < 0 || s.Actor >= n) continue;
+                float t = age / HealFx.MoteLife;
+                Vector3 feet = ActorPos(w, s.Actor, alpha, 0f);
+                float amt = Mathf.Clamp01((float)(s.Amount / 30));
+                _air.Add = 160;
+                for (int m = 0; m < HealFx.Motes; m++)
+                {
+                    float a = HealFx.MoteAlpha(m, t);
+                    if (a <= 0f) continue;
+                    _air.SoftMote(feet + HealFx.MoteOffset(m, t), mR, mU, HealFx.MoteRadius(t, amt), HealFx.MoteSegments, A(Heal, 0.9f * a));
+                    HealMotesDrawn++;
+                }
+                _air.Add = 0;
             }
             // wind-up glints (0.16 s) and contact flashes (0.08 s)
             for (int i = 0; i < MechFeed.Glints; i++)

@@ -80,12 +80,19 @@ namespace CriticalMass.Runtime.View.Skills
             return i >= 0 && i + 1 < a.Length ? a[i + 1] : null;
         }
 
+        // b15 view polish (item 7): the capture hook for the heal look, the soft mint motes drawn in the shot's frame
+        static int HealMotes()
+        {
+            var mech = UnityEngine.Object.FindFirstObjectByType<CriticalMass.Runtime.View.Mechanics.MechanicsWorldView>();
+            return mech != null ? mech.HealMotesDrawn : -1;
+        }
+
         string Counts()
         {
             SkillFxCore c = _view.Core;
             return "tick=" + _driver.World.Tick + " casts=" + c.CastsDrawn + " seeds=" + c.SeedsDrawn + " roots=" + c.RootsDrawn
                 + " slowed=" + c.MarkedCount + " glows=" + c.GlowCount + " lifts=" + c.LiftsDrawn + " shields=" + c.ShieldsDrawn
-                + " sparks=" + c.SparksDrawn + " bundles=" + c.BundlesDrawn + " overlay=" + _view.Overlay.Applied + " verts=" + _view.Budget;
+                + " sparks=" + c.SparksDrawn + " bundles=" + c.BundlesDrawn + " overlay=" + _view.Overlay.Applied + " verts=" + _view.Budget + " healMotes=" + HealMotes();
         }
 
         /// <summary>A close-up from the gameplay camera's own rotation, CloseDistance from focus, HUD-free (camera render only).</summary>

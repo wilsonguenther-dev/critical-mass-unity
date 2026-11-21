@@ -144,7 +144,7 @@ namespace CriticalMass.Runtime.View.Effects
             _air.NearFade = _solid.NearFade = true;   // follow-camera-3: bursts, smoke and debris never fill the lens
             Shader sh = Resources.Load<Shader>("CMFxUnlit");
             if (sh == null) sh = Shader.Find("CM/FxUnlit");
-            _groundMat = Mat(sh, "Fx Ground", 0, 0, -2, 2990);
+            _groundMat = Mat(sh, "Fx Ground", 0, 0, -2, GroundFxQueue);
             _airMat = Mat(sh, "Fx Air", 0, 0, 0, 3100);
             _solidMat = Mat(sh, "Fx Solid", 2, 1, 0, 2460);
             _groundGo = Layer("Fx Ground", _ground, _groundMat);
@@ -197,6 +197,11 @@ namespace CriticalMass.Runtime.View.Effects
             if (_groundGo != null) { _groundGo.SetActive(true); _airGo.SetActive(true); _solidGo.SetActive(true); }
             if (_vignetteCanvas != null) _vignetteCanvas.gameObject.SetActive(true);
         }
+
+        /// <summary>b15 view polish (item 3): the ground fx layer (wind-up wedges, telegraphs, blob shadows) draws after the
+        /// world decals (CM/WorldDecal, Transparent-50 = 2950) and before the air fx; it writes no depth and is depth-tested,
+        /// so characters (opaque) stand over it.</summary>
+        public const int GroundFxQueue = 2990;
 
         private static Material Mat(Shader sh, string name, int cull, int zwrite, int offset, int queue)
         {

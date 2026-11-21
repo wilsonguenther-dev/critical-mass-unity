@@ -59,7 +59,11 @@ namespace CriticalMass.Runtime.View.Mechanics
             double u = Math.Abs(along), face = FaceDist(halfLen), foot = FootDist(halfLen, top);
             if (u >= foot) return 0f;
             if (u <= face) return top;
-            return (float)(top * (foot - u) / Math.Max(1e-6, foot - face));
+            // b15 Editor review: smoothstep instead of a straight line. The line rose 2.8 u per u from the feet, so a
+            // fighter standing 0.1 u inside the foot floated 0.28 u; the curve gives 0.07 u there, keeps top/2 at the
+            // midpoint (LadderClimbTests) and never falls walking toward the wall.
+            double s = (foot - u) / Math.Max(1e-6, foot - face);
+            return (float)(top * s * s * (3.0 - 2.0 * s));
         }
 
         /// <summary>Old two-argument form (the hill rock top).</summary>

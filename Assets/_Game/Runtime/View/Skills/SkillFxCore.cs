@@ -446,7 +446,7 @@ namespace CriticalMass.Runtime.View.Skills
                 GroundRing(c, r - 0.1f, r, 0f, Mathf.PI * 2f, 24, A(HealGreen, 0.85f * (1f - k)));
                 GroundRing(c, r - 0.14f, r - 0.1f, 0f, Mathf.PI * 2f, 24, A(TeamColor(w.Actors[i].Team), 0.7f * (1f - k)));
                 _a.Add = 255;
-                _a.Blob(c + Vector3.up * (0.8f + 0.3f * k), _camR, _camU, 0.42f, null, 16, 0f, A(HealGreen, 0.16f * (1f - k)));
+                _a.SoftMote(c + Vector3.up * (0.8f + 0.3f * k), _camR, _camU, 0.42f, 16, A(HealGreen, 0.16f * (1f - k)));   // b15 item 7: soft edge, no hard disc
                 _a.Add = 0;
             }
         }
