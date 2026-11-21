@@ -31,6 +31,7 @@ jobs:
           set -o pipefail
           tools/balance/balance-report.sh tuning-index --out Temp/balance/ti.md >/dev/null || { cat Temp/balance/build.log | tail -40; exit 2; }
           DLL=tools/ci/BalanceReport/bin/Release/net8.0/balance-report.dll
+          mkdir -p Temp/b16/sweep
           python3 tools/balance/b16-arms.py grid Temp/b16/arms.tsv
           wc -l Temp/b16/arms.tsv
           for p in 0 1 2 3; do
