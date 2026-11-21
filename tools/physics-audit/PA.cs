@@ -730,3 +730,154 @@ public static class PAV
         return sb.ToString();
     }
 }
+
+public static class PAK
+{
+    static int Idx(World w, int cx, int cz) => cz * w.Map.Width + cx;
+    static string F2(double v) => v.ToString("F2");
+    /// <summary>A whole 16v16 match with the Kaiju out at 0:30: its turning, walking, shoves and the knocks it gives.</summary>
+    public static string KaijuMatch(int seed, int ticks)
+    {
+        var sb = new StringBuilder("# 5. Kaiju in a 16v16 bot match, seed " + seed + ", game hatch time (240 s), " + ticks + " ticks\n");
+        World w = PA.NewW(ClassId.Warrior, seed, 16, 240);
+        InputFrame s = SimInput.EmptyInput();
+        int head = 0; double maxTurn = 0, sumTurn = 0; int turnN = 0, flips = 0; double lastF = 0, lastDF = 0; bool have = false;
+        double maxSp = 0; int shoves = 0, shoveTicks = 0; double maxShove = 0;
+        var knock = new List<string>(); int kKnocks = 0; double kEffMax = 0, kEffSum = 0; int kStun = 0, kStunMax = 0;
+        int bKnocks = 0; double bEffMax = 0; int falls = 0, deathsKaiju = 0, deathsBlast = 0, kaijuHits = 0; double kaijuHitDmg = 0;
+        double onHillTicks = 0, bodiesNearSum = 0; int fastT = 0, walkT = 0, big45 = 0, big90 = 0; var fastLog = new StringBuilder();
+        for (int t = 0; t < ticks && w.Match.Phase != MatchPhase.Ended; t++)
+        {
+            MatchTick.Advance(w, null, s);
+            for (; head < w.EventHead; head++)
+            {
+                SimEvent e = w.Events[head % World.EventCapacity];
+                if (e.Type == SimEventType.Knock && e.B == Damage.KaijuSource) { kKnocks++; kEffMax = Math.Max(kEffMax, e.Impulse); kEffSum += e.Impulse; }
+                if (e.Type == SimEventType.Knock && e.Cause == DamageCause.Explosion) { bKnocks++; bEffMax = Math.Max(bEffMax, e.Impulse); }
+                if (e.Type == SimEventType.HitStun && e.B == Damage.KaijuSource) { kStun++; kStunMax = Math.Max(kStunMax, (int)e.Value); }
+                if (e.Type == SimEventType.BodyShove) { shoveTicks++; shoves += (int)e.Value; maxShove = Math.Max(maxShove, e.Impulse); }
+                if (e.Type == SimEventType.Fall) falls++;
+                if (e.Type == SimEventType.Death && e.B == Damage.KaijuSource) deathsKaiju++;
+                if (e.Type == SimEventType.Death && e.Cause == DamageCause.Explosion) deathsBlast++;
+            }
+            if (!w.Match.Hatched || w.Kaiju.State == KaijuState.Egg) continue;
+            Kaiju k = w.Kaiju;
+            double sp = Math.Sqrt((k.X - k.PrevX) * (k.X - k.PrevX) + (k.Z - k.PrevZ) * (k.Z - k.PrevZ)) * 30;
+            maxSp = Math.Max(maxSp, sp); if (sp > 3.2) { fastT++; if (fastLog.Length < 900) fastLog.Append(" t" + w.Tick + ":" + F2(sp) + "u/s@" + F2(k.X) + "," + F2(k.Z)); } walkT++;
+            if (have)
+            {
+                double df = k.Facing - lastF; while (df > Math.PI) df -= 2 * Math.PI; while (df < -Math.PI) df += 2 * Math.PI;
+                double ad = Math.Abs(df) * 180 / Math.PI;
+                if (ad > 45) big45++; if (ad > 90) big90++;
+                if (ad > 1e-6) { maxTurn = Math.Max(maxTurn, ad); sumTurn += ad; turnN++; if (lastDF * df < 0 && ad > 2) flips++; lastDF = df; }
+            }
+            lastF = k.Facing; have = true;
+            double hx = k.X - w.Map.Hill.X, hz = k.Z - w.Map.Hill.Z;
+            if (hx * hx + hz * hz < w.Map.Hill.R * w.Map.Hill.R)
+            {
+                onHillTicks++;
+                int near = 0; for (int i = 0; i < w.ActorCount; i++) { if (!w.Actors[i].Alive) continue; double dx = w.X[i] - k.X, dz = w.Z[i] - k.Z; if (dx * dx + dz * dz < 9) near++; }
+                bodiesNearSum += near;
+            }
+        }
+        sb.Append("Kaiju walk: max speed ").Append(F2(maxSp)).Append(" u/s (config ").Append(w.Config.Kaiju.MoveSpeed).Append("), facing change max ").Append(F2(maxTurn)).Append(" deg/tick, mean ").Append(F2(turnN > 0 ? sumTurn / turnN : 0))
+          .Append(" deg/tick over ").Append(turnN).Append(" turning ticks, direction flips (sign change > 2 deg) ").Append(flips).Append(", turns > 45 deg in ONE tick ").Append(big45).Append(", > 90 deg ").Append(big90).Append('\n');
+        sb.Append("ticks moving faster than 3.2 u/s: ").Append(fastT).Append(" of ").Append(walkT).Append(" hatched ticks:").Append(fastLog).Append('\n');
+        sb.Append("body shoves: ").Append(shoveTicks).Append(" ticks with a shove, ").Append(shoves).Append(" fighter-shoves, largest single shove ").Append(F2(maxShove)).Append(" u in one tick\n");
+        sb.Append("Kaiju knocks: ").Append(kKnocks).Append(", eff mean ").Append(F2(kKnocks > 0 ? kEffSum / kKnocks : 0)).Append(" u, max ").Append(F2(kEffMax)).Append(" u; Kaiju stuns ").Append(kStun).Append(" (longest ").Append(kStunMax).Append(" ticks); kills by the Kaiju ").Append(deathsKaiju).Append('\n');
+        sb.Append("blast knocks (TNT, mines): ").Append(bKnocks).Append(" (max ").Append(F2(bEffMax)).Append(" u); blast kills ").Append(deathsBlast).Append("; falls (teleport out of a hole) ").Append(falls).Append('\n');
+        sb.Append("Kaiju on the hill ").Append(F2(onHillTicks / 30)).Append(" s, bodies within 3 u of it there on average ").Append(F2(onHillTicks > 0 ? bodiesNearSum / onHillTicks : 0)).Append('\n');
+        File.WriteAllText(PA.Out + "data/5-kaiju-match-seed" + seed + ".txt", sb.ToString());
+        return sb.ToString();
+    }
+
+    /// <summary>The Kaiju body scripted into a fighter standing in front of a wall (pin), and into a fighter in a 2-cell corridor.</summary>
+    public static string Trap()
+    {
+        var sb = new StringBuilder("# 5b. Kaiju body vs a fighter (scripted Kaiju path, 2.6 u/s)\n");
+        foreach (string mode in new[] { "open", "wall", "corridor2", "corner" })
+        {
+            World w = PA.NewW(ClassId.Warrior, 4242, 16, 1e6); PA.Bench(w, new[] { 0 });
+            PA.OpenSpot(w, 14, w.Map.Hill.X, w.Map.Hill.Z, out double ox, out double oz);
+            w.ForceHatch = true; InputFrame s = SimInput.EmptyInput();
+            for (int t = 0; t < 40 && !w.Match.Hatched; t++) { PA.In(w, 0, 0, 0); SimStep.Step(w); }
+            int wx = (int)ox + 2;
+            if (mode != "open") for (int cz = (int)oz - 5; cz <= (int)oz + 5; cz++) w.Map.Cells[Idx(w, wx, cz)] = Cell.Wall;
+            if (mode == "corridor2") for (int cx = (int)ox - 6; cx <= wx; cx++) { w.Map.Cells[Idx(w, cx, (int)oz - 1)] = Cell.Wall; w.Map.Cells[Idx(w, cx, (int)oz + 2)] = Cell.Wall; }
+            if (mode == "corner") for (int cx = (int)ox - 6; cx <= wx; cx++) w.Map.Cells[Idx(w, cx, (int)oz + 2)] = Cell.Wall;
+            double fx = wx - 0.5, fz = oz + 0.5;
+            PA.Put(w, 0, fx, fz);
+            Kaiju k = w.Kaiju; double kx = fx - 4, kz = fz;
+            double minD = 99; int inside = 0, stillTicks = 0; double kBack = 0; int escapeT = -1;
+            for (int t = 0; t < 120; t++)
+            {
+                kx = Math.Min(kx + 2.6 / 30, wx - 0.2);
+                k.X = kx; k.Z = kz; k.PrevX = kx; k.PrevZ = kz; k.TargetId = -1;
+                double px = w.X[0], pz = w.Z[0];
+                // the fighter tries to escape sideways (+z) after tick 30
+                PA.In(w, 0, 0, t >= 30 ? -1 : 0); SimStep.Step(w);
+                double dx = w.X[0] - w.Kaiju.X, dz = w.Z[0] - w.Kaiju.Z, d = Math.Sqrt(dx * dx + dz * dz);
+                minD = Math.Min(minD, d);
+                if (d < w.Config.Physics.KaijuBodyRadius) inside++;
+                if (t >= 30 && Math.Abs(w.Z[0] - pz) < 0.01 && Math.Abs(w.X[0] - px) < 0.01) stillTicks++;
+                kBack = Math.Max(kBack, kx - w.Kaiju.X);
+                if (t >= 30 && escapeT < 0 && d > w.Config.Physics.KaijuBodyRadius + 0.45 + 0.5) escapeT = t - 30;
+            }
+            sb.Append(mode).Append(": closest centre distance ").Append(F2(minD)).Append(" u (body 1.3 + fighter 0.45 = 1.75 contact), ticks with the centre INSIDE the body ").Append(inside)
+              .Append(", fighter pinned still while pressing away ").Append(stillTicks).Append(" ticks, the Kaiju shoved back up to ").Append(F2(kBack)).Append(" u, escaped (0.5 u clear) ").Append(escapeT).Append(" ticks after trying, fighter HP ").Append(F2(w.Actors[0].Hp)).Append('\n');
+        }
+        File.WriteAllText(PA.Out + "data/5b-kaiju-trap.txt", sb.ToString());
+        return sb.ToString();
+    }
+}
+
+public static class PAW
+{
+    static int Idx(World w, int cx, int cz) => cz * w.Map.Width + cx;
+    static string F2(double v) => v.ToString("F2");
+    public static string WorldPhys()
+    {
+        var sb = new StringBuilder("# 6. world (sim)\n");
+        // (a) TNT on a raised 3x3 stack (level 2) with an enemy standing on top, and on short / tall wall cells
+        {
+            World w = PA.NewW(ClassId.Demolitions); PA.Bench(w, new[] { 0, 16 });
+            PA.OpenSpot(w, 14, w.Map.Hill.X, w.Map.Hill.Z, out double ox, out double oz);
+            int cx = (int)ox, cz = (int)oz;
+            for (int dz = -1; dz <= 1; dz++) for (int dx = -1; dx <= 1; dx++) w.Map.Lift[Idx(w, cx + dx, cz + dz)] = 2;
+            int lw = Idx(w, cx + 3, cz), bw = Idx(w, cx + 3, cz + 1);
+            w.Map.Cells[lw] = Cell.LowWall; w.Map.Cells[bw] = Cell.Barricade;
+            double lwHp0 = w.Map.WallHp != null ? w.Map.WallHp[lw] : -1, bwHp0 = w.Map.WallHp != null ? w.Map.WallHp[bw] : -1;
+            PA.Put(w, 0, ox - 5, oz); PA.Put(w, 16, cx + 0.5, cz + 0.5);
+            int r = Demolitions.ThrowTnt(w, 0, cx + 1.5, cz + 0.5);
+            int lvBefore = TerrainHeight.LevelAt(w.Map, w.X[16], w.Z[16], 0.45);
+            for (int t = 0; t < 90; t++) { PA.In(w, 0, 0, 0); PA.In(w, 16, 0, 0); SimStep.Step(w); }
+            sb.Append("(a) TNT (result ").Append(r).Append(") at the edge of a level-2 3x3 stack with an enemy on top: stack levels after ");
+            for (int dz = -1; dz <= 1; dz++) for (int dx = -1; dx <= 1; dx++) sb.Append(w.Map.Lift[Idx(w, cx + dx, cz + dz)]).Append(' ');
+            sb.Append("; enemy level ").Append(lvBefore).Append(" -> ").Append(TerrainHeight.LevelAt(w.Map, w.X[16], w.Z[16], 0.45)).Append(", alive ").Append(w.Actors[16].Alive)
+              .Append("; short wall 1.5 u from the blast: cell ").Append(w.Map.Cells[lw]).Append(" hp ").Append(lwHp0).Append(" -> ").Append(w.Map.WallHp != null ? w.Map.WallHp[lw] : -1)
+              .Append("; tall wall: cell ").Append(w.Map.Cells[bw]).Append(" hp ").Append(bwHp0).Append(" -> ").Append(w.Map.WallHp != null ? w.Map.WallHp[bw] : -1).Append('\n');
+        }
+        // (b) carry speed
+        {
+            sb.Append("(b) carry: top speed (u/s) carrying ");
+            foreach (CarryKind kind in new[] { CarryKind.None, CarryKind.Biomass, CarryKind.Ore, CarryKind.Corruption })
+            {
+                World w = PA.NewW(ClassId.Warrior); PA.Bench(w, new[] { 0 });
+                PA.OpenSpot(w, 14, w.Map.Hill.X, w.Map.Hill.Z, out double ox, out double oz); PA.Put(w, 0, ox - 6, oz);
+                w.Actors[0].Carry = kind; w.Actors[0].CarryAmount = kind == CarryKind.None ? 0 : 1;
+                for (int t = 0; t < 20; t++) { PA.In(w, 0, 1, 0); SimStep.Step(w); }
+                sb.Append(kind).Append(' ').Append(F2(PA.Sp(w, 0))).Append("; ");
+            }
+            sb.Append('\n');
+        }
+        // (c) determinism: the same seed twice, independent worlds, 3600 ticks
+        {
+            World a = PA.NewW(ClassId.Warrior, 31337, 16, 240), b = PA.NewW(ClassId.Warrior, 31337, 16, 240);
+            InputFrame s1 = SimInput.EmptyInput(), s2 = SimInput.EmptyInput(); int diff = -1;
+            for (int t = 0; t < 3600; t++) { MatchTick.Advance(a, null, s1); MatchTick.Advance(b, null, s2); if (diff < 0 && t % 300 == 299 && CriticalMass.Net.StateHash.Of(a) != CriticalMass.Net.StateHash.Of(b)) diff = t; }
+            sb.Append("(c) same seed (31337) twice, 3600 ticks, StateHash every 300 ticks: ").Append(diff < 0 ? "IDENTICAL, final " + CriticalMass.Net.StateHash.Of(a).ToString("X16") : "DIFFER at " + diff).Append('\n');
+        }
+        File.WriteAllText(PA.Out + "data/6-world.txt", sb.ToString());
+        return sb.ToString();
+    }
+}
