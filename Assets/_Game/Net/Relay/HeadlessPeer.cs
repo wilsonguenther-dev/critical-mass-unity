@@ -50,6 +50,8 @@ namespace CriticalMass.Net.Relay
         public string ChatText = "hello from the headless peer";
         /// <summary>online-rooms-9 (-onlineChatTeam): the scripted chat line goes to the peer's team only.</summary>
         public bool ChatTeam;
+        /// <summary>b17-chat (-callout-at TICK -callout-id ID): send quick-chat callout ID when the match reaches TICK.</summary>
+        public int CalloutAt = -1, CalloutId = 0;
         /// <summary>Drop off the network with no goodbye at this tick (-1 = never), to test the bot handover.</summary>
         public int DropAt = -1;
         /// <summary>b15-rejoin (-rejoin-after MS): after DropAt, wait this long, connect again with the same seat secret, replay
@@ -99,7 +101,7 @@ namespace CriticalMass.Net.Relay
         private LockstepSession _session;
         private readonly List<KeyValuePair<int, ulong>> _hashes = new List<KeyValuePair<int, ulong>>();
         private AutoplayPilot _pilot;
-        private bool _picked, _readyLogged, _chatSent, _dropped;
+        private bool _picked, _readyLogged, _chatSent, _dropped, _calloutSent;
         private bool _dropDone, _liveLogged;
         private long _rejoinAt = -1, _droppedAtMs = -1;
         private ulong _secret;
@@ -289,6 +291,12 @@ namespace CriticalMass.Net.Relay
                 _chatSent = true;
                 string why = Chat?.Say(ChatText, ChatTeam ? ChatScope.Team : ChatScope.All, now);
                 Log("ONLINE CHAT SENT" + (ChatTeam ? " TEAM" : "") + " at tick " + _session.Stepped + (why != null ? " refused: " + why : ""));
+            }
+            if (CalloutAt >= 0 && !_calloutSent && _session.Stepped >= CalloutAt)
+            {
+                _calloutSent = true;
+                string why = Chat?.Callout(CalloutId, now);
+                Log("ONLINE CALLOUT SENT " + CalloutId + " at tick " + _session.Stepped + (why != null ? " refused: " + why : ""));
             }
             if (_session.Stepped >= _nextLeadLine)
             {
@@ -481,6 +489,8 @@ namespace CriticalMass.Net.Relay
                     case "onlinechatat": case "chat-at": int.TryParse(next, System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out p.ChatAt); i++; break;
                     case "onlinechattext": case "chat-text": p.ChatText = next; i++; break;
                     case "onlinechatteam": case "chat-team": p.ChatTeam = true; break;
+                    case "onlinecalloutat": case "callout-at": int.TryParse(next, System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out p.CalloutAt); i++; break;
+                    case "onlinecalloutid": case "callout-id": int.TryParse(next, System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out p.CalloutId); i++; break;
                     case "onlinedropat": case "drop-at": int.TryParse(next, System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out p.DropAt); i++; break;
                     case "onlinerejoinafter": case "rejoin-after": int.TryParse(next, System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out p.RejoinAfterMs); i++; break;
                     case "onlinebuild": case "build": p.Build = next; i++; break;

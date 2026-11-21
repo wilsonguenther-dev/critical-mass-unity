@@ -63,6 +63,7 @@ namespace CriticalMass.Runtime.Hud.Interact
         {
             get
             {
+                if (ChatEats) return IsPressedOnGamepad;   // b17-chat: a chat line is being typed, the keyboard is chat's
                 if (_a != null) return _a.enabled && _a.IsPressed();
                 Keyboard kb = Keyboard.current;
                 if (kb != null && kb[DefaultKey].isPressed) return true;
@@ -75,6 +76,7 @@ namespace CriticalMass.Runtime.Hud.Interact
         {
             get
             {
+                if (ChatEats) return WasPressedOnGamepad;
                 if (_a != null) return _a.enabled && _a.WasPressedThisFrame();
                 Keyboard kb = Keyboard.current;
                 if (kb != null && kb[DefaultKey].wasPressedThisFrame) return true;
@@ -88,6 +90,7 @@ namespace CriticalMass.Runtime.Hud.Interact
         {
             get
             {
+                if (ChatEats) return false;
                 if (_a != null)
                 {
                     if (!_a.enabled) return false;
@@ -126,11 +129,32 @@ namespace CriticalMass.Runtime.Hud.Interact
             }
         }
 
+        /// <summary>b17-chat: while a chat line is typed (and the frame it closes) keyboard and mouse presses are chat's.</summary>
+        static bool ChatEats => CriticalMass.Runtime.Online.OnlineChatHud.EatsKeys;
+
+        /// <summary>Held on a controller.</summary>
+        public bool IsPressedOnGamepad
+        {
+            get
+            {
+                if (_a != null)
+                {
+                    if (!_a.enabled) return false;
+                    var cs = _a.controls;
+                    for (int i = 0; i < cs.Count; i++)
+                        if (cs[i].device is Gamepad && cs[i] is ButtonControl b && b.isPressed) return true;
+                    return false;
+                }
+                Gamepad pad = Gamepad.current;
+                return pad != null && pad[DefaultPad].isPressed;
+            }
+        }
+
         public bool WasReleased
         {
             get
             {
-                if (_a != null) return _a.enabled && _a.WasReleasedThisFrame();
+                if (_a != null) return _a.enabled && _a.WasReleasedThisFrame();   // a release never starts anything
                 Keyboard kb = Keyboard.current;
                 if (kb != null && kb[DefaultKey].wasReleasedThisFrame) return true;
                 Gamepad pad = Gamepad.current;
