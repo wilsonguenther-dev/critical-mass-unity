@@ -15,6 +15,9 @@ namespace CriticalMass.Runtime.Menus
     /// new leader's line). Faint guide lines every quarter of the height and every minute. One mesh, built when the data is
     /// set, never per frame.
     /// </summary>
+    // b15 Editor review: a custom Graphic gets no CanvasRenderer of its own (only Image-style classes require one), and in
+    // the Editor GetComponent hands Graphic a fake null, so the graph and its swatches drew nothing (the STORY tab was empty).
+    [RequireComponent(typeof(CanvasRenderer))]
     public sealed class LeadGraph : MaskableGraphic
     {
         public const float LineW = 4f, DashOn = 12f, DashOff = 7f, MarkSize = 16f, HutSize = 10f;
@@ -173,6 +176,7 @@ namespace CriticalMass.Runtime.Menus
     }
 
     /// <summary>b15 item 1: one legend swatch of the lead graph (the same line styles and mark shapes).</summary>
+    [RequireComponent(typeof(CanvasRenderer))]
     public sealed class GraphSwatch : MaskableGraphic
     {
         public enum Style { Solid, Dashed, Diamond, Square, Circle }
