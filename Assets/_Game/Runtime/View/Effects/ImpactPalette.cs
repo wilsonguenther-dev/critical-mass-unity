@@ -94,9 +94,12 @@ namespace CriticalMass.Runtime.View.Effects
         /// <summary>The weapon cue: glint radius, arm streak width, how far past the hand it runs along the weapon, and the
         /// start flash (the glint starts FlashScale times larger and settles over FlashSeconds; none under reduced flashing).</summary>
         public const float GlintRadius = 0.24f, ArmWidth = 0.08f, WeaponExtend = 0.45f, FlashSeconds = 0.10f, FlashScale = 1.45f;
-        /// <summary>The hill paving's top over GroundHeight.At (env_hill_plaza is 0.23 tall, SceneryLodTable) plus a margin,
-        /// inside the hill ring's radius; GroundLift everywhere else (was a flat 0.035 over the world ground).</summary>
-        public const float HillPavingTop = 0.27f, HillPavingRadius = 12f, GroundLift = 0.04f;
+        /// <summary>The hill paving's top over GroundHeight.At inside the paving's radius; GroundLift everywhere else (was a
+        /// flat 0.035 over the world ground). b15 Editor review r3: measured by raycast on the placed hill kit (WorldBase
+        /// Hill group): env_hill_plaza sits sunk, its highest tile 0.145 over the ground at the centre (0.05..0.12 out to
+        /// 5.5 u) and it ends at ~5.8 u; past that the walking surface is the ground itself. The old 0.27 inside 12 u (the
+        /// catalogue's full 0.23 height) floated the wedge and heal ring 0.17..0.31 u over what was drawn.</summary>
+        public const float HillPavingTop = 0.15f, HillPavingRadius = 5.8f, GroundLift = 0.04f;
 
         /// <summary>Cue strength 0..1 at wind-up progress p for a wind-up of this many wall seconds.</summary>
         public static float Strength(float p, float windupSeconds) =>
