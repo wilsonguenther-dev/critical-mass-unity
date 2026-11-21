@@ -74,6 +74,7 @@ namespace CriticalMass.Net
             H_HealerState(ref h, o.Healer);
             H_PendingHits(ref h, o.Hits);
             H_HutState(ref h, o.Hut);
+            H_HutChoiceState(ref h, o.HutVote);
             {
                 var a2 = o.Inputs;
                 if (a2 == null) M(ref h, -1);
@@ -120,6 +121,7 @@ namespace CriticalMass.Net
             }
             A(ref h, o.PrevX);
             A(ref h, o.PrevZ);
+            H_ComebackState(ref h, o.Rally);
             H_Rng(ref h, o.Rng);
             H_TerraformState(ref h, o.Terraform);
             M(ref h, o.Tick);
@@ -147,15 +149,21 @@ namespace CriticalMass.Net
             A(ref h, o.Corrupt);
             M(ref h, o.Epoch);
             A(ref h, o.EscortOf);
+            M(ref h, o.Escorts);
             H_BotFields(ref h, o.Fields);
             A(ref h, o.FightMode);
             A(ref h, o.FightModeUntil);
             A(ref h, o.GrabX);
             A(ref h, o.GrabZ);
             A(ref h, o.Greed);
+            A(ref h, o.HillBodies);
             A(ref h, o.HillSquad);
             M(ref h, o.HumanDrivenTick);
             A(ref h, o.InReach);
+            A(ref h, o.JamTick);
+            A(ref h, o.JamX);
+            A(ref h, o.JamZ);
+            A(ref h, o.Job);
             // LastTick: not hashed (see the header)
             D(ref h, o.NextDirectorTime);
             A(ref h, o.PostUntil);
@@ -164,10 +172,18 @@ namespace CriticalMass.Net
             A(ref h, o.ProgressTime);
             A(ref h, o.ProgressX);
             A(ref h, o.ProgressZ);
+            M(ref h, o.Rallies);
+            A(ref h, o.Rally);
+            A(ref h, o.RallySince);
+            M(ref h, o.Releases);
             H_Rng(ref h, o.Rng);
             A(ref h, o.Role);
             A(ref h, o.RoleSince);
+            A(ref h, o.SeenDeaths);
             A(ref h, o.Settled);
+            A(ref h, o.SideUntil);
+            A(ref h, o.SideX);
+            A(ref h, o.SideZ);
             M(ref h, o.StateChanges);
             A(ref h, o.StateSince);
             A(ref h, o.Supply);
@@ -178,7 +194,11 @@ namespace CriticalMass.Net
             A(ref h, o.TaskUntil);
             A(ref h, o.TaskX);
             A(ref h, o.TaskZ);
+            M(ref h, o.TerrainJumps);
             M(ref h, o.ThinkPeriod);
+            A(ref h, o.UnjamCount);
+            A(ref h, o.UnjamWindowStart);
+            M(ref h, o.Unjams);
             A(ref h, o.UnstickUntil);
             A(ref h, o.UnstickX);
             A(ref h, o.UnstickZ);
@@ -392,6 +412,7 @@ namespace CriticalMass.Net
             M(ref h, o.EggExposedUntil);
             M(ref h, o.EggWindows);
             M(ref h, o.EventIndex);
+            H_CombatFeelState(ref h, o.Feel);
             M(ref h, o.FieldBuildTick);
             A(ref h, o.Gathered);
             M(ref h, o.HandoffUnits);
@@ -600,6 +621,29 @@ namespace CriticalMass.Net
             A(ref h, o.PadFieldVersion);
             A(ref h, o.PrevHp);
             M(ref h, o.Warm ? 1 : 2);
+        }
+
+        private static void H_HutChoiceState(ref ulong h, global::CriticalMass.Sim.Core.HutChoiceState o)
+        {
+            if (o == null) { M(ref h, 0x4E554C4CL); return; }
+            A(ref h, o.BotTick);
+            M(ref h, o.Closed);
+            A(ref h, o.Decided);
+            M(ref h, o.Empty);
+            A(ref h, o.EndTick);
+            A(ref h, o.LastA);
+            A(ref h, o.LastB);
+            A(ref h, o.LastCard);
+            A(ref h, o.LastDefault);
+            A(ref h, o.LastLevel);
+            A(ref h, o.LastTick);
+            M(ref h, o.LongestTicks);
+            A(ref h, o.Mask);
+            A(ref h, o.OpenTick);
+            M(ref h, o.Opened);
+            A(ref h, o.Pick);
+            A(ref h, o.Vote);
+            A(ref h, o.VoteLevel);
         }
 
         private static void H_InputFrame(ref ulong h, global::CriticalMass.Sim.Core.InputFrame o)
@@ -820,6 +864,17 @@ namespace CriticalMass.Net
             D(ref h, o.Z);
         }
 
+        private static void H_ComebackState(ref ulong h, global::CriticalMass.Sim.Core.ComebackState o)
+        {
+            if (o == null) { M(ref h, 0x4E554C4CL); return; }
+            A(ref h, o.BonusMilli);
+            A(ref h, o.Earning);
+            A(ref h, o.FirstTick);
+            A(ref h, o.HoldStreak);
+            M(ref h, o.KoTeam);
+            M(ref h, o.Turns);
+        }
+
         private static void H_Rng(ref ulong h, global::CriticalMass.Sim.Core.Rng o)
         {
             if (o == null) { M(ref h, 0x4E554C4CL); return; }
@@ -1006,6 +1061,37 @@ namespace CriticalMass.Net
             M(ref h, o.TntBlasts);
             M(ref h, o.TntThrown);
             M(ref h, o.WallsBroken);
+        }
+
+        private static void H_CombatFeelState(ref ulong h, global::CriticalMass.Sim.Core.CombatFeelState o)
+        {
+            if (o == null) { M(ref h, 0x4E554C4CL); return; }
+            A(ref h, o.BufferTick);
+            M(ref h, o.Buffered);
+            A(ref h, o.ImmuneUntil);
+            A(ref h, o.Ladder);
+            A(ref h, o.LadderCells);
+            M(ref h, o.LadderCount);
+            M(ref h, o.LadderFalls);
+            M(ref h, o.LadderTick);
+            A(ref h, o.LockRun);
+            A(ref h, o.LockStart);
+            A(ref h, o.LockUntil);
+            M(ref h, o.MaxLockRun);
+            A(ref h, o.SlowUntil);
+            M(ref h, o.StaggerArmoured);
+            A(ref h, o.StaggerCount);
+            M(ref h, o.StaggerDiminished);
+            M(ref h, o.StaggerImmune);
+            A(ref h, o.StaggerWindowEnd);
+            M(ref h, o.Staggers);
+            A(ref h, o.StruckBy);
+            A(ref h, o.StruckTick);
+            A(ref h, o.SunderUntil);
+            M(ref h, o.Swings);
+            D(ref h, o.TntSelfDamage);
+            M(ref h, o.TntSelfHits);
+            M(ref h, o.Whiffs);
         }
 
         private static void H_TerrainHeightState(ref ulong h, global::CriticalMass.Sim.Core.TerrainHeightState o)

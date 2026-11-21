@@ -4,7 +4,7 @@ Every tuning field the sim reads from `GameConfig`, found by reflection (`Assets
 
 Regenerate: `tools/balance/balance-report.sh tuning-index (or the balance-report workflow, mode tuning-index)`. `TuningIndexTests` fails when a field has no row here. Paths work as `--set Path=Value` switches for the balance report.
 
-622 fields.
+813 fields.
 
 ## (top level)
 
@@ -707,3 +707,194 @@ Regenerate: `tools/balance/balance-report.sh tuning-index (or the balance-report
 | `Depth.TerrainHeight.KaijuSmashFrom` | 2 | int | `Assets/_Game/Sim/Config/TerrainHeightConfig.cs` | Kaiju: a cell its body overlaps at this lift or more is smashed down to SmashTo at once. |
 | `Depth.TerrainHeight.SmashTo` | 1 | int | `Assets/_Game/Sim/Config/TerrainHeightConfig.cs` |  |
 | `Depth.TerrainHeight.KaijuSmashMargin` | 0.25 | double | `Assets/_Game/Sim/Config/TerrainHeightConfig.cs` | Kaiju body overlap test: its wall collider radius (PhysicsConfig.KaijuBodyRadius) plus this margin, u. |
+| `Depth.CombatFeel.Enabled` | true | bool | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` | The one switch (default ON in Full). False = the game before b15 combat feel, bit for bit. |
+| `Depth.CombatFeel.Classes[0].MaxHp` | 115 | double | `Assets/_Game/Sim/Config/GameConfig.cs` |  |
+| `Depth.CombatFeel.Classes[0].MoveSpeed` | 3.8 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | Units per second. |
+| `Depth.CombatFeel.Classes[0].Radius` | 0.45 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | Collision circle. |
+| `Depth.CombatFeel.Classes[0].AttackDamage` | 21 | double | `Assets/_Game/Sim/Config/GameConfig.cs` |  |
+| `Depth.CombatFeel.Classes[0].AttackRange` | 1.8 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | Melee reach from the actor centre. |
+| `Depth.CombatFeel.Classes[0].AttackArcDeg` | 110 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | Cleave arc, centred on facing. |
+| `Depth.CombatFeel.Classes[0].AttackCooldown` | 0.9 | double | `Assets/_Game/Sim/Config/GameConfig.cs` |  |
+| `Depth.CombatFeel.Classes[0].AbilityCooldown` | 10 | double | `Assets/_Game/Sim/Config/GameConfig.cs` |  |
+| `Depth.CombatFeel.Classes[0].GatherSeconds` | 2 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | Time to pull one unit from a node. |
+| `Depth.CombatFeel.Classes[0].CarryCapacity` | 1 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | Max units carried. |
+| `Depth.CombatFeel.Classes[0].AttackWindupSeconds` | 0.4 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | DG-69 / OD-2: real seconds from the attack press to the hit (0 = the browser's press-tick hit). |
+| `Depth.CombatFeel.Classes[0].RecoverySeconds` | 0.3 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | DG-69: real seconds of slowed follow-through after the hit (the view's recovery; movement stays slowed). |
+| `Depth.CombatFeel.Classes[0].Mass` | 1.6 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | DG-70 / OD-3: knock distances are divided by this (Warrior heaviest, Farmer lightest). |
+| `Depth.CombatFeel.Classes[0].Poise` | 30 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | DG-70: a single hit of at least this much damage staggers this class (HeavyStunSeconds). |
+| `Depth.CombatFeel.Classes[1].MaxHp` | 100 | double | `Assets/_Game/Sim/Config/GameConfig.cs` |  |
+| `Depth.CombatFeel.Classes[1].MoveSpeed` | 4.2 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | Units per second. |
+| `Depth.CombatFeel.Classes[1].Radius` | 0.4 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | Collision circle. |
+| `Depth.CombatFeel.Classes[1].AttackDamage` | 23 | double | `Assets/_Game/Sim/Config/GameConfig.cs` |  |
+| `Depth.CombatFeel.Classes[1].AttackRange` | 2.3 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | Melee reach from the actor centre. |
+| `Depth.CombatFeel.Classes[1].AttackArcDeg` | 60 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | Cleave arc, centred on facing. |
+| `Depth.CombatFeel.Classes[1].AttackCooldown` | 0.65 | double | `Assets/_Game/Sim/Config/GameConfig.cs` |  |
+| `Depth.CombatFeel.Classes[1].AbilityCooldown` | 9 | double | `Assets/_Game/Sim/Config/GameConfig.cs` |  |
+| `Depth.CombatFeel.Classes[1].GatherSeconds` | 1 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | Time to pull one unit from a node. |
+| `Depth.CombatFeel.Classes[1].CarryCapacity` | 3 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | Max units carried. |
+| `Depth.CombatFeel.Classes[1].AttackWindupSeconds` | 0.27 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | DG-69 / OD-2: real seconds from the attack press to the hit (0 = the browser's press-tick hit). |
+| `Depth.CombatFeel.Classes[1].RecoverySeconds` | 0.22 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | DG-69: real seconds of slowed follow-through after the hit (the view's recovery; movement stays slowed). |
+| `Depth.CombatFeel.Classes[1].Mass` | 0.8 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | DG-70 / OD-3: knock distances are divided by this (Warrior heaviest, Farmer lightest). |
+| `Depth.CombatFeel.Classes[1].Poise` | 20 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | DG-70: a single hit of at least this much damage staggers this class (HeavyStunSeconds). |
+| `Depth.CombatFeel.Classes[2].MaxHp` | 100 | double | `Assets/_Game/Sim/Config/GameConfig.cs` |  |
+| `Depth.CombatFeel.Classes[2].MoveSpeed` | 4 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | Units per second. |
+| `Depth.CombatFeel.Classes[2].Radius` | 0.45 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | Collision circle. |
+| `Depth.CombatFeel.Classes[2].AttackDamage` | 17 | double | `Assets/_Game/Sim/Config/GameConfig.cs` |  |
+| `Depth.CombatFeel.Classes[2].AttackRange` | 1.5 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | Melee reach from the actor centre. |
+| `Depth.CombatFeel.Classes[2].AttackArcDeg` | 90 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | Cleave arc, centred on facing. |
+| `Depth.CombatFeel.Classes[2].AttackCooldown` | 0.65 | double | `Assets/_Game/Sim/Config/GameConfig.cs` |  |
+| `Depth.CombatFeel.Classes[2].AbilityCooldown` | 12 | double | `Assets/_Game/Sim/Config/GameConfig.cs` |  |
+| `Depth.CombatFeel.Classes[2].GatherSeconds` | 2 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | Time to pull one unit from a node. |
+| `Depth.CombatFeel.Classes[2].CarryCapacity` | 1 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | Max units carried. |
+| `Depth.CombatFeel.Classes[2].AttackWindupSeconds` | 0.2 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | DG-69 / OD-2: real seconds from the attack press to the hit (0 = the browser's press-tick hit). |
+| `Depth.CombatFeel.Classes[2].RecoverySeconds` | 0.18 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | DG-69: real seconds of slowed follow-through after the hit (the view's recovery; movement stays slowed). |
+| `Depth.CombatFeel.Classes[2].Mass` | 1.1 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | DG-70 / OD-3: knock distances are divided by this (Warrior heaviest, Farmer lightest). |
+| `Depth.CombatFeel.Classes[2].Poise` | 24 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | DG-70: a single hit of at least this much damage staggers this class (HeavyStunSeconds). |
+| `Depth.CombatFeel.Classes[3].MaxHp` | 120 | double | `Assets/_Game/Sim/Config/GameConfig.cs` |  |
+| `Depth.CombatFeel.Classes[3].MoveSpeed` | 4 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | Units per second. |
+| `Depth.CombatFeel.Classes[3].Radius` | 0.45 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | Collision circle. |
+| `Depth.CombatFeel.Classes[3].AttackDamage` | 12 | double | `Assets/_Game/Sim/Config/GameConfig.cs` |  |
+| `Depth.CombatFeel.Classes[3].AttackRange` | 1.4 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | Melee reach from the actor centre. |
+| `Depth.CombatFeel.Classes[3].AttackArcDeg` | 90 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | Cleave arc, centred on facing. |
+| `Depth.CombatFeel.Classes[3].AttackCooldown` | 0.7 | double | `Assets/_Game/Sim/Config/GameConfig.cs` |  |
+| `Depth.CombatFeel.Classes[3].AbilityCooldown` | 12 | double | `Assets/_Game/Sim/Config/GameConfig.cs` |  |
+| `Depth.CombatFeel.Classes[3].GatherSeconds` | 2 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | Time to pull one unit from a node. |
+| `Depth.CombatFeel.Classes[3].CarryCapacity` | 1 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | Max units carried. |
+| `Depth.CombatFeel.Classes[3].AttackWindupSeconds` | 0.23 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | DG-69 / OD-2: real seconds from the attack press to the hit (0 = the browser's press-tick hit). |
+| `Depth.CombatFeel.Classes[3].RecoverySeconds` | 0.25 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | DG-69: real seconds of slowed follow-through after the hit (the view's recovery; movement stays slowed). |
+| `Depth.CombatFeel.Classes[3].Mass` | 1 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | DG-70 / OD-3: knock distances are divided by this (Warrior heaviest, Farmer lightest). |
+| `Depth.CombatFeel.Classes[3].Poise` | 22 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | DG-70: a single hit of at least this much damage staggers this class (HeavyStunSeconds). |
+| `Depth.CombatFeel.Classes[4].MaxHp` | 120 | double | `Assets/_Game/Sim/Config/GameConfig.cs` |  |
+| `Depth.CombatFeel.Classes[4].MoveSpeed` | 4 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | Units per second. |
+| `Depth.CombatFeel.Classes[4].Radius` | 0.45 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | Collision circle. |
+| `Depth.CombatFeel.Classes[4].AttackDamage` | 26 | double | `Assets/_Game/Sim/Config/GameConfig.cs` |  |
+| `Depth.CombatFeel.Classes[4].AttackRange` | 1.6 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | Melee reach from the actor centre. |
+| `Depth.CombatFeel.Classes[4].AttackArcDeg` | 100 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | Cleave arc, centred on facing. |
+| `Depth.CombatFeel.Classes[4].AttackCooldown` | 0.9 | double | `Assets/_Game/Sim/Config/GameConfig.cs` |  |
+| `Depth.CombatFeel.Classes[4].AbilityCooldown` | 12 | double | `Assets/_Game/Sim/Config/GameConfig.cs` |  |
+| `Depth.CombatFeel.Classes[4].GatherSeconds` | 2 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | Time to pull one unit from a node. |
+| `Depth.CombatFeel.Classes[4].CarryCapacity` | 1 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | Max units carried. |
+| `Depth.CombatFeel.Classes[4].AttackWindupSeconds` | 0.33 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | DG-69 / OD-2: real seconds from the attack press to the hit (0 = the browser's press-tick hit). |
+| `Depth.CombatFeel.Classes[4].RecoverySeconds` | 0.3 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | DG-69: real seconds of slowed follow-through after the hit (the view's recovery; movement stays slowed). |
+| `Depth.CombatFeel.Classes[4].Mass` | 1.3 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | DG-70 / OD-3: knock distances are divided by this (Warrior heaviest, Farmer lightest). |
+| `Depth.CombatFeel.Classes[4].Poise` | 26 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | DG-70: a single hit of at least this much damage staggers this class (HeavyStunSeconds). |
+| `Depth.CombatFeel.Classes[5].MaxHp` | 110 | double | `Assets/_Game/Sim/Config/GameConfig.cs` |  |
+| `Depth.CombatFeel.Classes[5].MoveSpeed` | 4.1 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | Units per second. |
+| `Depth.CombatFeel.Classes[5].Radius` | 0.42 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | Collision circle. |
+| `Depth.CombatFeel.Classes[5].AttackDamage` | 15 | double | `Assets/_Game/Sim/Config/GameConfig.cs` |  |
+| `Depth.CombatFeel.Classes[5].AttackRange` | 1.5 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | Melee reach from the actor centre. |
+| `Depth.CombatFeel.Classes[5].AttackArcDeg` | 90 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | Cleave arc, centred on facing. |
+| `Depth.CombatFeel.Classes[5].AttackCooldown` | 0.8 | double | `Assets/_Game/Sim/Config/GameConfig.cs` |  |
+| `Depth.CombatFeel.Classes[5].AbilityCooldown` | 9 | double | `Assets/_Game/Sim/Config/GameConfig.cs` |  |
+| `Depth.CombatFeel.Classes[5].GatherSeconds` | 1.5 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | Time to pull one unit from a node. |
+| `Depth.CombatFeel.Classes[5].CarryCapacity` | 2 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | Max units carried. |
+| `Depth.CombatFeel.Classes[5].AttackWindupSeconds` | 0.23 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | DG-69 / OD-2: real seconds from the attack press to the hit (0 = the browser's press-tick hit). |
+| `Depth.CombatFeel.Classes[5].RecoverySeconds` | 0.22 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | DG-69: real seconds of slowed follow-through after the hit (the view's recovery; movement stays slowed). |
+| `Depth.CombatFeel.Classes[5].Mass` | 0.9 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | DG-70 / OD-3: knock distances are divided by this (Warrior heaviest, Farmer lightest). |
+| `Depth.CombatFeel.Classes[5].Poise` | 20 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | DG-70: a single hit of at least this much damage staggers this class (HeavyStunSeconds). |
+| `Depth.CombatFeel.Strikes[0].Knock` | 0.9 | double | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` | Knock of a landed hit (u travelled by a mass-1 body; Knock.Effective divides by the victim's Mass). |
+| `Depth.CombatFeel.Strikes[0].ArmouredWindup` | true | bool | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` | Hits under this class's Poise do not stagger it (or cancel its swing) while it winds up. |
+| `Depth.CombatFeel.Strikes[1].Knock` | 0.7 | double | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` | Knock of a landed hit (u travelled by a mass-1 body; Knock.Effective divides by the victim's Mass). |
+| `Depth.CombatFeel.Strikes[1].ArmouredWindup` | false | bool | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` | Hits under this class's Poise do not stagger it (or cancel its swing) while it winds up. |
+| `Depth.CombatFeel.Strikes[2].Knock` | 0.3 | double | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` | Knock of a landed hit (u travelled by a mass-1 body; Knock.Effective divides by the victim's Mass). |
+| `Depth.CombatFeel.Strikes[2].ArmouredWindup` | false | bool | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` | Hits under this class's Poise do not stagger it (or cancel its swing) while it winds up. |
+| `Depth.CombatFeel.Strikes[3].Knock` | 0.4 | double | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` | Knock of a landed hit (u travelled by a mass-1 body; Knock.Effective divides by the victim's Mass). |
+| `Depth.CombatFeel.Strikes[3].ArmouredWindup` | false | bool | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` | Hits under this class's Poise do not stagger it (or cancel its swing) while it winds up. |
+| `Depth.CombatFeel.Strikes[4].Knock` | 1.3 | double | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` | Knock of a landed hit (u travelled by a mass-1 body; Knock.Effective divides by the victim's Mass). |
+| `Depth.CombatFeel.Strikes[4].ArmouredWindup` | false | bool | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` | Hits under this class's Poise do not stagger it (or cancel its swing) while it winds up. |
+| `Depth.CombatFeel.Strikes[5].Knock` | 0.6 | double | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` | Knock of a landed hit (u travelled by a mass-1 body; Knock.Effective divides by the victim's Mass). |
+| `Depth.CombatFeel.Strikes[5].ArmouredWindup` | false | bool | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` | Hits under this class's Poise do not stagger it (or cancel its swing) while it winds up. |
+| `Depth.CombatFeel.BufferSeconds` | 0.2 | double | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` | An attack press this early (real seconds) before it could be accepted fires on the first tick it can. |
+| `Depth.CombatFeel.WindupMoveMultiplier` | 1 | double | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` | Move speed while winding up and while recovering (no skating swings; the shipped physics value is 1.0). |
+| `Depth.CombatFeel.RecoveryMoveMultiplier` | 1 | double | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` |  |
+| `Depth.CombatFeel.WhiffRecoverySeconds` | 0.15 | double | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` | Extra recovery (real seconds) after a swing that hit nothing: the whiff is punishable. |
+| `Depth.CombatFeel.StaggerSeconds` | 0.1 | double | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` | Every melee hit staggers this long (real seconds): input ignored, no attack; a non-armoured wind-up is cancelled. |
+| `Depth.CombatFeel.HeavyStaggerSeconds` | 0.25 | double | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` | A hit at or over the victim's Poise staggers this long instead. |
+| `Depth.CombatFeel.StaggerWindowSeconds` | 1.2 | double | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` | Diminishing returns: each earlier stagger inside the window multiplies the next by StaggerDecay. |
+| `Depth.CombatFeel.StaggerDecay` | 0.5 | double | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` |  |
+| `Depth.CombatFeel.StaggerMaxInWindow` | 3 | int | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` | After this many staggers inside one window the victim is immune to stagger for StaggerImmuneSeconds. |
+| `Depth.CombatFeel.StaggerImmuneSeconds` | 0.8 | double | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` |  |
+| `Depth.CombatFeel.StaggerMaxLockSeconds` | 0.4 | double | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` | No stun-lock: a run of melee staggers (each new one landing before the last ends) never lasts longer than this (real seconds); a hit that would extend it past the cap is clipped and gives StaggerImmuneSeconds at once. |
+| `Depth.CombatFeel.StaggerChainCapSeconds` | 0.5 | double | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` | Pass 3: no stun from any source (melee, Kaiju, blast) carries one unbroken stagger run past this; a stun that lands inside a run is shortened to fit (Knock.Push). StaggerMaxLockSeconds caps the melee share inside it. |
+| `Depth.CombatFeel.BotUnjam` | true | bool | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` | Bots side-step when jammed (BotSteer.Unjam). False = the FSM's own unstick only. |
+| `Depth.CombatFeel.BotUnjamKaijuClear` | 6 | double | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` |  |
+| `Depth.CombatFeel.BotUnjamHillClear` | -1 | double | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` | No side-step within the hill disc grown by this many u (negative = no such rule). |
+| `Depth.CombatFeel.BotUnjamHillZone` | 0 | double | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` | Pass 4: no side-step within this many u of the hill centre while the Kaiju is hatched (the Kaiju's fight zone, KaijuHillFightRadius 13 plus its leash; 0 = no such rule). |
+| `Depth.CombatFeel.BotUnjamBudget` | 3 | int | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` | Pass 4: the side-step budget: at most BotUnjamBudget side-steps per bot in any BotUnjamBudgetSeconds window (0 = unbounded). Past it the FSM's own slower unstick (StuckSeconds) takes over. |
+| `Depth.CombatFeel.BotUnjamBudgetSeconds` | 6 | double | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` |  |
+| `Depth.CombatFeel.StaggerSlowSeconds` | 0.3 | double | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` | After a stagger the victim moves at StaggerSlowMultiplier for StaggerSlowSeconds. |
+| `Depth.CombatFeel.StaggerSlowMultiplier` | 1 | double | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` | OWNER FEEL-TEST: 0.6 slows after a stagger (see WindupMoveMultiplier) |
+| `Depth.CombatFeel.FarmerCloseRange` | 1.2 | double | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` |  |
+| `Depth.CombatFeel.FarmerCloseShare` | 0.6 | double | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` |  |
+| `Depth.CombatFeel.SunderSeconds` | 3 | double | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` |  |
+| `Depth.CombatFeel.SunderDamageTaken` | 0.15 | double | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` |  |
+| `Depth.CombatFeel.MinerHeavyPierce` | 1.4 | double | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` |  |
+| `Depth.CombatFeel.MinerHeavyMass` | 1.3 | double | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` |  |
+| `Depth.CombatFeel.MinerStructureMultiplier` | 2 | double | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` |  |
+| `Depth.CombatFeel.BuilderHomeRadius` | 3.5 | double | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` |  |
+| `Depth.CombatFeel.BuilderHomeMultiplier` | 1.5 | double | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` |  |
+| `Depth.CombatFeel.TntCooldownTicks` | 180 | double | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` |  |
+| `Depth.CombatFeel.TntSelfShare` | 0.35 | double | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` | Share of her own TNT's blast damage the thrower takes when she stands inside its radius. |
+| `Depth.CombatFeel.TntDamage` | 46 | double | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` | Thrown TNT blast damage while the rule is on (DemolitionsTntConfig.Damage is 55). |
+| `Depth.CombatFeel.MendHeal` | 10 | double | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` | The Healer's mend while the rule is on (HealerConfig MendHeal 6 / MendRange 5.5). |
+| `Depth.CombatFeel.MendRange` | 6 | double | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` |  |
+| `Depth.CombatFeel.HealerBotStandOff` | 4 | double | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` | Bots: a Healer keeps this far from the enemy she is near (she mends from there, swings only when caught). |
+| `Depth.CombatFeel.LadderSpeedMultiplier` | 0.55 | double | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` | Speed over a built ladder's cells (a ladder is at most LadderMaxCells = 2 long: about 0.9 s to climb at 0.55). |
+| `Depth.CombatFeel.LadderAllyPass` | true | bool | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` |  |
+| `Depth.CombatFeel.LadderFallKnock` | 1.2 | double | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` |  |
+| `Depth.CombatFeel.BotNarrowRawStep` | false | bool | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` | In narrow spots bots follow the raw next-cell step, not the blended flow. OFF by default: the shiver gate's match (seed 7) had 4 hard flags with it and 0 without (sim run 44233001957, CombatFeelTests shiver-by-part). |
+| `Depth.CombatFeel.BotLeadSeconds` | 0.13 | double | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` | Bots lead a moving target by at most this much of their wind-up (real seconds) when they chase and aim. |
+| `Depth.BotBrain.Enabled` | true | bool | `Assets/_Game/Sim/Config/DepthConfig.cs` | b15 integrator: ON by default in Full (TeamBrain.On keeps Classic and PhysicsOnly off) |
+| `Depth.BotBrain.KiteSquad` | 2 | int | `Assets/_Game/Sim/Config/DepthConfig.cs` | Kite squad size at 10 living bots or fewer, and above that. |
+| `Depth.BotBrain.KiteSquadLarge` | 3 | int | `Assets/_Game/Sim/Config/DepthConfig.cs` | Kite squad size at 10 living bots or fewer, and above that. |
+| `Depth.BotBrain.KiteMinHpShare` | 0.5 | double | `Assets/_Game/Sim/Config/DepthConfig.cs` | A kiter needs this share of its HP when it is picked. |
+| `Depth.BotBrain.KiteEngageRange` | 40 | double | `Assets/_Game/Sim/Config/DepthConfig.cs` | A kiter goes for the hostile Kaiju from this far (the plain FSM engages within 12 u). |
+| `Depth.BotBrain.GuardCount` | 2 | int | `Assets/_Game/Sim/Config/DepthConfig.cs` | Hill-squad bots that never chase off the hill (the cocky rule skips them). |
+| `Depth.BotBrain.StageRadius` | 15 | double | `Assets/_Game/Sim/Config/DepthConfig.cs` | The staging ring: this far from the hill centre (outside the Kaiju's 13 u fight zone). |
+| `Depth.BotBrain.GroupMin` | 3 | int | `Assets/_Game/Sim/Config/DepthConfig.cs` |  |
+| `Depth.BotBrain.GroupShare` | 0.5 | double | `Assets/_Game/Sim/Config/DepthConfig.cs` |  |
+| `Depth.BotBrain.RallySeconds` | 12 | double | `Assets/_Game/Sim/Config/DepthConfig.cs` |  |
+| `Depth.BotBrain.RallyOutnumberedBy` | 2 | int | `Assets/_Game/Sim/Config/DepthConfig.cs` | A respawned bot stages only while the enemy has at least this many more bodies on the hill disc. |
+| `Depth.BotBrain.TargetHealersFirst` | true | bool | `Assets/_Game/Sim/Config/DepthConfig.cs` |  |
+| `Depth.BotBrain.TargetStickScore` | 1.5 | double | `Assets/_Game/Sim/Config/DepthConfig.cs` |  |
+| `Depth.BotBrain.CallToHillDeficit` | 3 | int | `Assets/_Game/Sim/Config/DepthConfig.cs` |  |
+| `Depth.BotBrain.OwnKaijuEscort` | true | bool | `Assets/_Game/Sim/Config/DepthConfig.cs` | KAIJU HOLDS NOTHING job (PR #219's rule: a team scores nothing while its own sided Kaiju stands in the hill ring). |
+| `Depth.BotBrain.OwnKaijuRuleAssumed` | false | bool | `Assets/_Game/Sim/Config/DepthConfig.cs` | Test lever for a base without PR #219: behave as if the rule were on (it does not change the score). |
+| `Depth.Comeback.Enabled` | true | bool | `Assets/_Game/Sim/Config/ComebackConfig.cs` | The rule's own switch (default on; Full profile only). |
+| `Depth.Comeback.RallyOn` | true | bool | `Assets/_Game/Sim/Config/ComebackConfig.cs` | RALLY on / off (each lever has its own switch; the rule's Enabled turns them all off). |
+| `Depth.Comeback.TrailThresholdSeconds` | 5 | double | `Assets/_Game/Sim/Config/ComebackConfig.cs` | Behind on hill seconds by more than this (s) = trailing (RALLY and FORWARD RETURN). |
+| `Depth.Comeback.RallyPerMille` | 500 | int | `Assets/_Game/Sim/Config/ComebackConfig.cs` | Extra credit per owned tick while trailing, per mille of a tick (500 = the hill counts x1.5). |
+| `Depth.Comeback.BonusCapSeconds` | 60 | double | `Assets/_Game/Sim/Config/ComebackConfig.cs` | Extra hill seconds a team can bank from RALLY in one match. |
+| `Depth.Comeback.RespawnCurveOn` | true | bool | `Assets/_Game/Sim/Config/ComebackConfig.cs` |  |
+| `Depth.Comeback.RespawnStartSeconds` | 2 | double | `Assets/_Game/Sim/Config/ComebackConfig.cs` |  |
+| `Depth.Comeback.RespawnEndSeconds` | 5 | double | `Assets/_Game/Sim/Config/ComebackConfig.cs` |  |
+| `Depth.Comeback.CurvePower` | 1 | int | `Assets/_Game/Sim/Config/ComebackConfig.cs` | 1 = linear, 2 = quadratic (slow start). Integers only. |
+| `Depth.Comeback.WaveSeconds` | 0 | double | `Assets/_Game/Sim/Config/ComebackConfig.cs` | WAVES: a knocked-out fighter comes back at his team's next wave (every WaveSeconds of match time, both teams on the same beat), never sooner than his own wait: the dead regroup and walk back together. 0 = off. |
+| `Depth.Comeback.KaijuTurncoat` | false | bool | `Assets/_Game/Sim/Config/ComebackConfig.cs` | TURNCOAT KAIJU: a sided Kaiju knocked out by the other team gets up on the side of the team that knocked it down ("it becomes what beat it"); a neutral or berserk Kaiju never turns. |
+| `Depth.Comeback.FeedTrailingPerMille` | 0 | int | `Assets/_Game/Sim/Config/ComebackConfig.cs` | TRAILING FEED (arm C): while a team trails on hill seconds by more than TrailThresholdSeconds, its deliveries to the egg count this many per mille EXTRA toward allegiance (500 = x1.5). |
+| `Depth.Comeback.KaijuHillPerMille` | 0 | int | `Assets/_Game/Sim/Config/ComebackConfig.cs` | KAIJU HOLDS NOTHING (arm D): while a sided Kaiju is up and standing in the hill ring (hill radius plus its own radius), its team's hill seconds count this many per mille (500 = half). |
+| `Depth.Comeback.KaijuHillAnywhere` | false | bool | `Assets/_Game/Sim/Config/ComebackConfig.cs` | KAIJU HOLDS NOTHING applies wherever the sided Kaiju is while it is up (not only while it stands on the hill). |
+| `Depth.Comeback.HoldFatigueOn` | true | bool | `Assets/_Game/Sim/Config/ComebackConfig.cs` | HOLD FATIGUE: after HoldGraceSeconds of unbroken ownership the owner's hill seconds count less and less, down to HoldMinPerMille / 1000 after HoldSpanSeconds more; a lost, contested or empty hill resets the streak. |
+| `Depth.Comeback.HoldGraceSeconds` | 20 | double | `Assets/_Game/Sim/Config/ComebackConfig.cs` |  |
+| `Depth.Comeback.HoldSpanSeconds` | 40 | double | `Assets/_Game/Sim/Config/ComebackConfig.cs` |  |
+| `Depth.Comeback.HoldMinPerMille` | 250 | int | `Assets/_Game/Sim/Config/ComebackConfig.cs` |  |
+| `Depth.Comeback.MajorityMargin` | 1 | int | `Assets/_Game/Sim/Config/ComebackConfig.cs` | MAJORITY: the hill is owned only with at least this many more bodies than the other team (1 = today's rule); fewer is contested and nobody scores. |
+| `Depth.Comeback.ForwardReturnOn` | true | bool | `Assets/_Game/Sim/Config/ComebackConfig.cs` | FORWARD RETURN: a team trailing by more than TrailThresholdSeconds respawns at a rally point ForwardShare of the way from its pad to the hill (on open floor; the pad when the point is blocked). |
+| `Depth.Comeback.ForwardShare` | 0.4 | double | `Assets/_Game/Sim/Config/ComebackConfig.cs` |  |
+| `Depth.Comeback.ForwardWhenHillLost` | true | bool | `Assets/_Game/Sim/Config/ComebackConfig.cs` | FORWARD RETURN also for a team whose hill the other team holds (not only a trailing team). |
+| `Depth.HutChoices.Enabled` | true | bool | `Assets/_Game/Sim/Config/HutChoicesConfig.cs` | The rule's own switch (default on; Full profile only, and only while the hut rule is on). |
+| `Depth.HutChoices.VoteSeconds` | 8 | double | `Assets/_Game/Sim/Config/HutChoicesConfig.cs` |  |
+| `Depth.HutChoices.BotThinkSeconds` | 1 | double | `Assets/_Game/Sim/Config/HutChoicesConfig.cs` | A bot votes this many seconds after the vote opens, plus a seeded 0..BotThinkSpreadSeconds. |
+| `Depth.HutChoices.BotThinkSpreadSeconds` | 3 | double | `Assets/_Game/Sim/Config/HutChoicesConfig.cs` |  |
+| `Depth.HutChoices.BotContrarianShare` | 0.2 | double | `Assets/_Game/Sim/Config/HutChoicesConfig.cs` | Share of bot votes that go against the team-need choice (seeded per bot and level): the picks vary and a human's vote can swing a split team. |
+| `Depth.HutChoices.QuickReturnSeconds` | 1.5 | double | `Assets/_Game/Sim/Config/HutChoicesConfig.cs` | QUICK RETURN: the team's knock-out wait is this much shorter (s), never under RespawnFloorSeconds. |
+| `Depth.HutChoices.RespawnFloorSeconds` | 2 | double | `Assets/_Game/Sim/Config/HutChoicesConfig.cs` |  |
+| `Depth.HutChoices.ToughWallScale` | 1.5 | double | `Assets/_Game/Sim/Config/HutChoicesConfig.cs` | TOUGH WALLS: the team's Builder walls and blocks get this HP and life multiplier. |
+| `Depth.HutChoices.RichVeinsMineScale` | 0.6 | double | `Assets/_Game/Sim/Config/HutChoicesConfig.cs` | RICH VEINS: one ore takes this share of the mining channel (0.6 = 40% faster). |
+| `Depth.HutChoices.ShieldWallScale` | 0.8 | double | `Assets/_Game/Sim/Config/HutChoicesConfig.cs` | SHIELD WALL: a Warrior of the team with his shield up takes this share of every hit, from any side, before the shield's own frontal cut. |
+| `Depth.HutChoices.ShortFuseScale` | 0.7 | double | `Assets/_Game/Sim/Config/HutChoicesConfig.cs` | SHORT FUSE: the team's TNT blows after this share of the fuse (0.7 = 45 ticks to 32). |
+| `Depth.HutChoices.BlastGuardScale` | 0.75 | double | `Assets/_Game/Sim/Config/HutChoicesConfig.cs` | BLAST GUARD: the team takes this share of explosion damage (TNT and mines). |
+| `Depth.HutChoices.WideMendScale` | 1.4 | double | `Assets/_Game/Sim/Config/HutChoicesConfig.cs` | WIDE MEND: the team's Healers reach this much further with MEND (x MendRange: 5.5 u to 7.7 u). |
+| `Depth.HutChoices.KaijuHunterScale` | 1.25 | double | `Assets/_Game/Sim/Config/HutChoicesConfig.cs` | KAIJU HUNTERS: the team deals this much damage to the Kaiju. |
+| `Depth.HutChoices.SwiftFeetScale` | 1.1 | double | `Assets/_Game/Sim/Config/HutChoicesConfig.cs` | SWIFT FEET: the team moves this much faster while off the hill (beyond the hill radius + SwiftHillMargin). |
+| `Depth.HutChoices.SwiftHillMargin` | 2 | double | `Assets/_Game/Sim/Config/HutChoicesConfig.cs` |  |

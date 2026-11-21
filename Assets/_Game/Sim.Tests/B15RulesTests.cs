@@ -78,11 +78,19 @@ namespace CriticalMass.Sim.Tests
         [Test]
         public void BothSwitchesOffLeaveTheFullMatchBitIdenticalToTheBase()
         {
-            // The Full golden of the base (integration/batch-13-cand1 a67be2bc, SimPhysicsSoakTests before b15). With both b15
-            // switches off every hook returns its input, so the Full match must hash to it bit for bit. Re-pin these two values
-            // together with the Full golden row whenever another rule item moves that row.
-            const ulong Base16 = 0xC0111682BA7C9FD6UL, Base5 = 0x75A137C63CDE1377UL;
-            Action<GameConfig> off = c => { c.ApplyRules(RulesProfile.Full); c.Depth.Comeback.Enabled = false; c.Depth.HutChoices.Enabled = false; };
+            // Batch 15 wave-two combine: the Full golden of wave one (batch 15 cand1, sim run 44835452641). With the wave-two
+            // switches off (these two rules, and the combat feel and bot brain merged beside them) every hook returns its input,
+            // so the Full match must hash to it bit for bit. Re-pin these two values together with the Full golden row whenever
+            // another rule item moves that row.
+            const ulong Base16 = 0x2B40BAD073394FD6UL, Base5 = 0x4E92D5071F543577UL;
+            Action<GameConfig> off = c =>
+            {
+                c.ApplyRules(RulesProfile.Full);
+                c.Depth.Comeback.Enabled = false;
+                c.Depth.HutChoices.Enabled = false;
+                c.Depth.CombatFeel.Enabled = false;
+                c.Depth.BotBrain.Enabled = false;
+            };
             ulong a = MatchHash.Run(1, 16, 3600, ClassId.Warrior, null, off);
             ulong b = MatchHash.Run(42, 5, 14500, ClassId.Warrior, null, off);
             Line("Full with Comeback.Enabled and HutChoices.Enabled false, 16v16 seed 1 2:00", "0x" + a.ToString("X16"), "0x" + Base16.ToString("X16"));

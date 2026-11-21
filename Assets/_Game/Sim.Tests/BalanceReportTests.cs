@@ -134,7 +134,10 @@ namespace CriticalMass.Sim.Tests
             DuelRunner.Cell wf = ttk[(int)ClassId.Warrior, (int)ClassId.Farmer];
             Assert.AreEqual(1, wf.Kills, "a Warrior kills a passive Farmer");
             Assert.That(wf.Ttk[0], Is.InRange(1.0, 15.0));
-            for (int b = 0; b < 6; b++) Assert.AreEqual(0, ttk[(int)ClassId.Healer, b].Kills, "the Healer has no weapon");
+            // b15 combat feel (PR #215) gives the Healer a self-defence lantern swing (Healer TTK row <= 6.20 s), so under Full
+            // she can kill a passive target; with the combat feel off she still has no weapon.
+            DuelRunner.Cell[,] plain = DuelRunner.Ttk(RulesProfile.Full, new[] { "Depth.CombatFeel.Enabled=false" }, 1);
+            for (int b = 0; b < 6; b++) Assert.AreEqual(0, plain[(int)ClassId.Healer, b].Kills, "without the combat feel the Healer has no weapon");
         }
 
         static BalanceReport OneRow(string key, int k, int n)
