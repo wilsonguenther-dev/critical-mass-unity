@@ -342,3 +342,89 @@ own wins 12 of 34. There is no way to steal or turn it (TURNCOAT is off, `Comeba
 - The Kaiju is not "led off" by the enemy; it is pushed off by its own team, because its AI walks back. See the fix in the
   ranked list (move the allied Kaiju's idle point to the hill rim on the enemy side).
 
+---
+
+## 6. Objectives and map
+
+### Where time is spent (control, share of time alive, 0.5 s samples)
+
+| class | hill disc | hill ring (6-15 u) | own base | bridge cells | flank | own mid | enemy mid | enemy base |
+|---|---|---|---|---|---|---|---|---|
+| Warrior | 0.568 | 0.145 | 0.140 | 0.121 | 0.005 | 0.020 | 0 | 0 |
+| Farmer | 0.245 | 0.186 | 0.116 | 0.173 | **0.199** | 0.067 | 0.008 | 0.005 |
+| Miner | 0.200 | 0.148 | **0.304** | 0.173 | 0.052 | 0.123 | 0 | 0 |
+| Demolitions | 0.492 | 0.189 | 0.153 | 0.127 | 0.015 | 0.023 | 0 | 0 |
+| Builder | 0.278 | 0.127 | **0.271** | 0.155 | 0.138 | 0.032 | 0 | 0 |
+| Healer | 0.440 | 0.199 | 0.189 | 0.147 | 0.001 | 0.025 | 0.001 | 0 |
+| all | 0.395 | 0.167 | 0.171 | 0.147 | 0.070 | 0.047 | 0.002 | 0.001 |
+
+- **The map is one point.** 56% of all living time is within 15 u of the hill centre; the enemy half outside the
+  ring is visited 0.3% of the time. The flanks are Farmer routes to nodes. There is no reason to go to the enemy side:
+  no objective, no resource only found there, no steal.
+- Activity by phase is flat (walk 0.35 / 0.34 / 0.34 / 0.32 and fight 0.27 / 0.26 / 0.28 / 0.29 for 0-2, 2-4, 4-6,
+  6-8 min): the match has no pace change except the hatch. Walking is the biggest single activity in every phase.
+
+### Spawn safety and the walk back
+- Deaths within 12 u of the victim's own pad: 0.1%. Deaths within 4 s of a respawn: 0.0%. Spawn protection 3 s and
+  stand-up 0.8 s (`GameConfig.cs:232-236`) plus FORWARD RETURN mean **no spawn camping**. Keep.
+- Respawn to first hit given or taken, median seconds: Warrior 11.8, Farmer 12.7, Miner 14.9, Demolitions 10.8,
+  Builder 11.3, Healer 12.0. Add the 2-5 s respawn timer: a knocked-out player is out of the fight about 15 s, half of it
+  walking. FORWARD RETURN (40% of the way) is what keeps that number at 12 s instead of about 18 s (systems audit).
+
+### Terrain use
+- Bots: 0 ground raised or lowered (terrain-height arm identical to control), 50 holes a match, all of them TNT craters;
+  3.3 walls and 5.3 ladders/bridges. The dig/place/climb verbs the owner approved for bots (2026-11-18) are not in
+  `BotBrain` (`BotBrain` clears the Terraform input). A human Miner who digs is doing something no bot does.
+- Walls are refused within 3 u of the hill centre (`Sim/Config/BuildConfig.cs:24` `HillKeepout = 3.0`), but the hill is
+  6 u (`GameConfig.cs` Hill radius). **A Builder can wall the outer half of the scoring disc.** Bots do not do it on
+  purpose; walls off moves Kaiju-owner wins 0.883 to 0.733, so the walls bots do build already help the holder.
+
+---
+
+## 7. Bots as teammates and opponents
+
+- **Pings:** bots ping 102 times a match (directors' calls, "on the hill", "egg"). They never read a human's ping
+  (there is no ping input in the probe; in the code the bot director has no branch on human pings). A human cannot
+  ask his bots for anything.
+- **Roles they fill:** hill quota `ceil(0.3 x team)`, egg duty `round(0.25 x team)` + 2 when ahead or 10 s behind
+  (`BotDirector.cs:11,183-190`). At 16 that is 6 feeders; at 5 it is 3 of 5 (the idle side effect in section 5).
+- **Healer focus:** `TargetHealersFirst` (`Sim/Bots/TeamBrain.cs:279`) scores a Healer as if she stood at 1% of her
+  distance, so every bot in range targets her first: 18 deaths a match against 7.9-13.6 for the others. Round 2 measures
+  the arm with it off. The design advisor asked for "target healers / lowest health" (2026-11-19/20), so the rule is on
+  purpose; the size of it is the question.
+- **What bots never do:** switch class (0), dig or place ground (0), go to the enemy half (0.3%), build a wall where it
+  matters, cleanse corruption on purpose (0.14 a match), purify (0).
+- **Difficulty** (`Runtime/Menus/MatchSetup.cs:136-160`, `Sim/Bots/BotSkill.cs:25-33`): Easy, Normal, Hard apply to
+  **enemy bots only**. The player's own bots are always Normal (`AllyBotDifficulty` is never set by any menu; its enum
+  default is Normal, `Sim/Core/SimEnums.cs:22`). Easy = think 1.5x slower, 1.5 u aim error, 40% swing hesitation, half
+  the abilities; Hard = twice as fast, no aim error, TNT leads 60%. Not measured here (the balance tool has no switch
+  for per-team difficulty; would need a probe arm).
+- **Bots as opponents:** they never change plan when the human is the best player on the field (no "focus the human",
+  no "push the weakest lane"). They are predictable: everybody on the disc.
+
+---
+
+## 8. Feedback and learning (rules side)
+
+What the HUD tells the player (`Runtime/Hud/Mechanics/B15RulesHud.cs:287-330`, `Runtime/Hud/DeathRecap.cs`,
+`Runtime/Game/MatchWords.cs:81-88`):
+
+| rule | is it shown? | gap |
+|---|---|---|
+| HOLD FATIGUE | "tiring" line while the rate falls | the cost (90 s a match) is never shown; a player sees his lead stall without the cause in the result |
+| RALLY | RALLY badge when trailing | fine |
+| FORWARD RETURN | forward rally point on the map | fine |
+| KAIJU HOLDS NOTHING | NO SCORE pill | fine; the owner team does not learn "lead the Kaiju off", it learns "the score stopped" |
+| Hut vote | vote card for 8 s | bots close it in about 3 s; the human sees a result, not a choice |
+| Hut result | toast | fine |
+| Death | "Knocked out by X" + a tip | fine |
+| Kaiju type | name on hatch | the reason (which food decided it) is never shown; players cannot learn to steer it |
+| Kaiju owner | colour | fine |
+| Why we lost | results screen | no "the Kaiju decided it" or "you lost the hatch race by 40 food"; no turning point |
+| First-match goals | one line per class | the Miner's line is stale (section 3) |
+| Trial | 14 steps (`Runtime/Onboarding/TrialSteps.cs`) | does not teach hut votes, fatigue, RALLY, the hill rule or the Kaiju feeding race |
+
+What a new player can infer from the screen in his first match: stand on the circle, hit people, the big monster is
+important. What he cannot: that feeding decides the Kaiju, that the Kaiju decides the match, and that a Warrior is the
+worst body to stack. The biggest learning gap is the one with the biggest effect on winning.
+
