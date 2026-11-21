@@ -61,6 +61,8 @@ namespace CriticalMass.Runtime.View.Dressing
         private MapDef _map;
         private int _seenGridVersion;
         private byte[] _cells;
+        /// <summary>b15 Editor review r3: the lift seen at the last grid change (a dig lowers the lift and keeps the cell Floor).</summary>
+        private sbyte[] _lift;
         private Transform _root;
         private WorldKitCatalog _catalog;
         private readonly Dictionary<string, Material> _mats = new Dictionary<string, Material>();
@@ -370,6 +372,20 @@ namespace CriticalMass.Runtime.View.Dressing
                 _cells[i] = cells[i];
                 if (wasLand != isLand) dirtyChunks.Add(ChunkOf(i % _map.Width + 0.5, i / _map.Width + 0.5));
                 breakables = true;
+            }
+            // b15 Editor review r3: a dig lowers the lift and leaves the cell Floor, so the land-ness test above never fired
+            // and the ground chunk kept its flat tile over the pit (the hole was drawn under it; only the earth lip showed).
+            // A lift change rebuilds that chunk (BuildGroundChunk skips TerrainEdits cells) and re-plans its dressing.
+            sbyte[] lift = w.Map.Lift;
+            if (lift != null)
+            {
+                if (_lift == null || _lift.Length != lift.Length) _lift = new sbyte[lift.Length];
+                for (int i = 0; i < lift.Length; i++)
+                {
+                    if (lift[i] == _lift[i]) continue;
+                    _lift[i] = lift[i];
+                    dirtyChunks.Add(ChunkOf(i % _map.Width + 0.5, i / _map.Width + 0.5));
+                }
             }
             foreach (int c in dirtyChunks) BuildGroundChunk(c);
             if (dirtyChunks.Count > 0)
@@ -912,6 +928,7 @@ namespace CriticalMass.Runtime.View.Dressing
             _map = w.Map;
             _seenGridVersion = w.GridVersion;
             _cells = (byte[])_map.Cells.Clone();
+            _lift = _map.Lift != null ? (sbyte[])_map.Lift.Clone() : null;
             _catalog = WorldKitCatalog.Load();
             if (_catalog == null || _catalog.Names.Length == 0) yield break;
             var st = System.Diagnostics.Stopwatch.StartNew();
