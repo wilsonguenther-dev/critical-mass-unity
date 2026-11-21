@@ -845,6 +845,19 @@ Regenerate: `tools/balance/balance-report.sh tuning-index (or the balance-report
 | `Depth.CombatFeel.LadderFallKnock` | 1.2 | double | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` |  |
 | `Depth.CombatFeel.BotNarrowRawStep` | false | bool | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` | In narrow spots bots follow the raw next-cell step, not the blended flow. OFF by default: the shiver gate's match (seed 7) had 4 hard flags with it and 0 without (sim run 44233001957, CombatFeelTests shiver-by-part). |
 | `Depth.CombatFeel.BotLeadSeconds` | 0.13 | double | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` | Bots lead a moving target by at most this much of their wind-up (real seconds) when they chase and aim. |
+| `Depth.CombatFeel.SunderBreaksArmour` | true | bool | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` | b16 duel order: a SUNDER-marked Warrior loses its armour (its wind-up can be staggered). |
+| `Depth.CombatFeel.MinerPierceWarrior` | true | bool | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` | b16 duel order: the Miner's pierce bonus (mass 1.3 and up) applies to the Warrior. |
+| `Depth.CombatFeel.StaggerCancelRefund` | 0 | double | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` | b16: share of the cooldown given back when a stagger cancels a wind-up (0 = the full cooldown is kept). |
+| `Depth.CombatFeel.StrikeStaggers` | null | bool[] | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` | b16: per attacker class, does its melee hit stagger (null = every class). |
+| `Depth.CombatFeel.PulseSelfShare` | 1 | double | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` | b16: share of the Healer's pulse heal the Healer gets on herself (team healing unchanged). |
+| `Depth.CombatFeel.WhiffExtraSeconds` | null | double[] | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` | b16: per class extra recovery (real seconds) after a whiff, on top of WhiffRecoverySeconds. |
+| `Depth.CombatFeel.OutnumberedBreaksArmour` | false | bool | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` | b16 trade: an armoured class struck by a second attacker within OutnumberedSeconds loses its armour for that hit. |
+| `Depth.CombatFeel.OutnumberedSeconds` | 1 | double | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` | b16 trade: the window for OutnumberedBreaksArmour. |
+| `Depth.CombatFeel.CancelEnabled` | true | bool | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` | b16 CANCEL (Full only): the cancel input feints a wind-up or cuts the recovery after a landed hit. False = the button does nothing. |
+| `Depth.CombatFeel.FeintRecoverySeconds` | 0.1 | double | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` | b16 CANCEL: the fixed recovery after a feint (no swing, no dodge). |
+| `Depth.CombatFeel.FeintRefund` | 0.7 | double | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` | b16 CANCEL: share of the attack cooldown left that a feint gives back (never under the feint recovery). |
+| `Depth.CombatFeel.FeintLockoutSeconds` | 0.5 | double | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` | b16 CANCEL: no second feint within this long after a feint. |
+| `Depth.CombatFeel.HitCancelShare` | 0.4 | double | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` | b16 CANCEL: share of the remaining recovery a hit-cancel cuts (only after a landed hit, once per attack). |
 | `Depth.BotBrain.Enabled` | true | bool | `Assets/_Game/Sim/Config/DepthConfig.cs` | b15 integrator: ON by default in Full (TeamBrain.On keeps Classic and PhysicsOnly off) |
 | `Depth.BotBrain.KiteSquad` | 2 | int | `Assets/_Game/Sim/Config/DepthConfig.cs` | Kite squad size at 10 living bots or fewer, and above that. |
 | `Depth.BotBrain.KiteSquadLarge` | 3 | int | `Assets/_Game/Sim/Config/DepthConfig.cs` | Kite squad size at 10 living bots or fewer, and above that. |
