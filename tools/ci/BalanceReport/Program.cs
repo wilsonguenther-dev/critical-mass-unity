@@ -42,6 +42,7 @@ namespace CriticalMass.Balance
             public string Base, Head;
             public string Arms;
             public int Shard, Shards = 1;
+            public AuditOptions Audit = new AuditOptions();   // AUDIT ONLY (audit/mechanics-2026-11-21)
         }
 
         public static int Main(string[] args)
@@ -103,11 +104,17 @@ namespace CriticalMass.Balance
                         o.Shards = int.Parse(kn[1], CultureInfo.InvariantCulture);
                         break;
                     }
+                    case "--idle": o.Audit.Idle = true; break;
+                    case "--mix-team": o.Audit.MixTeam = ParseTeam(V()); break;
+                    case "--mix": o.Audit.Mix = Array.ConvertAll(V().Split(','), x => int.Parse(x.Trim(), CultureInfo.InvariantCulture)); break;
+                    case "--no-feed-team": o.Audit.NoFeedTeam = ParseTeam(V()); break;
                     default: throw new ArgumentException("unknown option " + k);
                 }
             }
             return o;
         }
+
+        static int ParseTeam(string s) => s.Trim().ToLowerInvariant() == "crimson" || s.Trim() == "1" ? 1 : 0;
 
         static RulesProfile ParseProfile(string s)
         {
@@ -163,6 +170,7 @@ namespace CriticalMass.Balance
             BalanceReport r = Measure(o, o.Profile, o.Sets, o.Label);
             List<BalanceTarget> targets = LoadTargets(o);
             Write(o.Out ?? "Temp/balance/report", "balance-report", BalanceWriter.Markdown(r, targets), BalanceWriter.Json(r), BalanceWriter.Csv(r));
+            File.WriteAllText(Path.Combine(o.Out ?? "Temp/balance/report", "audit.jsonl"), o.Audit.Lines.ToString());
             PrintTargets(r, targets);
             return 0;
         }
@@ -211,7 +219,7 @@ namespace CriticalMass.Balance
                 {
                     var sw = Stopwatch.StartNew();
                     ReplayRecorder rec = null;
-                    MatchRecord m = BalanceRunner.BotMatch(BalanceRunner.Config(profile, sets), seed, o.TeamSize, 0,
+                    MatchRecord m = o.Record == null ? AuditRunner.Match(BalanceRunner.Config(profile, sets), seed, o.TeamSize, o.Audit) : BalanceRunner.BotMatch(BalanceRunner.Config(profile, sets), seed, o.TeamSize, 0,
                         w =>
                         {
                             if (o.Record == null) return;
