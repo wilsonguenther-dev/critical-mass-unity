@@ -145,6 +145,12 @@ namespace CriticalMass.Sim.Config
         /// <summary>After a stagger the victim moves at StaggerSlowMultiplier for StaggerSlowSeconds.</summary>
         public double StaggerSlowSeconds = 0.30;
         public double StaggerSlowMultiplier = 1.0; // OWNER FEEL-TEST: 0.6 slows after a stagger (see WindupMoveMultiplier)
+        /// <summary>b15 integrator (duel lever 1): a stagger that cancels a wind-up gives the swing's cooldown back, so the hit
+        /// interrupts that swing and not the next one too (false: the cancelled swing keeps its whole cooldown).</summary>
+        public bool CancelRefundsCooldown = false;
+        /// <summary>b15 integrator (duel lever 2): a hit under the victim's Poise never cancels its wind-up (every class gets the
+        /// Warrior's armoured wind-up against light hits; SUNDER still strips only the Warrior's own armour).</summary>
+        public bool LightHitsKeepWindup = false;
 
         // ---- C. class extras
         public double FarmerCloseRange = 1.2;

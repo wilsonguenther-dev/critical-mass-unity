@@ -85,6 +85,7 @@ namespace CriticalMass.Sim.Core
                 if (t.SwingPending)
                 {
                     t.SwingPending = false;
+                    if (CombatFeel.On(w) && w.Config.Depth.CombatFeel.CancelRefundsCooldown) t.AttackCd = 0;
                     World.PushEvent(w, SimEventType.AttackCancel, target, source, w.X[target], w.Z[target], 0);
                 }
             }

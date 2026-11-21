@@ -209,7 +209,7 @@ namespace CriticalMass.Sim.Core
             if (immune) return 0;
             bool heavy = amount >= w.Config.Class(t.Cls).Poise;
             // Armour break: a SUNDERED body (a Miner hit it in the last SunderSeconds) loses its armoured wind-up.
-            if (!heavy && t.SwingPending && f.Strikes[(int)t.Cls].ArmouredWindup && w.Tick > s.SunderUntil[target])
+            if (!heavy && t.SwingPending && (f.LightHitsKeepWindup || (f.Strikes[(int)t.Cls].ArmouredWindup && w.Tick > s.SunderUntil[target])))
             {
                 armoured = true;
                 return 0;
