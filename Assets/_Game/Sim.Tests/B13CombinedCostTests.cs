@@ -25,6 +25,11 @@ namespace CriticalMass.Sim.Tests
         {
             GameConfig c = GameConfig.CreateDefault();
             c.Depth.CombatFeel.Enabled = false; // b15: this measures the three b13 items on the b13 fights; CombatFeelTests times the feel rule
+            // b15 wave two: the same for the bot brain (on by default since the combine; BotBrainBlowoutTests times it). With the
+            // combat feel OFF and the brain ON, the dodge arm costs +38% pooled over the six seeds (probe run 44854921377; the
+            // terrain-jump hook is not it: 1.65 with it disabled, run 44854009447). In the shipped game (feel on) the whole wave
+            // measured +3.3% per tick against wave one at 72 seeds (balance run 44854626081). Listed as a follow-up for the brain.
+            c.Depth.BotBrain.Enabled = false;
             c.Depth.Dodge.On = dodge;
             c.Depth.Build.On = walls;
             c.Depth.Corruption.On = corruption;
