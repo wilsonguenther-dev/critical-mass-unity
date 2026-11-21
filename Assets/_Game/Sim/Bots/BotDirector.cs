@@ -210,7 +210,9 @@ namespace CriticalMass.Sim.Bots
                 bool huntingUs = tgt >= 0 && tgt < world.ActorCount && world.Actors[tgt].Team == team;
                 if (hostile && k.KoIn <= 0 && (k.State != KaijuState.Berserk || huntingUs))
                 {
-                    for (int c = 0; c < count; c++) Desired[c] = (byte)BotsState.RoleFightKaiju;
+                    // b15 bot brain: a kite squad keeps the Kaiju busy and the rest contest the hill (before: the whole team left it).
+                    if (TeamBrain.On(world)) TeamBrain.PickKiteSquad(world, st, Ids, count, Desired);
+                    else for (int c = 0; c < count; c++) Desired[c] = (byte)BotsState.RoleFightKaiju;
                 }
             }
 
@@ -311,6 +313,7 @@ namespace CriticalMass.Sim.Bots
                 AssignTeam(w, st, team, now, shortHanded, mine > theirs);
                 BotDepth.AssignSupply(w, st, team); // U-064
                 BotDepth.AssignHillSquad(w, st, team); // U-076
+                if (TeamBrain.On(w)) TeamBrain.AssignJobs(w, st, team);   // b15 bot brain
             }
             byte[] f = mem.Cocky;
             MatchState m = w.Match;

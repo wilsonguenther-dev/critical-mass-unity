@@ -587,6 +587,11 @@ namespace CriticalMass.Sim.Bots
                     Toward(w, id, st.UnstickX[id], st.UnstickZ[id], 0.2);
                     break;
                 case AiState.HoldHill:
+                    if (TeamBrain.On(w) && st.Job[id] == TeamBrain.JobEscort)
+                    {
+                        Escort(w, st, id, a);   // b15 bot brain: KAIJU HOLDS NOTHING, walk our Kaiju off the disc
+                        break;
+                    }
                     if (calm) HoldPost(w, st, id, x, z, mates);
                     else Toward(w, id, st.PostX[id], st.PostZ[id], 0.5);
                     break;
@@ -638,6 +643,18 @@ namespace CriticalMass.Sim.Bots
                     // and the straight line counts only when the whole body fits along it (no route / line flip at a wall end).
                     bool wide = Phys.On(w, cfg.Physics.BotWideLine);
                     bool seen = !wide || !Phys.On(w, cfg.Physics.WallsBlockHits) || SegmentClear.Clear(map, x, z, tx, tz);
+                    // b15 bot brain (a): a kiter strikes the Kaiju from its side away from the hill, so the Kaiju's chase walks it
+                    // off the disc. Only while the straight line to that point is clear; else the plain fight steering below.
+                    if (t == BotsState.TargetKaiju && TeamBrain.On(w) && st.Job[id] == TeamBrain.JobKite)
+                    {
+                        TeamBrain.KitePoint(w, id, reach, out double kpx, out double kpz);
+                        if (wide ? WideLineClear(map, x, z, kpx, kpz, cc.Radius * 0.9, 0.5) : FirstBlockedCell(map, x, z, kpx, kpz) < 0)
+                        {
+                            if (d2 <= reach * reach && seen) output.Attack = InArc(w, id, tx, tz);
+                            Toward(w, id, kpx, kpz, 0.3);
+                            break;
+                        }
+                    }
                     if (calm)
                     {
                         FightCalm(w, st, id, t, tx, tz, reach, output);
@@ -833,6 +850,18 @@ namespace CriticalMass.Sim.Bots
                 }
                 default:
                 {
+                    // b15 bot brain (b): a respawned attacker waits at the staging ring until its group goes in together.
+                    if (a.AiState == AiState.ToHill && TeamBrain.On(w) && TeamBrain.HoldsAtStage(w, st, id))
+                    {
+                        aimX = map.Hill.X;
+                        aimZ = map.Hill.Z;
+                        break;
+                    }
+                    if (TeamBrain.On(w) && st.Job[id] == TeamBrain.JobEscort)
+                    {
+                        Escort(w, st, id, a);
+                        break;
+                    }
                     // toHill (and 'none' before the first think).
                     minerField = a.Cls == ClassId.Miner;
                     if (!Follow(w, st, id, minerField ? BotFields.FieldMinerHill : BotFields.FieldHill)) Toward(w, id, map.Hill.X, map.Hill.Z, 1);
@@ -1049,11 +1078,14 @@ namespace CriticalMass.Sim.Bots
             if (output.Attack && BotSkill.HoldsSwing(w, id)) output.Attack = false;
             // Sim-physics lane (DG-84 / DG-85): a Hard bot steps out of a telegraphed claw cone or slam ring, and jumps a slam.
             BotSkillConfig dsk = BotSkill.Profile(w, id);
-            if (dsk != null && dsk.DodgeKaiju && Phys.On(w, true) && DodgeKaiju(w, id, output)) st.WantMove[id] = 1;
+            // b15 bot brain: a kiter uses the dodge step and the slam jump at every skill level.
+            bool kiter = TeamBrain.On(w) && st.Job[id] == TeamBrain.JobKite;
+            if (((dsk != null && dsk.DodgeKaiju) || kiter) && Phys.On(w, true) && DodgeKaiju(w, id, output)) st.WantMove[id] = 1;
             // b13 r3 [K]: a bot the SHROUD would blind leaves the cloud and skirts it, unless it is contesting the hill.
             if (BotKaijuFeed.AvoidCloud(w, id, output)) st.WantMove[id] = 1;
             // b15 combat feel: a bot that has pressed for JamSeconds and covered under a quarter of its walk side-steps.
             if (CombatFeel.On(w) && cfg.Depth.CombatFeel.BotUnjam && Unjam(w, st, id, cc, output)) st.WantMove[id] = 1;
+            if (TeamBrain.On(w)) TeamBrain.TerrainVerbsHook(w, st, id, output);   // b15 bot brain (d): TerrainHeight hook (PR #211), a no-op here
 
             // Ability press decided at think time.
             if (st.AbilityReq[id] == 1)
@@ -1077,6 +1109,14 @@ namespace CriticalMass.Sim.Bots
                 output.AimX = x + output.MoveX * AimAhead;
                 output.AimZ = z + output.MoveZ * AimAhead;
             }
+        }
+
+        /// <summary>b15 bot brain, KAIJU HOLDS NOTHING escort: toward the enemy pad (its flow field), so the fights it meets
+        /// pull our Kaiju off the hill disc; straight at the Kaiju's far side if the field has no route.</summary>
+        private static void Escort(World w, BotsState st, int id, Actor a)
+        {
+            int field = a.Team == TeamId.Azure ? BotFields.FieldPadCrimson : BotFields.FieldPadAzure;
+            if (!Follow(w, st, id, field)) Toward(w, id, w.Kaiju.X, w.Kaiju.Z, 3);
         }
     }
 }
