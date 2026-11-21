@@ -307,14 +307,16 @@ namespace CriticalMass.Sim.Core
         /// of the body's span by at most CornerNudgeMax: shift the cross coordinate `other` off that cell by the overlap (at
         /// most `stepLen`) when the shifted body clears the line, so the body slides round the corner. False = still blocked.
         /// </summary>
-        private static bool CornerNudge(World w, int line, bool alongX, double r, double stepLen, double along, double blockedAlong, ref double other)
+        private static bool CornerNudge(World w, int line, bool alongX, double r, double stepLen, double along, double blockedAlong, ref double other, bool steered)
         {
             bool feel = PhysicsFeel.On(w);   // b16 [4]: grazes up to 0.35 u are rounded, over several ticks when deeper than a step
             // b16 combine: not at a bridge. On a deck or at its mouth the wide rounding slid a body that grazed the mouth corner
             // round it onto the island beside the mouth, where it stood against the edge (CreatorAcceptance Need4: B7 back and
             // B8 forward at +-60 degrees stalled at tick 17; Sim repro BridgeCrossingSweepTests...AcceptanceCrossingAt60Degrees:
             // only "corner nudge 0.1" and "physics feel off" crossed). There the plain rule's 0.1 u keeps the body in the band.
-            if (feel && NearBridge(alongX ? along : other, alongX ? other : along)) feel = false;
+            // The person-steered actor only (as the CM-33 rail below): bots path on the flow field, and with this on for them too
+            // Farmers pressed into the shrine-bridge gate posts at 56:13 for 16 s (sim run 44955420622, 11 hard flags).
+            if (feel && steered && NearBridge(alongX ? along : other, alongX ? other : along)) feel = false;
             double max = feel ? PhysicsFeel.Cfg(w).CornerNudgeMax : w.Config.Physics.CornerNudgeMax;
             int lo = JsMath.FloorToInt(other - r - RangeEps);
             int hi = JsMath.FloorToInt(other + r + RangeEps);
@@ -459,6 +461,7 @@ namespace CriticalMass.Sim.Core
                 double lx = px;
                 double lz = pz;
                 bool corners = !air && Phys.On(w, w.Config.Physics.CornerRounding); // DG-97 (S10): slide round convex corners
+                bool steered = corners && w.Actors[id].IsHuman && !Bots.BotBrain.ActorZeroOnAutopilot(w);   // b16 combine: bridge-mouth rounding
                 bool xHit = false, zHit = false;   // b16 [12]: which axis the wall stopped
                 if (sx != 0)
                 {
@@ -466,12 +469,12 @@ namespace CriticalMass.Sim.Core
                     if (sx > 0)
                     {
                         int cx = JsMath.FloorToInt(lx + r + RangeEps);
-                        if (RowBlocked(w, cx, lz, r, air) && !(corners && CornerNudge(w, cx, true, r, Math.Abs(sx), lx, JsMath.F32(cx - r - Skin), ref lz))) { lx = JsMath.F32(cx - r - Skin); xHit = true; }
+                        if (RowBlocked(w, cx, lz, r, air) && !(corners && CornerNudge(w, cx, true, r, Math.Abs(sx), lx, JsMath.F32(cx - r - Skin), ref lz, steered))) { lx = JsMath.F32(cx - r - Skin); xHit = true; }
                     }
                     else
                     {
                         int cx = JsMath.FloorToInt(lx - r - RangeEps);
-                        if (RowBlocked(w, cx, lz, r, air) && !(corners && CornerNudge(w, cx, true, r, Math.Abs(sx), lx, JsMath.F32(cx + 1 + r + Skin), ref lz))) { lx = JsMath.F32(cx + 1 + r + Skin); xHit = true; }
+                        if (RowBlocked(w, cx, lz, r, air) && !(corners && CornerNudge(w, cx, true, r, Math.Abs(sx), lx, JsMath.F32(cx + 1 + r + Skin), ref lz, steered))) { lx = JsMath.F32(cx + 1 + r + Skin); xHit = true; }
                     }
                 }
                 if (sz != 0)
@@ -480,12 +483,12 @@ namespace CriticalMass.Sim.Core
                     if (sz > 0)
                     {
                         int cz = JsMath.FloorToInt(lz + r + RangeEps);
-                        if (ColBlocked(w, cz, lx, r, air) && !(corners && CornerNudge(w, cz, false, r, Math.Abs(sz), lz, JsMath.F32(cz - r - Skin), ref lx))) { lz = JsMath.F32(cz - r - Skin); zHit = true; }
+                        if (ColBlocked(w, cz, lx, r, air) && !(corners && CornerNudge(w, cz, false, r, Math.Abs(sz), lz, JsMath.F32(cz - r - Skin), ref lx, steered))) { lz = JsMath.F32(cz - r - Skin); zHit = true; }
                     }
                     else
                     {
                         int cz = JsMath.FloorToInt(lz - r - RangeEps);
-                        if (ColBlocked(w, cz, lx, r, air) && !(corners && CornerNudge(w, cz, false, r, Math.Abs(sz), lz, JsMath.F32(cz + 1 + r + Skin), ref lx))) { lz = JsMath.F32(cz + 1 + r + Skin); zHit = true; }
+                        if (ColBlocked(w, cz, lx, r, air) && !(corners && CornerNudge(w, cz, false, r, Math.Abs(sz), lz, JsMath.F32(cz + 1 + r + Skin), ref lx, steered))) { lz = JsMath.F32(cz + 1 + r + Skin); zHit = true; }
                     }
                 }
                 // CM-33: grounded, inside a diagonal rail's capture zone: the deck and the rail (see the class summary).
