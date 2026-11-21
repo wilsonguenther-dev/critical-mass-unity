@@ -49,8 +49,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        seeds: ${{ github.event_name == 'push' && fromJSON('["24","72"]') || fromJSON(format('["{0}"]', inputs.seeds)) }}
-    timeout-minutes: ${{ matrix.seeds == '72' && 60 || 25 }}
+        include:
+          - { seeds: '72', base: 'Abilities.MinerTerraform.DigAimedCell=false', sw: '', tag: dig }
+          - { seeds: '72', base: '', sw: 'Depth.CombatFeel.Classes[2].AttackWindupSeconds=0.35', tag: mw35 }
+          - { seeds: '72', base: '', sw: 'Depth.CombatFeel.Classes[2].AttackWindupSeconds=0.40', tag: mw40 }
+    timeout-minutes: ${{ matrix.seeds == '72' && 120 || 45 }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -63,12 +66,12 @@ jobs:
         shell: bash
         env:
           # push (self-check): 24 seeds = compare integration/batch-13-cand1 (measured in a worktree) with this commit; 72 = report
-          MODE: ${{ inputs.mode || (matrix.seeds == '24' && 'compare' || 'report') }}
+          MODE: ${{ inputs.mode || 'compare' }}
           REF: ${{ inputs.ref }}
           SEEDS: ${{ matrix.seeds }}
-          SWITCHES: ${{ inputs.switches }}
-          BASE: ${{ github.event_name == 'push' && 'origin/integration/batch-13-cand1' || inputs.base }}
-          HEAD: ${{ inputs.head }}
+          SWITCHES: ${{ inputs.switches || matrix.sw }}
+          BASE: ${{ github.event_name == 'push' && matrix.base || inputs.base }}
+          HEAD: ${{ inputs.head || matrix.sw }}
         run: |
           set -o pipefail
           start=$(date +%s)
@@ -106,7 +109,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: balance-report-${{ matrix.seeds }}
+          name: balance-report-${{ matrix.seeds }}-${{ matrix.tag }}
           path: |
             Temp/balance/report-${{ matrix.seeds }}/
             Temp/balance/base-report/
