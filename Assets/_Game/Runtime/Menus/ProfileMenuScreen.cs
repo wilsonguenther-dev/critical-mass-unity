@@ -209,14 +209,60 @@ namespace CriticalMass.Runtime.Menus
         public void Refresh()
         {
             PlayerProfile p = P;
-            HudText.Set(_player, MetaWords.F("{0}   {1} {2}   {3}", p.PlayerName, ProgressionWords.Level, p.Level,
-                MetaWords.F(MetaWords.CareerLine, p.MatchesPlayed, p.Wins, p.Draws, p.Losses)));
+            HudText.Set(_player, HeaderLine(p));
             switch (Tab)
             {
                 case ProfileTab.Mastery: RefreshMastery(p); break;
                 case ProfileTab.History: RefreshHistory(p); break;
                 default: RefreshAchievements(p); break;
             }
+        }
+
+        // b15 view polish (Editor review item 5): the header read "66 matches" (PlayerProfile.MatchesPlayed: an account
+        // counter that also counts practice matches and everything before the class careers existed) while CAREER read
+        // "1 matches" (the selected class's ClassMastery). One source now: the class careers (practice excluded,
+        // docs/PROFILE-V2.md). The header is their sum, the CAREER line names its class, and the stats line no longer
+        // repeats KNOCK-OUTS / HILL TIME when they are already the class's job stats (the Warrior's).
+
+        /// <summary>The header: name, level, and the career totals summed over every class (the one source).</summary>
+        public static string HeaderLine(PlayerProfile p)
+        {
+            CareerTotals(p, out int n, out int w, out int d, out int l);
+            return MetaWords.F("{0}   {1} {2}   {3}", p.PlayerName, ProgressionWords.Level, p.Level, MetaWords.F(MetaWords.CareerLine, n, w, d, l));
+        }
+
+        /// <summary>Matches, wins, draws and losses summed over the class careers (no track is created).</summary>
+        public static void CareerTotals(PlayerProfile p, out int matches, out int wins, out int draws, out int losses)
+        {
+            matches = wins = draws = losses = 0;
+            if (p?.Mastery == null) return;
+            foreach (ClassMastery m in p.Mastery)
+            {
+                if (m == null) continue;
+                matches += m.Matches; wins += m.Wins; draws += m.Draws; losses += m.Losses;
+            }
+        }
+
+        /// <summary>"WARRIOR CAREER   1 matches   1 wins ...": the class's own share of the header's totals.</summary>
+        public static string CareerHead(ClassId cls, ClassMastery m) =>
+            MetaWords.F("{0} {1}   {2}", ProgressionWords.ClassName(cls), MetaWords.Career, MetaWords.F(MetaWords.CareerLine, m.Matches, m.Wins, m.Draws, m.Losses));
+
+        /// <summary>The class's career stats, each once: its two job stats, then knock-outs and hill time if not among them.</summary>
+        public static RoleStat[] CareerStats(ClassId cls)
+        {
+            RoleStat[] job = MasteryRules.Job[(int)cls];
+            var list = new List<RoleStat>(4) { job[0] };
+            foreach (RoleStat r in new[] { job[1], RoleStat.KnockOuts, RoleStat.HillSeconds })
+                if (!list.Contains(r)) list.Add(r);
+            return list.ToArray();
+        }
+
+        public static string CareerStatsLine(ClassId cls, ClassMastery m)
+        {
+            RoleStat[] stats = CareerStats(cls);
+            var parts = new string[stats.Length];
+            for (int i = 0; i < stats.Length; i++) parts[i] = MetaWords.StatValue(stats[i], m.Total(stats[i]));
+            return string.Join("     ", parts);
         }
 
         void RefreshMastery(PlayerProfile p)
@@ -264,11 +310,8 @@ namespace CriticalMass.Runtime.Menus
             }
             else
             {
-                HudText.Set(_career, MetaWords.F("{0}   {1}", MetaWords.Career, MetaWords.F(MetaWords.CareerLine, m.Matches, m.Wins, m.Draws, m.Losses)));
-                RoleStat[] job = MasteryRules.Job[(int)Class];
-                HudText.Set(_careerTotals, MetaWords.F("{0}     {1}     {2}     {3}",
-                    MetaWords.StatValue(job[0], m.Total(job[0])), MetaWords.StatValue(job[1], m.Total(job[1])),
-                    MetaWords.StatValue(RoleStat.KnockOuts, m.KnockOuts), MetaWords.StatValue(RoleStat.HillSeconds, m.HillSeconds)));
+                HudText.Set(_career, CareerHead(Class, m));
+                HudText.Set(_careerTotals, CareerStatsLine(Class, m));
             }
         }
 
