@@ -351,8 +351,12 @@ namespace CriticalMass.Sim.Core
                 // measured with ">= capTicks", CombatFeelBalanceTests run 44837692193).
                 if (a.Alive && a.HitStunTicks > 0 && capTicks > 0 && s.LockRun[i] >= capTicks - 1)
                 {
+                    // pass 4b: and the victim gets StaggerImmuneSeconds at once, or the next melee hit this same tick restarts the
+                    // stun with a full room and the lock runs on across the reset (0.63 s measured, slow run 44841109806).
                     a.HitStunTicks = 0;
                     s.LockRun[i] = 0;
+                    int until = w.Tick + Ticks(w, Cfg(w).StaggerImmuneSeconds);
+                    if (until > s.ImmuneUntil[i]) s.ImmuneUntil[i] = until;
                 }
                 else if (a.Alive && a.HitStunTicks > 0)
                 {
