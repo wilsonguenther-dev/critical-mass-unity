@@ -17,9 +17,9 @@ namespace CriticalMass.Sim.Bots
     /// and jump the slam ring) at every skill level. DIG / STACK / PIT use TerrainHeight (PR #211), which is not on this base:
     /// see <see cref="TerrainVerbsHook"/>.</para>
     /// </summary>
-    public static class TeamBrain
+    public static partial class TeamBrain
     {
-        public const byte JobNone = 0, JobHill = 1, JobGuard = 2, JobKite = 3, JobFeed = 4, JobMine = 5, JobBuild = 6, JobCalled = 7;
+        public const byte JobNone = 0, JobHill = 1, JobGuard = 2, JobKite = 3, JobFeed = 4, JobMine = 5, JobBuild = 6, JobCalled = 7, JobEscort = 8;
         public const byte RallyNone = 0, RallyStage = 1, RallyGo = 2;
 
         public static bool On(GameConfig c) =>
@@ -135,6 +135,7 @@ namespace CriticalMass.Sim.Bots
             for (int t = 0; t < 2; t++)
             {
                 TeamId team = t == 0 ? TeamId.Azure : TeamId.Crimson;
+                EscortJobs(w, st, team, t);
                 int staged = 0, teamSize = 0;
                 double oldest = double.PositiveInfinity;
                 bool outnumbered = st.HillBodies[1 - t] - st.HillBodies[t] >= b.RallyOutnumberedBy;
@@ -183,6 +184,76 @@ namespace CriticalMass.Sim.Bots
                     }
                 }
                 if (released) st.Releases++;
+            }
+        }
+
+        /// <summary>
+        /// HOOK for PR #219's KAIJU HOLDS NOTHING (ComebackConfig.KaijuHillPerMille, default 0 there; not on this base). A
+        /// partial method: with no body it and its call compile away, so the rule reads as off. After the combine add
+        /// Sim/Bots/TeamBrain.Comeback.cs with:
+        /// <code>
+        /// public static partial class TeamBrain
+        /// {
+        ///     static partial void KaijuHoldsNothingRule(World w, ref bool cuts)
+        ///     {
+        ///         cuts = Comeback.On(w) &amp;&amp; w.Config.Depth.Comeback.KaijuHillPerMille &lt; 1000;
+        ///     }
+        /// }
+        /// </code>
+        /// </summary>
+        static partial void KaijuHoldsNothingRule(World w, ref bool cuts);
+
+        /// <summary>True when `team`'s own sided Kaiju is up and inside the hill ring (hill radius + Kaiju radius) and the
+        /// rule makes that cut `team`'s hill score (PR #219, or OwnKaijuRuleAssumed in a test).</summary>
+        public static bool OwnKaijuBlocksScore(World w, TeamId team)
+        {
+            BotBrainConfig b = w.Config.Depth.BotBrain;
+            if (!b.OwnKaijuEscort) return false;
+            bool cuts = b.OwnKaijuRuleAssumed;
+            if (!cuts) KaijuHoldsNothingRule(w, ref cuts);
+            if (!cuts) return false;
+            Kaiju k = w.Kaiju;
+            if (k.KoIn > 0) return false;
+            if (!((team == TeamId.Azure && k.State == KaijuState.Azure) || (team == TeamId.Crimson && k.State == KaijuState.Crimson))) return false;
+            double r = w.Config.Hill.Radius + w.Config.Kaiju.Radius;
+            double dx = k.X - w.Map.Hill.X, dz = k.Z - w.Map.Hill.Z;
+            return dx * dx + dz * dz < r * r;
+        }
+
+        /// <summary>
+        /// KAIJU HOLDS NOTHING job, every step after the hill count: while our own Kaiju on the hill cuts our score and no
+        /// enemy stands on the disc, every hill-job bot beyond GuardCount guards (JobGuard first, then the lowest ids stay)
+        /// becomes JobEscort: it walks off the disc toward the enemy pad and fights what it meets (the Kaiju follows fights).
+        /// The step the Kaiju leaves the ring or an enemy contests, every escort is a hill bot again.
+        /// </summary>
+        private static void EscortJobs(World w, BotsState st, TeamId team, int t)
+        {
+            BotBrainConfig b = w.Config.Depth.BotBrain;
+            bool escort = st.HillBodies[1 - t] == 0 && OwnKaijuBlocksScore(w, team);
+            int keep = 0;
+            if (escort)
+                for (int id = 0; id < w.ActorCount; id++)
+                    if (w.Actors[id].Team == team && w.Actors[id].Alive && st.Job[id] == JobGuard) keep++;
+            for (int id = 0; id < w.ActorCount; id++)
+            {
+                Actor a = w.Actors[id];
+                if (a.Team != team || !a.Alive || !BotsState.IsBot(st, w, id)) continue;
+                byte job = st.Job[id];
+                if (!escort)
+                {
+                    if (job == JobEscort) st.Job[id] = JobHill;
+                    continue;
+                }
+                if (job != JobHill && job != JobEscort) continue;
+                if (keep < b.GuardCount)
+                {
+                    keep++;
+                    st.Job[id] = JobHill;
+                    continue;
+                }
+                if (job != JobEscort) st.Escorts++;
+                st.Job[id] = JobEscort;
+                st.Rally[id] = RallyNone;
             }
         }
 

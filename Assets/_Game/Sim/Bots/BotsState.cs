@@ -103,7 +103,7 @@ namespace CriticalMass.Sim.Bots
         public int[] SeenDeaths;
         public int[] HillBodies;
         /// <summary>b15 bot brain: rally steps started and group releases (counters the tests print).</summary>
-        public int Rallies, Releases;
+        public int Rallies, Releases, Escorts;   // Escorts: KAIJU HOLDS NOTHING escort jobs handed out (TeamBrain.EscortJobs)
 
         /// <summary>Browser createBotsState: allocate every per-actor array at ActorCapacity (no reset).</summary>
         public static BotsState CreateBotsState(World w)
@@ -242,6 +242,7 @@ namespace CriticalMass.Sim.Bots
             st.HillBodies[1] = 0;
             st.Rallies = 0;
             st.Releases = 0;
+            st.Escorts = 0;
             BotFields.ResetFields(st.Fields, w);
             BotFields.BuildAllFields(st.Fields, w);
         }

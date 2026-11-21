@@ -102,6 +102,13 @@ namespace CriticalMass.Sim.Config
         public bool TargetHealersFirst = true;
         public double TargetStickScore = 1.5;
         public int CallToHillDeficit = 3;
+        /// <summary>KAIJU HOLDS NOTHING job (PR #219's rule: a team scores nothing while its own sided Kaiju stands in the hill
+        /// ring). While that cuts our score and no enemy is on the disc, hill-job bots past the guards escort the Kaiju off the
+        /// disc toward the enemy pad; they return the tick it leaves the ring or an enemy steps on the disc. The rule's own
+        /// switch is read through TeamBrain.KaijuHoldsNothingRule (a partial-method hook: no rule on this base = never).</summary>
+        public bool OwnKaijuEscort = true;
+        /// <summary>Test lever for a base without PR #219: behave as if the rule were on (it does not change the score).</summary>
+        public bool OwnKaijuRuleAssumed = false;
 
         public BotBrainConfig Clone() => (BotBrainConfig)MemberwiseClone();
     }

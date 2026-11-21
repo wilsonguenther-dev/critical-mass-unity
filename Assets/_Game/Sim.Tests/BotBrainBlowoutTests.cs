@@ -24,17 +24,19 @@ namespace CriticalMass.Sim.Tests
         private sealed class Arm
         {
             public string Name;
-            public int Matches, Decided, Blowouts, LeaderAtHalf, LeaderAtHalfWon, Sided, SideWon, Arrivals, Outnumbered, DownFast, Shiver, Rallies, Releases;
+            public int Matches, Decided, Blowouts, LeaderAtHalf, LeaderAtHalfWon, Sided, SideWon, Arrivals, Outnumbered, DownFast, Shiver, Rallies, Releases, Escorts;
+            public double BlockSamples, BlockKaijuTeamBodies, Samples;
             public double KaijuOwnedTicks, KaijuOnDiscTicks;
             public double LeadChanges, SideShare1, SideShare2, SideHalves, OwnerBodies, ChallengerBodies, BodySamples, Us;
             public long Ticks;
             public readonly List<int> Stuck = new List<int>();
         }
 
-        private static void Play(Arm arm, int seed, bool brain)
+        private static void Play(Arm arm, int seed, bool brain, bool escortAssumed = false)
         {
             GameConfig cfg = GameConfig.CreateDefault();
             cfg.Depth.BotBrain.Enabled = brain;
+            cfg.Depth.BotBrain.OwnKaijuRuleAssumed = escortAssumed;   // KAIJU HOLDS NOTHING escort job without PR #219's score cut
             World w = World.CreateWorld(new WorldOptions { Seed = seed, TeamSize = 16, HumanTeam = TeamId.Azure, HumanClass = ClassId.Warrior, Config = cfg });
             InputFrame scratch = SimInput.EmptyInput();
             HillDef hill = w.Map.Hill;
@@ -113,6 +115,28 @@ namespace CriticalMass.Sim.Tests
                     }
                 }
                 if (w.Tick % hz != 0) continue;
+                // KAIJU HOLDS NOTHING exposure (PR #219's rule, not applied here): seconds the hill owner's own sided Kaiju is up
+                // inside the hill ring, and how many of that team's bodies stand on the disc then (earning nothing under the rule).
+                arm.Samples++;
+                {
+                    Kaiju kj = w.Kaiju;
+                    HillState hs = w.Match.HillState;
+                    bool sided = (hs == HillState.Azure && kj.State == KaijuState.Azure) || (hs == HillState.Crimson && kj.State == KaijuState.Crimson);
+                    double kr = cfg.Hill.Radius + cfg.Kaiju.Radius, kx = kj.X - hill.X, kz = kj.Z - hill.Z;
+                    if (sided && kj.KoIn <= 0 && kx * kx + kz * kz < kr * kr)
+                    {
+                        TeamId kt = hs == HillState.Azure ? TeamId.Azure : TeamId.Crimson;
+                        int own = 0;
+                        for (int j = 0; j < n; j++)
+                        {
+                            if (!w.Actors[j].Alive || w.Actors[j].Team != kt) continue;
+                            double jx = w.X[j] - hill.X, jz = w.Z[j] - hill.Z;
+                            if (jx * jx + jz * jz <= hill.R * hill.R) own++;
+                        }
+                        arm.BlockSamples++;
+                        arm.BlockKaijuTeamBodies += own;
+                    }
+                }
                 double lead = w.Match.HillSeconds.Azure - w.Match.HillSeconds.Crimson;
                 int sg = lead > 0.5 ? 1 : lead < -0.5 ? -1 : 0;
                 if (sg != 0 && lastSign != 0 && sg != lastSign) changes++;
@@ -145,6 +169,7 @@ namespace CriticalMass.Sim.Tests
             BotsState st = BotBrain.GetBotsState(w);
             arm.Rallies += st.Rallies;
             arm.Releases += st.Releases;
+            arm.Escorts += st.Escorts;
             arm.Us += sw.Elapsed.TotalMilliseconds * 1000;
             arm.Matches++;
             arm.LeadChanges += changes;
@@ -193,27 +218,30 @@ namespace CriticalMass.Sim.Tests
                    ",\"kaijuSideWins\":" + F(a.SideWon / (double)Math.Max(1, a.Sided)) + ",\"arrivals\":" + a.Arrivals + ",\"arrivalsOutnumbered2\":" + F(a.Outnumbered / (double)Math.Max(1, a.Arrivals)) +
                    ",\"downWithin5s\":" + F(a.DownFast / (double)Math.Max(1, a.Arrivals)) + ",\"ownerBodiesH2\":" + (a.OwnerBodies / Math.Max(1, a.BodySamples)).ToString("0.0") +
                    ",\"challengerBodiesH2\":" + (a.ChallengerBodies / Math.Max(1, a.BodySamples)).ToString("0.0") + ",\"stuckMedian\":" + med.ToString("0.0") + ",\"shiverFlags\":" + a.Shiver +
-                   ",\"kaijuOnDiscShare\":" + F(a.KaijuOnDiscTicks / Math.Max(1, a.KaijuOwnedTicks)) + ",\"rallies\":" + a.Rallies + ",\"releases\":" + a.Releases + ",\"usPerTick\":" + (a.Us / Math.Max(1, a.Ticks)).ToString("0.0") + "}";
+                   ",\"kaijuOnDiscShare\":" + F(a.KaijuOnDiscTicks / Math.Max(1, a.KaijuOwnedTicks)) + ",\"rallies\":" + a.Rallies + ",\"releases\":" + a.Releases + ",\"escorts\":" + a.Escorts + ",\"ownKaijuOnHillShare\":" + F(a.BlockSamples / Math.Max(1, a.Samples)) + ",\"kaijuTeamBodiesThen\":" + (a.BlockKaijuTeamBodies / Math.Max(1, a.BlockSamples)).ToString("0.0") + ",\"usPerTick\":" + (a.Us / Math.Max(1, a.Ticks)).ToString("0.0") + "}";
         }
 
-        private static void Compare(int[] seeds, string label)
+        private static void Compare(int[] seeds, string label, bool escortArm = false)
         {
             var off = new Arm { Name = "brain off" };
             var on = new Arm { Name = "brain on" };
+            var esc = new Arm { Name = "brain on + own-Kaiju escort (rule assumed, score not cut)" };
             foreach (int seed in seeds)
             {
                 Play(off, seed, false);
                 Play(on, seed, true);
+                if (escortArm) Play(esc, seed, true, true);
             }
             Console.WriteLine(Summary(off));
             Console.WriteLine(Summary(on));
+            if (escortArm) Console.WriteLine(Summary(esc));
             Console.WriteLine("{\"item\":\"b15 brain compare\",\"seeds\":\"" + label + "\",\"tickCostRatio\":" + ((on.Us / Math.Max(1, on.Ticks)) / Math.Max(1e-9, off.Us / Math.Max(1, off.Ticks))).ToString("0.000") +
                               ",\"blowoutOff\":" + F(off.Blowouts / (double)Math.Max(1, off.Decided)) + ",\"blowoutOn\":" + F(on.Blowouts / (double)Math.Max(1, on.Decided)) + "}");
             Assert.AreEqual(seeds.Length, on.Matches);
         }
 
         [Test]
-        public void TwentyFourSeedsBrainOffAgainstOn() => Compare(WinShare.Seeds16, "24 (WinShare.Seeds16)");
+        public void TwentyFourSeedsBrainOffAgainstOn() => Compare(WinShare.Seeds16, "24 (WinShare.Seeds16)", true);
 
         [Test, Category("Slow")]
         public void SeventyTwoSeedsBrainOffAgainstOn()

@@ -583,6 +583,11 @@ namespace CriticalMass.Sim.Bots
                     Toward(w, id, st.UnstickX[id], st.UnstickZ[id], 0.2);
                     break;
                 case AiState.HoldHill:
+                    if (TeamBrain.On(w) && st.Job[id] == TeamBrain.JobEscort)
+                    {
+                        Escort(w, st, id, a);   // b15 bot brain: KAIJU HOLDS NOTHING, walk our Kaiju off the disc
+                        break;
+                    }
                     if (calm) HoldPost(w, st, id, x, z, mates);
                     else Toward(w, id, st.PostX[id], st.PostZ[id], 0.5);
                     break;
@@ -848,6 +853,11 @@ namespace CriticalMass.Sim.Bots
                         aimZ = map.Hill.Z;
                         break;
                     }
+                    if (TeamBrain.On(w) && st.Job[id] == TeamBrain.JobEscort)
+                    {
+                        Escort(w, st, id, a);
+                        break;
+                    }
                     // toHill (and 'none' before the first think).
                     minerField = a.Cls == ClassId.Miner;
                     if (!Follow(w, st, id, minerField ? BotFields.FieldMinerHill : BotFields.FieldHill)) Toward(w, id, map.Hill.X, map.Hill.Z, 1);
@@ -1095,6 +1105,14 @@ namespace CriticalMass.Sim.Bots
                 output.AimX = x + output.MoveX * AimAhead;
                 output.AimZ = z + output.MoveZ * AimAhead;
             }
+        }
+
+        /// <summary>b15 bot brain, KAIJU HOLDS NOTHING escort: toward the enemy pad (its flow field), so the fights it meets
+        /// pull our Kaiju off the hill disc; straight at the Kaiju's far side if the field has no route.</summary>
+        private static void Escort(World w, BotsState st, int id, Actor a)
+        {
+            int field = a.Team == TeamId.Azure ? BotFields.FieldPadCrimson : BotFields.FieldPadAzure;
+            if (!Follow(w, st, id, field)) Toward(w, id, w.Kaiju.X, w.Kaiju.Z, 3);
         }
     }
 }
