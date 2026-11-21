@@ -64,8 +64,9 @@ else
   if [ $rc -eq 0 ]; then
     EXE=tools/ci/SimTests/bin/Release/net8.0/CriticalMass.Sim.Tests.dll
     mkdir -p Temp/ci/split
-    # Memory guard (8 GB box, the owner's apps keep running): about 700 MB per test process, never below one.
-    a=$(avail_mb); cap=$(( a / 700 )); [ $cap -lt 1 ] && cap=1
+    # Memory guard (8 GB box, the owner's apps keep running): one test process peaked at 178 MB resident on the slow
+    # set (2026-11-21); 300 MB each of free + inactive memory, never below one process.
+    a=$(avail_mb); cap=$(( a / 300 )); [ $cap -lt 1 ] && cap=1
     used=$JOBS; [ $used -gt $cap ] && used=$cap
     echo "air-sim-job: ${a} MB free or reclaimable; ${used} test process(es) (asked ${JOBS})"
     if [ "$used" -le 1 ]; then

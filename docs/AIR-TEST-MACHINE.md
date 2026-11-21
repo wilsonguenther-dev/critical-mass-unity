@@ -21,7 +21,7 @@ Same command, same JSON line (also in `loop/logs/gates.jsonl`) and same result f
 What is tested is the committed tree of the current commit (uncommitted edits are not, as on GitHub). The branch is
 still pushed first so a fallback can use it; `--no-push` skips that.
 
-Options: `--jobs N` (default 3; the box lowers it when free memory is short, about 700 MB per process),
+Options: `--jobs N` (default 3; the box lowers it when free memory is short, about 300 MB of free memory per process; one peaked at 178 MB),
 `--air-wait MIN` (how long to wait for the box when another job holds it, default 30), `--no-fallback`.
 `CM_REMOTE_SIM_ON=air` makes `--on air` the default; `CM_AIR_JOBS` sets the default split.
 
