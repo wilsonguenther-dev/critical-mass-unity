@@ -20,8 +20,21 @@ while [ $# -gt 0 ]; do
     *) echo "air-sim-job: unknown flag $1" >&2; exit 3 ;;
   esac
 done
-BASE="$HOME/cm-remote"; RUN="$BASE/runs/$ID"; SRC="$BASE/sim/src"; RES="$RUN/sim-results/ci"
-[ -n "$ID" ] && [ -f "$RUN/src.tgz" ] || { echo "air-sim-job: no $RUN/src.tgz" >&2; exit 3; }
+BASE="${CM_AIR_BASE:-$HOME/cm-remote}"; RUN="$BASE/runs/$ID"; SRC="$BASE/sim/src"; RES="$RUN/sim-results/ci"
+case "$ID" in ''|*/*|*..*) echo "air-sim-job: bad --id" >&2; exit 3 ;; esac
+[ -f "$RUN/src.tgz" ] || { echo "air-sim-job: no $RUN/src.tgz" >&2; exit 3; }
+# Minimal environment (security seat, 2026-11-21): re-run this script under `env -i` with only what the build and the
+# tests need. HOME and TMPDIR point inside ~/cm-remote, so the .NET first-run files, NuGet's http cache and every temp
+# file stay there; no inherited variables (no tokens, no SSH_AUTH_SOCK; the caller also forbids agent forwarding).
+# This keeps honest code in its folder. It is NOT a sandbox: test code still runs as the owner's macOS user and can
+# read his files by absolute path, use the network, and ask the logged-in Keychain (docs/AIR-TEST-MACHINE.md).
+if [ -z "${CM_AIR_CLEAN:-}" ]; then
+  mkdir -p "$BASE/sim/home" "$RUN/tmp"
+  exec /usr/bin/env -i CM_AIR_CLEAN=1 CM_AIR_BASE="$BASE" HOME="$BASE/sim/home" TMPDIR="$RUN/tmp/" USER="${USER:-}" \
+    LANG=en_US.UTF-8 PATH="$BASE/dotnet:$BASE/venv/bin:/usr/bin:/bin:/usr/sbin:/sbin" DOTNET_ROOT="$BASE/dotnet" \
+    NUGET_PACKAGES="$BASE/nuget" DOTNET_CLI_TELEMETRY_OPTOUT=1 DOTNET_NOLOGO=1 DOTNET_SKIP_FIRST_TIME_EXPERIENCE=1 \
+    /bin/bash "$0" --id "$ID" --suite "$SUITE" --jobs "$JOBS"
+fi
 case "$SUITE" in fast) FLAG=''; WHERE='cat != Slow' ;; slow) FLAG='--slow'; WHERE='cat == Slow' ;; all) FLAG='--all'; WHERE='' ;;
   *) echo "air-sim-job: bad suite $SUITE" >&2; exit 3 ;; esac
 case "$JOBS" in ''|*[!0-9]*) JOBS=1 ;; esac
@@ -138,5 +151,5 @@ cp Temp/ci/*.cs "$RES/" 2>/dev/null
 peak=$(sort -n "$RUN/rss.txt" 2>/dev/null | tail -1)
 printf 'suite=%s jobs=%s used=%s rc=%s wall_s=%s peak_dotnet_rss_mb=%s host=%s\n' "$SUITE" "$JOBS" "$used" "$rc" \
   "$(perl -e "printf '%.1f', $t1 - $t0")" "${peak:-0}" "$(scutil --get LocalHostName 2>/dev/null)" | tee "$RUN/job.txt"
-rm -f "$RUN/rss.txt"
+rm -rf "$RUN/rss.txt" "$RUN/tmp"
 exit $rc

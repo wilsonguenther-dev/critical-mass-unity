@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # The no-Unity Sim tests on the second Mac (the Air) instead of GitHub (feat/air-test-machine, 2026-11-21).
 # Normally called by `loop/gates/remote sim --on air`, which falls back to GitHub on exit 69/75/67; usable alone:
-#   tools/remote/air-sim.sh --suite fast|slow|all [--sha COMMIT] [--jobs N] [--wait MIN] [--timeout MIN] [--out DIR]
+#   tools/remote/air-sim.sh --suite fast|slow|all --ref BRANCH [--sha COMMIT] [--jobs N] [--wait MIN] [--timeout MIN] [--out DIR]
+# Only our code runs there: COMMIT must be reachable from BRANCH as it is on origin (our repo on GitHub, checked with
+# ls-remote + fetch of that one branch), else exit 77 and nothing is sent.
 # What it does: packs the COMMITTED tree of COMMIT (default HEAD; uncommitted edits are not tested, as on GitHub) with
 # `git archive` (Sim, Sim.Tests, Net, tools, docs, ProjectSettings: about 2 MB), copies it to ~/cm-remote/runs/<id>/
 # on the box, and runs tools/remote/air-sim-job.sh there through air-run.sh: the box's queue lock (one job at a time;
@@ -11,18 +13,19 @@
 # the workflow does. Results come back to OUT (default loop/logs/remote/air-<id>) in the workflow artifact's layout:
 # sim-results/ci/sim-results.xml + sim-build.log, plus run.json ({conclusion, jobs}) like `gh run view --json`.
 # Prints the results folder on stdout (last line). Exit: 0 pass, 1 test failure, 2 compile failure, 124 hard limit,
-# 130 aborted, 75 queue wait ran out, 67 box refused (battery under 25 % or disk under 12 GB), 69 unreachable, 64 usage.
+# 130 aborted, 77 commit not on our origin branch, 75 queue wait ran out, 67 box refused (battery under 25 % or disk under 12 GB), 69 unreachable, 64 usage.
 # Nothing on the box outside ~/cm-remote is touched. Host: CM_REMOTE_HOST (default the ssh alias in _remote-lib.sh).
 set -uo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(git -C "$PWD" rev-parse --show-toplevel 2>/dev/null || (cd "$HERE/../.." && pwd))"
 source "$HERE/_remote-lib.sh"
-SUITE=fast; SHA=HEAD; JOBS="${CM_AIR_JOBS:-3}"; WAIT=30; TMIN=75; OUT=''
+SUITE=fast; SHA=HEAD; REF=''; JOBS="${CM_AIR_JOBS:-3}"; WAIT=30; TMIN=75; OUT=''
 TRIES="${CM_AIR_TRIES:-3}"; GAP="${CM_AIR_TRY_GAP:-20}"
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --suite) SUITE="${2:?}"; shift 2 ;;
     --sha) SHA="${2:?}"; shift 2 ;;
+    --ref) REF="${2:?}"; shift 2 ;;
     --jobs) JOBS="${2:?}"; shift 2 ;;
     --wait) WAIT="${2:?}"; shift 2 ;;
     --timeout) TMIN="${2:?}"; shift 2 ;;
@@ -32,6 +35,16 @@ while [[ $# -gt 0 ]]; do
 done
 case "$SUITE" in fast|slow|all) ;; *) echo "air-sim: --suite fast|slow|all" >&2; exit 64 ;; esac
 SHA="$(git -C "$ROOT" rev-parse --verify "$SHA^{commit}" 2>/dev/null)" || { echo "air-sim: no such commit" >&2; exit 64; }
+# Our repo, our branch, a commit on it: never a fork, a PR ref or an arbitrary local commit.
+REPO_RE='github\.com[:/]wilsonguenther-dev/critical-mass-unity(\.git)?$'
+url="$(git -C "$ROOT" remote get-url origin 2>/dev/null)"
+[[ "$url" =~ $REPO_RE ]] || { echo "air-sim: origin is not wilsonguenther-dev/critical-mass-unity; refusing" >&2; exit 77; }
+[[ -n "$REF" && "$REF" != refs/* && "$REF" != */../* ]] || { echo "air-sim: --ref BRANCH is required (a branch of our repo)" >&2; exit 77; }
+tip="$(git -C "$ROOT" ls-remote origin "refs/heads/$REF" 2>/dev/null | cut -f1)"
+[[ -n "$tip" ]] || { echo "air-sim: branch $REF is not on origin; push it first" >&2; exit 77; }
+git -C "$ROOT" cat-file -e "$tip^{commit}" 2>/dev/null || git -C "$ROOT" fetch -q origin "refs/heads/$REF" 2>/dev/null
+git -C "$ROOT" merge-base --is-ancestor "$SHA" "$tip" 2>/dev/null \
+  || { echo "air-sim: ${SHA:0:12} is not on origin/$REF (tip ${tip:0:12}); push it first" >&2; exit 77; }
 ID="$(date -u +%Y%m%dT%H%M%SZ)-sim-$SUITE-$$"
 OUT="${OUT:-$ROOT/loop/logs/remote/air-$ID}"
 

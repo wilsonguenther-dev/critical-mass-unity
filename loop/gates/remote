@@ -81,7 +81,7 @@ case "$ON" in github|air) ;; *) echo "remote: --on github|air" >&2; exit 64 ;; e
 if [[ "$what" == sim && "$ON" == air ]]; then
   if [[ $PUSH -eq 1 && "$REF" != main ]]; then git -C "$ROOT" push -q origin "HEAD:refs/heads/$REF" 2>/dev/null || true; fi   # for a fallback
   s0=$(date +%s)
-  D=$("$ROOT/tools/remote/air-sim.sh" --suite "$SUITE" --sha "$SHA" --jobs "$JOBS" --wait "$AIRWAIT" \
+  D=$("$ROOT/tools/remote/air-sim.sh" --suite "$SUITE" --ref "$REF" --sha "$SHA" --jobs "$JOBS" --wait "$AIRWAIT" \
         --timeout "$(( MAXW < 75 ? MAXW : 75 ))" | tail -1); ac=${PIPESTATUS[0]}
   case "$ac" in
     0|1|2|124|130)
@@ -92,7 +92,7 @@ if [[ "$what" == sim && "$ON" == air ]]; then
       extra=",\"runner\":\"air\",\"run\":\"$RUN\",\"minutes\":$(( ($(date +%s) - s0 + 59) / 60 )),\"results\":\"$D\",\"detail\":$summary"
       [[ "$status" == pass ]] && out pass 0 "$extra"; out fail 1 "$extra" ;;
     *)
-      case "$ac" in 69) reason=unreachable ;; 75) reason="busy past ${AIRWAIT} min" ;; 67) reason="refused (battery or disk)" ;; *) reason="exit $ac" ;; esac
+      case "$ac" in 69) reason=unreachable ;; 75) reason="busy past ${AIRWAIT} min" ;; 67) reason="refused (battery or disk)" ;; 77) reason="refused: commit not on origin/$REF" ;; *) reason="exit $ac" ;; esac
       [[ $FALLBACK -eq 1 ]] || out could-not-start 75 ",\"runner\":\"air\",\"reason\":\"Air $reason; --no-fallback\""
       echo "remote: the Air is $reason; falling back to GitHub" >&2
       FB=",\"fallback_from\":\"air\",\"fallback_reason\":\"$reason\"" ;;

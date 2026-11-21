@@ -54,6 +54,11 @@ at the window size; they land in `OUT/shots/`. Screen grabs from outside the gam
 `could not create image from display`: no screen-recording grant for sshd), so the Editor capture walks
 (`tools/unity-owner-walk-capture.sh`, `unity-batch*-capture.sh`) stay on a machine with the Unity Editor.
 
+## The Sim tests, slow set included (feat/air-test-machine)
+
+`loop/gates/remote sim --suite slow --on air` runs the no-Unity Sim tests here instead of on GitHub, in the same
+queue, split over 3 processes, with a hard limit and an automatic GitHub fallback. See `docs/AIR-TEST-MACHINE.md`.
+
 ## Any other command (same queue)
 
 ```
