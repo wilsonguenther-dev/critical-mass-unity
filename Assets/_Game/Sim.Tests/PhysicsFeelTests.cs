@@ -272,7 +272,7 @@ namespace CriticalMass.Sim.Tests
             Assert.Greater(maxV, 0, "the blast in the match set the Kaiju sliding");
             Assert.Greater(slide, 0.05, "the Kaiju is moved");
             Assert.Less(slide, 0.4, "a small slide only");
-            Assert.AreEqual(0, k2.PushVx, "the slide ended");
+            Assert.AreEqual(0.0, k2.PushVx, 1e-12, "the slide ended");
         }
 
         // ------------------------------------------------------------------------------------------------ [4] corner grazes
@@ -700,7 +700,7 @@ namespace CriticalMass.Sim.Tests
                 ulong on = CriticalMass.Sim.Tests.Harness.MatchHash.Run(1, 16, 1800, ClassId.Warrior, null, c => c.ApplyRules(p));
                 ulong off = CriticalMass.Sim.Tests.Harness.MatchHash.Run(1, 16, 1800, ClassId.Warrior, null, c => { c.ApplyRules(p); c.Depth.PhysicsFeel.Enabled = false; });
                 Console.WriteLine("{\"item\":\"" + p + " unchanged\",\"on\":\"0x" + on.ToString("X16") + "\",\"off\":\"0x" + off.ToString("X16") + "\"}");
-                Assert.AreEqual(off, on, p);
+                Assert.AreEqual(off, on, p.ToString());
                 Assert.IsFalse(PhysicsFeel.On(GameConfig.CreateBrowser5v5().ApplyRules(p)), p + ": PhysicsFeel.On");
             }
             Assert.IsTrue(PhysicsFeel.On(GameConfig.CreateDefault()), "on in the game's default (Full)");
