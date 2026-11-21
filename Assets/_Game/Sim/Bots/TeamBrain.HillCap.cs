@@ -1,5 +1,7 @@
 using System;
+using CriticalMass.Sim.Config;
 using CriticalMass.Sim.Core;
+using CriticalMass.Sim.Grid;
 
 namespace CriticalMass.Sim.Bots
 {
