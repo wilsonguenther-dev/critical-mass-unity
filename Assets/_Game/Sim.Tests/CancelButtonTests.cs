@@ -31,10 +31,15 @@ namespace CriticalMass.Sim.Tests
 
         static int Feints(World w) => w.Depth.Feel.Feints;
 
-        /// <summary>Starts a Warrior swing at a passive Farmer standing in reach; returns the press tick.</summary>
-        static int StartSwing(World w)
+        /// <summary>Starts a Warrior swing at a passive Farmer (in reach, 1.7 u away, unless near is false); returns the press tick.</summary>
+        static int StartSwing(World w, bool near = true)
         {
             int foe = CombatFeelTests.Foe(w);
+            if (near)
+            {
+                CombatFeelTests.Put(w, foe, w.X[0] + 1.7, w.Z[0]);
+                SpatialHash.Rebuild(w.Hash, w.X, w.Z, w.Actors, w.ActorCount);
+            }
             CombatFeelTests.Tick(w, Frame(w, 0, foe, true, false), null);
             Assert.IsTrue(w.Actors[0].SwingPending, "the press started a wind-up");
             return w.Actors[0].SwingTick;
@@ -125,7 +130,7 @@ namespace CriticalMass.Sim.Tests
             int foe = CombatFeelTests.Foe(w);
             CombatFeelTests.Put(w, foe, CombatFeelTests.X0 + 6, CombatFeelTests.Z0);   // out of reach: the swing whiffs
             SpatialHash.Rebuild(w.Hash, w.X, w.Z, w.Actors, w.ActorCount);
-            StartSwing(w);
+            StartSwing(w, false);
             Actor a = w.Actors[0];
             int contact = a.SwingTick + a.SwingWindup;
             while (w.Tick <= contact) CombatFeelTests.Tick(w, Frame(w, 0, foe, false, false), null);
