@@ -175,6 +175,16 @@ namespace CriticalMass.Sim.Core
             Actor s = w.Actors[source];
             double m = 1;
             if (w.Tick <= w.Depth.Feel.SunderUntil[target]) m *= 1 + f.SunderDamageTaken;
+            // b16 solo guard: one on one (no other enemy struck the target within OutnumberedSeconds) it shrugs off a share.
+            if (f.SoloGuard != null)
+            {
+                int tc = (int)w.Actors[target].Cls;
+                if (tc < f.SoloGuard.Length && f.SoloGuard[tc] > 0)
+                {
+                    int by = w.Depth.Feel.StruckBy[target];
+                    if (by < 0 || by == source || w.Tick - w.Depth.Feel.StruckTick[target] > Ticks(w, f.OutnumberedSeconds)) m *= 1 - f.SoloGuard[tc];
+                }
+            }
             switch (s.Cls)
             {
                 case ClassId.Farmer:

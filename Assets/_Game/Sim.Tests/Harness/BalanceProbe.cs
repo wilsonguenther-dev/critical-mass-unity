@@ -7,6 +7,7 @@ using CriticalMass.Net.Replay;
 using CriticalMass.Sim.Bots;
 using CriticalMass.Sim.Config;
 using CriticalMass.Sim.Core;
+using CriticalMass.Sim.Grid;
 
 namespace CriticalMass.Sim.Tests.Harness
 {
@@ -767,6 +768,18 @@ namespace CriticalMass.Sim.Tests.Harness
             }
             double cx = w.Map.Hill.X, cz = w.Map.Hill.Z;
             double ux = Math.Cos(angle), uz = Math.Sin(angle);
+            // open ground: a floor disc past the goal around the hill (no wall, chasm or step decides the chase)
+            MapDef map = w.Map;
+            int r = (int)Math.Ceiling(EscapeGoal + 3);
+            for (int z = Math.Max(1, (int)cz - r); z <= Math.Min(map.Height - 2, (int)cz + r); z++)
+                for (int x = Math.Max(1, (int)cx - r); x <= Math.Min(map.Width - 2, (int)cx + r); x++)
+                {
+                    double ex = x + 0.5 - cx, ez = z + 0.5 - cz;
+                    if (ex * ex + ez * ez > r * r) continue;
+                    int i = z * map.Width + x;
+                    map.Cells[i] = CriticalMass.Sim.Core.Cell.Floor;
+                    if (map.Lift != null) map.Lift[i] = 0;
+                }
             Place(w, iw, ClassId.Warrior, cx, cz);
             Place(w, ir, runner, cx + ux * EscapeGap, cz + uz * EscapeGap);
             InputFrame fw = SimInput.EmptyInput(), fr = SimInput.EmptyInput(), idle = SimInput.EmptyInput();

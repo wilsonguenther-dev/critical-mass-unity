@@ -12,20 +12,29 @@ import csv, glob, itertools, json, os, sys
 
 CF = "Depth.CombatFeel."
 # (key, [values]; the first value is the shipped game, aa2ecfef)
+# round 1 (3456 arms, run 44921976456): no arm held the order. Every class beats the Healer only with the Healer's
+# lantern not staggering (hstag off); the Warrior beats all only at 145 HP and 24+ damage with SUNDER not breaking his
+# armour; the stagger refund flips the Farmer from unbeaten to winless among the middle four; the Warrior's speed never
+# changed a duel. Round 2 fixes sunder=false and hstag=off, adds the Warrior's one-on-one guard (SoloGuard: damage he
+# shrugs off while one enemy fights him, so the duel edge does not carry into a crowd), the Farmer's wind-up and damage
+# and the Builder's damage, and sweeps at the 5% speed only.
 LEVERS = [
-    ("sunder", ["true", "false"], CF + "SunderBreaksArmour={}"),
+    ("sunder", ["false"], CF + "SunderBreaksArmour={}"),
+    ("hstag", ["off"], None),
     ("pierce", ["true", "false"], CF + "MinerPierceWarrior={}"),
-    ("mwind", ["0.35", "0.40"], CF + "Classes[Miner].AttackWindupSeconds={}"),
-    ("wdmg", ["21", "24", "27"], CF + "Classes[Warrior].AttackDamage={}"),
     ("whp", ["115", "130", "145"], CF + "Classes[Warrior].MaxHp={}"),
+    ("wdmg", ["24", "27"], CF + "Classes[Warrior].AttackDamage={}"),
+    ("guard", ["0", "0.2", "0.35"], CF + "SoloGuard={},0,0,0,0,0"),
     ("refund", ["0", "0.6"], CF + "StaggerCancelRefund={}"),
-    ("hstag", ["on", "off"], None),
-    ("mdmg", ["17", "20"], CF + "Classes[Miner].AttackDamage={}"),
+    ("fwind", ["0.27", "0.31"], CF + "Classes[Farmer].AttackWindupSeconds={}"),
+    ("fdmg", ["23", "20"], CF + "Classes[Farmer].AttackDamage={}"),
     ("ddmg", ["12", "15"], CF + "Classes[Demolitions].AttackDamage={}"),
-    ("wspd", ["3.8", "3.61", "3.5"], CF + "Classes[Warrior].MoveSpeed={}"),
+    ("mwind", ["0.35", "0.40"], CF + "Classes[Miner].AttackWindupSeconds={}"),
+    ("bdmg", ["26", "23"], CF + "Classes[Builder].AttackDamage={}"),
+    ("wspd", ["3.61"], CF + "Classes[Warrior].MoveSpeed={}"),
 ]
-SHIPPED = {k: v[0] for k, v, _ in LEVERS}
-SHIPPED["mwind"] = "0.20"
+SHIPPED = {"sunder": "true", "hstag": "on", "pierce": "true", "whp": "115", "wdmg": "21", "guard": "0", "refund": "0",
+           "fwind": "0.27", "fdmg": "23", "ddmg": "12", "mwind": "0.20", "bdmg": "26", "wspd": "3.8"}
 
 
 def switches(arm):
@@ -59,16 +68,18 @@ def parse(nm):
 
 
 def cost(a):
+    # lever cost: the Warrior's raw power (HP, damage) costs most (it carries into team fights); the guard is cheap (one on one only)
     c = 0.0
-    c += a["sunder"] == "false"
     c += a["pierce"] == "false"
     c += 0.2 if a["mwind"] == "0.40" else 0
-    c += (int(a["wdmg"]) - 21) / 3.0
-    c += (int(a["whp"]) - 115) / 15.0
+    c += (int(a["wdmg"]) - 21) / 2.0
+    c += (int(a["whp"]) - 115) / 10.0
+    c += float(a["guard"]) * 2
     c += 1.5 if a["refund"] != "0" else 0
-    c += a["hstag"] == "off"
-    c += a["mdmg"] != "17"
+    c += a["fwind"] != "0.27"
+    c += a["fdmg"] != "23"
     c += a["ddmg"] != "12"
+    c += a["bdmg"] != "26"
     return c
 
 
@@ -85,13 +96,9 @@ def pick(sweep_dir, out, k):
     sets = {}
     for r in ok:
         a = parse(r["arm"])
-        if a["wspd"] == "3.8":
-            continue
         key = tuple((kk, a[kk]) for kk, _, _ in LEVERS if kk != "wspd")
         sets.setdefault(key, set()).add(a["wspd"])
-    both = [s for s, sp in sets.items() if {"3.61", "3.5"} <= sp]
-    print("[pick] %d lever sets hold at both Warrior speed arms (5%% and 8%% slower)" % len(both))
-    pool = both if both else list(sets.keys())
+    pool = list(sets.keys())
     if not pool:
         # nothing holds: take the arms with the fewest violations so the 72-seed runs still say where it stands
         best = sorted(rows, key=lambda r: (int(r["violations"]), cost(parse(r["arm"]))))[:k]
@@ -109,7 +116,7 @@ def pick(sweep_dir, out, k):
     with open(out, "w") as f:
         f.write("base\t\n")
         for i, a in enumerate(top):
-            for spd in ("3.61", "3.5"):
+            for spd in (("3.61", "3.5") if i == 0 else ("3.61",)):
                 arm = dict(a, wspd=spd)
                 f.write("c%d-%s\t%s\n" % (i, spd, switches(arm)))
             print("[pick] c%d cost %.2f: %s" % (i, cost(a), switches(dict(a, wspd="3.8")) or "(shipped)"))

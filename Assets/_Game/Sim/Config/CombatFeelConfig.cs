@@ -181,6 +181,9 @@ namespace CriticalMass.Sim.Config
         /// its armoured wind-up for OutnumberedSeconds (one on one it never triggers). False = b15.</summary>
         public bool OutnumberedBreaksArmour = false;
         public double OutnumberedSeconds = 1.0;
+        /// <summary>Per target class: share of melee damage it shrugs off while ONE enemy fights it (no other enemy struck it
+        /// within OutnumberedSeconds; null = none). The fighter's one-on-one edge that does not carry into a crowd.</summary>
+        public double[] SoloGuard = null;
 
         // ---- E. b16 CANCEL button (test feature for high-level play; design advisor 2026-11-21: "it should cancel the attack
         // animation and allows for feints. also cancelling the attack animation after a hit lands would allow people to
@@ -233,6 +236,7 @@ namespace CriticalMass.Sim.Config
             for (int i = 0; i < Strikes.Length; i++) c.Strikes[i] = Strikes[i].Clone();
             if (StrikeStaggers != null) c.StrikeStaggers = (bool[])StrikeStaggers.Clone();
             if (WhiffExtraSeconds != null) c.WhiffExtraSeconds = (double[])WhiffExtraSeconds.Clone();
+            if (SoloGuard != null) c.SoloGuard = (double[])SoloGuard.Clone();
             return c;
         }
     }

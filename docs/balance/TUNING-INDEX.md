@@ -853,6 +853,7 @@ Regenerate: `tools/balance/balance-report.sh tuning-index (or the balance-report
 | `Depth.CombatFeel.WhiffExtraSeconds` | null | double[] | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` | b16: per class extra recovery (real seconds) after a whiff, on top of WhiffRecoverySeconds. |
 | `Depth.CombatFeel.OutnumberedBreaksArmour` | false | bool | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` | b16 trade: an armoured class struck by a second attacker within OutnumberedSeconds loses its armour for that hit. |
 | `Depth.CombatFeel.OutnumberedSeconds` | 1 | double | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` | b16 trade: the window for OutnumberedBreaksArmour. |
+| `Depth.CombatFeel.SoloGuard` | null | double[] | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` | b16: per target class, share of melee damage shrugged off while only one enemy fights it (none struck it within OutnumberedSeconds). |
 | `Depth.CombatFeel.CancelEnabled` | true | bool | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` | b16 CANCEL (Full only): the cancel input feints a wind-up or cuts the recovery after a landed hit. False = the button does nothing. |
 | `Depth.CombatFeel.FeintRecoverySeconds` | 0.1 | double | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` | b16 CANCEL: the fixed recovery after a feint (no swing, no dodge). |
 | `Depth.CombatFeel.FeintRefund` | 0.7 | double | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` | b16 CANCEL: share of the attack cooldown left that a feint gives back (never under the feint recovery). |
