@@ -82,7 +82,7 @@ namespace CriticalMass.Runtime.Game
         {
             "Warrior goal: knock out an enemy on the hill. Attack with {Attack}",
             "Farmer goal: bring food to the egg so the Kaiju sides with your team. Gather with {Interact}",
-            "Miner goal: bank ore at your hut to make your whole team stronger. Mine with {DigPlace}",
+            "Miner goal: bank ore at your hut to level it up; each level, your team votes for a perk card. Mine with {DigPlace}",   // b16: the cards replaced the flat bonus
             "Demolitionist goal: hit an enemy with TNT. Throw it with {DigPlace}",
             "Builder goal: put a ladder on the hill wall so your team gets in. Pick it with {Switch}, build with {DigPlace}",
             "Healer goal: heal a hurt teammate. Mend with {Attack}",

@@ -506,12 +506,14 @@ namespace CriticalMass.Runtime.Menu
 
         public void RestartMatch()
         {
+            CriticalMass.Runtime.Progression.MatchRewardTracker.RecordLeave();   // b16: leaving a running match is a loss
             PendingAfterReload = AfterReload.Play;
             ReloadBoot();
         }
 
         public void QuitToTitle()
         {
+            CriticalMass.Runtime.Progression.MatchRewardTracker.RecordLeave();   // b16: leaving a running match is a loss
             PendingAfterReload = AfterReload.Title;
             ReloadBoot();
         }
@@ -524,6 +526,7 @@ namespace CriticalMass.Runtime.Menu
 
         public static void QuitGame()
         {
+            CriticalMass.Runtime.Progression.MatchRewardTracker.RecordLeave();   // b16: leaving a running match is a loss
 #if UNITY_EDITOR
             UnityEditor.EditorApplication.isPlaying = false;
 #else

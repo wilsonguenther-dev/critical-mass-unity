@@ -17,7 +17,10 @@ namespace CriticalMass.Sim.Config
         public bool Enabled = true;
 
         // ---- the vote
-        public double VoteSeconds = 8;
+        /// <summary>b16: 10 s (was 8). Two cards are a name and one line each: about 2 s of reading each plus the choice. With
+        /// MechRulesConfig.HutBotsWaitForHumans the people have the first 7 s to themselves (the bots vote in the last 3 s or once
+        /// every person has voted); before, 15 bots closed the vote in about 3 s, before a person had read both cards.</summary>
+        public double VoteSeconds = 10;
         /// <summary>A bot votes this many seconds after the vote opens, plus a seeded 0..BotThinkSpreadSeconds.</summary>
         public double BotThinkSeconds = 1;
         public double BotThinkSpreadSeconds = 3;

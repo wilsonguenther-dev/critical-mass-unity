@@ -159,7 +159,7 @@ namespace CriticalMass.Runtime.Progression
             MasteryAward a = MasteryRules.Compute(cls, stats, ctx);
             MasteryRules.Apply(a, track, ctx);
             m.Award = a;
-            if (ctx.Completed && !ctx.PracticeMode) MatchHistory.AddCareer(track, stats, ctx.Outcome, score);
+            if (ctx.Completed && !ctx.PracticeMode) MatchHistory.AddCareer(track, stats, ctx.Outcome, score);   // MatchCounting's rule
             m.Unlocked.AddRange(MasteryRewards.Between(cls, a.LevelBefore, a.LevelAfter));
             m.Next = MasteryRewards.NextAfter(cls, a.LevelAfter);
             var rec = new MatchRecord
@@ -172,10 +172,32 @@ namespace CriticalMass.Runtime.Progression
                 BotOnly = ctx.BotOnly,
                 MasteryXp = a.Xp,
                 Stats = stats,
+                Practice = ctx.PracticeMode,   // b16: shown apart
             };
             MatchHistory.Add(p, rec);
             m.Record = rec;
             return m;
+        }
+
+        /// <summary>b16: a left match (MatchRewardTracker.RecordLeave): a loss in the class career and a history row, no
+        /// mastery XP (the same rule as the profile's count: MatchCounting).</summary>
+        public static MatchRecord RecordLeave(PlayerProfile p, ClassId cls, TeamId team, DateTime utc)
+        {
+            if (p == null) return null;
+            MatchHistory.AddCareer(p.MasteryOf(cls), default(RoleStats), MatchOutcome.Loss, 0);
+            var rec = new MatchRecord
+            {
+                DateUtc = MatchHistory.Stamp(utc),
+                Class = cls.ToString(),
+                Result = 0,
+                Azure = team == TeamId.Azure,
+                Left = true,
+                Mode = (int)PlayModes.SessionMode,
+                ModeLabel = PlayModes.Info(PlayModes.SessionMode)?.Title ?? string.Empty,
+                Map = PlayModes.MapName ?? string.Empty,
+            };
+            MatchHistory.Add(p, rec);
+            return rec;
         }
 
         /// <summary>Moves this match's progress into the profile's achievement records (best values only ever rise).</summary>

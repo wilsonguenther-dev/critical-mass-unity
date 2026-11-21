@@ -14,9 +14,9 @@ namespace CriticalMass.Sim
         /// <summary>History: 1 = the browser port through batch 14 (never bumped); 2 = b15-rejoin full-state fingerprint;
         /// 3 = b15 terrain height (MapDef.Lift is sim state; older replays are "from a different game version");
         /// 4 = batch 15 wave two (combat feel, bot brain, comeback + hut choices: new hashed sim state and rules).</summary>
-        public const int Schema = 5;
+        public const int Schema = 6;
 
         /// <summary>The reference-match digest this Schema was pinned for (printed by SimVersionTests).</summary>
-        public const ulong RulesDigest = 0x597B21BFA247E913UL;   // b15 fix round (schema 5: Miner bot route steering, Kaiju squeeze ignores ladders): printed by sim run 44880553461 at a7433909; was 0xC3FD3B160874096B (schema 4, sim run 44856207208)
+        public const ulong RulesDigest = 0x677B2CA156EA17ADUL;   // b16 mechanics fixes (schema 6: Kaiju waits off the circle, idle autopilot, hut vote waits, hill count Warrior x2 + cap 10, keep-out 7, type refs, comeback by size): printed by sim run 44937275234; was 0x597B21BFA247E913 (schema 5). Before: b15 fix round (schema 5: Miner bot route steering, Kaiju squeeze ignores ladders): printed by sim run 44880553461 at a7433909; was 0xC3FD3B160874096B (schema 4, sim run 44856207208)
     }
 }
