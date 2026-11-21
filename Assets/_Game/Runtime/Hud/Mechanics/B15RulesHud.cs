@@ -341,8 +341,12 @@ namespace CriticalMass.Runtime.Hud.Mechanics
             int press = 0;
             Keyboard kb = Keyboard.current;
             Gamepad gp = Gamepad.current;
-            bool typing = CriticalMass.Runtime.Online.OnlineChatHud.Typing || CriticalMass.Runtime.Menu.CharacterPanel.IsTyping;
-            if (typing) kb = null;
+            // b16 combine (b17 chat): every chat surface that owns the keys blocks the vote keys: the open text input (Typing), the
+            // scroll-back / settings panel, the frame the input closes on (EatsKeys), a name field, and the quick-chat wheel
+            // (it is held on D-pad right, which is also a vote key). `[` / `]` typed into chat never cast a vote.
+            bool typing = CriticalMass.Runtime.Online.OnlineChatHud.EatsKeys || CriticalMass.Runtime.Online.OnlineChatHud.WheelOpen
+                          || CriticalMass.Runtime.Menu.CharacterPanel.IsTyping || CriticalMass.Runtime.Online.OnlineMenuScreen.TypingName;
+            if (typing) { kb = null; gp = null; }
             if (kb != null && kb.leftBracketKey.wasPressedThisFrame) press = 1;
             else if (kb != null && kb.rightBracketKey.wasPressedThisFrame) press = 2;
             else if (gp != null && gp.dpad.left.wasPressedThisFrame) press = 1;

@@ -237,7 +237,9 @@ namespace CriticalMass.Runtime.Menu
             {
                 // The ground-camera key stays the "low view on" switch (older saves and tests use it); the view key says which.
                 if (!GetB(GroundCameraKey, false)) return CriticalMass.Runtime.Camera.CameraView.TopDown;
-                return PlayerPrefs.GetInt(CameraViewKey, 1) == 2 ? CriticalMass.Runtime.Camera.CameraView.FirstPerson : CriticalMass.Runtime.Camera.CameraView.ThirdPerson;
+                // b16: with FollowCamera.FirstPersonEnabled off (the demo default) a stored first person reads as third person
+                return PlayerPrefs.GetInt(CameraViewKey, 1) == 2 && CriticalMass.Runtime.Camera.FollowCamera.FirstPersonEnabled
+                    ? CriticalMass.Runtime.Camera.CameraView.FirstPerson : CriticalMass.Runtime.Camera.CameraView.ThirdPerson;
             }
             set
             {

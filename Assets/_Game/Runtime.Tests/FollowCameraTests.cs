@@ -252,6 +252,22 @@ namespace CriticalMass.Runtime.Tests
                 Assert.AreEqual(1f, GameSettings.CameraSensitivity, 1e-6);
                 Assert.AreEqual(FollowCamera.FovDefault, GameSettings.CameraFov);
 
+                // b16 owner decision: first person is hidden for the demo (switch off): the cycle is top-down <-> third person
+                Assert.IsFalse(FollowCamera.FirstPersonEnabled, "first person is hidden by default (demo)");
+                Assert.AreEqual(CameraView.ThirdPerson, FollowCamera.Next(CameraView.TopDown));
+                Assert.AreEqual(CameraView.TopDown, FollowCamera.Next(CameraView.ThirdPerson));
+                GameSettings.CameraView = CameraView.TopDown;
+                string offFirst = PauseMenu.CameraText();
+                var offSeen = new System.Collections.Generic.HashSet<string> { offFirst };
+                for (int i = 0; i < 2; i++) { PauseMenu.StepCamera(1); offSeen.Add(PauseMenu.CameraText()); }
+                Assert.AreEqual(3, offSeen.Count, "switch off: the CAMERA line shows the two top-down angles and third person");
+                Assert.IsFalse(offSeen.Contains("FIRST PERSON"));
+                PlayerPrefs.SetInt(GameSettings.CameraViewKey, 2);
+                GameSettings.GroundCamera = true;
+                Assert.AreEqual(CameraView.ThirdPerson, GameSettings.CameraView, "a stored first person plays as third person while hidden");
+                GameSettings.CameraView = CameraView.TopDown;
+                FollowCamera.FirstPersonEnabled = true;   // the rest of this test is the switch on (the code stays)
+
                 Assert.AreEqual(CameraView.ThirdPerson, FollowCamera.Next(CameraView.TopDown));
                 Assert.AreEqual(CameraView.FirstPerson, FollowCamera.Next(CameraView.ThirdPerson));
                 Assert.AreEqual(CameraView.TopDown, FollowCamera.Next(CameraView.FirstPerson));
@@ -292,6 +308,7 @@ namespace CriticalMass.Runtime.Tests
             }
             finally
             {
+                FollowCamera.FirstPersonEnabled = false;
                 for (int i = 0; i < Keys.Length; i++)
                 {
                     if (had[i]) PlayerPrefs.SetInt(Keys[i], old[i]);

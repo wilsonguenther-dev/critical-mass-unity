@@ -1457,7 +1457,8 @@ namespace CriticalMass.Runtime.Menu
 
         public static void StepCamera(int d)
         {
-            int i = ((CameraIndex() + (d >= 0 ? 1 : -1)) % 4 + 4) % 4;
+            int n = CriticalMass.Runtime.Camera.FollowCamera.FirstPersonEnabled ? 4 : 3;   // b16: FIRST PERSON hidden while the switch is off
+            int i = ((CameraIndex() + (d >= 0 ? 1 : -1)) % n + n) % n;
             GameSettings.CameraView = i == 3 ? CriticalMass.Runtime.Camera.CameraView.FirstPerson
                 : i == 2 ? CriticalMass.Runtime.Camera.CameraView.ThirdPerson : CriticalMass.Runtime.Camera.CameraView.TopDown;
             if (i < 2) CriticalMass.Runtime.Camera.CameraHeading.ClassicChosen = i == 1;
