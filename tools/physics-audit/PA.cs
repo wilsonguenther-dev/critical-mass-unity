@@ -881,3 +881,82 @@ public static class PAW
         return sb.ToString();
     }
 }
+
+public static class PAPose
+{
+    static void Dump(World w, string name, int kaiju)
+    {
+        var sb = new StringBuilder();
+        for (int i = 0; i < w.ActorCount; i++) { Actor a = w.Actors[i]; sb.Append(i).Append(' ').Append(a.Alive ? 1 : 0).Append(' ').Append((int)a.Cls).Append(' ').Append(w.X[i].ToString("R")).Append(' ').Append(w.Z[i].ToString("R")).Append(' ').Append(a.Facing.ToString("R")).Append('\n'); }
+        sb.Append("K ").Append(kaiju).Append(' ').Append(w.Kaiju.X.ToString("R")).Append(' ').Append(w.Kaiju.Z.ToString("R")).Append(' ').Append(w.Kaiju.Facing.ToString("R")).Append('\n');
+        Directory.CreateDirectory(PA.Out + "poses"); File.WriteAllText(PA.Out + "poses/" + name + ".txt", sb.ToString());
+    }
+    /// <summary>The 16v16 seed-7 match state at a tick (the ally overlap picture).</summary>
+    public static string Match(int seed, int tick, string name)
+    {
+        World w = PA.NewW(ClassId.Warrior, seed, 16, 30); InputFrame s = SimInput.EmptyInput();
+        while (w.Tick < tick) MatchTick.Advance(w, null, s);
+        Dump(w, name, 0);
+        return "dumped " + name + " at tick " + w.Tick;
+    }
+    /// <summary>The 1-cell doorway jam at a tick (same geometry as PA.Collision (c)).</summary>
+    public static string Door(int gap, int tick)
+    {
+        World w = PA.NewW(ClassId.Warrior);
+        var ids = new List<int>(); for (int k = 0; k < 8; k++) ids.Add(k);
+        PA.Bench(w, ids);
+        PA.OpenSpot(w, 14, w.Map.Hill.X, w.Map.Hill.Z, out double ox, out double oz);
+        int wx = (int)Math.Floor(ox); int gz0 = (int)Math.Floor(oz) - gap / 2;
+        for (int cz = (int)oz - 8; cz <= (int)oz + 8; cz++) if (cz < gz0 || cz >= gz0 + gap) w.Map.Cells[cz * w.Map.Width + wx] = Cell.Wall;
+        double doorZ = gz0 + gap * 0.5;
+        for (int k = 0; k < 8; k++) PA.Put(w, ids[k], ox - 4 - (k / 3) * 1.0, doorZ - 1.2 + (k % 3) * 1.2);
+        for (int t = 1; t <= tick; t++)
+        {
+            for (int k = 0; k < 8; k++)
+            {
+                int id = ids[k];
+                double tx = w.X[id] < wx + 0.5 ? wx + 0.5 : ox + 5, tz = w.X[id] < wx + 0.5 ? doorZ : w.Z[id];
+                double dx = tx - w.X[id], dz = tz - w.Z[id], l = Math.Sqrt(dx * dx + dz * dz) + 1e-9;
+                PA.In(w, id, dx / l, dz / l);
+            }
+            SimStep.Step(w);
+        }
+        Dump(w, "door" + gap + "-t" + tick, 0);
+        return "door wall x=" + wx + " gap z " + gz0 + ".." + (gz0 + gap - 1) + " from z " + ((int)oz - 8) + " to " + ((int)oz + 8);
+    }
+}
+
+public static class PAShiver
+{
+    /// <summary>The guard-on half of MovementShiverTests.NoActorOrKaijuShiversInWholeBotMatches, flags broken down.</summary>
+    public static string Soak()
+    {
+        var sb = new StringBuilder("# shiver soak (guard on): 16v16, seeds 1/7/1337 x hatch 240/60, 14400 ticks\n");
+        var byState = new Dictionary<string, int>(); var byKind = new int[3]; int total = 0, kaiju = 0, onHill = 0, nearWall = 0;
+        var amps = new List<double>(); var nets = new List<double>();
+        foreach (int seed in new[] { 1, 7, 1337 })
+            foreach (double hatch in new[] { 240.0, 60.0 })
+            {
+                World w = PA.NewW(ClassId.Warrior, seed, 16, hatch);
+                var watch = new ShiverWatch(); watch.MaxFlags = 4096; InputFrame s = SimInput.EmptyInput();
+                for (int t = 0; t < 14400 && w.Match.Phase != MatchPhase.Ended; t++) { MatchTick.Advance(w, null, s); watch.Observe(w); }
+                sb.Append("seed ").Append(seed).Append(" hatch ").Append(hatch).Append(": ").Append(watch.Count).Append(" (dither ").Append(watch.CountByKind[0]).Append(", reversals ").Append(watch.CountByKind[1]).Append(", pressed ").Append(watch.CountByKind[2]).Append(")\n");
+                foreach (ShiverFlag f in watch.Flags)
+                {
+                    total++; byKind[(int)f.Kind]++;
+                    if (f.Actor == ShiverWatch.KaijuId) { kaiju++; continue; }
+                    string k = f.Kind + "/" + f.State; byState[k] = byState.TryGetValue(k, out int c) ? c + 1 : 1;
+                    double hx = f.X - w.Map.Hill.X, hz = f.Z - w.Map.Hill.Z; if (hx * hx + hz * hz < 13 * 13) onHill++;
+                    bool wall = false; for (int dz = -1; dz <= 1 && !wall; dz++) for (int dx = -1; dx <= 1 && !wall; dx++) { int ct = MapGrid.CellAt(w.Map, f.X + dx, f.Z + dz); if (ct != Cell.Floor && ct != Cell.BreakableDestroyed) wall = true; }
+                    if (wall) nearWall++;
+                    if (f.Kind != ShiverKind.Pressed) { amps.Add(f.Path - f.Net); nets.Add(f.Net); }
+                }
+            }
+        amps.Sort();
+        sb.Append("total ").Append(total).Append(", Kaiju ").Append(kaiju).Append(", within 13 u of the hill ").Append(onHill).Append(", a non-floor cell within 1 cell ").Append(nearWall).Append('\n');
+        sb.Append("by kind/state: "); foreach (var kv in byState) sb.Append(kv.Key).Append(' ').Append(kv.Value).Append("; "); sb.Append('\n');
+        if (amps.Count > 0) sb.Append("back-and-forth amplitude (walked minus net, 1 s window) median ").Append(amps[amps.Count / 2].ToString("F2")).Append(" u, p90 ").Append(amps[(int)(amps.Count * 0.9)].ToString("F2")).Append(" u, max ").Append(amps[amps.Count - 1].ToString("F2")).Append(" u\n");
+        File.WriteAllText(PA.Out + "data/shiver-soak.txt", sb.ToString());
+        return sb.ToString();
+    }
+}
