@@ -4,7 +4,7 @@ Every tuning field the sim reads from `GameConfig`, found by reflection (`Assets
 
 Regenerate: `tools/balance/balance-report.sh tuning-index (or the balance-report workflow, mode tuning-index)`. `TuningIndexTests` fails when a field has no row here. Paths work as `--set Path=Value` switches for the balance report.
 
-864 fields.
+863 fields.
 
 ## (top level)
 
@@ -938,7 +938,6 @@ Regenerate: `tools/balance/balance-report.sh tuning-index (or the balance-report
 | `Depth.PhysicsFeel.BotNoSnapReversal` | true | bool | `Assets/_Game/Sim/Config/PhysicsFeelConfig.cs` | [3] A bot whose wish flips over 120 degrees off its motion turns through the side at the bot turn rate instead of stepping straight back (fighters and straight walkers; the field-following turn limit already covers th... |
 | `Depth.PhysicsFeel.AllyPushRampFrom` | 0.1 | double | `Assets/_Game/Sim/Config/PhysicsFeelConfig.cs` | Teammates push at PhysicsConfig.AllyPushShare up to AllyPushRampFrom of overlap, rising to the full push at AllyPushFullAt. |
 | `Depth.PhysicsFeel.AllyPushFullAt` | 0.25 | double | `Assets/_Game/Sim/Config/PhysicsFeelConfig.cs` |  |
-| `Depth.PhysicsFeel.AllyGetUpShare` | 0.5 | double | `Assets/_Game/Sim/Config/PhysicsFeelConfig.cs` | b16 combine (D, ally overlap): a teammate getting up is no longer immovable to an ally walking into it: it takes this share of the pair's push (0 = the old rule, the walker takes all of it). |
 | `Depth.PhysicsFeel.AllyPassInGapsOnly` | true | bool | `Assets/_Game/Sim/Config/PhysicsFeelConfig.cs` | The U-071 opposing-ally pass (no push between a retreating bot and an ally walking into it) only inside or at the mouth of a one-cell passage, where they cannot step round each other. |
 | `Depth.PhysicsFeel.GapFlow` | true | bool | `Assets/_Game/Sim/Config/PhysicsFeelConfig.cs` | Bodies queue through one-cell gaps: inside a gap (or one cell from its mouth along its walk) a body's push across the passage is dropped, and of a pair where only one is there, that one takes GapLeadShare of the push. |
 | `Depth.PhysicsFeel.GapLeadShare` | 0.2 | double | `Assets/_Game/Sim/Config/PhysicsFeelConfig.cs` |  |

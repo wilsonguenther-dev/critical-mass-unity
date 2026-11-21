@@ -970,12 +970,6 @@ namespace CriticalMass.Sim.Core
                         double mj = p.SeparationByMass ? w.Config.Class(aj.Cls).Mass : 1;
                         double pushI = jFixed ? overlap : iFixed ? 0 : overlap * mj / (mi + mj);
                         double pushJ = iFixed ? overlap : jFixed ? 0 : overlap - pushI;
-                        // b16 combine (D): a teammate getting up shares the push with the ally walking into it (AllyGetUpShare).
-                        if (feel && pf.AllyGetUpShare > 0 && ai.Team == aj.Team && iFixed != jFixed)
-                        {
-                            if (iFixed) { pushI = overlap * pf.AllyGetUpShare; pushJ = overlap - pushI; }
-                            else { pushJ = overlap * pf.AllyGetUpShare; pushI = overlap - pushJ; }
-                        }
                         // b16 [5]: of a pair where only one is in (or walking into) a one-cell gap, that one takes GapLeadShare: the
                         // queue behind it no longer shoves it sideways out of the mouth.
                         if (gapFlow && !iFixed && !jFixed && (gi != 0) != (gj != 0))
