@@ -102,7 +102,11 @@ namespace CriticalMass.Sim.Tests
                         if (kx * kx + kz * kz < body * body) failures.Add($"{tag} tick {tick}: actor {id} inside the Kaiju");
                     }
                     bool windingUp = a.AiState == AiState.Deliver && a.DeliverTicks != 0;
-                    bool travelling = a.StandUp <= 0 && Travelling(a.AiState) && !windingUp;
+                    // b15 wave two (bot brain ON by default): a respawned bot that waits on the staging ring for its group
+                    // (RallyStage, up to RallySeconds) is holding on purpose, not stuck (slow run 44857709950 flagged seed 101's
+                    // ring at (70.7, 38.5), 15 u from the hill, at every difficulty). Every other bot is judged as before.
+                    bool staging = BotBrain.TryGetBotsState(w, out BotsState bst) && bst.Rally != null && id < bst.Rally.Length && bst.Rally[id] == TeamBrain.RallyStage;
+                    bool travelling = a.StandUp <= 0 && Travelling(a.AiState) && !windingUp && !staging;
                     double dx = x - anchorX[id];
                     double dz = z - anchorZ[id];
                     if (!travelling || a.AiState != anchorState[id] || dx * dx + dz * dz >= StuckRadius * StuckRadius)

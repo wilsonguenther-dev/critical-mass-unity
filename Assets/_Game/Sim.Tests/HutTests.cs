@@ -217,6 +217,10 @@ namespace CriticalMass.Sim.Tests
         {
             GameConfig cfg = GameConfig.CreateBrowser5v5().ApplyRules(RulesProfile.Full);
             cfg.Depth.Hut.On = hutOn;
+            // b15 wave two: the b13 H limits judge the b13 hut against no hut. PR #219's hut CHOICES (on by default) only exist
+            // with a hut, so with them on the "hut" arm also carried the choices: hill lead changes 448 vs 249 over 112 matches
+            // (slow run 44857709950), a wave-two target the balance report measures (median 2 -> 4 at 72 seeds). Off in both arms.
+            cfg.Depth.HutChoices.Enabled = false;
             World w = World.CreateWorld(new WorldOptions { Seed = seed, TeamSize = teamSize, HumanTeam = TeamId.Azure, HumanClass = ClassId.Warrior, Config = cfg });
             InputFrame scratch = SimInput.EmptyInput();
             int hz = (int)Math.Round(cfg.SimHz);
