@@ -59,7 +59,7 @@ namespace CriticalMass.Sim.Bots
         /// WalkLookahead u: no hit blocker on the centre line (SegmentClear) and every sample of the centre line and of both
         /// edge lines one class radius to each side stands on a walkable cell. SegmentClear alone is a HIT line (a hole, a
         /// cliff edge or water does not stop it), so it sent Miners straight at the base island edge (Pressed flags).
-        /// Allocation-free; at most 8 samples x 3 cell reads.
+        /// Allocation-free; at most 8 samples x 5 cell reads.
         /// </summary>
         static bool StraightWalk(World w, int id, double x, double z, double gx, double gz)
         {
