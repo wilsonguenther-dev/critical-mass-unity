@@ -528,7 +528,7 @@ namespace CriticalMass.Sim.Tests.Net
             {
                 { RulesProfile.Classic, 0x5C912AEED16BC302UL },
                 { RulesProfile.PhysicsOnly, 0x0836DA5FD21C4854UL },
-                { RulesProfile.Full, 0x48A817A4B2B3F068UL },
+                { RulesProfile.Full, 0x0B1E594CAC2A34E0UL },   // batch 16 combined (sim run 44953083481); chat alone matched the base 0x48A817A4B2B3F068
             };
             foreach (KeyValuePair<RulesProfile, ulong> kv in pins)
             {
@@ -546,7 +546,7 @@ namespace CriticalMass.Sim.Tests.Net
             {
                 { RulesProfile.Classic, 0x2980068FA0457CC2UL },
                 { RulesProfile.PhysicsOnly, 0x780B92B03E6FFEAEUL },
-                { RulesProfile.Full, 0x1978E881F4005F28UL },
+                { RulesProfile.Full, 0xF41666EAD7BC9994UL },   // batch 16 combined (sim run 44953083481); chat alone matched the base 0x1978E881F4005F28
             };
             foreach (KeyValuePair<RulesProfile, ulong> kv in pins)
             {
