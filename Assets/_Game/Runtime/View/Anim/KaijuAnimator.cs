@@ -429,7 +429,16 @@ namespace CriticalMass.Runtime.View.Anim
                 // material's own ratios and lit multiplier stand), and a model without part sets keeps only its type tint
                 // (BodyRatio) without the b14 value lift (LitLift / MidLift / ShadowLift). The lift constants are kept for the
                 // in-Editor value probe (EDITOR-CHECKLIST: Kaiju brightness) in case the world look's lift alone reads flat.
-                if (!parts)
+                // b15 Editor review (2026-11-21): the world look's lift alone read flat on the adult parts model: body minus
+                // ground -0.03 to -0.21 at Day/Dusk and -0.03 to +0.05 at Night on the hill (bars +0.12 / +0.15), so the
+                // parts lift is back (checklist 0.4 fallback). Models without part sets keep only their type tint.
+                if (parts)
+                {
+                    _typeBlock.SetVector("_MidRatio", Vector4.one * KaijuTypeLook.PartsMidLift);
+                    _typeBlock.SetVector("_ShadowRatio", Vector4.one * KaijuTypeLook.PartsShadowLift);
+                    _typeBlock.SetFloat("_LitMultiplier", KaijuTypeLook.PartsLitLift);
+                }
+                else
                 {
                     Vector4 body = KaijuTypeLook.BodyRatio(type);
                     _typeBlock.SetVector("_MidRatio", body);
