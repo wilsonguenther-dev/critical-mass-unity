@@ -346,8 +346,10 @@ namespace CriticalMass.Sim.Core
                 Actor a = w.Actors[i];
                 // b15 pass 4: the chain cap is a hard stop. Movement counts a stun down only on grounded ticks (an airborne body,
                 // a dodge step or a fall keeps it), so a knock-up inside a run carried it to 25 ticks (0.83 s, run 44253108383)
-                // although Knock.Push had clipped every stun to the room left. A run that has had capTicks stunned ticks ends here.
-                if (a.Alive && a.HitStunTicks > 0 && capTicks > 0 && s.LockRun[i] >= capTicks)
+                // although Knock.Push had clipped every stun to the room left. The stun lands after this step's movement, so the
+                // run already holds LockRun + 1 stunned ticks here: at capTicks - 1 counted it has had capTicks and ends (0.53 s
+                // measured with ">= capTicks", CombatFeelBalanceTests run 44837692193).
+                if (a.Alive && a.HitStunTicks > 0 && capTicks > 0 && s.LockRun[i] >= capTicks - 1)
                 {
                     a.HitStunTicks = 0;
                     s.LockRun[i] = 0;
