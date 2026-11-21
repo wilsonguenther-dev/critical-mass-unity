@@ -480,8 +480,8 @@ namespace CriticalMass.Sim.Tests
                               ",\"farmerClose\":" + farmerClose + ",\"builderOpen\":" + builderOpen + ",\"builderHome\":" + builderHome + "}");
             Assert.AreEqual(f.Classes[(int)ClassId.Miner].AttackDamage * f.MinerHeavyPierce, minerOnWarrior, 1e-6, "Miner pierces the Warrior");
             Assert.AreEqual(f.Classes[(int)ClassId.Miner].AttackDamage, minerOnFarmer, 1e-6);
-            Assert.AreEqual(20, farmerFar, 1e-6);
-            Assert.AreEqual(20 * f.FarmerCloseShare, farmerClose, 1e-6, "Farmer weak up close");
+            Assert.AreEqual(f.Classes[(int)ClassId.Farmer].AttackDamage, farmerFar, 1e-6);
+            Assert.AreEqual(f.Classes[(int)ClassId.Farmer].AttackDamage * f.FarmerCloseShare, farmerClose, 1e-6, "Farmer weak up close");
             Assert.AreEqual(f.Classes[(int)ClassId.Builder].AttackDamage, builderOpen, 1e-6);
             Assert.AreEqual(f.Classes[(int)ClassId.Builder].AttackDamage * f.BuilderHomeMultiplier, builderHome, 1e-6, "Builder at home");
 
