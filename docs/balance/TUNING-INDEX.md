@@ -4,7 +4,7 @@ Every tuning field the sim reads from `GameConfig`, found by reflection (`Assets
 
 Regenerate: `tools/balance/balance-report.sh tuning-index (or the balance-report workflow, mode tuning-index)`. `TuningIndexTests` fails when a field has no row here. Paths work as `--set Path=Value` switches for the balance report.
 
-813 fields.
+837 fields.
 
 ## (top level)
 
@@ -221,7 +221,7 @@ Regenerate: `tools/balance/balance-report.sh tuning-index (or the balance-report
 | `Abilities.MinerBarricade.MinDistanceFromActor` | 0.9 | double | `Assets/_Game/Sim/Config/GameConfig.cs` |  |
 | `Abilities.MinerBarricade.PlaceRange` | 2 | double | `Assets/_Game/Sim/Config/GameConfig.cs` |  |
 | `Abilities.MinerTerraform.Reach` | 1.6 | double | `Assets/_Game/Sim/Config/GameConfig.cs` |  |
-| `Abilities.MinerTerraform.DigAimedCell` | true | bool | `Assets/_Game/Sim/Config/GameConfig.cs` |  |
+| `Abilities.MinerTerraform.DigAimedCell` | true | bool | `Assets/_Game/Sim/Config/GameConfig.cs` | b15 fix round (Full profile only): dig / place on the aimed cell when its square reaches into the Reach circle, instead of the cell under the aim pulled back to Reach (which could land one cell short of the marked cell). |
 | `Abilities.MinerTerraform.TeamCooldownTicks` | 30 | double | `Assets/_Game/Sim/Config/GameConfig.cs` |  |
 | `Abilities.MinerTerraform.MinGapTicks` | 15 | double | `Assets/_Game/Sim/Config/GameConfig.cs` |  |
 | `Abilities.MinerTerraform.ActorMargin` | 0.05 | double | `Assets/_Game/Sim/Config/GameConfig.cs` |  |
@@ -854,7 +854,7 @@ Regenerate: `tools/balance/balance-report.sh tuning-index (or the balance-report
 | `Depth.BotBrain.StageRadius` | 15 | double | `Assets/_Game/Sim/Config/DepthConfig.cs` | The staging ring: this far from the hill centre (outside the Kaiju's 13 u fight zone). |
 | `Depth.BotBrain.GroupMin` | 3 | int | `Assets/_Game/Sim/Config/DepthConfig.cs` |  |
 | `Depth.BotBrain.GroupShare` | 0.5 | double | `Assets/_Game/Sim/Config/DepthConfig.cs` |  |
-| `Depth.BotBrain.RallySeconds` | 12 | double | `Assets/_Game/Sim/Config/DepthConfig.cs` |  |
+| `Depth.BotBrain.RallySeconds` | 6 | double | `Assets/_Game/Sim/Config/DepthConfig.cs` |  |
 | `Depth.BotBrain.RallyOutnumberedBy` | 2 | int | `Assets/_Game/Sim/Config/DepthConfig.cs` | A respawned bot stages only while the enemy has at least this many more bodies on the hill disc. |
 | `Depth.BotBrain.TargetHealersFirst` | true | bool | `Assets/_Game/Sim/Config/DepthConfig.cs` |  |
 | `Depth.BotBrain.TargetStickScore` | 1.5 | double | `Assets/_Game/Sim/Config/DepthConfig.cs` |  |
@@ -899,3 +899,26 @@ Regenerate: `tools/balance/balance-report.sh tuning-index (or the balance-report
 | `Depth.HutChoices.KaijuHunterScale` | 1.25 | double | `Assets/_Game/Sim/Config/HutChoicesConfig.cs` | KAIJU HUNTERS: the team deals this much damage to the Kaiju. |
 | `Depth.HutChoices.SwiftFeetScale` | 1.1 | double | `Assets/_Game/Sim/Config/HutChoicesConfig.cs` | SWIFT FEET: the team moves this much faster while off the hill (beyond the hill radius + SwiftHillMargin). |
 | `Depth.HutChoices.SwiftHillMargin` | 2 | double | `Assets/_Game/Sim/Config/HutChoicesConfig.cs` |  |
+| `Depth.PhysicsFeel.Enabled` | true | bool | `Assets/_Game/Sim/Config/PhysicsFeelConfig.cs` |  |
+| `Depth.PhysicsFeel.CornerNudgeMax` | 0.35 | double | `Assets/_Game/Sim/Config/PhysicsFeelConfig.cs` | Largest overlap with a corner cell that is slid round (u; PhysicsConfig.CornerNudgeMax 0.1 otherwise). |
+| `Depth.PhysicsFeel.WallSlideKeep` | 0.92 | double | `Assets/_Game/Sim/Config/PhysicsFeelConfig.cs` | Share of the step kept along a wall when one axis is blocked and the input is within WallSlideFullDeg of the wall (pure projection keeps cos(angle): 71 percent at 45 degrees). |
+| `Depth.PhysicsFeel.WallSlideFullDeg` | 45 | double | `Assets/_Game/Sim/Config/PhysicsFeelConfig.cs` |  |
+| `Depth.PhysicsFeel.WallSlideFadeDeg` | 75 | double | `Assets/_Game/Sim/Config/PhysicsFeelConfig.cs` |  |
+| `Depth.PhysicsFeel.KaijuPinStepMax` | 0.2 | double | `Assets/_Game/Sim/Config/PhysicsFeelConfig.cs` | Most a fighter is moved in one tick by the Kaiju body's push-out and its end-of-tick depenetration together (u; with a top-speed step, 0.13 u, the whole tick stays under 0.35 u). |
+| `Depth.PhysicsFeel.KaijuNetSpeedMax` | 3 | double | `Assets/_Game/Sim/Config/PhysicsFeelConfig.cs` | A pinned fighter (no free spot on its own side within KaijuPinStepMax) holds the Kaiju: the body gives way instead of the fighter being placed through it, by what is missing (at most KaijuPinStepMax), with the Kaiju's... |
+| `Depth.PhysicsFeel.KaijuCrowdShoveMax` | 0.02 | double | `Assets/_Game/Sim/Config/PhysicsFeelConfig.cs` | Most the whole crowd of fighters wedged against it can shove the Kaiju in one tick (u, about 0.6 u/s of drift). The rest is dropped: fighters do not move the Kaiju beyond a slow drift. |
+| `Depth.PhysicsFeel.KaijuTurnDegPerSec` | 300 | double | `Assets/_Game/Sim/Config/PhysicsFeelConfig.cs` | The Kaiju's sim facing turns at most this fast (degrees per real second). It starts a claw only once it faces the target, so the claw cone always matches the drawn facing. |
+| `Depth.PhysicsFeel.BlastShove` | true | bool | `Assets/_Game/Sim/Config/PhysicsFeelConfig.cs` | TNT and mine blasts shove under their own switch (PhysicsConfig.Knockback, which gates every fighter knock and is off, no longer decides it). |
+| `Depth.PhysicsFeel.BlastShoveCentre` | 2.8 | double | `Assets/_Game/Sim/Config/PhysicsFeelConfig.cs` | Shove at the blast centre (u travelled for mass 1), falling linearly to 0 at the blast radius. |
+| `Depth.PhysicsFeel.BlastStunSeconds` | 0.25 | double | `Assets/_Game/Sim/Config/PhysicsFeelConfig.cs` | Stagger at the centre (real seconds), falling linearly to 0 at the radius. |
+| `Depth.PhysicsFeel.BlastKaijuShove` | 0.35 | double | `Assets/_Game/Sim/Config/PhysicsFeelConfig.cs` | The hatched Kaiju inside a TNT blast slides this far at the centre (u), falling to 0 at the edge. |
+| `Depth.PhysicsFeel.KaijuPushDecay` | 0.7 | double | `Assets/_Game/Sim/Config/PhysicsFeelConfig.cs` | The Kaiju's blast slide keeps this share of its speed per 1/30 s. |
+| `Depth.PhysicsFeel.BotPullDeadband` | 0.2 | double | `Assets/_Game/Sim/Config/PhysicsFeelConfig.cs` | The circle-strafe keep-distance pull is zero within this band (u) of the wanted distance (no in-out flip at it). |
+| `Depth.PhysicsFeel.SeparationNoReversal` | true | bool | `Assets/_Game/Sim/Config/PhysicsFeelConfig.cs` | Separation never pushes a walking body backwards past a standstill in one tick: the part of the push against its own step this tick is capped at that step's length (lateral and forward parts are kept). |
+| `Depth.PhysicsFeel.BotNoSnapReversal` | true | bool | `Assets/_Game/Sim/Config/PhysicsFeelConfig.cs` | [3] A bot whose wish flips over 120 degrees off its motion turns through the side at the bot turn rate instead of stepping straight back (fighters and straight walkers; the field-following turn limit already covers th... |
+| `Depth.PhysicsFeel.AllyPushRampFrom` | 0.1 | double | `Assets/_Game/Sim/Config/PhysicsFeelConfig.cs` | Teammates push at PhysicsConfig.AllyPushShare up to AllyPushRampFrom of overlap, rising to the full push at AllyPushFullAt. |
+| `Depth.PhysicsFeel.AllyPushFullAt` | 0.25 | double | `Assets/_Game/Sim/Config/PhysicsFeelConfig.cs` |  |
+| `Depth.PhysicsFeel.AllyPassInGapsOnly` | true | bool | `Assets/_Game/Sim/Config/PhysicsFeelConfig.cs` | The U-071 opposing-ally pass (no push between a retreating bot and an ally walking into it) only inside or at the mouth of a one-cell passage, where they cannot step round each other. |
+| `Depth.PhysicsFeel.GapFlow` | true | bool | `Assets/_Game/Sim/Config/PhysicsFeelConfig.cs` | Bodies queue through one-cell gaps: inside a gap (or one cell from its mouth along its walk) a body's push across the passage is dropped, and of a pair where only one is there, that one takes GapLeadShare of the push. |
+| `Depth.PhysicsFeel.GapLeadShare` | 0.2 | double | `Assets/_Game/Sim/Config/PhysicsFeelConfig.cs` |  |
+| `Depth.PhysicsFeel.JumpRefusedEvent` | true | bool | `Assets/_Game/Sim/Config/PhysicsFeelConfig.cs` | A jump press the sim refuses (no clear landing, past the coyote window) raises SimEventType.JumpRefused once the buffer runs out, for the view's cue. |

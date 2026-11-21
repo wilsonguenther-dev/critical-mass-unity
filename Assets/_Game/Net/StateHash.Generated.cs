@@ -683,6 +683,8 @@ namespace CriticalMass.Net
             M(ref h, o.MeleeWindupLen);
             D(ref h, o.PrevX);
             D(ref h, o.PrevZ);
+            D(ref h, o.PushVx);
+            D(ref h, o.PushVz);
             D(ref h, o.SlamCd);
             M(ref h, (long)o.State);
             M(ref h, o.TargetId);
