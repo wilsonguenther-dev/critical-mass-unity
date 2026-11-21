@@ -15,7 +15,28 @@ import {
   OP_DATA, OP_LOCK, OP_WELCOME, OP_JOINED, OP_LEFT, OP_CLOSING, BROADCAST, HOST, REASON, PROTOCOL_VERSION,
   MAX_PEERS, MAX_FRAME, IDLE_MS, HOST_CONNECT_MS, MAX_ROOM_MS, Bucket, frame, normaliseCode, randomCode, randomKey,
   FREE_REQUESTS_PER_DAY, MESSAGES_PER_REQUEST,
+  chatKind, CHAT_RATE_JOINER, CHAT_BURST_JOINER, CHAT_RATE_HOST, CHAT_BURST_HOST, VOICE_RATE, VOICE_BURST,
+  VOICE_ROOM_RATE, VOICE_ROOM_BURST, CHAT_STRIKES, CHAT_MAX_BYTES,
+  CREATE_PER_MIN_PER_IP, JOIN_PER_MIN_PER_IP, MSGS_PER_MIN_PER_IP, MSG_CHECK_EVERY, IP_RATE_PER_ROOM, IP_BURST_PER_ROOM,
+  ROOM_RATE, ROOM_BURST, JOINS_PER_MIN_PER_ROOM, WindowLimiter, budgetLevel,
 } from "./protocol.js";
+
+// b17-harden: fallback limiters when the [[ratelimits]] bindings are absent (best effort: one isolate's view only).
+const fallbackCreate = new WindowLimiter(CREATE_PER_MIN_PER_IP);
+const fallbackJoin = new WindowLimiter(JOIN_PER_MIN_PER_IP);
+const fallbackMsgs = new WindowLimiter(MSGS_PER_MIN_PER_IP);
+
+// b17-harden: true = allowed. The binding is approximate and per location; never throws (a limiter error allows).
+async function allow(binding, fallback, key, delta = 1) {
+  if (binding && typeof binding.limit === "function") {
+    try { return (await binding.limit({ key, delta })).success; } catch { return true; }
+  }
+  return fallback.take(key, Date.now(), delta);
+}
+
+function clientIp(request) {
+  return request.headers.get("CF-Connecting-IP") || "unknown";
+}
 
 export default {
   async fetch(request, env) {
@@ -28,6 +49,10 @@ export default {
       return Response.json(usage, { headers: { "cache-control": "no-store", "access-control-allow-origin": "*" } });
     }
     if (parts.length === 1 && parts[0] === "rooms" && request.method === "POST") {
+      // b17-harden: cheapest first: the per-IP limit (no Durable Object touched), then the day's budget (one request).
+      if (!(await allow(env.CREATE_LIMIT, fallbackCreate, clientIp(request)))) return new Response("slow down", { status: 429, headers: { "retry-after": "60" } });
+      const usage = await env.USAGE.get(env.USAGE.idFromName("usage")).today();
+      if (!budgetLevel(usage.requests).newRooms) return new Response("the free relay is nearly used up for today", { status: 503, headers: { "retry-after": "3600" } });
       for (let attempt = 0; attempt < 5; attempt++) {
         const code = randomCode();
         const key = randomKey();
@@ -41,6 +66,9 @@ export default {
       if (request.headers.get("Upgrade") !== "websocket") return new Response("expected a WebSocket", { status: 426 });
       const code = normaliseCode(parts[1]);
       if (!code) return closingSocket(REASON.NOT_FOUND);
+      // b17-harden: a bad version or a join flood is refused here, before the room object (a billed request) is touched.
+      if (Number(url.searchParams.get("v")) !== PROTOCOL_VERSION) return closingSocket(REASON.BAD_VERSION);
+      if (!(await allow(env.JOIN_LIMIT, fallbackJoin, clientIp(request)))) return closingSocket(REASON.TOO_FAST);
       const stub = env.ROOMS.get(env.ROOMS.idFromName(code));
       return stub.fetch(request);
     }
@@ -61,6 +89,15 @@ export class Room extends DurableObject {
   constructor(ctx, env) {
     super(ctx, env);
     this.buckets = new Map(); // peer -> Bucket (memory only; a hibernation wake starts a fresh bucket)
+    // b17-chat: chat and voice caps (memory only, like the buckets): peer -> {chat, voice, strikes}; one room voice bucket.
+    this.chatCaps = new Map();
+    this.roomVoice = new Bucket(VOICE_ROOM_RATE, VOICE_ROOM_BURST);
+    // b17-harden: per-IP and whole-room buckets, join window, the day's budget as last reported (chat on until told).
+    this.ipBuckets = new Map();
+    this.roomBucket = new Bucket(ROOM_RATE, ROOM_BURST);
+    this.joinWindow = new WindowLimiter(JOINS_PER_MIN_PER_ROOM, 60000, 1);
+    this.chatAllowed = true;
+    this.msgCount = new Map(); // peer -> messages (memory only)
     // b15-zero-cost: what this room cost since its last report (memory only: a hibernation wake starts at 0, so the count
     // can miss a few messages of a quiet room; a room in play never sleeps). Reported to the Usage object every alarm.
     this.msgs = 0;
@@ -73,7 +110,11 @@ export class Room extends DurableObject {
     const delta = { msgs: this.msgs, connects: this.connects, alarms, rooms: this.creates };
     this.msgs = 0; this.connects = 0; this.creates = 0;
     if (!delta.msgs && !delta.connects && !delta.alarms && !delta.rooms) return;
-    try { await this.env.USAGE.get(this.env.USAGE.idFromName("usage")).add(delta); } catch { /* counting must never break a room */ }
+    try {
+      // b17-harden: the same call answers with today's total, so every busy room learns the budget once a minute for free.
+      const total = await this.env.USAGE.get(this.env.USAGE.idFromName("usage")).add(delta);
+      if (typeof total === "number") this.chatAllowed = budgetLevel(total).chat;
+    } catch { /* counting must never break a room */ }
   }
 
   // ---- RPC from the Worker ------------------------------------------------------------------------------------------
@@ -94,7 +135,6 @@ export class Room extends DurableObject {
     const url = new URL(request.url);
     const pair = new WebSocketPair();
     const client = pair[0], server = pair[1];
-    const meta = await this.ctx.storage.get("meta");
     const reject = (reason) => {
       server.accept();
       server.send(frame(OP_CLOSING, reason));
@@ -102,6 +142,9 @@ export class Room extends DurableObject {
       return new Response(null, { status: 101, webSocket: client });
     };
     if (Number(url.searchParams.get("v")) !== PROTOCOL_VERSION) return reject(REASON.BAD_VERSION);
+    // b17-harden: a room takes at most JOINS_PER_MIN_PER_ROOM sockets a minute (checked before storage is read).
+    if (!this.joinWindow.take("room", Date.now())) return reject(REASON.TOO_FAST);
+    const meta = await this.ctx.storage.get("meta");
     if (!meta || Date.now() - meta.created > MAX_ROOM_MS) return reject(REASON.NOT_FOUND);
     const sockets = this.ctx.getWebSockets();
     const isHost = url.searchParams.get("key") === meta.key && !sockets.some((s) => this.peerOf(s) === HOST);
@@ -121,7 +164,8 @@ export class Room extends DurableObject {
     this.connects += 1;
     // Hibernation API: the object can sleep between messages; the peer number rides on the socket.
     this.ctx.acceptWebSocket(server);
-    server.serializeAttachment({ peer });
+    // The address stays in this socket's attachment while it is open (rate limits only); it is never stored or logged.
+    server.serializeAttachment({ peer, ip: request.headers.get("CF-Connecting-IP") || "unknown" });
     const others = sockets.map((s) => this.peerOf(s)).filter((p) => p !== undefined);
     server.send(frame(OP_WELCOME, peer, others.length, ...others));
     for (const s of sockets) this.trySend(s, frame(OP_JOINED, peer));
@@ -136,11 +180,26 @@ export class Room extends DurableObject {
     if (typeof message === "string") return this.kick(ws, REASON.BAD_REQUEST);
     const data = new Uint8Array(message);
     if (data.length > MAX_FRAME) return this.kick(ws, REASON.TOO_BIG);
+    const now = Date.now();
     let bucket = this.buckets.get(from);
     if (!bucket) this.buckets.set(from, (bucket = new Bucket()));
-    if (!bucket.take(Date.now())) return this.kick(ws, REASON.TOO_FAST);
-    this.touched = Date.now();
+    if (!bucket.take(now)) return this.kick(ws, REASON.TOO_FAST);
+    // b17-harden: one IP's sockets share a bucket in this room; the whole room has a ceiling; and every MSG_CHECK_EVERY
+    // messages a socket asks the per-IP limiter (all rooms, approximate) so one address cannot flood room after room.
+    const att = ws.deserializeAttachment() || {};
+    const ip = att.ip || "unknown";
+    let ipb = this.ipBuckets.get(ip);
+    if (!ipb) this.ipBuckets.set(ip, (ipb = new Bucket(IP_RATE_PER_ROOM, IP_BURST_PER_ROOM)));
+    if (!ipb.take(now) || !this.roomBucket.take(now)) return this.kick(ws, REASON.TOO_FAST);
+    const n = (this.msgCount.get(from) || 0) + 1;
+    this.msgCount.set(from, n);
+    if (n % MSG_CHECK_EVERY === 0 && !(await allow(this.env.MSG_LIMIT, fallbackMsgs, ip, MSG_CHECK_EVERY))) return this.kick(ws, REASON.TOO_FAST);
+    this.touched = now;
     if (data.length >= 2 && data[0] === OP_DATA) {
+      const kind = chatKind(data);
+      // b17-chat + b17-harden: chat and voice have their own caps and size limits, and are the first thing dropped when
+      // the day's budget runs low (the match's own messages keep flowing).
+      if (kind && (!this.chatAllowed || (kind === "chat" && data.length > CHAT_MAX_BYTES) || !this.allowChat(ws, from, kind))) return;
       const to = data[1];
       const out = new Uint8Array(data.length);
       out.set(data);
@@ -185,6 +244,26 @@ export class Room extends DurableObject {
 
   // ---- helpers ------------------------------------------------------------------------------------------------------
 
+  // b17-chat: false = drop this chat or voice frame (over its cap); a sender with CHAT_STRIKES drops is closed.
+  allowChat(ws, from, kind) {
+    let c = this.chatCaps.get(from);
+    if (!c) {
+      const host = from === HOST;
+      c = {
+        chat: new Bucket(host ? CHAT_RATE_HOST : CHAT_RATE_JOINER, host ? CHAT_BURST_HOST : CHAT_BURST_JOINER),
+        voice: new Bucket(VOICE_RATE, VOICE_BURST),
+        strikes: 0,
+      };
+      this.chatCaps.set(from, c);
+    }
+    const now = Date.now();
+    const ok = kind === "voice" ? c.voice.take(now) && this.roomVoice.take(now) : c.chat.take(now);
+    if (ok) return true;
+    c.strikes += 1;
+    if (c.strikes >= CHAT_STRIKES) this.kick(ws, REASON.TOO_FAST);
+    return false;
+  }
+
   peerOf(ws) {
     const a = ws.deserializeAttachment();
     return a && typeof a.peer === "number" ? a.peer : undefined;
@@ -204,6 +283,8 @@ export class Room extends DurableObject {
     if (peer === undefined) return;
     ws.serializeAttachment({});
     this.buckets.delete(peer);
+    this.chatCaps.delete(peer);
+    this.msgCount.delete(peer);
     const rest = this.ctx.getWebSockets().filter((s) => s !== ws && this.peerOf(s) !== undefined);
     if (peer === HOST) {
       // The host is the lockstep sequencer: without it nobody can continue (host migration is a later step).
@@ -231,12 +312,14 @@ export class Usage extends DurableObject {
     cur.rooms += d.rooms || 0;
     cur.reports += 1;
     await this.ctx.storage.put(day, cur);
+    const total = Math.ceil(cur.msgs / MESSAGES_PER_REQUEST) + cur.connects + cur.alarms + 2 * cur.rooms + cur.reports;
     if (cur.reports === 1) {
       // A new day: forget days older than a week (a handful of rows).
       const old = new Date(Date.now() - 8 * 86400000).toISOString().slice(0, 10);
       const keys = [...(await this.ctx.storage.list()).keys()].filter((k) => k < old);
       if (keys.length) await this.ctx.storage.delete(keys);
     }
+    return total; // b17-harden: rooms learn the day's budget from this answer
   }
 
   async today() {
