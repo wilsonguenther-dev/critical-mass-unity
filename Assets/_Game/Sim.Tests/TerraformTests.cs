@@ -110,14 +110,17 @@ namespace CriticalMass.Sim.Tests
         {
             World w = Strip();
             w.Config.Depth.Classic = false;
+            w.Actors[Miner].Cls = Terraform.OwnerClass(w);   // the Full game's terraformer (the Builder with the hut rule)
             w.X[Miner] = 32.5;
             w.Z[Miner] = 9.5;
             // (34, 10): nearest edge point (34, 10) is 1.58 u away (in reach); its centre (34.5, 10.5) is 2.24 u away (off the hill).
             Assert.IsTrue(Terraform.TargetCell(w, Miner, 34.5, 10.5, out int mx, out int mz));
             Assert.AreEqual(34, mx, "marker x: the aimed cell");
             Assert.AreEqual(10, mz, "marker z: the aimed cell");
+            int at = 10 * w.Map.Width + 34;
+            int liftBefore = w.Map.Lift != null ? w.Map.Lift[at] : 0;
             Assert.AreEqual(Terraform.Dug, Terraform.Dig(w, Miner, 34.5, 10.5));
-            Assert.AreEqual(Cell.Void, CellAt(w, 34, 10), "the dug cell is the marked cell");
+            Assert.IsTrue(CellAt(w, 34, 10) == Cell.Void || (w.Map.Lift != null && w.Map.Lift[at] != liftBefore), "the dug cell is the marked cell (void, or one level off with terrain height)");
             Assert.AreEqual(Cell.Floor, CellAt(w, 33, 10), "not the cell one short");
             Assert.AreEqual(10 * w.Map.Width + 34, LastEvent(w).B);
             // Out of reach (the square of (36, 10) is 3.5 u away): pulled back to 1.6 u along the line, as before.

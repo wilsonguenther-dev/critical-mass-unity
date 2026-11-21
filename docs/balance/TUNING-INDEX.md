@@ -221,6 +221,7 @@ Regenerate: `tools/balance/balance-report.sh tuning-index (or the balance-report
 | `Abilities.MinerBarricade.MinDistanceFromActor` | 0.9 | double | `Assets/_Game/Sim/Config/GameConfig.cs` |  |
 | `Abilities.MinerBarricade.PlaceRange` | 2 | double | `Assets/_Game/Sim/Config/GameConfig.cs` |  |
 | `Abilities.MinerTerraform.Reach` | 1.6 | double | `Assets/_Game/Sim/Config/GameConfig.cs` |  |
+| `Abilities.MinerTerraform.DigAimedCell` | true | bool | `Assets/_Game/Sim/Config/GameConfig.cs` |  |
 | `Abilities.MinerTerraform.TeamCooldownTicks` | 30 | double | `Assets/_Game/Sim/Config/GameConfig.cs` |  |
 | `Abilities.MinerTerraform.MinGapTicks` | 15 | double | `Assets/_Game/Sim/Config/GameConfig.cs` |  |
 | `Abilities.MinerTerraform.ActorMargin` | 0.05 | double | `Assets/_Game/Sim/Config/GameConfig.cs` |  |
