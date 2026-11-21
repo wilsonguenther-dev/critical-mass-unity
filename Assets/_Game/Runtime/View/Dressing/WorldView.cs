@@ -276,10 +276,13 @@ namespace CriticalMass.Runtime.View.Dressing
         /// integrator b15: the live world view has not taken its driver's new world yet. It starts the build in LateUpdate,
         /// after the driver's Update, so without this the load frame could run a tick before Building turns on
         /// (PerfSmoothPlayTests "no sim tick ran while the world built" read 1 on the combined candidate). Holds one frame at
-        /// most: the next LateUpdate always starts the build. View timing only; the match is the same.
+        /// most: the next LateUpdate always starts the build. View timing only; the match is the same. Sliced builds only.
         /// </summary>
         public static bool AwaitsWorld(Sim.Core.World w)
         {
+            // Only where the build is sliced (players; the editor with SliceInEditor): the editor's one-frame build never
+            // spans a tick, and holding there moved two editor PlayMode measurements by one frame (unity-ci 44843284722).
+            if (Application.isEditor && !SliceInEditor) return false;
             WorldView v = _live;
             return w != null && v != null && v.isActiveAndEnabled && v._building == null && v._driver != null
                    && ReferenceEquals(v._driver.World, w) && (!ReferenceEquals(w, v._world) || !ReferenceEquals(w.Map, v._map));
