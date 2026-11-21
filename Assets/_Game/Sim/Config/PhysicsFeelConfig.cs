@@ -73,6 +73,10 @@ namespace CriticalMass.Sim.Config
         /// AllyPushFullAt.</summary>
         public double AllyPushRampFrom = 0.1;
         public double AllyPushFullAt = 0.25;
+        /// <summary>b16 combine (D, ally overlap): a teammate getting up is no longer immovable to an ally walking into it: it takes
+        /// this share of the pair's push (0 = the old rule, the walker takes all of it). The worst fused pair in the crowd match
+        /// (0.575 u, run 44953083481) was a walker pressed into a teammate getting up.</summary>
+        public double AllyGetUpShare = 0.5;
         /// <summary>The U-071 opposing-ally pass (no push between a retreating bot and an ally walking into it) only inside or at the
         /// mouth of a one-cell passage, where they cannot step round each other.</summary>
         public bool AllyPassInGapsOnly = true;
