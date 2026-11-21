@@ -880,6 +880,7 @@ namespace CriticalMass.Sim.Core
             Kaiju.WarmClearanceBuild(world);
             // b15 (W6): every lazily filled bot route field gets its buffer now, so no first use allocates mid-match (no rule change).
             RouteFields.Preallocate(world);
+            Jump.Warm(world.Config);   // b15 wave two: the jump planner's buffers exist before the first tick (no first-jump allocation)
             return world;
         }
 
