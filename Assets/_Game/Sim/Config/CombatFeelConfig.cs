@@ -156,6 +156,47 @@ namespace CriticalMass.Sim.Config
         public double MinerStructureMultiplier = 2;
         public double BuilderHomeRadius = 3.5;
         public double BuilderHomeMultiplier = 1.5;
+
+        // ---- D. b16 duel order (design advisor 2026-11-21: "fighter class is all about fighting ... they should be winning all
+        // 1v1 fights based on equal skill"; "healer class should be killable by all other classes one on one"). Each lever is
+        // one switch; the values below are the ones the 72-seed arms chose (docs/balance, PR body).
+        /// <summary>True (b15): a SUNDERED body (a Miner hit it in the last SunderSeconds) loses its armoured wind-up. False: the
+        /// Warrior's armour holds against every hit under his Poise, SUNDER or not (SUNDER still adds its damage).</summary>
+        public bool SunderBreaksArmour = true;
+        /// <summary>True (b15): the Miner's heavy pierce (MinerHeavyPierce on Mass at or over MinerHeavyMass) applies to the
+        /// Warrior too. False: it pierces the Builder (and any other heavy non-fighter) but not the Warrior.</summary>
+        public bool MinerPierceWarrior = true;
+        /// <summary>Share of the attack cooldown given back when a stagger cancels a wind-up (0 = b15: a cancelled swing
+        /// keeps its full cooldown, so the faster wind-up always wins the exchange).</summary>
+        public double StaggerCancelRefund = 0;
+        /// <summary>Per class (indexed by ClassId): does a landed melee hit of this class stagger (and so cancel a wind-up)?
+        /// null = every class staggers (b15). The knock and the damage are unchanged either way.</summary>
+        public bool[] StrikeStaggers = null;
+        /// <summary>Share of her own HEALING WINGS pulse the Healer gets herself (1 = b15; her allies always get all of it).</summary>
+        public double PulseSelfShare = 1;
+        /// <summary>Per class: extra recovery (real seconds) on top of WhiffRecoverySeconds after a swing that hit nothing
+        /// (null = none). The trade for a strong 1v1 Warrior: a miss in a crowd is punished.</summary>
+        public double[] WhiffExtraSeconds = null;
+        /// <summary>Outnumbered: an armoured class hit by a SECOND enemy within OutnumberedSeconds of another enemy's hit loses
+        /// its armoured wind-up for OutnumberedSeconds (one on one it never triggers). False = b15.</summary>
+        public bool OutnumberedBreaksArmour = false;
+        public double OutnumberedSeconds = 1.0;
+
+        // ---- E. b16 CANCEL button (test feature for high-level play; design advisor 2026-11-21: "it should cancel the attack
+        // animation and allows for feints. also cancelling the attack animation after a hit lands would allow people to
+        // potentially attack a little bit faster"). InputFrame.Cancel, one press = one cancel (Sim/CombatFeel.cs TakeCancel).
+        /// <summary>The one switch (default ON in Full so the owner and the advisor can feel it; the settings toggle turns it
+        /// off for the local player, the rule stays in the config so every machine agrees).</summary>
+        public bool CancelEnabled = true;
+        /// <summary>FEINT: a press during the wind-up drops the swing (no hit). The attacker cannot swing again for
+        /// FeintRecoverySeconds; FeintRefund of the attack cooldown left is given back (the rest is the price).</summary>
+        public double FeintRecoverySeconds = 0.10;
+        public double FeintRefund = 0.70;
+        /// <summary>No second feint within this many real seconds of a feint (a feint cannot be chained for free).</summary>
+        public double FeintLockoutSeconds = 0.5;
+        /// <summary>HIT-CANCEL: a press during the recovery after a swing that LANDED (never before the hit tick, never on a
+        /// whiff) cuts this share of the recovery left, and the cooldown by the same time.</summary>
+        public double HitCancelShare = 0.40;
         /// <summary>TNT cooldown (ticks at 30 Hz) while the rule is on (DemolitionsTntConfig.CooldownTicks is 150).</summary>
         // pass 4: 120 -> 180 (with the Warrior at 120 HP her knock-out share in DemolitionsAttackThrowTests was 0.309 at 120 and
         // 0.269 at 150 with TNT 46, limit 0.25; runs 44834829109, 44837951367). A duel still sees one throw.
@@ -190,6 +231,8 @@ namespace CriticalMass.Sim.Config
             for (int i = 0; i < Classes.Length; i++) c.Classes[i] = Classes[i].Clone();
             c.Strikes = new CombatFeelStrike[Strikes.Length];
             for (int i = 0; i < Strikes.Length; i++) c.Strikes[i] = Strikes[i].Clone();
+            if (StrikeStaggers != null) c.StrikeStaggers = (bool[])StrikeStaggers.Clone();
+            if (WhiffExtraSeconds != null) c.WhiffExtraSeconds = (double[])WhiffExtraSeconds.Clone();
             return c;
         }
     }

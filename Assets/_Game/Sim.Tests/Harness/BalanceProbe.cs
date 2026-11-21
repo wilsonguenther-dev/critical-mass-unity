@@ -682,6 +682,130 @@ namespace CriticalMass.Sim.Tests.Harness
             w.Vz[j] = 0;
         }
 
+        // ---------------------------------------------------------------------------------------------- b16 duel order
+
+        /// <summary>
+        /// b16 (design advisor 2026-11-21): row a beats column b when it wins more than half of all its tries against b, both
+        /// seatings counted (Duels[a, b] wins plus Duels[b, a] losses).
+        /// </summary>
+        public static bool Beats(Cell[,] duels, int a, int b)
+        {
+            Cell ab = duels[a, b], ba = duels[b, a];
+            int wins = ab.Wins + ba.Losses, tries = ab.Reps + ba.Reps;
+            return tries > 0 && wins * 2 > tries;
+        }
+
+        /// <summary>The middle classes of the duel order: neither the fighter nor the Healer.</summary>
+        public static readonly int[] Middle = { (int)ClassId.Farmer, (int)ClassId.Miner, (int)ClassId.Demolitions, (int)ClassId.Builder };
+
+        /// <summary>
+        /// b16 duel order, the advisor's rule: the Warrior beats every class; every class beats the Healer; among the Miner,
+        /// Builder, Farmer and Demolitions none is unbeaten (no middle class beats it) and none is winless (it beats no middle
+        /// class). Returns the number of broken conditions (0 = the order holds) and names each one in why.
+        /// </summary>
+        public static int OrderViolations(Cell[,] duels, out string why)
+        {
+            var parts = new List<string>();
+            int w = (int)ClassId.Warrior, h = (int)ClassId.Healer;
+            for (int b = 0; b < 6; b++)
+                if (b != w && !Beats(duels, w, b)) parts.Add("Warrior does not beat " + (ClassId)b);
+            for (int a = 0; a < 6; a++)
+                if (a != h && !Beats(duels, a, h)) parts.Add((ClassId)a + " does not beat Healer");
+            foreach (int m in Middle)
+            {
+                int wins = 0, losses = 0;
+                foreach (int o in Middle)
+                {
+                    if (o == m) continue;
+                    if (Beats(duels, m, o)) wins++;
+                    if (Beats(duels, o, m)) losses++;
+                }
+                if (losses == 0) parts.Add((ClassId)m + " unbeaten among the middle four");
+                if (wins == 0) parts.Add((ClassId)m + " winless among the middle four");
+            }
+            why = string.Join("; ", parts);
+            return parts.Count;
+        }
+
+        // ---------------------------------------------------------------------------------------------- b16 escape
+
+        public const double EscapeGap = 4.0, EscapeGoal = 20.0, EscapeMaxSeconds = 12;
+
+        /// <summary>
+        /// b16 scripted chase (design advisor 2026-11-21: "their speed should be a touch slower so the non fighter has a chance of
+        /// escape"): on the empty map a Warrior stands at the hill centre and a full-HP class 4 u from him along one of reps
+        /// angles; the runner flees straight away from the Warrior, the Warrior chases (aims at the runner, swings only when
+        /// it is in reach, dodges at it once the dash would bring it into reach). runnerDodges: the runner also dodges away when
+        /// the Warrior is within his reach + 1 u. Escape = the runner is alive and 20 u from the Warrior's start within 12 s.
+        /// Cells indexed by ClassId (the Warrior's own cell stays empty): Wins = escapes, Losses = caught (killed, or not out
+        /// in time), Kills = killed.
+        /// </summary>
+        public static Cell[] Escape(RulesProfile profile, IEnumerable<string> sets, int reps, bool runnerDodges)
+        {
+            var cells = new Cell[6];
+            for (int c = 0; c < 6; c++)
+            {
+                cells[c] = new Cell();
+                if (c == (int)ClassId.Warrior) continue;
+                for (int k = 0; k < reps; k++) Chase(profile, sets, (ClassId)c, 2 * Math.PI * (k + 0.5) / reps, runnerDodges, cells[c]);
+            }
+            return cells;
+        }
+
+        static void Chase(RulesProfile profile, IEnumerable<string> sets, ClassId runner, double angle, bool runnerDodges, Cell cell)
+        {
+            GameConfig cfg = BalanceRunner.Config(profile, sets);
+            World w = World.CreateWorld(BalanceRunner.Options(cfg, 4242, 5));
+            int iw = 0, ir = w.ActorCount / 2;
+            for (int j = 0; j < w.ActorCount; j++)
+            {
+                if (j == iw || j == ir) continue;
+                w.Actors[j].Alive = false;
+                w.Actors[j].RespawnIn = 1e9;
+                w.MeatDropped[j] = 1;
+                w.Depth.WasAlive[j] = 0;
+            }
+            double cx = w.Map.Hill.X, cz = w.Map.Hill.Z;
+            double ux = Math.Cos(angle), uz = Math.Sin(angle);
+            Place(w, iw, ClassId.Warrior, cx, cz);
+            Place(w, ir, runner, cx + ux * EscapeGap, cz + uz * EscapeGap);
+            InputFrame fw = SimInput.EmptyInput(), fr = SimInput.EmptyInput(), idle = SimInput.EmptyInput();
+            int max = (int)Math.Ceiling(EscapeMaxSeconds * cfg.SimHz);
+            double reachW = cfg.Class(ClassId.Warrior).AttackRange + cfg.Class(runner).Radius;
+            double dodgeD = cfg.Depth.Dodge != null ? cfg.Depth.Dodge.Distance : 0;
+            cell.Reps++;
+            for (int t = 0; t < max; t++)
+            {
+                double dx = w.X[ir] - w.X[iw], dz = w.Z[ir] - w.Z[iw];
+                double d = Math.Sqrt(dx * dx + dz * dz);
+                double nx = d > 1e-9 ? dx / d : ux, nz = d > 1e-9 ? dz / d : uz;
+                fw.MoveX = nx; fw.MoveZ = nz; fw.AimX = w.X[ir]; fw.AimZ = w.Z[ir];
+                fw.Attack = d <= reachW;
+                fw.Dodge = d > reachW && d <= reachW + dodgeD;
+                fr.MoveX = nx; fr.MoveZ = nz; fr.AimX = w.X[ir] + nx; fr.AimZ = w.Z[ir] + nz;
+                fr.Attack = false;
+                fr.Dodge = runnerDodges && d <= reachW + 1.0;
+                SimInput.ApplyInput(w, iw, fw);
+                SimInput.ApplyInput(w, ir, fr);
+                for (int j = 0; j < w.ActorCount; j++)
+                    if (j != iw && j != ir) SimInput.ApplyInput(w, j, idle);
+                SimStep.Step(w);
+                if (!w.Actors[ir].Alive)
+                {
+                    cell.Kills++;
+                    cell.Losses++;
+                    return;
+                }
+                double ox = w.X[ir] - cx, oz = w.Z[ir] - cz;
+                if (ox * ox + oz * oz >= EscapeGoal * EscapeGoal)
+                {
+                    cell.Wins++;
+                    return;
+                }
+            }
+            cell.Losses++;
+        }
+
         static void Drive(World w, int self, int target, InputFrame f)
         {
             double dx = w.X[target] - w.X[self], dz = w.Z[target] - w.Z[self];
