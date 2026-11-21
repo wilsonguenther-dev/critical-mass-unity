@@ -369,6 +369,7 @@ namespace CriticalMass.Runtime.Audio.Sound
             Silent(SimEventType.CorruptionRoll, "b13 S0: silent until item C adds its cue"),
             Silent(SimEventType.KaijuPower, "b13 S0: silent until item K adds its cue"),
             Silent(SimEventType.CrystalMined, "b13 S0: silent until item C adds its cue"),
+            R(SimEventType.JumpRefused, Pick.Fixed, "refused"),   // b16 [11]: the soft refused cue, the local player's own only (SoundFeed.Fixed)
         };
 
         /// <summary>Every world-force source (draft PR #43): audible cue or silence, and the low-frequency layer.</summary>

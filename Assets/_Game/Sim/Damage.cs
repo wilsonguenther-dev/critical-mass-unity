@@ -79,7 +79,8 @@ namespace CriticalMass.Sim.Core
         public static bool Knocks(World w, DamageCause cause) =>
             Phys.On(w, w.Config.Physics.Knockback) ||
             cause == DamageCause.Melee && CombatFeel.On(w) ||   // b15 combat feel: melee hits knock, stagger and carry their tier
-            (cause == DamageCause.KaijuMelee || cause == DamageCause.KaijuSlam) && Phys.On(w, w.Config.Physics.KaijuKnockback);
+            (cause == DamageCause.KaijuMelee || cause == DamageCause.KaijuSlam) && Phys.On(w, w.Config.Physics.KaijuKnockback) ||
+            cause == DamageCause.Explosion && PhysicsFeel.BlastOn(w);   // b16 [2]: blasts shove and stagger under their own switch
 
         /// <summary>
         /// DG-70: the one entry point (ApplyDamage(..., cause) calls it with no knock): damage, then, when the victim lives and

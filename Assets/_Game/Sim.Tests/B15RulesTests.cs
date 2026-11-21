@@ -92,6 +92,7 @@ namespace CriticalMass.Sim.Tests
                 c.Depth.HutChoices.Enabled = false;
                 c.Depth.CombatFeel.Enabled = false;
                 c.Depth.BotBrain.Enabled = false;
+                c.Depth.PhysicsFeel.Enabled = false;   // b16: the physics fixes are a later switch on top
             };
             ulong a = MatchHash.Run(1, 16, 3600, ClassId.Warrior, null, off);
             ulong b = MatchHash.Run(42, 5, 14500, ClassId.Warrior, null, off);

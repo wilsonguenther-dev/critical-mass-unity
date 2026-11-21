@@ -279,6 +279,11 @@ namespace CriticalMass.Runtime.Audio.Sound
                 case SimEventType.HealLanded:
                     Emit(sink, cue, w, ev.X, ev.Z, ownA || ev.B == LocalSeat.Actor, false, ownA ? 1.1f : 0.8f, 1f, ev.A);
                     return;
+                case SimEventType.JumpRefused:
+                    // b16 [11]: a refused jump at the edge: your own only, soft (sixteen bots pressing jump at the edge would buzz).
+                    if (ownA) Emit(sink, cue, w, ev.X, ev.Z, true, false, 0.6f, 1f, 0);
+                    else Silenced++;
+                    return;
                 case SimEventType.Dodge:
                 case SimEventType.WallBroken:
                     // b15: B is not an actor here (0 / a cell index): own = the dodger / the wall's owner only

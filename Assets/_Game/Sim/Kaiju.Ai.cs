@@ -621,9 +621,27 @@ namespace CriticalMass.Sim.Core
         /// </summary>
         public static void KaijuSystem(World w, double dt)
         {
+            // b16 [8]: the sim facing turns at most PhysicsFeel.KaijuTurnStep a tick (it flipped up to 179 degrees in one tick and
+            // the claw cone followed it); a claw starts only once the Kaiju faces its target (TurnReady). [2]: the blast slide.
+            Kaiju k = w.Kaiju;
+            bool cap = PhysicsFeel.On(w) && w.Match.Hatched && k.State != KaijuState.Egg;
+            double f0 = k.Facing;
+            _turnCap = cap;
+            _turnFrom = f0;
+            _turnMax = cap ? PhysicsFeel.KaijuTurnStep(w) : 0;
+            if (cap) PhysicsFeel.KaijuPushStep(w, dt);
             KaijuStep(w, dt);
+            if (cap) k.Facing = PhysicsFeel.CapTurn(f0, k.Facing, _turnMax);
+            _turnCap = false;
             Collide.KaijuDepenetrate(w);
         }
+
+        /// <summary>b16 [8]: this tick's turn cap (set and cleared by KaijuSystem around KaijuStep; scratch, not state).</summary>
+        private static bool _turnCap;
+        private static double _turnFrom, _turnMax;
+
+        /// <summary>b16 [8]: true when a claw toward facing `want` may start this tick (no turn cap, or within one tick's turn).</summary>
+        private static bool TurnReady(double want) => !_turnCap || Math.Abs(PhysicsFeel.AngleDelta(want, _turnFrom)) <= _turnMax + 1e-9;
 
         private static void KaijuStep(World w, double dt)
         {
@@ -754,7 +772,8 @@ namespace CriticalMass.Sim.Core
                     {
                         double bx = nav.SiegeCx + 0.5 - k.X;
                         double bz = nav.SiegeCz + 0.5 - k.Z;
-                        if (bx * bx + bz * bz <= kc.MeleeRange * kc.MeleeRange)
+                        if (bx * bx + bz * bz <= kc.MeleeRange * kc.MeleeRange && !TurnReady(JsMath.Atan2(bz, bx))) k.Facing = JsMath.Atan2(bz, bx);   // b16 [8]: turn first
+                        else if (bx * bx + bz * bz <= kc.MeleeRange * kc.MeleeRange)
                         {
                             // Claw the barricade (no actor target): ResolveClawCone smashes it and hits any fighter in the cone.
                             k.Facing = JsMath.Atan2(bz, bx);
@@ -824,7 +843,10 @@ namespace CriticalMass.Sim.Core
                 double dx = w.X[t] - k.X;
                 double dz = w.Z[t] - k.Z;
                 // fix/movement-shiver-1: no swing at a fighter behind a wall (the claw would be blocked: a whiff every 1.6 s).
-                if (dx * dx + dz * dz <= kc.MeleeRange * kc.MeleeRange && (!seen || SegmentClear.Clear(w.Map, k.X, k.Z, w.X[t], w.Z[t])))
+                bool canClaw = dx * dx + dz * dz <= kc.MeleeRange * kc.MeleeRange && (!seen || SegmentClear.Clear(w.Map, k.X, k.Z, w.X[t], w.Z[t]));
+                // b16 [8]: under the turn cap it turns toward the target first and claws once it faces it (the cone = the facing).
+                if (canClaw && !TurnReady(JsMath.Atan2(dz, dx))) k.Facing = JsMath.Atan2(dz, dx);
+                else if (canClaw)
                 {
                     k.Facing = JsMath.Atan2(dz, dx);
                     k.MeleeWindupIn = w.Dur.KaijuClawWindup;

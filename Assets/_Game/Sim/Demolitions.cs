@@ -325,7 +325,8 @@ namespace CriticalMass.Sim.Core
             PhysicsConfig p = w.Config.Physics;
             bool ownerIsBot = owner >= 0 && owner < w.ActorCount && !w.Actors[owner].IsHuman;
             bool walls = Phys.On(w, p.WallsBlockHits);
-            bool knock = Phys.On(w, p.Knockback);
+            bool feelBlast = PhysicsFeel.BlastOn(w);   // b16 [2]: blasts shove under their own switch (Knockback is off by default)
+            bool knock = Phys.On(w, p.Knockback) || feelBlast;
             int hit = 0;
             for (int j = 0; j < w.ActorCount; j++)
             {
@@ -342,7 +343,8 @@ namespace CriticalMass.Sim.Core
                 double u = Math.Min(1, d / radius);
                 double ux = d > 1e-6 ? dx / d : JsMath.Cos(j * 2.39996);
                 double uz = d > 1e-6 ? dz / d : JsMath.Sin(j * 2.39996);
-                double kd = knock ? p.BlastKnockCentre + (p.BlastKnockEdge - p.BlastKnockCentre) * u : 0;
+                double kd = feelBlast ? PhysicsFeel.BlastKnock(w, t.Cls, u) : knock ? p.BlastKnockCentre + (p.BlastKnockEdge - p.BlastKnockCentre) * u : 0;
+                int stun = feelBlast ? PhysicsFeel.BlastStun(w, u) : knock ? w.Dur.BlastStun : 0;
                 if (t.AirLen > 0)
                 {
                     // In the air: pushed, never hurt (the push applies when it lands).
@@ -350,7 +352,7 @@ namespace CriticalMass.Sim.Core
                     continue;
                 }
                 double share = 1 - (1 - p.BlastEdgeDamageShare) * u;
-                double dealt = Damage.ApplyHit(w, j, damage * share, owner, x, z, DamageCause.Explosion, ux, uz, kd, knock ? w.Dur.BlastStun : 0);
+                double dealt = Damage.ApplyHit(w, j, damage * share, owner, x, z, DamageCause.Explosion, ux, uz, kd, stun);
                 st.Damage += dealt;
                 if (dealt > 0) hit++;
                 if (dealt > 0 && !t.Alive) st.Kills++;
@@ -500,6 +502,7 @@ namespace CriticalMass.Sim.Core
             {
                 double kr = cfg.BlastRadius + w.Config.Kaiju.Radius;
                 if ((k.X - bx) * (k.X - bx) + (k.Z - bz) * (k.Z - bz) <= kr * kr) Kaiju.DamageKaiju(w, b.Owner, cfg.Damage, DamageCause.Explosion);   // b13-k: BARKSKIN reads the cause
+                PhysicsFeel.BlastKaiju(w, bx, bz, kr);   // b16 [2]: a small slide away from the blast (no-op without the rule)
             }
             bool walls = BuilderWalls.On(w);
             Barricades.DamageBarricadesInArc(w, b.Owner, bx, bz, 1, 0, cfg.BlastRadius, -1, cfg.Damage, walls);

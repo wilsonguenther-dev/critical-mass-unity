@@ -245,6 +245,8 @@ namespace CriticalMass.Sim.Core
         KaijuPower,
         /// <summary>CM b13 [C]: a crystal was gathered from a crystal vein.</summary>
         CrystalMined,
+        /// <summary>b16 [11]: a jump press was refused for its whole buffer (A actor; Value 1 no clear landing, 2 past the coyote window).</summary>
+        JumpRefused,
     }
 
     /// <summary>CM b13 [K]: the Kaiju type decided by the biomass mix at the hatch (Elder = today's Kaiju; appended members only).</summary>

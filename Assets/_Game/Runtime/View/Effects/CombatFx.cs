@@ -382,7 +382,11 @@ namespace CriticalMass.Runtime.View.Effects
         private void PlanLaunch(ref FxEvent e, World w)
         {
             float motion = Reactions.ReactionBudget.MotionScale;
-            LaunchPlan p = DeathLaunch.Plan(w.Map, e.X, e.Z, e.DirX, e.DirZ, CombatFeed.TierOf(e.Value, false), e.B, motion);
+            double dx = e.DirX, dz = e.DirZ;
+            // b16 (audit missing list: death fling): a Death without a direction (the sim gives one only with knockback physics)
+            // flings away from the killing blow's source: the killer's body, the Kaiju, else no fling (a fall, a blast in place).
+            if (dx * dx + dz * dz < 1e-12) KillerDir(w, e.B, e.X, e.Z, out dx, out dz);
+            LaunchPlan p = DeathLaunch.Plan(w.Map, e.X, e.Z, dx, dz, CombatFeed.TierOf(e.Value, false), e.B, motion);
             _launch[e.A] = p;
             if (p.Distance <= 0f || _bus == null || p.Falls) return;
             double lx = e.X + p.DirX * p.Distance, lz = e.Z + p.DirZ * p.Distance;
@@ -392,6 +396,20 @@ namespace CriticalMass.Runtime.View.Effects
             land.Team = e.Team;
             int ticks = (int)System.Math.Ceiling(p.Flight * _scene.S(1.0) * w.Config.SimHz);
             _bus.Schedule(land, e.Tick + System.Math.Max(1, ticks));
+        }
+
+        /// <summary>b16: the unit direction from the killing blow's source to the victim at (x, z), or zero (pure; tests).</summary>
+        public static void KillerDir(World w, int source, double x, double z, out double dx, out double dz)
+        {
+            dx = 0; dz = 0;
+            double sx, sz;
+            if (source >= 0 && source < w.ActorCount) { sx = w.X[source]; sz = w.Z[source]; }
+            else if ((source == CriticalMass.Sim.Core.Damage.KaijuSource || source == CriticalMass.Sim.Core.Damage.KaijuSlamSource) && w.Kaiju != null) { sx = w.Kaiju.X; sz = w.Kaiju.Z; }
+            else return;
+            double ex = x - sx, ez = z - sz, l = System.Math.Sqrt(ex * ex + ez * ez);
+            if (l < 1e-4) return;
+            dx = ex / l;
+            dz = ez / l;
         }
 
         /// <summary>Actor i's planned death launch (tests, captures).</summary>

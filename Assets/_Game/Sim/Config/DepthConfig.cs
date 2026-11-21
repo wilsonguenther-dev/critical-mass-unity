@@ -46,6 +46,8 @@ namespace CriticalMass.Sim.Config
         public ComebackConfig Comeback = new ComebackConfig();
         /// <summary>b15 rule B: each hut level is a team vote between two side-grades. One switch: HutChoices.Enabled.</summary>
         public HutChoicesConfig HutChoices = new HutChoicesConfig();
+        /// <summary>b16: the physics audit fixes (Kaiju pins, blast shove, corner grazes, wall slide, gaps, crowds); Sim/B16/PhysicsFeel.cs.</summary>
+        public PhysicsFeelConfig PhysicsFeel = new PhysicsFeelConfig();
 
         public DepthConfig Clone()
         {
@@ -67,6 +69,7 @@ namespace CriticalMass.Sim.Config
             c.BotBrain = BotBrain.Clone();
             c.Comeback = Comeback.Clone();   // b15
             c.HutChoices = HutChoices.Clone();   // b15
+            c.PhysicsFeel = PhysicsFeel.Clone();   // b16
             return c;
         }
     }

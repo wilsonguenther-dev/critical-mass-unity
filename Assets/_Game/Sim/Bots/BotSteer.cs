@@ -346,6 +346,13 @@ namespace CriticalMass.Sim.Bots
                 double side = (id & 1) == 0 ? 1 : -1;
                 double want = reach * 0.7;
                 double pull = (d - want) / reach;
+                if (PhysicsFeel.On(w))
+                {
+                    // b16 [3]: no keep-distance pull within BotPullDeadband of the wanted distance. Pressed sideways into a wall or a
+                    // body the strafe part stops and the pull alone was left, flipping in, out, in as the gap jittered round `want`.
+                    double off = d - want, db = PhysicsFeel.Cfg(w).BotPullDeadband;
+                    pull = off > db ? (off - db) / reach : off < -db ? (off + db) / reach : 0;
+                }
                 Mv.X = (-dz / d) * side * 0.6 + (dx / d) * pull;
                 Mv.Z = (dx / d) * side * 0.6 + (dz / d) * pull;
             }
@@ -1060,6 +1067,24 @@ namespace CriticalMass.Sim.Bots
                     double turnCos = TurnCos(cfg);
                     if (hx * ox + hz * oz < turnCos)
                     {
+                        double turnSin = TurnSin(cfg);
+                        double sn = hx * oz - hz * ox >= 0 ? turnSin : -turnSin;
+                        ox = hx * turnCos - hz * sn;
+                        oz = hx * sn + hz * turnCos;
+                    }
+                }
+                else if (PhysicsFeel.On(w) && PhysicsFeel.Cfg(w).BotNoSnapReversal && vs >= 0.05 * cc.MoveSpeed)
+                {
+                    // b16 [3]: no snap reversal. A fighter (or a bot walking straight at a point) whose wish flips to more than 120
+                    // degrees off the way it is moving turns through the side at TurnStep a step instead of stepping straight back:
+                    // the approach / retreat band flipping in, out, in read as Reversals in the fast gate's match. Dodges, the cloud
+                    // and the unjam step are decided after this and are not limited. From 5% of top speed: a fighter slowed by its
+                    // own swing (CombatFeel.SpeedScale) moves under the field rule's quarter and snapped back there.
+                    double hx = vx / vs;
+                    double hz = vz / vs;
+                    if (hx * ox + hz * oz < -0.5)
+                    {
+                        double turnCos = TurnCos(cfg);
                         double turnSin = TurnSin(cfg);
                         double sn = hx * oz - hz * ox >= 0 ? turnSin : -turnSin;
                         ox = hx * turnCos - hz * sn;
