@@ -6,6 +6,7 @@ using CriticalMass.Runtime.Game;
 using CriticalMass.Sim.Config;
 using CriticalMass.Sim.Core;
 using NUnit.Framework;
+using UnityEngine;
 
 namespace CriticalMass.Runtime.Tests.PlayerExperience
 {
@@ -318,6 +319,57 @@ namespace CriticalMass.Runtime.Tests.PlayerExperience
                 Step(w, feed, rec);
                 foreach (SoundRequest p in rec.Plays) Assert.AreEqual(0, p.Feedback, "a bot's structure hit is not my impact");
                 if (kind == PlayerReasons.StructureSolid) Assert.AreEqual(0, rec.Plays.Count, "a bot never knocks on rock");
+            }
+        }
+
+        [Test]
+        public void TheDirectorsSkipAFrameQuietlyWhenTheirBuildDidNotFinish()
+        {
+            // round 4 (pass 4 capture): ~735,000 NullReferenceExceptions from MusicDirector.UpdateCost and
+            // SoundDirector.LateUpdateBody after their Awake stopped early. In edit mode Awake does not run, which is exactly
+            // that state: the per-frame bodies must return without a throw.
+            var go = new GameObject("Px Directors Test");
+            try
+            {
+                var music = go.AddComponent<CriticalMass.Runtime.Audio.MusicDirector>();
+                Assert.IsFalse(music.ReadyForTests);
+                music.HoldRebuildForTests();
+                MethodInfo mu = typeof(CriticalMass.Runtime.Audio.MusicDirector).GetMethod("UpdateCost", BindingFlags.Instance | BindingFlags.NonPublic);
+                Assert.IsNotNull(mu);
+                Assert.DoesNotThrow(() => { for (int i = 0; i < 3; i++) mu.Invoke(music, null); }, "music: no per-frame throw");
+
+                var sound = go.AddComponent<SoundDirector>();
+                Assert.IsFalse(sound.Ready);
+                sound.HoldInitForTests();
+                MethodInfo su = typeof(SoundDirector).GetMethod("LateUpdateBody", BindingFlags.Instance | BindingFlags.NonPublic);
+                Assert.IsNotNull(su);
+                Assert.DoesNotThrow(() => { for (int i = 0; i < 3; i++) su.Invoke(sound, null); }, "sound: no per-frame throw");
+                Assert.IsFalse(sound.UpdateGuard(), "held: still not ready, and no throw");
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(go);
+            }
+        }
+
+        [Test]
+        public void ExactlyOneAudioListenerIsKeptAndItIsTheGamesOwn()
+        {
+            var cam = new GameObject("Main Camera");
+            var ear = new GameObject("CM Listener");
+            try
+            {
+                AudioListener a = cam.AddComponent<AudioListener>(), b = ear.AddComponent<AudioListener>();
+                int removed = CriticalMass.Runtime.Audio.SingleListener.Enforce(new[] { a, b });
+                Assert.AreEqual(1, removed);
+                Assert.IsTrue(ear.GetComponent<AudioListener>() != null, "the persistent CM Listener stays");
+                Assert.IsTrue(cam.GetComponent<AudioListener>() == null, "the scene camera's is removed");
+                Assert.AreEqual(0, CriticalMass.Runtime.Audio.SingleListener.Enforce(new[] { ear.GetComponent<AudioListener>() }));
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(cam);
+                UnityEngine.Object.DestroyImmediate(ear);
             }
         }
 

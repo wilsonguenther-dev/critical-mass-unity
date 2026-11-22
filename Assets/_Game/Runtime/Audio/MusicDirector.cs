@@ -42,6 +42,51 @@ namespace CriticalMass.Runtime.Audio
             _root.AddComponent<Announcer>();
             _root.AddComponent<UiSoundBinder>();
             _root.AddComponent<MasterBusKeeper>();   // CM b13 S0: -1 dB headroom + a -1 dBFS limiter on the final mix
+            _root.AddComponent<SingleListener>();    // px lane F round 4: exactly one AudioListener
+        }
+    }
+
+    /// <summary>
+    /// px lane F round 4 ("There are 2 audio listeners in the scene", every frame in the pass 4 capture): AudioHost adds its
+    /// own "CM Listener" before the first scene loads when there is none; a scene camera (Unity's default Main Camera
+    /// carries an AudioListener) or CombatAudio's fallback then adds a second. All sound here is 2D (spatialBlend 0), so
+    /// which listener stays does not move any sound: keep the persistent CM Listener when it exists (the master bus filter
+    /// follows the active listener, MasterBusKeeper), else the first, and remove the rest. Checked on every scene load and
+    /// once a second.
+    /// </summary>
+    public sealed class SingleListener : MonoBehaviour
+    {
+        float _next;
+
+        void OnEnable() => UnityEngine.SceneManagement.SceneManager.sceneLoaded += OnLoaded;
+        void OnDisable() => UnityEngine.SceneManagement.SceneManager.sceneLoaded -= OnLoaded;
+        void OnLoaded(UnityEngine.SceneManagement.Scene s, UnityEngine.SceneManagement.LoadSceneMode m) => _next = 0f;
+
+        void Update()
+        {
+            float now = Time.unscaledTime;
+            if (now < _next) return;
+            _next = now + 1f;
+            Enforce(FindObjectsByType<AudioListener>(FindObjectsSortMode.None));
+        }
+
+        /// <summary>Keeps one listener of the given set (the CM Listener first); returns how many were removed.</summary>
+        public static int Enforce(AudioListener[] all)
+        {
+            if (all == null || all.Length <= 1) return 0;
+            AudioListener keep = null;
+            foreach (AudioListener l in all) if (l != null && l.gameObject.name == "CM Listener") { keep = l; break; }
+            if (keep == null) foreach (AudioListener l in all) if (l != null && l.isActiveAndEnabled) { keep = l; break; }
+            if (keep == null) keep = all[0];
+            int removed = 0;
+            foreach (AudioListener l in all)
+            {
+                if (l == null || l == keep) continue;
+                if (Application.isPlaying) Destroy(l); else DestroyImmediate(l);
+                removed++;
+            }
+            if (!keep.enabled) keep.enabled = true;
+            return removed;
         }
     }
 
@@ -173,21 +218,54 @@ namespace CriticalMass.Runtime.Audio
         HumanInputSource _input;
         int _lookupFrames;
 
+        // px lane F round 4: Awake runs inside a try; a failed build leaves _ready false, Update skips quietly and, every
+        // 2 s, removes this instance's own sources and adds a fresh MusicDirector (a clean rebuild), warning once.
+        bool _ready;
+        float _rebuildAt;
+        static bool _rebuildWarned;
+        readonly System.Collections.Generic.List<AudioSource> _mine = new System.Collections.Generic.List<AudioSource>();
+
+        AudioSource AddSource()
+        {
+            AudioSource s = gameObject.AddComponent<AudioSource>();
+            if (s == null) throw new InvalidOperationException("AddComponent<AudioSource> returned null");
+            _mine.Add(s);
+            return s;
+        }
+
+        /// <summary>Tests: whether Awake finished, and a way to hold the rebuild (edit mode has no Destroy).</summary>
+        internal bool ReadyForTests => _ready;
+        internal void HoldRebuildForTests() => _rebuildAt = float.MaxValue;
+
         void Awake()
         {
             Instance = this;
-            for (int i = 0; i < 2; i++)
+            try
             {
-                AudioSource s = gameObject.AddComponent<AudioSource>();
-                s.playOnAwake = false;
-                s.loop = true;
-                s.spatialBlend = 0f;
-                s.priority = 0;
-                s.volume = 0f;
-                s.outputAudioMixerGroup = GameSettings.MusicGroup;
-                _loops[i] = s;
+                AwakeBody();
+                _ready = true;
             }
-            _sting = gameObject.AddComponent<AudioSource>();
+            catch (Exception e)
+            {
+                if (!_rebuildWarned) { _rebuildWarned = true; Debug.LogWarning("[CM.Audio] music director build failed (" + e.GetType().Name + ": " + e.Message + "); rebuilding every 2 s"); }
+            }
+        }
+
+        void Rebuild()
+        {
+            if (!Application.isPlaying) return;
+            for (int i = 0; i < _mine.Count; i++) if (_mine[i] != null) Destroy(_mine[i]);
+            _mine.Clear();
+            GameObject go = gameObject;
+            if (Instance == this) Instance = null;
+            Destroy(this);
+            go.AddComponent<MusicDirector>();
+        }
+
+        void AwakeBody()
+        {
+            EnsureLoops();
+            _sting = AddSource();
             _sting.playOnAwake = false;
             _sting.loop = false;
             _sting.spatialBlend = 0f;
@@ -251,7 +329,7 @@ namespace CriticalMass.Runtime.Audio
             for (int l = 0; l < Layers; l++)
                 for (int k = 0; k < 2; k++)
                 {
-                    AudioSource s = gameObject.AddComponent<AudioSource>();
+                    AudioSource s = AddSource();
                     s.playOnAwake = false;
                     s.loop = false;
                     s.spatialBlend = 0f;
@@ -261,7 +339,7 @@ namespace CriticalMass.Runtime.Audio
                     _sSrc[l, k] = s;
                     _sVar[l, k] = -1;
                 }
-            _hatch = gameObject.AddComponent<AudioSource>();
+            _hatch = AddSource();
             _hatch.playOnAwake = false;
             _hatch.loop = false;
             _hatch.spatialBlend = 0f;
@@ -470,11 +548,48 @@ namespace CriticalMass.Runtime.Audio
             _lookupFrames = 0;
         }
 
+        // px lane F round 4 (pass 4 capture: ~735,000 NullReferenceExceptions at "inc.volume", one a frame): a null loop
+        // source means Awake stopped before it filled _loops (a NullReference, not a MissingReference: never assigned).
+        bool _loopsWarned;
+
+        /// <summary>True when both loop sources exist (building any that are missing; never throws).</summary>
+        bool EnsureLoops()
+        {
+            bool ok = true;
+            for (int i = 0; i < 2; i++)
+            {
+                if (_loops[i] != null) continue;
+                try
+                {
+                    AudioSource s = AddSource();
+                    if (s == null) { ok = false; continue; }
+                    s.playOnAwake = false;
+                    s.loop = true;
+                    s.spatialBlend = 0f;
+                    s.priority = 0;
+                    s.volume = 0f;
+                    try { s.outputAudioMixerGroup = GameSettings.MusicGroup; } catch (System.Exception) { /* no mixer: default output */ }
+                    _loops[i] = s;
+                }
+                catch (System.Exception e)
+                {
+                    ok = false;
+                    if (!_loopsWarned) { _loopsWarned = true; Debug.LogWarning("[CM.Audio] music loop source could not be built: " + e.Message); }
+                }
+            }
+            return ok;
+        }
+
         void Update() { var cost = CriticalMass.Runtime.Game.FrameCost.Enter(); UpdateCost(); CriticalMass.Runtime.Game.FrameCost.Exit(CriticalMass.Runtime.Game.FrameCost.Slot.Sound, cost); }
 
         void UpdateCost()
         {
             float now = Time.unscaledTime;
+            if (!_ready || _loops[0] == null || _loops[1] == null)
+            {
+                if (now >= _rebuildAt) { _rebuildAt = now + 2f; Rebuild(); }
+                return;
+            }
             float dt = Mathf.Min(Time.unscaledDeltaTime, 0.1f);
             if (_driver == null && (_lookupFrames++ % 15) == 0)
             {
@@ -567,6 +682,7 @@ namespace CriticalMass.Runtime.Audio
             MusicDirector m = Instance;
             if (m == null) return;
             AudioSource cur = m._loops[m._cur];
+            if (cur == null) return;
             AudioClip title = m._tracks[(int)MusicState.Title];
             bool settled = Time.unscaledTime - m._fadeStart >= m._fadeLen;
             if (title == null || cur.clip != title || !cur.isPlaying || !settled) return;
@@ -579,6 +695,7 @@ namespace CriticalMass.Runtime.Audio
         void Switch(AudioClip clip, float seconds, float now)
         {
             AudioSource cur = _loops[_cur];
+            if (cur == null || _loops[1 - _cur] == null) return;   // round 4: never throw on a missing loop source
             if (clip != null && cur.clip == clip && cur.isPlaying) return;
             // A fade still running: the outgoing source is cut so only two sources ever sound.
             AudioSource other = _loops[1 - _cur];

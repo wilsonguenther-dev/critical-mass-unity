@@ -186,6 +186,10 @@ namespace CriticalMass.Runtime.View.Art
             _animator.cullingMode = AnimatorCullingMode.CullCompletely;
             _graph = PlayableGraph.Create(name);
             _graph.SetTimeUpdateMode(DirectorUpdateMode.Manual);
+            // px lane F round 4: the graph dies with the model's root (scene reload, Play stopped), not only via Dispose
+            ModelGraphReleaser rel = Root.GetComponent<ModelGraphReleaser>();
+            if (rel == null) rel = Root.AddComponent<ModelGraphReleaser>();
+            rel.Owner = this;
             var output = AnimationPlayableOutput.Create(_graph, "anim", _animator);
             _mixer = AnimationMixerPlayable.Create(_graph, n);
             for (int i = 0; i < n; i++)
@@ -573,6 +577,12 @@ namespace CriticalMass.Runtime.View.Art
             }
             sb.Append(" | evaluated ").Append(Evaluations).Append(", skipped ").Append(SkippedEvaluations);
             return sb.ToString();
+        }
+
+        /// <summary>px lane F round 4: destroys the PlayableGraph only (ModelGraphReleaser calls this when the root dies).</summary>
+        internal void ReleaseGraph()
+        {
+            if (_graph.IsValid()) _graph.Destroy();
         }
 
         public void Dispose()
