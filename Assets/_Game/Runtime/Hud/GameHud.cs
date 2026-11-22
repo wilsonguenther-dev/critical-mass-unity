@@ -97,6 +97,8 @@ namespace CriticalMass.Runtime.Hud
             LoadTimer.Part("hud minimap", t0);
             t0 = LoadTimer.Now();
             BuildDeath();
+            // player-experience lane D: the local player's combat HUD (bars, hit marker, direction, kills, tags, tally)
+            PlayerHud = new CriticalMass.Runtime.Hud.Player.PlayerHud(Root, _world, Clusters[(int)HudCluster.Player]);
             UpdateScale();
             LoadTimer.Part("hud death and scale", t0);
         }
@@ -574,14 +576,11 @@ namespace CriticalMass.Runtime.Hud
 
         // ---------------------------------------------------------------- world layer
 
-        const int HeartRows = 24;
         const int DamageNumbers = 12;
         const int Pointers = 2;
         RectTransform _world;
         VectorShape _hillMarker;
         Text _hillMarkerWord;
-        readonly RectTransform[] _heartRows = new RectTransform[HeartRows];
-        readonly VectorShape[,] _rowHearts = new VectorShape[HeartRows, Hearts];
         readonly Text[] _dmg = new Text[DamageNumbers];
         readonly float[] _dmgAge = new float[DamageNumbers];
         readonly Vector3[] _dmgPos = new Vector3[DamageNumbers];
@@ -608,21 +607,7 @@ namespace CriticalMass.Runtime.Hud
             Icon(_hillMarker.transform, "Crown", UiIcons.Crown, 4f, 4f, 36f, 36f);
             _hillMarkerWord = Label(marker, "Word", CMTokens.Ui, UiScale.TypeMin, Cream, TextAnchor.MiddleCenter, 0f, 46f, 120f, 22f, "NEUTRAL", 2.5f);
 
-            for (int r = 0; r < HeartRows; r++)
-            {
-                RectTransform row = Rt(_world, "Hearts " + r);
-                Center(row, Hearts * 16f, 14f);
-                for (int i = 0; i < Hearts; i++)
-                {
-                    VectorShape h = Shape(row, "H" + i, ShapeKind.Heart, i * 16f, 0f, 14f, 13f, CMTokens.Azure.Color);
-                    h.OutlinePx = 2f;
-                    h.RimPx = 0f;
-                    h.EmptyColor = Empty;
-                    _rowHearts[r, i] = h;
-                }
-                row.gameObject.SetActive(false);
-                _heartRows[r] = row;
-            }
+            // player-experience lane D: the overhead hearts became always-on health bars (Hud/Player/HealthBars.cs)
             for (int i = 0; i < DamageNumbers; i++)
             {
                 Text t = HudText.Make(_world, "Damage " + i, CMTokens.Mono, UiScale.TypeHeading, Cream, TextAnchor.MiddleCenter, 3f);
@@ -653,6 +638,9 @@ namespace CriticalMass.Runtime.Hud
                 _ptr[i] = p;
             }
         }
+
+        /// <summary>Player-experience lane D: the local player's combat HUD (Hud/Player/PlayerHud.cs).</summary>
+        public CriticalMass.Runtime.Hud.Player.PlayerHud PlayerHud { get; private set; }
 
         /// <summary>The nested canvases of the M5 split (tests read them).</summary>
         public Canvas WorldCanvas { get; private set; }
@@ -1219,28 +1207,9 @@ namespace CriticalMass.Runtime.Hud
                 SetAlpha(_dmgFade[k], 1f - t * t);
             }
 
-            // overhead hearts: other units, 3 s after damage, never at full health
-            int row = 0;
-            for (int i = 0; i < w.ActorCount && row < HeartRows; i++)
-            {
-                Actor a = w.Actors[i];
-                // Batch 12 item P: an enemy the fog hides shows no hearts either
-                if (i == HudBinder.LocalActor || !a.Alive || global::CriticalMass.Runtime.View.Fog.FogOfWar.Hides(i) || a.Hp >= a.MaxHp || w.Match.Time - _lastHit[i] > 3.0 || _lastHit[i] <= 0) continue;
-                Vector3 head = SimSpace.ToWorld(w.X[i], GroundHeight.At(w.Map, w.X[i], w.Z[i]) + 2.8, w.Z[i]);
-                if (!Project(cam, head, out Vector2 p)) continue;
-                RectTransform r = _heartRows[row];
-                if (!r.gameObject.activeSelf) r.gameObject.SetActive(true);
-                r.anchoredPosition = p / scale;
-                float hp01 = (float)(a.Hp / a.MaxHp);
-                Color tc = CMTokens.Team(a.Team);
-                for (int h = 0; h < Hearts; h++)
-                {
-                    _rowHearts[row, h].SetFill(tc);
-                    _rowHearts[row, h].Fill01 = Mathf.Clamp01(hp01 * Hearts - h);
-                }
-                row++;
-            }
-            for (; row < HeartRows; row++) if (_heartRows[row].gameObject.activeSelf) _heartRows[row].gameObject.SetActive(false);
+            // player-experience lane D: health bars over every unit in view, hit marker, damage direction, kill confirm,
+            // tags and pops (Hud/Player); replaces the 3-second overhead hearts
+            PlayerHud?.Tick(w, s, Driver != null ? Driver.Alpha : 1.0, cam, scale, dt);
         }
 
         static readonly string[] Metres = BuildMetres();
