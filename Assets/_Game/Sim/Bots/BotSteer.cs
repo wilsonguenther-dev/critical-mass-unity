@@ -391,7 +391,7 @@ namespace CriticalMass.Sim.Bots
             double d2 = dx * dx + dz * dz;
             if (d2 < 1e-12) return true;
             double f = w.Actors[id].Facing;
-            return (dx * JsMath.Cos(f) + dz * JsMath.Sin(f)) / Math.Sqrt(d2) >= AttackCos - 1e-9;
+            return (dx * JsMath.Cos(f) + dz * JsMath.Sin(f)) / Math.Sqrt(d2) >= BotAim.PressCos(w, id, AttackCos) - 1e-9;   // px S1 [2]: class arc
         }
 
         /// <summary>
@@ -625,7 +625,9 @@ namespace CriticalMass.Sim.Bots
                         reach = CombatFeel.BotReach(w, a.Cls, cc.AttackRange) + AttackSlack; // b15: the Healer keeps her stand-off
                         // DG-69: with a wind-up the bot swings at where the target will be on the contact tick.
                         int windup = w.Dur.AttackWindup[(int)a.Cls];
-                        if (windup > 0)
+                        // px S1 [2]: human limits: the target where it was BotMeleeAimDelayTicks ago, its lead and aim error.
+                        if (BotAim.On(w)) BotAim.Perceive(w, st, id, t, windup, out tx, out tz);
+                        else if (windup > 0)
                         {
                             // b15 combat feel: the lead is capped at BotLeadSeconds. A 0.40 s wind-up led the whole way swung the
                             // chase point across a knocked or strafing target, so the bot walked back and forth (shiver gate run

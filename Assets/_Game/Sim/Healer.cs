@@ -106,6 +106,7 @@ namespace CriticalMass.Sim.Core
         {
             Actor t = w.Actors[target];
             amount *= B13Hooks.HealScale(w, healer);   // b13-hook
+            amount *= CombatFeel.HealShare(w, target, false);   // px S1 [4]: a wounded target gets WoundedHealShare (x 1 with the rule off)
             double room = t.MaxHp - t.Hp;
             double d = amount < room ? amount : room;
             if (!(d > 0)) return 0;

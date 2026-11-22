@@ -144,6 +144,10 @@ namespace CriticalMass.Net
             A(ref h, o.AbilityZ);
             M(ref h, o.ActorCount);
             A(ref h, o.Aggression);
+            M(ref h, o.AimHistCap);
+            A(ref h, o.AimHistTick);
+            A(ref h, o.AimHistX);
+            A(ref h, o.AimHistZ);
             A(ref h, o.AnchorTime);
             A(ref h, o.AnchorX);
             A(ref h, o.AnchorZ);
@@ -1090,6 +1094,10 @@ namespace CriticalMass.Net
             A(ref h, o.BufferTick);
             M(ref h, o.Buffered);
             A(ref h, o.CancelUsed);
+            A(ref h, o.CritFrom);
+            A(ref h, o.CritKind);
+            A(ref h, o.CritTick);
+            M(ref h, o.Crits);
             A(ref h, o.FeintLockUntil);
             M(ref h, o.Feints);
             M(ref h, o.HitCancels);
@@ -1117,7 +1125,9 @@ namespace CriticalMass.Net
             M(ref h, o.Swings);
             D(ref h, o.TntSelfDamage);
             M(ref h, o.TntSelfHits);
+            A(ref h, o.WhiffRecoverUntil);
             M(ref h, o.Whiffs);
+            A(ref h, o.WoundedUntil);
         }
 
         private static void H_TerrainHeightState(ref ulong h, global::CriticalMass.Sim.Core.TerrainHeightState o)

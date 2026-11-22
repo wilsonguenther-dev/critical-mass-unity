@@ -269,6 +269,10 @@ namespace CriticalMass.Sim.Core
         /// <summary>Lane S2: the idle-player autopilot took over (Value 1) or handed back (Value 0) actor A's fighter, on the tick it
         /// happened: A = the actor, B = -1, (X, Z) = the actor, Value = 1 on / 0 off. The HUD announces both.</summary>
         AutopilotChanged,
+        /// <summary>px S1 [9] view only: a melee hit was CRITICAL (earned, never rolled): A = the victim, B = the attacker,
+        /// (X, Z) = the victim, Value = kind (1 counter: hit inside his wind-up, 2 punish: hit in the recovery of his whiff,
+        /// 3 back hit: from his rear arc), Radius = the bonus damage dealt. The Hit event of the same strike carries Tier 2.</summary>
+        CriticalHit,
     }
 
     /// <summary>CM b13 [K]: the Kaiju type decided by the biomass mix at the hatch (Elder = today's Kaiju; appended members only).</summary>

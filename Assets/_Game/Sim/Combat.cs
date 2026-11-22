@@ -63,6 +63,9 @@ namespace CriticalMass.Sim.Core
                 Actor a = w.Actors[i];
                 // b16 CANCEL (Full rules only): a feint drops the wind-up before its contact tick; a hit-cancel cuts the recovery.
                 if (feel) CombatFeel.TakeCancel(w, i);
+                // px S1 [1] (Full rules only): the wound-up swing turns toward the current aim (Facing) until a short lock before
+                // contact, for every actor (CombatFeelConfig.SwingTrack*). Off: the facing stays locked at the press (DG-69).
+                if (feel && a.SwingPending) CombatFeel.TrackSwing(w, i);
                 // DG-69: a wound-up swing lands on its contact tick, along the facing locked at the press.
                 if (a.SwingPending && w.Tick >= a.SwingTick + a.SwingWindup)
                 {
