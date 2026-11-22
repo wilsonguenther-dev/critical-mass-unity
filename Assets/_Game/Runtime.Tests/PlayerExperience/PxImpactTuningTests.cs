@@ -330,11 +330,11 @@ namespace CriticalMass.Runtime.Tests
             try
             {
                 StringAssert.Contains("no Player map", CriticalMass.Runtime.Input.HumanInputSource.ActionsProblem(asset));
-                var map = asset.AddActionMap("Player");
-                map.AddAction("Move");
+                var map = UnityEngine.InputSystem.InputActionSetupExtensions.AddActionMap(asset, "Player");
+                UnityEngine.InputSystem.InputActionSetupExtensions.AddAction(map, "Move");
                 StringAssert.Contains("'Point'", CriticalMass.Runtime.Input.HumanInputSource.ActionsProblem(asset));
                 foreach (string a in CriticalMass.Runtime.Input.HumanInputSource.RequiredActions)
-                    if (map.FindAction(a, false) == null) map.AddAction(a);
+                    if (map.FindAction(a, false) == null) UnityEngine.InputSystem.InputActionSetupExtensions.AddAction(map, a);
                 Assert.IsNull(CriticalMass.Runtime.Input.HumanInputSource.ActionsProblem(asset));
             }
             finally { UnityEngine.Object.DestroyImmediate(asset); }
