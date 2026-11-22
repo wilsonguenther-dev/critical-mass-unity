@@ -17,10 +17,12 @@ namespace CriticalMass.Runtime.Hud.Player
         public static PlayerHud Current { get; private set; }
 
         public readonly HealthBars Bars;
+        public readonly HitMarker Marker;
 
         World _world;
         int _epoch = -1;
         int _cursor = -1;
+        double _alpha = 1.0;
 
         /// <summary>Sim events dropped because the HUD fell a whole ring behind (tests).</summary>
         public int Dropped { get; private set; }
@@ -28,6 +30,7 @@ namespace CriticalMass.Runtime.Hud.Player
         public PlayerHud(RectTransform root, RectTransform world, RectTransform playerCard)
         {
             Bars = new HealthBars(world);
+            Marker = new HitMarker(world);
             Current = this;
         }
 
@@ -36,12 +39,14 @@ namespace CriticalMass.Runtime.Hud.Player
         {
             if (w == null || cam == null) return;
             int me = HudBinder.LocalActor;
+            _alpha = alpha;
             if (!ReferenceEquals(w, _world) || w.Epoch != _epoch)
             {
                 _world = w;
                 _epoch = w.Epoch;
                 _cursor = w.EventHead;
                 Bars.Clear();
+                Marker.Clear();
             }
             if (_cursor < 0 || _cursor > w.EventHead) _cursor = w.EventHead;
             if (w.EventHead - _cursor > World.EventCapacity)
@@ -51,6 +56,7 @@ namespace CriticalMass.Runtime.Hud.Player
             }
             for (; _cursor < w.EventHead; _cursor++) OnEvent(w, w.Events[_cursor % World.EventCapacity], me);
             Bars.Tick(w, me, alpha, cam, scale, dt);
+            Marker.Tick(w, me, alpha, cam, scale, dt);
         }
 
         void OnEvent(World w, SimEvent e, int me)
@@ -58,13 +64,28 @@ namespace CriticalMass.Runtime.Hud.Player
             switch (e.Type)
             {
                 case SimEventType.Hit:
-                    if (e.B == me && e.A != me && e.A >= 0) Bars.OnMyHit(e.A, w.Match.Time);
+                    if (e.B == me && e.A != me && e.A >= 0)
+                    {
+                        Bars.OnMyHit(e.A, w.Match.Time);
+                        Marker.OnMyHit(w, e.A, e.Tier, _alpha);
+                    }
+                    break;
+                case SimEventType.Death:
+                    if (e.B == me && e.A != me && e.A >= 0) Marker.OnMyKill(w, e.A, e.X, e.Z);
                     break;
                 case SimEventType.StructureHit:
-                    if (e.A == me) Bars.OnStructureHit(w, e.X, e.Z, (float)e.Radius, e.B);
+                    if (e.A == me && e.Value > 0)
+                    {
+                        Bars.OnStructureHit(w, e.X, e.Z, (float)e.Radius, e.B);
+                        Marker.OnMyHitAt(PxProject.Point(w, e.X, e.Z, 1.2f), 0);
+                    }
                     break;
                 case SimEventType.KaijuDamaged:
-                    if (e.A == me) Bars.OnMyKaijuHit(w.Match.Time);
+                    if (e.A == me)
+                    {
+                        Bars.OnMyKaijuHit(w.Match.Time);
+                        Marker.OnMyHitAt(PxProject.Point(w, e.X, e.Z, 1.6f), e.Value >= 20 ? 1 : 0);
+                    }
                     break;
             }
         }
