@@ -25,6 +25,9 @@ namespace CriticalMass.Sim.Config
         /// <summary>px DM (review defect 9): an enemy barricade or wall cell inside her pry-bar reach and arc (and within
         /// PointBlankRange) also takes the pry bar instead of a throw. False = only enemy bodies count (lane S2).</summary>
         public bool PointBlankStructures = true;
+        /// <summary>px DM (review defect 6): a frontal hit cut by the Warrior's raised shield does not stagger him (the hit
+        /// still lands reduced and knocks; HitBlocked BlockedShield says BLOCKED). False = it staggers like any hit.</summary>
+        public bool ShieldStopsStagger = true;
 
         // ---- THE HEALER CHOOSES
         /// <summary>An Attack press whose aim point is within this of an enemy inside her lantern reach swings the lantern, even

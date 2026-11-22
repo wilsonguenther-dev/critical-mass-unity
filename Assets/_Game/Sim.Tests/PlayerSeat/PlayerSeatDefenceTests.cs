@@ -347,6 +347,34 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
             Assert.IsTrue(ok);
         }
 
+        [TestCase(true)]
+        [TestCase(false)]
+        public void S57b_ShieldCutHit_DoesNotStagger(bool rule)
+        {
+            // review defect 6: a frontal hit the raised shield cuts says BLOCKED and does not stagger the Warrior (switch off: it does)
+            Seat s = PlayerSeatRig.Duel(ClassId.Miner, ClassId.Warrior, TargetMode.Passive, 0, 0, distance: 1.2);
+            World w = s.W;
+            w.Config.Depth.Seat.ShieldStopsStagger = rule;
+            int me = s.Me, him = s.Them, wu = w.Dur.AttackWindup[(int)ClassId.Miner];
+            w.Actors[him].Facing = Math.Atan2(w.Z[me] - w.Z[him], w.X[me] - w.X[him]);
+            w.Actors[him].AbilityActive = 2.5;
+            int mark = s.Spy.Mark, stun = 0;
+            s.Human.Fight = false;
+            s.Human.PressAttack = true;
+            s.Human.AimOverrideX = w.X[him]; s.Human.AimOverrideZ = w.Z[him];
+            for (int t = 0; t < wu + 4; t++)
+            {
+                s.Human.MoveOverrideX = s.Human.MoveOverrideZ = 0;
+                s.Step();
+                stun = Math.Max(stun, w.Actors[him].HitStunTicks);
+            }
+            int hits = s.Spy.Hits(me, him, mark).Count;
+            int blocked = s.Spy.Since(mark, SimEventType.HitBlocked, e => e.A == him && e.B == me && (int)e.Value == PlayerReasons.BlockedShield).Count;
+            bool ok = PxLog.Line("S57b ShieldCutHit_DoesNotStagger", "Miner hits a Warrior with his shield up, facing him; ShieldStopsStagger " + rule, "Hit " + hits + ", BLOCKED " + blocked + ", Warrior stagger ticks " + stun,
+                rule ? "Hit 1, BLOCKED 1, no stagger" : "Hit 1, BLOCKED 1, staggered", hits == 1 && blocked == 1 && (rule ? stun == 0 : stun > 0));
+            Assert.IsTrue(ok);
+        }
+
         // ------------------------------------------------------------------ S58: movement never sticks or shivers
 
         /// <summary>Holds one move direction from (x0, z0) toward (x1, z1); false = not reached, stuck (under 20% of walk speed
