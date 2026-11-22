@@ -84,16 +84,20 @@ namespace CriticalMass.Sim.Tests
         [Test]
         public void EachThreatDodgesAtItsChancePerDifficulty()
         {
-            int[] kinds = { BotReflex.KindSlam, BotReflex.KindTnt, BotReflex.KindMelee, BotReflex.KindClaw };
-            string[] names = { "slam", "tnt", "melee", "claw" };
+            int[] kinds = { BotReflex.KindSlam, BotReflex.KindTnt, BotReflex.KindMelee, BotReflex.KindClaw, BotReflex.KindMelee };
+            string[] names = { "slam", "tnt", "melee", "claw", "melee (human attacker)" };
             var failures = new System.Collections.Generic.List<string>();
             foreach (BotDifficulty d in Diffs)
             {
                 World w = Field(d, out int bot, out int foe);
                 DodgeConfig dc = w.Config.Depth.Dodge;
                 int di = BotReflex.DiffIndex(w, bot);
+                bool foeWasHuman = w.Actors[foe].IsHuman;
                 for (int n = 0; n < kinds.Length; n++)
                 {
+                    // px DM (lead's call 18): the melee threat twice, from a bot (the b13 chance) and from a human seat (the lowered one)
+                    bool humanArm = n == 4;
+                    w.Actors[foe].IsHuman = humanArm || (foeWasHuman && kinds[n] != BotReflex.KindMelee);
                     int dodged = 0;
                     for (int trial = 0; trial < 200; trial++)
                     {
@@ -123,7 +127,8 @@ namespace CriticalMass.Sim.Tests
                     double share = dodged / 200.0, want = kinds[n] == BotReflex.KindTnt ? dc.TntChance[di] : dc.DodgeChance[di];   // b13 r3: TNT has its own roll
                     // px S1 [3]: with the bots' human limits on, a melee threat rolls CombatFeelConfig.BotMeleeDodgeChance instead.
                     double[] md = BotAim.On(w) ? w.Config.Depth.CombatFeel.BotMeleeDodgeChance : null;
-                    if (kinds[n] == BotReflex.KindMelee && md != null) want = md[di];
+                    bool humansOnly = w.Config.Depth.CombatFeel.BotMeleeDodgeHumansOnly;
+                    if (kinds[n] == BotReflex.KindMelee && md != null && (humanArm || !humansOnly)) want = md[di];
                     bool ok = Math.Abs(share - want) <= 0.12;
                     Console.WriteLine("{\"item\":\"b13-jd reflex\",\"difficulty\":\"" + d + "\",\"threat\":\"" + names[n] + "\",\"dodged\":" + dodged + ",\"trials\":200,\"share\":" + share.ToString("F3") +
                                       ",\"chance\":" + want.ToString("F2") + ",\"limit\":0.12,\"verdict\":\"" + (ok ? "PASS" : "FAIL") + "\"}");
