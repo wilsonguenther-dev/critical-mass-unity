@@ -50,7 +50,9 @@ namespace CriticalMass.Sim.Tests
                 if (got != want) bad++;
             }
             Case(RulesProfile.Full, ClassId.Builder, true, 1);
-            Case(RulesProfile.Full, ClassId.Miner, true, 0);
+            // player-experience lane S2 (lead's call 1, PLAN.md section 4): a HUMAN Miner's F away from a vein digs with the
+            // Builder's dig rule (no place); bots never do (PxClassRepairTests). Re-baselined 0 -> 1.
+            Case(RulesProfile.Full, ClassId.Miner, true, 1);
             Case(RulesProfile.Full, ClassId.Warrior, true, 0);
             Case(RulesProfile.Full, ClassId.Builder, false, 0);
             Case(RulesProfile.Full, ClassId.Miner, false, 0);
