@@ -248,6 +248,9 @@ namespace CriticalMass.Runtime.Input
         }
 
         bool _unusable;
+        /// <summary>Fix round 6: this reader turned itself off on purpose (missing / empty input actions, seat on autopilot);
+        /// the lockout watchdog must not "repair" it (that was a second red error).</summary>
+        public bool ActionsMissing => _unusable;
 
         private void OnDisable()
         {
