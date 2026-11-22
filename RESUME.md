@@ -30,7 +30,7 @@ decision E (first person hidden behind `FollowCamera.FirstPersonEnabled = false`
 |---|---|---|---|
 | 1 | 2272ad84 merge / aec09b87 re-pin | fast 44953083481, fast 44953689294, slow 44953691993, unity-ci all 44953694417, smoke 44953696665, balance 44953147967 | see reds below; smoke cross-OS drop+rejoin SUCCESS |
 | 2 | 6d4c1b20 / de8b6aed / 95b1190b fix groups | fast 44954702167, 44955420622, 44955919924; probes 44953805795, 44954708867 | lever measurements; final pins |
-| 3 | c398317b final | fast 44959976798, slow 44959978885, unity-ci all 44959980911, smoke 44959982949, balance 44959989062 | running |
+| 3 | c398317b final | fast 44959976798, slow 44959978885, unity-ci all 44959980911, smoke 44959982949, balance 44959989062 | no new red (below); builds mac+win, Windows smoke, cross-OS drop+rejoin SUCCESS |
 
 ## Leftover reds (A-D)
 - A1 lone walker 1337: passes on the combined branch (12.5 s). Seed 7 stalled only under the reverted fighter-only lever.
@@ -39,7 +39,7 @@ decision E (first person hidden behind `FollowCamera.FirstPersonEnabled = false`
 - A3 Need4 B7/B8: FIXED in the sim. Cause: b16 [4] wide corner rounding (0.35 u) slid a body grazing the bridge-mouth corner
   round it onto the island beside the mouth. Repro arms: default 4 stalls, wall slide off 4, corner nudge 0.1 -> 0, feel off -> 0.
   Fix: no wide rounding within the deck band + 1 u of a span, for the person-steered actor only (bots kept it: with bots too,
-  Farmers pressed into the shrine-bridge gate posts for 16 s, 11 hard flags). PlayMode Need4 to confirm in round 3.
+  Farmers pressed into the shrine-bridge gate posts for 16 s, 11 hard flags). PlayMode Need4 PASSES (unity-ci 44959980911).
 - A4 WorldReactionsTests bus-reader allowlist: PASSES in EditMode 44953694417.
 - B1 GameplaySanity scale 3.17 u: guard widened (whole attack: AttackCd, 1.2 s of an action clip); PlayMode 1/2 passed in 44953694417.
 - B2 BotsPastTheHillCap: PASSES on the combined branch (slow 44953691993).
@@ -52,6 +52,15 @@ decision E (first person hidden behind `FollowCamera.FirstPersonEnabled = false`
 - Slow known reds on the merge (44953691993): CombatFeel stuck cell 14 (base 39), idle floor 0.11 x2 (DepthSoak, RulesCombined),
   Hut higher-level team 0.889 (base 0.933), Elder hatch 0/24, CM-64 interceptions 39/100, MovementShiver soak 272 (allowed).
   Hill Anchor, hut-choices and coin-flip share shifts: green.
+
+## Round 3 reds (c398317b), sorted
+- fast 44959976798: PhysicsFeel Items3678 ally overlap 0.575 (D, listed; base 0.847). Pins all equal.
+- unity-ci 44959980911: EditMode the same Items3678 (listed) + 5 PerfSmooth inconclusive (allowed); PlayMode 1/2 green
+  (Need4, GameplaySanity pass); PlayMode 3 FighterVisibility, OwnerWalkHud (allowed), HatchFrame inconclusive (allowed).
+- slow 44959978885 (7, all known/allowed, none new): MovementShiver soak 272 (allowed) and PhysicsFeel Item3 272 > 251.4 (known),
+  CM-64 interceptions 59/100 (allowed; was 39), CombatFeel stuck cell 14 (known; base 39), Hut higher-level (known),
+  Elder 0/24 (known), BuilderWall (B4, listed). The idle-floor reds (DepthSoak, RulesCombined) and B16 blocking now pass.
+- smoke 44959982949: Windows host + macOS joiner MATCH, 64 fingerprints agree, dropped tick 900, rejoined live 1011, 31 agree after.
 
 ## Lever changes (before -> after), D
 | item | lever | result | kept |
@@ -66,6 +75,21 @@ Attribution arms (probe 44953805795, one switch each vs the combined head): 8v8 
 comeback 0.292, Kaiju idle off 0.306, old feeders 0.347, feel off 0.431 (head 0.431); 5v5 old feeders 0.319, feel off 0.319,
 Warrior x1 0.333, Kaiju idle off 0.347, nocap 0.417 (head 0.444).
 Trade-off of the kept lever: the audit's "3 of 5 bots off the hill at 5v5" (two extra feeders) is back.
+
+## Final balance, head c398317b vs aa2ecfef (1.0.1356), 72 seeds each (probe 44959989062; docs/balance/COMPARE-*-c398317b-72-*)
+| stat | 16v16 | 8v8 | 5v5 |
+|---|---|---|---|
+| Crimson win | 0.361 -> 0.417 | 0.611 -> 0.486 | 0.569 -> 0.542 |
+| blowouts | 0.125 -> 0.181 (noise) | 0.236 -> 0.264 (noise) | 0.236 -> 0.222 |
+| lead changes (median) | 4 -> 3 | 3 -> 3 | 2 -> 2 |
+| half-time leader wins | 0.458 -> 0.542 | 0.493 -> 0.500 | 0.606 -> 0.521 |
+| Kaiju owner wins | 0.883 -> 0.807 | 0.845 -> 0.829 | 0.603 -> 0.657 |
+| stuck median (mean) | 4 -> 3 (7.89 -> 4.10) | 1 -> 1 (1.68 -> 0.90) | 0 -> 0 (0.93 -> 1.06) |
+| Warrior damage share | 0.429 -> 0.440 | 0.559 -> 0.618 | 0.623 -> 0.652 |
+| Healer deaths | 18.0 -> 15.2 | 8.08 -> 7.40 | 6.57 -> 6.38 |
+| duel order violations | 6 -> 0 (holds) | | |
+Blowouts at 16v16 (+4 matches of 72) and 8v8 (+2) are numerically above 1.0.1356 but inside noise; the 16v16 rise comes from
+the merge itself (my levers do not touch 16v16). Both blowout levers are used; listed for the owner, not tuned further.
 
 ## Must not ship
 - The relay worker change from #234 is NOT deployed. Deploy step: docs/online/CHAT-AND-VOICE.md (needs the owner; not done here).
