@@ -84,7 +84,9 @@ namespace CriticalMass.Runtime.Hud.Player
         }
 
         /// <summary>One frame: events since the last frame, then every piece's animation and placement.</summary>
-        public void Tick(World w, HudState s, double alpha, UnityEngine.Camera cam, float scale, float dt)
+        /// <param name="head">the world's event head, passed in by GameHud (the one allowed reader of the event ring here,
+        /// WorldReactionsTests.NoNewReaderOfWorldEventsOutsideTheBus)</param>
+        public void Tick(World w, HudState s, double alpha, UnityEngine.Camera cam, float scale, float dt, int head)
         {
             if (w == null || cam == null) return;
             int me = HudBinder.LocalActor;
@@ -96,7 +98,7 @@ namespace CriticalMass.Runtime.Hud.Player
             {
                 _world = w;
                 _epoch = w.Epoch;
-                _cursor = w.EventHead;
+                _cursor = head;
                 Bars.Clear();
                 Marker.Clear();
                 Direction.Clear();
@@ -110,16 +112,16 @@ namespace CriticalMass.Runtime.Hud.Player
                 Assists.Clear();
                 Criticals = 0;
             }
-            if (_cursor < 0 || _cursor > w.EventHead) _cursor = w.EventHead;
-            if (w.EventHead - _cursor > World.EventCapacity)
+            if (_cursor < 0 || _cursor > head) _cursor = head;
+            if (head - _cursor > World.EventCapacity)
             {
-                Dropped += w.EventHead - World.EventCapacity - _cursor;
-                RuntimeCounters.HudEventsDropped += w.EventHead - World.EventCapacity - _cursor;   // DG-60 (was GameHud's loop)
-                _cursor = w.EventHead - World.EventCapacity;
+                Dropped += head - World.EventCapacity - _cursor;
+                RuntimeCounters.HudEventsDropped += head - World.EventCapacity - _cursor;   // DG-60 (was GameHud's loop)
+                _cursor = head - World.EventCapacity;
             }
-            ScanBlasts(w);
+            ScanBlasts(w, head);
             Pops.BeforeEvents(w, me);
-            for (; _cursor < w.EventHead; _cursor++) OnEvent(w, w.Events[_cursor % World.EventCapacity], me);
+            for (; _cursor < head; _cursor++) OnEvent(w, w.Events[_cursor % World.EventCapacity], me);
             Bars.Tick(w, me, alpha, cam, scale, dt);
             Marker.Tick(w, me, alpha, cam, scale, dt);
             Direction.Tick(w, me, alpha, cam, scale, dt);
@@ -227,10 +229,10 @@ namespace CriticalMass.Runtime.Hud.Player
         int _blasts;
 
         /// <summary>This batch's explosions first (a blast's hits may precede its Explosion event in the ring).</summary>
-        void ScanBlasts(World w)
+        void ScanBlasts(World w, int head)
         {
             _blasts = 0;
-            for (int k = _cursor; k < w.EventHead && _blasts < BlastCap; k++)
+            for (int k = _cursor; k < head && _blasts < BlastCap; k++)
             {
                 SimEvent e = w.Events[k % World.EventCapacity];
                 if (e.Type != SimEventType.Explosion) continue;
