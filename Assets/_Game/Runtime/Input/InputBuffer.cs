@@ -29,10 +29,25 @@ namespace CriticalMass.Runtime.Input
         public int Age => _age;
 
         /// <summary>The window in whole sim steps at simHz: floor(0.15 x simHz), 4 at 30 Hz.</summary>
-        public static int MaxEarlyTicks(double simHz)
+        public static int MaxEarlyTicks(double simHz) => MaxEarlyTicks(simHz, WindowSeconds);
+
+        /// <summary>The window in whole sim steps for a given window length (s).</summary>
+        public static int MaxEarlyTicks(double simHz, double seconds)
         {
-            if (!(simHz > 0)) return 0;
-            return Math.Max(0, (int)Math.Floor(WindowSeconds * simHz + 1e-9));
+            if (!(simHz > 0) || !(seconds > 0)) return 0;
+            return Math.Max(0, (int)Math.Floor(seconds * simHz + 1e-9));
+        }
+
+        /// <summary>Lane I (2026-11-22): the class ability buffers as long as the sim buffers an attack after lane S1 (about
+        /// 0.35 s), so an ability pressed just before its cooldown ends is never silently dropped by the view.</summary>
+        public const double AbilityWindowSeconds = 0.35;
+
+        /// <summary>Lane I: the attack window matches the sim's own buffer (CombatFeelConfig.BufferSeconds under the Full
+        /// rules), never shorter than WindowSeconds, so the two buffers in series agree on how early a press may come.</summary>
+        public static double AttackWindow(World w)
+        {
+            double sim = w != null && w.Config != null && CombatFeel.On(w) ? CombatFeel.Cfg(w).BufferSeconds : 0;
+            return Math.Max(WindowSeconds, sim);
         }
 
         public void Clear() => _age = -1;

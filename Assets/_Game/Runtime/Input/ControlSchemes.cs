@@ -51,6 +51,9 @@ namespace CriticalMass.Runtime.Input
                     if (action == "LockFacing") return "the right stick (Aim) holds a facing while the left stick moves";
                     if (action == "MoveToPointer") return "not used: walking to the pointer needs a mouse; the left stick walks";
                     if (action == "StationBuy") return "A (UI submit) inside the open station panel";
+                    // Lane I (2026-11-22): one job per button.
+                    if (action == "CameraView") return "Settings, CAMERA (Start opens the menu): no button, so a stick click never changes the view";
+                    if (action == "Look") return "hold R3 (CameraFollowTarget reads the right stick while it is held)";
                     break;
             }
             return null;
