@@ -275,8 +275,12 @@ namespace CriticalMass.Sim.Config
         /// its own wind-up (counter), in the recovery of its whiff (punish) or from its rear arc (back hit). Measured in
         /// data/s1-combat/crit/. OFF by default: the ask's bar "the strong model gains >= 5 points" is not shown yet. Measured on
         /// (288 duels each): lag-6 0.50 -> 0.50, 50%-player 0.28 -> 0.30, first-match floor 0.27 -> 0.27, a 0.13 s human 0.53 ->
-        /// 0.54 (+1; the probe has no feint / back-circling model yet). Turn on once that model shows the gain.</summary>
-        public bool CritEnabled = false;
+        /// 0.54 (+1; the probe has no feint / back-circling model yet). Turn on once that model shows the gain.
+        /// px S3: ON. The gate's strong model (feints, dodges, hit-cancels) gains 0.68 -> 0.73 vs Normal (S48b passes) and
+        /// 0.51 -> 0.53 vs Hard; the first-match floor holds (0.30 -> 0.30); Warrior wins all (39/40), Healer loses all (3/40);
+        /// S43, S44, S35 stay green; the only band move is the Demolitions middle-three share 0.50 -> 0.75 (5 points over).
+        /// Same-tick trades are not COUNTERs (CritKindOf). Data: data/s3-tune/sweep/crit1.25.txt, crit1.15.txt.</summary>
+        public bool CritEnabled = true;
         /// <summary>[9] Damage of a critical hit, applied after every other multiplier (kinds do not stack). Start value of the ask.</summary>
         public double CritDamageMul = 1.25;
         /// <summary>[9] The rear arc (degrees, centred on the back) a back hit comes from: 120 = more than 120 deg off his facing.</summary>
