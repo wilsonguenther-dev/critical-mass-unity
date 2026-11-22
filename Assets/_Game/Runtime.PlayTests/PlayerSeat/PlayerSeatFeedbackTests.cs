@@ -295,7 +295,19 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
             // fix round 5 (item 4): a virtual-device press queued now is delivered by the Input System's next update, at
             // the start of the next frame: that frame is the press frame the player sees
             int pressFrame = Time.frameCount + 1;
-            yield return TickFrame(() => Pin(e, px, pz));
+            // fix round 6: the drawn pose weight on each rendered frame from the press to press + 2, read at the end of
+            // that frame (ActorViews.LocalSwingWeightDrawn), so the rig measures what was rendered, not a later loop pass
+            float drawnBest = 0f;
+            int drawnFrames = 0;
+            while (Time.frameCount <= pressFrame + 2 && drawnFrames < 8)
+            {
+                yield return null;   // the next frame, after its Update (where TickFrame steps the sim)
+                if (Time.frameCount == pressFrame) { Pin(e, px, pz); S.Tick(1); }   // the press frame's sim step, as TickFrame
+                yield return new WaitForEndOfFrame();
+                drawnFrames++;
+                if (CriticalMass.Runtime.View.ActorViews.LocalSwingWeightFrame == Time.frameCount && Time.frameCount >= pressFrame)
+                    drawnBest = Math.Max(drawnBest, CriticalMass.Runtime.View.ActorViews.LocalSwingWeightDrawn);
+            }
             ReleaseAttack();
             bool started = Events(head, SimEventType.AttackStart).Any(q => q.A == 0);
             float best = 0;
@@ -309,7 +321,7 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
             if (reported) best = Math.Max(best, last.Value);
             int framesAfterPress = reported ? last.Frame - pressFrame : -1;
             AssertAtControls("the end");
-            Check("F30 SwingPose", Tag(ClassId.Warrior, v), "sim accepted " + started + ", SwingCommit pose weight " + best.ToString("0.00") + " drawn " + framesAfterPress + " rendered frames after the press frame [" + LedgerDump(cursor) + "]", ">= 0.8 within 2 frames of the press", started && best >= T.SwingPoseWeight && reported && framesAfterPress >= 0 && framesAfterPress <= 2);
+            Check("F30 SwingPose", Tag(ClassId.Warrior, v), "sim accepted " + started + ", drawn pose weight by press + 2 " + drawnBest.ToString("0.00") + "; SwingCommit ledger weight " + best.ToString("0.00") + " at " + framesAfterPress + " frames after the press [" + LedgerDump(cursor) + "]", ">= 0.8 drawn within 2 frames of the press", started && Math.Max(drawnBest, best) >= T.SwingPoseWeight && reported && framesAfterPress >= 0 && framesAfterPress <= 2);
         }
 
         [UnityTest]

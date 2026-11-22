@@ -542,6 +542,9 @@ namespace CriticalMass.Runtime.View
             slot.Anim.TakeSwingCommit(out _);
             if (i == me)
             {
+                // fix round 6 (F30 rig): the local fighter's drawn swing weight this frame and the frame it was drawn on
+                LocalSwingWeightDrawn = slot.Anim.SwingWeightNow;
+                LocalSwingWeightFrame = Time.frameCount;
                 // fix round 5 (item 4): a predicted press starts the 2-frame count on the press frame; the sim's SwingTick
                 // that follows it does not restart the count (one report per press)
                 if (_predStartFrame == Time.frameCount) { _swingSeenFrame = Time.frameCount; _swingReported = false; _swingFromPredict = true; }
@@ -580,6 +583,10 @@ namespace CriticalMass.Runtime.View
             }
             _intentWas = intent;
         }
+
+        /// <summary>Fix round 6 (tests): the local fighter's swing pose weight as drawn on frame LocalSwingWeightFrame.</summary>
+        public static float LocalSwingWeightDrawn;
+        public static int LocalSwingWeightFrame = -1;
 
         Anim.ImpactCueLedger.Seen[] _cues;
         int _swingSeenTick = int.MinValue, _swingSeenFrame;
