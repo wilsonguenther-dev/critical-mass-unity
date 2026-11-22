@@ -463,7 +463,7 @@ namespace CriticalMass.Runtime.View
             // Animation pass: clips, timing, facing spring, squash and the level of detail live in Anim.ActorAnimator.
             slot.Anim.Pose(m, w, cfg, i, a, simTime, dSim, basePos, _fx, hasFx, in fx, ref _poseState);
             PostPose(i, m, in _poseState);
-            ReportCues(i, m, slot, hasFx, in fx, knockDrawn, knockCheck);
+            ReportCues(i, m, slot, hasFx, in fx, knockDrawn, knockCheck, actor.SwingTick);
             CriticalMass.Runtime.Camera.ViewCull.FightersDrawn++;
             if (CriticalMass.Runtime.Camera.ViewCull.SampleFrame) CriticalMass.Runtime.Camera.ViewCull.FighterTriangles += CriticalMass.Runtime.Camera.ViewCull.Triangles(m.Renderers);
             return true;
@@ -513,14 +513,49 @@ namespace CriticalMass.Runtime.View
         /// along the blow at 100 ms), SwingCommit (pose weight 2 frames after the press, local swings). Never a cue a setting
         /// suppressed (reduce motion: no hold reported; the flash strength is the variant actually shown).
         /// </summary>
-        private void ReportCues(int i, ModelView m, CharSlot slot, bool hasFx, in Effects.ActorPoseFx fx, float knockDrawn, bool knockCheck)
+        private void ReportCues(int i, ModelView m, CharSlot slot, bool hasFx, in Effects.ActorPoseFx fx, float knockDrawn, bool knockCheck, int swingTick)
         {
-            UnityEngine.Object src = m.Renderers != null && m.Renderers.Length > 0 && m.Renderers[0] != null ? (UnityEngine.Object)m.Renderers[0] : this;
+            UnityEngine.Object src = DrawnRenderer(m);
             int me = LocalSeat.Actor;
             if (hasFx && fx.FlashNew && fx.FlashOwn) PlayerFeedback.Report(FeedbackChannel.HitFlash, i, fx.FlashStrength, src);
             if (hasFx && fx.HoldNew && fx.HoldOwn && fx.HoldMs > 0f) PlayerFeedback.Report(FeedbackChannel.HitStop, i, fx.HoldMs, src);
             if (knockCheck && hasFx && fx.Own) PlayerFeedback.Report(FeedbackChannel.KnockVisual, i, knockDrawn, src);
-            if (slot.Anim.TakeSwingCommit(out float cw) && i == me) PlayerFeedback.Report(FeedbackChannel.SwingCommit, i, cw, src);
+            // fix round 2 (gate F30): SwingCommit for MY swing, once, 2 rendered frames after the press tick's swing appears,
+            // with the pose weight actually drawn then (keyed on the sim's SwingTick, not on the animator's own latch,
+            // which the gate never saw report). The animator's latch is drained so it never doubles.
+            slot.Anim.TakeSwingCommit(out _);
+            if (i == me)
+            {
+                if (swingTick != _swingSeenTick) { _swingSeenTick = swingTick; _swingSeenFrame = Time.frameCount; _swingReported = false; }
+                if (!_swingReported && swingTick >= 0 && Time.frameCount - _swingSeenFrame >= 2)
+                {
+                    _swingReported = true;
+                    PlayerFeedback.Report(FeedbackChannel.SwingCommit, i, slot.Anim.SwingWeightNow, src);
+                }
+            }
+        }
+
+        int _swingSeenTick = int.MinValue, _swingSeenFrame;
+        bool _swingReported = true;
+
+        /// <summary>Fix round 2 (gate F03): the renderer that is really drawn (active, enabled, not culled away), so the
+        /// ledger's Source is a visible component; the views component itself when none is.</summary>
+        private UnityEngine.Object DrawnRenderer(ModelView m)
+        {
+            Renderer[] rs = m.Renderers;
+            if (rs != null)
+            {
+                Renderer any = null;
+                for (int k = 0; k < rs.Length; k++)
+                {
+                    Renderer r = rs[k];
+                    if (r == null || !r.enabled || !r.gameObject.activeInHierarchy) continue;
+                    if (r.isVisible) return r;
+                    if (any == null) any = r;
+                }
+                if (any != null) return any;
+            }
+            return this;
         }
 
         // follow-camera-3: a light rim on your own fighter in third person, so you read in a crowd. One shared property

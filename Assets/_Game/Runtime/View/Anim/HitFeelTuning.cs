@@ -205,6 +205,20 @@ namespace CriticalMass.Runtime.View.Anim
         // CombatFx.OnCritical at the combine; until then every own Tier-2 non-kill hit takes this look (kind 0).
         /// <summary>The critical kick is this many times the plain hit kick (by me / on me).</summary>
         public const float CritKickMul = 1.6f;
+
+        // ---- fix round 2 (review pass 2): third person
+        /// <summary>Own hit burst in third person: this share of the size, at most this long (s wall), drawn behind the victim.</summary>
+        public const float Burst3PShare = 0.6f;
+        public const double Burst3PLife = 0.16;
+        /// <summary>
+        /// Third-person kick multipliers: the kick moves the lens, and a lens translation shifts a point by u / depth, so at the
+        /// enemy's chest (about 6 u deep, not the 4.4 u focus) my hit measured 7.5-9.1 px and my kill 12.1 px. These bring them
+        /// to about 14 / 20 px at the enemy; the hit on me (14.1 px) and top-down (13 / 19 px) read fine and are unchanged.
+        /// </summary>
+        public static float ThirdPersonKickMul(KickKind k) =>
+            k == KickKind.ByMe ? 1.7f : k == KickKind.MyKill ? 1.65f : k == KickKind.CritByMe ? 1.5f : 1f;
+        public static float KickU(KickKind k, double distance, double fovDeg, float scale, bool thirdPerson) =>
+            KickU(k, distance, fovDeg, scale) * (thirdPerson ? ThirdPersonKickMul(k) : 1f);
         /// <summary>The critical FOV punch: +2 deg, out with the kick envelope (zero under reduce motion).</summary>
         public const float CritFovPunchDeg = 2f;
         public const double CritFovPunchSeconds = 0.2;
