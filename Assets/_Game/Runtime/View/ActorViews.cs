@@ -454,6 +454,7 @@ namespace CriticalMass.Runtime.View
             if (hasFx && fx.Corpse) { knockLead = Vector3.zero; knockCheck = false; }   // the death launch owns a corpse's travel
             Vector3 drawnOff = Anim.HitFeel.ClampOffset((hasFx ? fx.Nudge : Vector3.zero) + Anim.HitFeel.Lunge(w, i, a)) + knockLead;
             drawnOff = ClampDrawn(drawnOff);
+            if (knockCheck) knockDrawn = KnockDrawnNow(i, x, z, drawnOff);
             m.Transform.localPosition = basePos + drawnOff
                 + JumpLift.Offset(w, map, i, a, x, z) // DG-02 jump arc
                 + B16.JumpRefusedView.Offset(w, i, a); // b16 [11]: the refused-jump stumble
@@ -487,6 +488,14 @@ namespace CriticalMass.Runtime.View
             int kt = _fx.Feed.KnockTick[i];
             if (age >= Anim.HitFeelTuning.KnockCheckSeconds && _knockReported[i] != kt) { _knockReported[i] = kt; check = true; }
             return lead > 0 ? SimSpace.ToWorld(dx * lead, 0, dz * lead) : Vector3.zero;
+        }
+
+        /// <summary>The travel along the blow the eye sees now: the sim body's own plus the (clamped) drawn offset along it.</summary>
+        private float KnockDrawnNow(int i, double x, double z, Vector3 drawnOff)
+        {
+            if (_fx == null || !_fx.Knock(i, out _, out _, out double x0, out double z0, out double dx, out double dz)) return 0f;
+            Vector3 d = SimSpace.ToWorld(dx, 0, dz);
+            return (float)(Math.Max(0, (x - x0) * dx + (z - z0) * dz) + Vector3.Dot(drawnOff, d));
         }
 
         private static Vector3 ClampDrawn(Vector3 v)

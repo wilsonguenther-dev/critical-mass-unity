@@ -364,7 +364,7 @@ namespace CriticalMass.Runtime.View.Effects
                                       MaxMarks + MaxDrips + MaxGibs + MaxExplosions + MaxMotes + MaxBubbles + MaxLeaves;
 
         // ---- worst-case vertex cost per element and layer (the draw code below stays inside these) ----
-        public const int CostBurst = 270, CostDroplet = 30, CostDecal = 130, CostRingGround = 390, CostRingAir = 52, CostTrail = 100;
+        public const int CostBurst = 270, CostDroplet = 30, CostDecal = 130, CostRingGround = 390, CostRingAir = 52, CostTrail = 160;   // px lane C: + the 2 x 30-vert reach arc (Warrior 150, Demolitions 158)
         public const int CostChunk = 48, CostPuff = 40, CostSpark = 27, CostMark = 240, CostDrip = 14, CostGib = 144;
         public const int CostExplosionAir = 520, CostExplosionGround = 21, CostMote = 36, CostBubble = 74, CostLeaf = 14;
         public const int CostShield = 66, CostKaijuGround = 600, CostKaijuAir = 108;
@@ -860,8 +860,8 @@ namespace CriticalMass.Runtime.View.Effects
                 if (r.Kind == 5)
                 {
                     // px lane C: blocked-hit shimmer: a camera-facing ring at the contact point, steel then white.
-                    air.Ring(r.P, camRight, camUp, rad - wd * 0.5f - 0.03f, rad + wd * 0.5f + 0.03f, 0, Mathf.PI * 2f, 20, A(Navy, fade * 0.7f));
-                    air.Ring(r.P, camRight, camUp, rad - wd * 0.5f, rad + wd * 0.5f, 0, Mathf.PI * 2f, 20, A(t < 0.35f ? SparkWhite : r.Col, fade));
+                    air.Ring(r.P, camRight, camUp, rad - wd * 0.5f - 0.03f, rad + wd * 0.5f + 0.03f, 0, Mathf.PI * 2f, 12, A(Navy, fade * 0.7f));
+                    air.Ring(r.P, camRight, camUp, rad - wd * 0.5f, rad + wd * 0.5f, 0, Mathf.PI * 2f, 12, A(t < 0.35f ? SparkWhite : r.Col, fade));
                     continue;
                 }
                 if (r.Kind == 3)
