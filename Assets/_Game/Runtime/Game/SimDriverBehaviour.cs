@@ -337,6 +337,7 @@ namespace CriticalMass.Runtime.Game
             FrameCost.Mark c0 = FrameCost.Enter();
             long lt = CriticalMass.Runtime.Game.LoadTimer.WatchingTicks ? CriticalMass.Runtime.Game.LoadTimer.Now() : 0;   // perf/start-hitch-1: the first ticks after a load, timed
             using (CriticalMass.Net.SimThreadGuard.Enter()) MatchTick.Advance(World, HumanAutopilot ? null : _humanFrame, _scratch);
+            PlayerSeatLogHook.AfterTick?.Invoke(World, HumanAutopilot ? null : _humanFrame);   // px lane T: player-seat telemetry (null unless the dev logger is on)
             if (lt != 0) CriticalMass.Runtime.Game.LoadTimer.TickDone(lt);
             if (_shiverLogOn < 0)
             {
