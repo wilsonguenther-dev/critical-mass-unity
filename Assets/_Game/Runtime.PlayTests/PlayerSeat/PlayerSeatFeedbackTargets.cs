@@ -46,5 +46,8 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
         public const double DeliveryAllegiance = 37.5;
         /// <summary>F34: sim seconds of no input after which the autopilot may take over (MechRules: 15 s), plus slack.</summary>
         public const double IdleSeconds = 16;
+        /// <summary>D2 (review defect 2): in third person at melee range at least this share of the enemy's screen box is not
+        /// covered by my own fighter's box (boxes over-cover a silhouette; the Editor review measured 65-86% visible pixels).</summary>
+        public const double EnemyVisibleShareMin = 0.5;
     }
 }
