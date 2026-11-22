@@ -4,7 +4,7 @@ Every tuning field the sim reads from `GameConfig`, found by reflection (`Assets
 
 Regenerate: `tools/balance/balance-report.sh tuning-index (or the balance-report workflow, mode tuning-index)`. `TuningIndexTests` fails when a field has no row here. Paths work as `--set Path=Value` switches for the balance report.
 
-896 fields.
+898 fields.
 
 ## (top level)
 
@@ -976,6 +976,8 @@ Regenerate: `tools/balance/balance-report.sh tuning-index (or the balance-report
 | `Depth.Seat.MinerDigsAwayFromVein` | true | bool | `Assets/_Game/Sim/Config/PlayerSeatConfig.cs` | A human Miner's F away from an ore vein digs the cell ahead with the Builder's dig rule (no carry, no place). Bots never dig. |
 | `Depth.Seat.IdleAimUnits` | 0.5 | double | `Assets/_Game/Sim/Config/PlayerSeatConfig.cs` | Idle rule: an aim (relative to the body) that moved this far since input last counted is input. |
 | `Depth.Seat.IdleAimDegrees` | 2 | double | `Assets/_Game/Sim/Config/PlayerSeatConfig.cs` | Idle rule: an aim direction that turned this many degrees since input last counted is input. |
+| `Depth.Seat.MinerTapMinesToFull` | true | bool | `Assets/_Game/Sim/Config/PlayerSeatConfig.cs` | Lane S3 (lead's call): one tap of F at an ore vein keeps a human Miner mining until the cargo is full or the vein is out; moving, attacking, Cancel, a hit or a get-up stops it. False = one unit per tap. Bots unchanged. |
+| `Depth.Seat.MinerTapStopMoveShare` | 0.25 | double | `Assets/_Game/Sim/Config/PlayerSeatConfig.cs` | Lane S3: move input share above which a tapped mining channel stops (under it is stick drift). |
 | `Depth.Mech.FeedExtrasShare` | false | bool | `Assets/_Game/Sim/Config/MechRulesConfig.cs` | The director's two extra Kaiju feeders (ahead, or 10 s behind) become a share of the team: ceil(FeedExtraShare x team size) = 2 at 16, 1 at 8, 1 at 5 (before: 2 at every size, 3 of 5 bots off the hill at 5v5). |
 | `Depth.Mech.FeedExtraShare` | 0.12 | double | `Assets/_Game/Sim/Config/MechRulesConfig.cs` |  |
 | `Depth.Mech.HutBotsWaitForHumans` | true | bool | `Assets/_Game/Sim/Config/MechRulesConfig.cs` | On a team with at least one human at the controls, bots hold their votes until HutBotLastSeconds are left in the window or every such human has voted, whichever is first, and then follow the humans' majority; when the... |

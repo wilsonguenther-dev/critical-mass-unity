@@ -42,6 +42,14 @@ namespace CriticalMass.Sim.Config
         /// <summary>An aim DIRECTION from the body that turned this far (degrees) is input (third person: fighter + camera yaw).</summary>
         public double IdleAimDegrees = 2.0;
 
+        /// <summary>Lane S3 (lead's call): one tap of F at an ore vein keeps a human Miner mining unit after unit until his cargo
+        /// is full or the vein is out; moving, attacking, Cancel, a hit or a get-up stops it (no need to hold F). False = S2's one
+        /// unit per tap. Bots are unchanged (they mine while F is held).</summary>
+        public bool MinerTapMinesToFull = true;
+        /// <summary>Lane S3: move input (stick share, 0..1) above which a tapped mining channel stops ("he moves"); under it is
+        /// stick drift. 0.25 = a deliberate push on a pad, any WASD key.</summary>
+        public double MinerTapStopMoveShare = 0.25;
+
         public PlayerSeatConfig Clone() => (PlayerSeatConfig)MemberwiseClone();
     }
 }

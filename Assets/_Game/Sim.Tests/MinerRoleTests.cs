@@ -72,6 +72,7 @@ namespace CriticalMass.Sim.Tests
             Assert.AreEqual(-1, Blacksmith.ChannelVein(w, 0), "a full Miner stops channelling");
 
             World h = AtVein(ClassId.Miner, out _);
+            h.Actors[0].IsHuman = false; // lane S3 (lead's call): a player's tapped channel ENDS on a hit; a bot's restarts
             h.Inputs[0].Terraform = true;
             int hitAt = TicksToOre(h, 200, t => { if (t == 21) h.Actors[0].Hp -= 1; });
             Line("ticks to the first ore with a hit before tick 21", hitAt, (21 + need) + " (20 + the hit + " + need + ")");
@@ -92,7 +93,11 @@ namespace CriticalMass.Sim.Tests
             Line("a player's one-tick F tap at a vein: ticks to the ore", tapAt, need + " or so");
             Assert.Greater(tapAt, 0, "a tap mines one unit");
             Assert.AreEqual(1, t.Actors[0].CarryAmount);
-            Assert.AreEqual(-1, Blacksmith.ChannelVein(t, 0), "the tap's channel ends after its unit");
+            // lane S3 (lead's call, PlayerSeatConfig.MinerTapMinesToFull): the tap keeps mining to a full cargo
+            Assert.AreNotEqual(-1, Blacksmith.ChannelVein(t, 0), "the tap's channel runs on to the next unit");
+            t.Actors[0].Hp -= 1;
+            DepthKit.Steps(t, 1);
+            Assert.AreEqual(-1, Blacksmith.ChannelVein(t, 0), "a hit ends a player's tapped channel");
         }
 
         [Test]

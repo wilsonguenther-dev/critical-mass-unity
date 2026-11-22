@@ -403,6 +403,19 @@ namespace CriticalMass.Sim.Core
                     Cancel(h, id);
                     continue;
                 }
+                // lane S3: a human's tapped channel runs unit after unit (MinerTapMinesToFull); moving, attacking or being hit
+                // ends it (a hit no longer just restarts it: the player is in a fight and gets his fighter back).
+                bool toFull = tap && PlayerSeat.Cfg(w).MinerTapMinesToFull;
+                if (toFull)
+                {
+                    double mv = PlayerSeat.Cfg(w).MinerTapStopMoveShare;
+                    InputFrame fi = w.Inputs[id];
+                    if (hit || fi.MoveX * fi.MoveX + fi.MoveZ * fi.MoveZ > mv * mv || PlayerSeat.Pressed(w, id, PlayerReasons.ButtonAttack))
+                    {
+                        Cancel(h, id);
+                        continue;
+                    }
+                }
                 if (hit)
                 {
                     h.ChannelTicks[id] = 0; // a hit restarts the channel (Sources' gather rule)
@@ -416,7 +429,9 @@ namespace CriticalMass.Sim.Core
                 h.MinedBy[id]++;
                 h.Mined[(int)a.Team]++;
                 World.PushEvent(w, SimEventType.OreMined, id, v, s.X, s.Z, a.CarryAmount, BiomassType.Ore, DamageCause.None);
-                if (a.CarryAmount >= cap || s.Charges <= 0 || (tap && !w.Inputs[id].Terraform)) Cancel(h, id);   // lane S2: one unit per tap; held F keeps mining
+                if (a.CarryAmount >= cap || s.Charges <= 0 || (tap && !toFull && !w.Inputs[id].Terraform)) Cancel(h, id);   // lane S2: one unit per tap; held F keeps mining
+                else if (toFull)   // lane S3: the next unit's channel starts now and says so, as a tap's first one does
+                    World.PushEvent(w, SimEventType.WorldAction, id, PlayerReasons.WorldMineOre, s.X, s.Z, 0, null, DamageCause.None, Durations.T30(w.Config, w.Config.Depth.Hut.MineTicks) / w.Config.SimHz);
             }
             HutChoices.VoteSystem(w);   // b15-hook: rule B, the team votes on each hut level (nothing with the rule off)
         }
