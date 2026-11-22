@@ -346,6 +346,13 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
             return Math.Abs(d);
         }
 
+        /// <summary>The line, then the assertion carrying it: a red test says what was measured against what.</summary>
+        protected static void Check(string id, string what, string measured, string target, bool ok)
+        {
+            Line(id, what, measured, target, ok);
+            Assert.IsTrue(ok, id + " | " + what + " | measured: " + measured + " | target: " + target);
+        }
+
         /// <summary>One "[px-f]" line per measured case in the player log (the gate parses it), and true when ok.</summary>
         protected static bool Line(string id, string what, string measured, string target, bool ok)
         {
