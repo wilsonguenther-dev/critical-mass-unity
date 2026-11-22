@@ -364,7 +364,9 @@ namespace CriticalMass.Runtime.Tests
         [Test]
         public void NameTagsArePlacedAfterTheKickLikeTheHealthBars()
         {
-            int tags = OrderOf(typeof(CriticalMass.Runtime.Hud.Mechanics.DepthHud));
+            // fix round 6: the DepthHud itself stays at the default order (the bar tests need it there); its late tag pass moves
+            Assert.AreEqual(0, OrderOf(typeof(CriticalMass.Runtime.Hud.Mechanics.DepthHud)), "the HUD itself keeps the default order");
+            int tags = OrderOf(typeof(CriticalMass.Runtime.Hud.Mechanics.DepthHudTagsLate));
             Assert.Greater(tags, OrderOf(typeof(CameraShake)), "after the kick is applied");
             Assert.GreaterOrEqual(tags, OrderOf(typeof(CriticalMass.Runtime.Hud.GameHud)), "with the bars' camera");
             Assert.Less(tags, OrderOf(typeof(CriticalMass.Runtime.View.LowViewTags)), "before the low-view tag pass");

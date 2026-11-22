@@ -96,15 +96,30 @@ namespace CriticalMass.Runtime.Hud.Mechanics
         }
     }
 
-    /// <summary>Fix round 5 (item 6, review pass 4: the enemy's name dropped off his health bar on the impact frame). The
-    /// name tags were placed in this LateUpdate at the default order 0, BEFORE CameraShake (150) adds the hit kick, while the
-    /// bars are placed by GameHud (200), AFTER it: on a kick frame they were projected through two different cameras and
-    /// parted by the kick (14-20 px). This runs after both (210), so name and bar use the camera as it renders.</summary>
-    [DefaultExecutionOrder(DepthHud.LateOrder)]
+    /// <summary>Fix round 5 (item 6, review pass 4: the enemy's name dropped off his health bar on the impact frame): the
+    /// name tags were placed here at the default order 0, BEFORE CameraShake (150) adds the hit kick, the bars by GameHud
+    /// (200) AFTER it. Fix round 6: moving this whole HUD to order 210 (round 5) broke the player-seat bar tests (F02 / F23 /
+    /// D4), so DepthHud is back at the default order and only the tag POSITIONS are re-projected late, by DepthHudTagsLate
+    /// (order 210), through the camera as it renders.</summary>
     public sealed class DepthHud : MonoBehaviour
     {
-        /// <summary>After CameraShake (150) and GameHud (200), before LowViewTags (1100).</summary>
+        /// <summary>The late tag pass: after CameraShake (150) and GameHud (200), before LowViewTags (1100).</summary>
         public const int LateOrder = 210;
+        readonly Vector3[] _tagHead = new Vector3[Tags];
+
+        /// <summary>Fix round 6: put every shown name tag back on its fighter's head through the camera as it renders now
+        /// (after the kick), the same projection the health bars use. Positions only; what shows was decided earlier.</summary>
+        public void ReprojectTags()
+        {
+            UnityEngine.Camera cam = UnityEngine.Camera.main;
+            if (cam == null || _canvas == null || !_canvas.enabled) return;
+            for (int i = 0; i < Tags; i++)
+            {
+                RectTransform rt = _tag[i];
+                if (rt == null || _tagActor[i] < 0 || !rt.gameObject.activeSelf) continue;
+                if (ToLocal(cam, _tagHead[i], out Vector2 at)) rt.anchoredPosition = at;
+            }
+        }
 
         public const int SortingOrder = 14;
         public const int Tags = 20, Bubbles = 8, Floats = 10, Coins = 8, MaxSources = 12, MaxPowers = 6;
@@ -214,6 +229,9 @@ namespace CriticalMass.Runtime.Hud.Mechanics
         {
             Instance = this;
             _driver = GetComponent<SimDriverBehaviour>();
+            DepthHudTagsLate late = GetComponent<DepthHudTagsLate>();
+            if (late == null) late = gameObject.AddComponent<DepthHudTagsLate>();
+            late.Hud = this;
             DepthWords.Ensure();
             Build();
             _onLine = OnLine;
@@ -848,6 +866,7 @@ namespace CriticalMass.Runtime.Hud.Mechanics
                     if (HudKeepOut.Contains(new Vector2(hp.x, hp.y), 40f * _canvas.scaleFactor)) continue;
                     RectTransform rt = _tag[used];
                     rt.anchoredPosition = at;
+                    _tagHead[used] = head;
                     // fix/hud-containment-4 (by eye: JUNO over the build bank box): no tag over a HUD panel (tested before
                     // it shows, so a hidden tag does not flick on and off every frame)
                     if (HudZones.OverPanel(rt, _canvas)) { if (rt.gameObject.activeSelf) rt.gameObject.SetActive(false); _tagActor[used] = -1; continue; }
