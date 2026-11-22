@@ -53,7 +53,7 @@ namespace CriticalMass.Runtime.View.Anim
         public const double MinVisualKnock = 0.3, RecoilOutSeconds = 0.07, RecoilBackSeconds = 0.35;
         /// <summary>The lead's cap, and the cap of everything drawn off the interpolated sim spot (the play-mode placement
         /// check allows 0.35 u; GameplaySanityPlayTests).</summary>
-        public const float MaxKnockLead = 0.3f, MaxDrawnOffset = 0.34f;
+        public const float MaxKnockLead = 0.34f, MaxDrawnOffset = 0.34f;
 
         static double Smooth(double x) => x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3 - 2 * x);
         static double EaseOut(double x) => x <= 0 ? 0 : x >= 1 ? 1 : 1 - (1 - x) * (1 - x);
