@@ -726,10 +726,10 @@ Regenerate: `tools/balance/balance-report.sh tuning-index (or the balance-report
 | `Depth.CombatFeel.Classes[1].MaxHp` | 100 | double | `Assets/_Game/Sim/Config/GameConfig.cs` |  |
 | `Depth.CombatFeel.Classes[1].MoveSpeed` | 4.2 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | Units per second. |
 | `Depth.CombatFeel.Classes[1].Radius` | 0.4 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | Collision circle. |
-| `Depth.CombatFeel.Classes[1].AttackDamage` | 23 | double | `Assets/_Game/Sim/Config/GameConfig.cs` |  |
+| `Depth.CombatFeel.Classes[1].AttackDamage` | 22 | double | `Assets/_Game/Sim/Config/GameConfig.cs` |  |
 | `Depth.CombatFeel.Classes[1].AttackRange` | 2.3 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | Melee reach from the actor centre. |
 | `Depth.CombatFeel.Classes[1].AttackArcDeg` | 60 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | Cleave arc, centred on facing. |
-| `Depth.CombatFeel.Classes[1].AttackCooldown` | 0.65 | double | `Assets/_Game/Sim/Config/GameConfig.cs` |  |
+| `Depth.CombatFeel.Classes[1].AttackCooldown` | 0.7 | double | `Assets/_Game/Sim/Config/GameConfig.cs` |  |
 | `Depth.CombatFeel.Classes[1].AbilityCooldown` | 9 | double | `Assets/_Game/Sim/Config/GameConfig.cs` |  |
 | `Depth.CombatFeel.Classes[1].GatherSeconds` | 1 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | Time to pull one unit from a node. |
 | `Depth.CombatFeel.Classes[1].CarryCapacity` | 3 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | Max units carried. |
@@ -737,7 +737,7 @@ Regenerate: `tools/balance/balance-report.sh tuning-index (or the balance-report
 | `Depth.CombatFeel.Classes[1].RecoverySeconds` | 0.22 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | DG-69: real seconds of slowed follow-through after the hit (the view's recovery; movement stays slowed). |
 | `Depth.CombatFeel.Classes[1].Mass` | 0.8 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | DG-70 / OD-3: knock distances are divided by this (Warrior heaviest, Farmer lightest). |
 | `Depth.CombatFeel.Classes[1].Poise` | 20 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | DG-70: a single hit of at least this much damage staggers this class (HeavyStunSeconds). |
-| `Depth.CombatFeel.Classes[2].MaxHp` | 100 | double | `Assets/_Game/Sim/Config/GameConfig.cs` |  |
+| `Depth.CombatFeel.Classes[2].MaxHp` | 115 | double | `Assets/_Game/Sim/Config/GameConfig.cs` |  |
 | `Depth.CombatFeel.Classes[2].MoveSpeed` | 4 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | Units per second. |
 | `Depth.CombatFeel.Classes[2].Radius` | 0.45 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | Collision circle. |
 | `Depth.CombatFeel.Classes[2].AttackDamage` | 19 | double | `Assets/_Game/Sim/Config/GameConfig.cs` |  |
@@ -754,10 +754,10 @@ Regenerate: `tools/balance/balance-report.sh tuning-index (or the balance-report
 | `Depth.CombatFeel.Classes[3].MaxHp` | 120 | double | `Assets/_Game/Sim/Config/GameConfig.cs` |  |
 | `Depth.CombatFeel.Classes[3].MoveSpeed` | 4 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | Units per second. |
 | `Depth.CombatFeel.Classes[3].Radius` | 0.45 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | Collision circle. |
-| `Depth.CombatFeel.Classes[3].AttackDamage` | 15 | double | `Assets/_Game/Sim/Config/GameConfig.cs` |  |
+| `Depth.CombatFeel.Classes[3].AttackDamage` | 18 | double | `Assets/_Game/Sim/Config/GameConfig.cs` |  |
 | `Depth.CombatFeel.Classes[3].AttackRange` | 1.4 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | Melee reach from the actor centre. |
 | `Depth.CombatFeel.Classes[3].AttackArcDeg` | 90 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | Cleave arc, centred on facing. |
-| `Depth.CombatFeel.Classes[3].AttackCooldown` | 0.7 | double | `Assets/_Game/Sim/Config/GameConfig.cs` |  |
+| `Depth.CombatFeel.Classes[3].AttackCooldown` | 0.65 | double | `Assets/_Game/Sim/Config/GameConfig.cs` |  |
 | `Depth.CombatFeel.Classes[3].AbilityCooldown` | 12 | double | `Assets/_Game/Sim/Config/GameConfig.cs` |  |
 | `Depth.CombatFeel.Classes[3].GatherSeconds` | 2 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | Time to pull one unit from a node. |
 | `Depth.CombatFeel.Classes[3].CarryCapacity` | 1 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | Max units carried. |
@@ -775,14 +775,14 @@ Regenerate: `tools/balance/balance-report.sh tuning-index (or the balance-report
 | `Depth.CombatFeel.Classes[4].AbilityCooldown` | 12 | double | `Assets/_Game/Sim/Config/GameConfig.cs` |  |
 | `Depth.CombatFeel.Classes[4].GatherSeconds` | 2 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | Time to pull one unit from a node. |
 | `Depth.CombatFeel.Classes[4].CarryCapacity` | 1 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | Max units carried. |
-| `Depth.CombatFeel.Classes[4].AttackWindupSeconds` | 0.33 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | DG-69 / OD-2: real seconds from the attack press to the hit (0 = the browser's press-tick hit). |
+| `Depth.CombatFeel.Classes[4].AttackWindupSeconds` | 0.35 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | DG-69 / OD-2: real seconds from the attack press to the hit (0 = the browser's press-tick hit). |
 | `Depth.CombatFeel.Classes[4].RecoverySeconds` | 0.3 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | DG-69: real seconds of slowed follow-through after the hit (the view's recovery; movement stays slowed). |
 | `Depth.CombatFeel.Classes[4].Mass` | 1.3 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | DG-70 / OD-3: knock distances are divided by this (Warrior heaviest, Farmer lightest). |
 | `Depth.CombatFeel.Classes[4].Poise` | 26 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | DG-70: a single hit of at least this much damage staggers this class (HeavyStunSeconds). |
 | `Depth.CombatFeel.Classes[5].MaxHp` | 110 | double | `Assets/_Game/Sim/Config/GameConfig.cs` |  |
 | `Depth.CombatFeel.Classes[5].MoveSpeed` | 4.1 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | Units per second. |
 | `Depth.CombatFeel.Classes[5].Radius` | 0.42 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | Collision circle. |
-| `Depth.CombatFeel.Classes[5].AttackDamage` | 15 | double | `Assets/_Game/Sim/Config/GameConfig.cs` |  |
+| `Depth.CombatFeel.Classes[5].AttackDamage` | 14 | double | `Assets/_Game/Sim/Config/GameConfig.cs` |  |
 | `Depth.CombatFeel.Classes[5].AttackRange` | 1.5 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | Melee reach from the actor centre. |
 | `Depth.CombatFeel.Classes[5].AttackArcDeg` | 90 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | Cleave arc, centred on facing. |
 | `Depth.CombatFeel.Classes[5].AttackCooldown` | 0.8 | double | `Assets/_Game/Sim/Config/GameConfig.cs` |  |
