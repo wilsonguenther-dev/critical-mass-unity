@@ -81,9 +81,13 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
             List<SeatEvent> hits = s.Spy.Hits(s.Me, s.Them, mark);
             double want = s.W.Config.Class(x).AttackDamage;
             double got = hits.Sum(h => h.Value);
+            // S2 lane: an in-face hit below full damage is by design only when it is REPORTED as glancing (HitBlocked code 8
+            // BlockedGlancing, compared by number so the base without the code still fails) on the same tick as the hit
+            var glance = s.Spy.Since(mark, SimEventType.HitBlocked, e => e.A == s.Them && e.B == s.Me && (int)e.Value == 8 && hits.Any(h => h.Tick == e.Tick));
+            bool okDmg = hits.Count > 0 && (got >= T.InFaceDamageShareMin * s.W.Config.Class(x).AttackDamage || glance.Count > 0);
             bool ok = PxLog.Line("S02 Primary_InFace_DealsDamage", x + " at " + T.InFaceDistance + " u" + (x == ClassId.Demolitions ? " (TNT ready)" : x == ClassId.Healer ? " (hurt ally 3 u)" : ""),
                 "dealt " + PxLog.F(got, "0.0") + " within " + (wu + 1) + " ticks" + (s.Spy.Since(mark, SimEventType.TntThrown, e => e.A == 0).Count > 0 ? " (the press threw TNT)" : "") + (s.Spy.Since(mark, SimEventType.HealCast, e => e.A == 0).Count > 0 ? " (the press mended)" : ""),
-                ">= " + PxLog.F(T.InFaceDamageShareMin * want, "0.0"), got >= T.InFaceDamageShareMin * want);
+                ">= " + PxLog.F(T.InFaceDamageShareMin * want, "0.0") + " or a hit reported glancing (HitBlocked 8)" + (glance.Count > 0 ? " [glancing reported]" : ""), okDmg);
             Assert.IsTrue(ok);
         }
 
@@ -220,15 +224,36 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
         public void S16_Miner_F_AwayFromVein_DoesWhatTheBindingSays()
         {
             Seat s = PlayerSeatRig.Field(ClassId.Miner, x: 30, z: 40);
+            World w = s.W;
+            // stage on a real FLOOR cell with floor ahead, away from every ore vein (S2 lane: an empty cell drops him)
+            MapDef m = w.Map;
+            int bx = -1, bz = -1;
+            double best = double.MaxValue;
+            for (int cz = 2; cz < m.Height - 2; cz++)
+                for (int cx = 2; cx < m.Width - 4; cx++)
+                {
+                    bool ok0 = true;
+                    for (int k = -1; k <= 3 && ok0; k++) for (int dz = -1; dz <= 1 && ok0; dz++) ok0 = m.Cells[(cz + dz) * m.Width + cx + k] == Cell.Floor;
+                    if (!ok0) continue;
+                    if (w.Depth.Sources != null && w.Depth.Sources.Any(sn => sn != null && sn.Kind == BiomassType.Ore && Math.Abs(sn.X - cx - 0.5) < 4 && Math.Abs(sn.Z - cz - 0.5) < 4)) continue;
+                    double d = (cx - 30) * (cx - 30) + (cz - 40) * (cz - 40);
+                    if (d < best) { best = d; bx = cx; bz = cz; }
+                }
+            Assume.That(bx >= 0, "a floor strip on the map");
+            PlayerSeatRig.Place(w, 0, ClassId.Miner, bx + 0.5, bz + 0.5);
             s.Steps(2);
+            int tx = bx + 2, tz = bz;
+            byte c0 = m.Cells[tz * m.Width + tx];
+            int h0 = m.Lift != null ? m.Lift[tz * m.Width + tx] : 0;
             int mark = s.Spy.Mark;
-            s.Human.AimOverrideX = s.W.X[0] + 1.5;
-            s.Human.AimOverrideZ = s.W.Z[0];
+            s.Human.AimOverrideX = tx + 0.5;
+            s.Human.AimOverrideZ = tz + 0.5;
             s.Human.PressDigPlace = true;
             s.Steps(3);
-            var dug = s.Spy.Since(mark, SimEventType.Terraform, e => e.A == 0 && e.Value > 0);
+            var dug = s.Spy.Since(mark, SimEventType.Terraform, e => e.A == 0 && (int)e.Value == Terraform.Dug);
             var ore = s.Spy.Since(mark, SimEventType.OreMined, e => e.A == 0);
-            bool ok = PxLog.Line("S16 Miner_F_AwayFromVein_DoesWhatTheBindingSays", "Miner F on open ground", dug.Count > 0 ? "dug" : "no dig; OreMined " + (ore.Count > 0 ? "refusal code " + ore[0].Value : "none"), "a dig (the binding row says Dig / place; F18 checks the words)", dug.Count > 0);
+            bool changed = m.Cells[tz * m.Width + tx] != c0 || (m.Lift != null ? m.Lift[tz * m.Width + tx] : 0) != h0;
+            bool ok = PxLog.Line("S16 Miner_F_AwayFromVein_DoesWhatTheBindingSays", "Miner F on a floor cell, floor ahead, no vein within 4 u", dug.Count > 0 || changed ? "dug (Terraform Dug " + dug.Count + ", cell changed " + changed + ")" : "no dig; OreMined " + (ore.Count > 0 ? "refusal code " + ore[0].Value : "none"), "a dig: Terraform Dug or the cell changes", dug.Count > 0 || changed);
             Assert.IsTrue(ok);
         }
 
@@ -333,14 +358,18 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
                 s.Step();
                 if (MechRules.Autopiloted(w, 0)) takeTick = w.Tick;
             }
-            // an announcement = any event about actor 0 on the takeover tick (no such event type exists today)
-            var said = takeTick < 0 ? new List<SeatEvent>() : s.Spy.Since(mark, SimEventType.ActionRefused, e => e.A == 0 && e.Tick == takeTick).Concat(s.Spy.Since(mark, SimEventType.WorldAction, e => e.A == 0 && e.Tick == takeTick)).ToList();
+            // the announcement: SimEventType.AutopilotChanged (S2 lane, appended; A actor, Value 1 taken / 0 handed back), found by
+            // NAME so this branch compiles without it and fails on a base where it does not exist
+            bool has = Enum.TryParse("AutopilotChanged", out SimEventType ac);
+            var said = takeTick < 0 || !has ? new List<SeatEvent>() : s.Spy.Since(mark, ac, e => e.A == 0 && (int)e.Value == 1 && e.Tick >= takeTick - 1 && e.Tick <= takeTick + 1);
+            int mark2 = s.Spy.Mark;
             s.Human.MoveOverrideX = 1;
             s.Human.MoveOverrideZ = 0;
             s.Step();
-            bool back = !MechRules.Autopiloted(w, 0);
+            bool backSaid = has && s.Spy.Since(mark2, ac, e => e.A == 0 && (int)e.Value == 0).Count > 0;
+            bool back = !MechRules.Autopiloted(w, 0) && backSaid;
             bool okTake = PxLog.Line("S47 Autopilot_HandsBackOnFirstInput_AndIsAnnounced", "takeover after " + w.Config.Depth.Mech.AfkSeconds + " s idle", takeTick < 0 ? "no takeover" : "took over at tick " + takeTick + ", announced by an event: " + (said.Count > 0), "a takeover event the HUD can show", takeTick >= 0 && said.Count > 0);
-            bool okBack = PxLog.Line("S47 Autopilot_HandsBackOnFirstInput_AndIsAnnounced", "hand back", "back at the controls on the first input frame: " + back, "true", back);
+            bool okBack = PxLog.Line("S47 Autopilot_HandsBackOnFirstInput_AndIsAnnounced", "hand back", "back at the controls on the first input frame: " + !MechRules.Autopiloted(w, 0) + ", AutopilotChanged 0 " + backSaid + (has ? "" : " (no AutopilotChanged event type on this build)"), "back and announced", back);
             Assert.IsTrue(okTake && okBack);
         }
 
@@ -427,6 +456,8 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
                 foreach (string scene in new[] { "open", "valid", "cooldown" })
                 {
                     if (scene == "cooldown" && b != "Attack" && b != "Ability" && b != "Dodge") continue;
+                    // S2 lane: an Attack press during its own cooldown belongs to the input buffer (S46), not to S33
+                    if (scene == "cooldown" && b == "Attack") continue;
                     List<SeatEvent> said = PressOnce(x, b, scene, out string where);
                     bool ok = said.Count > 0;
                     PxLog.Line("S33 Press_NeverSilent", x + " " + b + " (" + where + ")", ok ? string.Join(" ", said.Select(e => e.Type + (e.Type == SimEventType.ActionRefused || e.Value < 0 ? "[" + e.Value + "]" : ""))) : "SILENT", "an action or refusal event within " + T.PressAnswerTicks + " ticks", ok);

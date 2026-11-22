@@ -512,7 +512,7 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
             s.Steps(T.PressAnswerTicks);
             var up = s.Spy.Since(mark, SimEventType.Upgrade, e => e.A == 0);
             var refused = s.Spy.Since(mark, SimEventType.ActionRefused, e => e.A == 0);
-            bool ok = PxLog.Line("S23 Builder_StationBuy_Levels", "Builder buys a Warrior upgrade in his station (Full rules, stock 999; in station " + Stations.InStation(w, 0) + ", stations on " + Stations.On(w) + ", hut on " + Blacksmith.On(w) + ")", "Upgrade " + (up.Count > 0 ? "value " + up[0].Value : "none") + ", level " + lvl0 + " -> " + Stations.Level(w, TeamId.Azure, ClassId.Warrior) + (refused.Count > 0 ? ", ActionRefused " + refused[0].Value : ""), "Upgrade, level +1 (or, if the hut rule retired the station, a refusal saying so)", (up.Count > 0 && up[0].Value >= 2) || refused.Count > 0);
+            bool ok = PxLog.Line("S23 Builder_StationBuy_Levels", "Builder buys a Warrior upgrade in his station (Full rules, stock 999; in station " + Stations.InStation(w, 0) + ", stations on " + Stations.On(w) + ", hut on " + Blacksmith.On(w) + ")", "Upgrade " + (up.Count > 0 ? "value " + up[0].Value : "none") + ", level " + lvl0 + " -> " + Stations.Level(w, TeamId.Azure, ClassId.Warrior) + (refused.Count > 0 ? ", ActionRefused B " + refused[0].B + " V " + refused[0].Value : ""), "Full rules: the hut retired station upgrades: ActionRefused B 8 (ButtonStationBuy) Value 13 (RefusedRuleOff)", refused.Any(e => e.B == 8 && (int)e.Value == 13));
             Assert.IsTrue(ok);
         }
 
@@ -527,7 +527,7 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
             s.Steps(T.PressAnswerTicks);
             var up = s.Spy.Since(mark, SimEventType.Upgrade, e => e.A == 0);
             var refused = s.Spy.Since(mark, SimEventType.ActionRefused, e => e.A == 0);
-            bool ok = PxLog.Line("S24 NonBuilder_StationBuy_TellsWhy", "Warrior presses buy in his station", up.Count > 0 ? "Upgrade value " + up[0].Value : refused.Count > 0 ? "ActionRefused " + refused[0].Value : "SILENT", "Upgrade RefusedNotBuilder (" + Stations.RefusedNotBuilder + ") or an ActionRefused", (up.Count > 0 && (int)up[0].Value == Stations.RefusedNotBuilder) || refused.Count > 0);
+            bool ok = PxLog.Line("S24 NonBuilder_StationBuy_TellsWhy", "Warrior presses buy in his station", up.Count > 0 ? "Upgrade value " + up[0].Value : refused.Count > 0 ? "ActionRefused B " + refused[0].B + " V " + refused[0].Value : "SILENT", "Full rules: ActionRefused B 8 (ButtonStationBuy) Value 13 (RefusedRuleOff)", refused.Any(e => e.B == 8 && (int)e.Value == 13));
             Assert.IsTrue(ok);
         }
 
