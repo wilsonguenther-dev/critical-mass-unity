@@ -133,7 +133,8 @@ namespace CriticalMass.Runtime.Tests.PlayerExperience
             Assert.IsTrue(rec.Has("own_hurt"), "a hit on me plays my hurt thump");
             Assert.IsTrue(small.Own && small.Threat, "own priority, and a threat");
             Assert.AreEqual((int)FeedbackChannel.OwnHurtSound + 1, small.Feedback);
-            Assert.IsTrue(rec.Has("pain"), "with the pain voice");
+            Assert.IsTrue(rec.Has("own_pain"), "with the pain voice (its own cue for my hits, so a crowd pain never swallows it)");
+            Assert.IsFalse(rec.Has("pain"));
             rec.Plays.Clear();
             World.PushEvent(w, SimEventType.Hit, me, foe, w.X[me], w.Z[me], max * 0.3, null, DamageCause.Melee);
             Step(w, feed, rec);
@@ -194,7 +195,6 @@ namespace CriticalMass.Runtime.Tests.PlayerExperience
             var silent = new Dictionary<int, string>
             {
                 { PlayerReasons.BlockedWard, "WardAbsorb plays block_heavy" },
-                { PlayerReasons.BlockedShield, "the Hit itself plays the shield block (my own: own_hurt_block)" },
             };
             int me = LocalSeat.Actor;
             foreach (FieldInfo f in typeof(PlayerReasons).GetFields(BindingFlags.Public | BindingFlags.Static))
@@ -241,6 +241,57 @@ namespace CriticalMass.Runtime.Tests.PlayerExperience
         }
 
         [Test]
+        public void MyDodgeAndMyShieldSoundOwnAndTheGlancingHitTapsOncePerTargetPerTwoSeconds()
+        {
+            World w = NewWorld();
+            (SoundFeed feed, Rec rec) = Feed(w);
+            int me = LocalSeat.Actor, foe = Enemy(w), other = Enemy(w, 1), ally = -1;
+            for (int i = 1; i < w.ActorCount && ally < 0; i++) if (w.Actors[i].Team == w.Actors[me].Team) ally = i;
+
+            World.PushEvent(w, SimEventType.HitBlocked, me, foe, w.X[me], w.Z[me], PlayerReasons.BlockedDodge);
+            World.PushEvent(w, SimEventType.AttackContact, foe, -1, w.X[foe], w.Z[foe], 0);
+            Step(w, feed, rec);
+            SoundRequest d = rec.Get("my_dodge");
+            Assert.IsTrue(rec.Has("my_dodge") && d.Own, "MY successful dodge: its own cue at own priority");
+            Assert.IsFalse(rec.Has("dodge_phew"), "distinct from the crowd's phew");
+            Assert.IsNotNull(SoundTable.Cue(SoundTable.IndexOf("my_dodge")).Caption);
+            rec.Plays.Clear();
+            World.PushEvent(w, SimEventType.HitBlocked, foe, me, w.X[foe], w.Z[foe], PlayerReasons.BlockedDodge);
+            Step(w, feed, rec);
+            Assert.IsTrue(rec.Has("dodge_phew") && !rec.Has("my_dodge"), "they dodged MY swing: the phew");
+
+            rec.Plays.Clear();
+            World.PushEvent(w, SimEventType.HitBlocked, me, foe, w.X[me], w.Z[me], PlayerReasons.BlockedShield);
+            Step(w, feed, rec);
+            Assert.IsTrue(rec.Has("my_shield") && rec.Get("my_shield").Own, "my raised shield took it: the shield block, own");
+            rec.Plays.Clear();
+            World.PushEvent(w, SimEventType.HitBlocked, ally, foe, w.X[ally], w.Z[ally], PlayerReasons.BlockedShield);
+            Step(w, feed, rec);
+            Assert.AreEqual(0, rec.Plays.Count, "someone else's shield: the Hit plays its block");
+
+            int hz = (int)w.Config.SimHz, played = 0;
+            for (int k = 0; k < hz; k++)   // a glancing hit on the same target every tick for one second
+            {
+                rec.Plays.Clear();
+                World.PushEvent(w, SimEventType.HitBlocked, foe, me, w.X[foe], w.Z[foe], PlayerReasons.BlockedGlancing);
+                Step(w, feed, rec);
+                played += rec.Count("glance_tap");
+            }
+            Assert.AreEqual(1, played, "one tap per target per 2 s");
+            rec.Plays.Clear();
+            World.PushEvent(w, SimEventType.HitBlocked, other, me, w.X[other], w.Z[other], PlayerReasons.BlockedGlancing);
+            Step(w, feed, rec);
+            Assert.AreEqual(1, rec.Count("glance_tap"), "another target has its own clock");
+            for (int k = 0; k < 2 * hz; k++) Step(w, feed, rec);
+            rec.Plays.Clear();
+            World.PushEvent(w, SimEventType.HitBlocked, foe, me, w.X[foe], w.Z[foe], PlayerReasons.BlockedGlancing);
+            Step(w, feed, rec);
+            Assert.AreEqual(1, rec.Count("glance_tap"), "after 2 s it taps again");
+            Assert.Less(SynthRecipes.Find("px_glance").Length, 0.12f, "soft and short");
+            Assert.Less(SoundTable.Cue(SoundTable.IndexOf("glance_tap")).Gain, 0.4f);
+        }
+
+        [Test]
         public void TheAutopilotAndACriticalHitAreHeardByTheLocalPlayer()
         {
             World w = NewWorld();
@@ -277,12 +328,15 @@ namespace CriticalMass.Runtime.Tests.PlayerExperience
         {
             VoicePlanner p = VoicePlanner.FromTable(SoundDirector.Voices);
             Assert.Greater(p.OwnReserve, 0);
-            int[] crowd = { SoundTable.IndexOf("hit_flesh_heavy"), SoundTable.IndexOf("pain"), SoundTable.IndexOf("swing_heavy"),
+            int[] crowd = { SoundTable.IndexOf("hit_flesh_heavy"), SoundTable.IndexOf("pain"), SoundTable.IndexOf("swing_heavy"), SoundTable.IndexOf("dodge_phew"),
                 SoundTable.IndexOf("step_grass"), SoundTable.IndexOf("blast_near"), SoundTable.IndexOf("kaiju_slam"), SoundTable.IndexOf("death") };
-            // My own-only cues. A cue the crowd shares (pain) keeps the existing 30 ms repeat guard across owners
-            // (SoundCoverageTests.CooldownsHoldForTheCrowdAndOnlyTheRepeatGuardForOwnActions): the same sample already
-            // started inside 30 ms, so the two merge into one; my own_hurt thump carries the personal hurt either way.
-            int[] mine = { SoundTable.IndexOf("own_impact_thud"), SoundTable.IndexOf("hit_confirm"), SoundTable.IndexOf("own_hurt"), SoundTable.IndexOf("kill_sting") };
+            // Everything the feed sends at own priority for my hits, hurts, kills and defence. Each is an own-only cue (my pain
+            // is own_pain, not the crowd's pain), so the only limit left is the planner's 30 ms repeat guard on MY OWN copy of
+            // the same cue (VoicePlanner.OwnRepeatGuard: two identical starts inside 30 ms are one sound); the loop asks for
+            // each cue every 7 frames (117 ms), and a second loop below asks inside the guard to pin that exact limit.
+            int[] mine = { SoundTable.IndexOf("own_impact_thud"), SoundTable.IndexOf("hit_confirm"), SoundTable.IndexOf("own_hurt"), SoundTable.IndexOf("own_pain"),
+                SoundTable.IndexOf("kill_sting"), SoundTable.IndexOf("my_dodge"), SoundTable.IndexOf("my_shield"), SoundTable.IndexOf("own_hurt_block") };
+            foreach (int c in mine) Assert.GreaterOrEqual(c, 0);
             int refusedOwn = 0, startedCrowd = 0;
             double now = 0;
             for (int frame = 0; frame < 600; frame++, now += 1.0 / 60.0)
@@ -299,8 +353,13 @@ namespace CriticalMass.Runtime.Tests.PlayerExperience
                     foreach (int cue in mine)
                         if (p.Request(cue, SoundSpace.Priority(SoundTable.Cues[cue].Priority, 1f, true, false), now, 0.6, true) < 0) refusedOwn++;
             }
-            Assert.AreEqual(0, refusedOwn, "my impact, confirm, hurt thump and kill sting always get a voice");
+            Assert.AreEqual(0, refusedOwn, "every own cue always gets a voice at 32 fighters");
             Assert.Greater(startedCrowd, 0, "the crowd still plays");
+            p.BeginFrame(9999);
+            Assert.GreaterOrEqual(p.Request(mine[0], 200f, now, 0.5, true), 0);
+            Assert.AreEqual(-1, p.Request(mine[0], 200f, now + 0.01, 0.5, true), "the one stated limit: my own repeat inside 30 ms");
+            Assert.AreEqual(VoiceRefusal.Cooldown, p.LastRefusal);
+            Assert.GreaterOrEqual(p.Request(mine[0], 200f, now + VoicePlanner.OwnRepeatGuard + 0.001, 0.5, true), 0);
         }
 
         [Test]

@@ -40,7 +40,9 @@ namespace CriticalMass.Runtime.Menu
         InputGlyphView _lookGlyph;
         Text _lookKey;
         bool _lookSpecs;
-        GlyphSpec _lookMouse, _lookPad;
+        GlyphSpec _lookMouse, _lookPad, _lookNow;
+        int _lookReadAt = -1;
+        bool _lookReadPad;
 
         /// <summary>The label texts found under the HUD (null entries until found).</summary>
         public Text Label(int i) => _labels[i];
@@ -215,13 +217,25 @@ namespace CriticalMass.Runtime.Menu
                 rt.anchoredPosition = Vector2.zero;
             }
             bool pad = ControlBindings.ActiveDevice == ControlDevice.Gamepad;
-            if (!_lookSpecs)
+            // px lane F fix round: the prompt names the Look action's CURRENT binding (backquote by default, rebindable),
+            // never a hard-coded middle click; re-read on every throttled refresh so a rebind shows at once.
+            if (_lookReadAt < 0 || pad != _lookReadPad || Time.frameCount >= _lookReadAt + 30)
             {
-                _lookSpecs = true;
-                _lookMouse = InputGlyphs.ForPath("<Mouse>/middleButton");
-                _lookPad = InputGlyphs.ForPath("<Gamepad>/rightStickPress");
+                _lookReadAt = Time.frameCount;
+                _lookReadPad = pad;
+                _lookNow = InputGlyphs.ForAction("Look", pad ? ControlDevice.Gamepad : ControlDevice.KeyboardMouse);
             }
-            GlyphSpec g = pad ? _lookPad : _lookMouse;
+            GlyphSpec g = _lookNow;
+            if (g.IsEmpty)
+            {
+                if (!_lookSpecs)
+                {
+                    _lookSpecs = true;
+                    _lookMouse = InputGlyphs.ForPath("<Keyboard>/backquote");
+                    _lookPad = InputGlyphs.ForPath("<Gamepad>/rightStickPress");
+                }
+                g = pad ? _lookPad : _lookMouse;   // no binding found (a bare test scene): the defaults
+            }
             _lookGlyph.Set(g);
             if (_lookKey != null) HudText.Set(_lookKey, g.Words);
         }

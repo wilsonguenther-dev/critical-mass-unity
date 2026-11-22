@@ -447,6 +447,11 @@ namespace CriticalMass.Runtime.Audio.Sound
             R("px_denied", 0.09f, 0f, L(Si, 0, 0.08f, 330, 290, 0.001f, 0.03f, 1f), L(Tr, 0, 0.06f, 660, 580, 0.001f, 0.02f, 0.3f)),
             R("px_shield_clang", 0.45f, 0f, L(Si, 0, 0.42f, 980, 975, 0.0005f, 0.12f, 0.6f), L(Si, 0, 0.4f, 2460, 2450, 0.0005f, 0.08f, 0.4f),
                 L(Sq, 0, 0.2f, 490, 488, 0.0005f, 0.05f, 0.3f, 3500, 1200), L(Nz, 0, 0.02f, 1, 1, 0.0005f, 0.006f, 0.6f, 8000, 0, 1000)),
+            // px lane F fix round: MY successful dodge (rising air + a clean whistle; the crowd's phew falls) and the Farmer's
+            // glancing hit (a soft dull scuff, 90 ms).
+            R("px_my_dodge", 0.3f, 0f, L(Nz, 0, 0.28f, 1, 1, 0.015f, 0.09f, 1f, 1800, 6000, 600), L(Si, 0.02f, 0.24f, 700, 1600, 0.03f, 0.08f, 0.35f),
+                L(Tr, 0.18f, 0.08f, 1320, 1320, 0.002f, 0.03f, 0.25f)),
+            R("px_glance", 0.09f, 0f, L(Tr, 0, 0.08f, 520, 420, 0.001f, 0.025f, 0.7f), L(Nz, 0, 0.05f, 1, 1, 0.001f, 0.015f, 0.5f, 2500, 1200, 500)),
             R("px_phew", 0.28f, 0f, L(Nz, 0, 0.26f, 1, 1, 0.03f, 0.08f, 1f, 3200, 800, 400), L(Si, 0, 0.22f, 700, 420, 0.02f, 0.07f, 0.15f)),
             R("px_wall_thud", 0.22f, 0f, L(Si, 0, 0.2f, 140, 80, 0.001f, 0.05f, 1f), L(Nz, 0, 0.1f, 1, 1, 0.001f, 0.03f, 0.6f, 1400, 400, 150)),
             R("px_clonk", 0.2f, 0f, L(Si, 0, 0.18f, 200, 160, 0.0008f, 0.04f, 1f), L(Tr, 0, 0.12f, 470, 430, 0.0008f, 0.025f, 0.4f),
