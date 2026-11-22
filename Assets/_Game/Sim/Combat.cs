@@ -202,8 +202,7 @@ namespace CriticalMass.Sim.Core
                     if (dot < (body ? WidenedCos(halfRad, cfg.Class(t.Cls).Radius, Math.Sqrt(d2)) : cosHalf) - 1e-9)
                     {
                         // lane S2: a target inside the reach whose dodge carried it out of the arc (it dashed past or through):
-                        // DODGED, not a silent miss. The outcome is the same skip.
-                        if (report && Dodge.Immune(w, j, DamageCause.Melee)) World.PushEvent(w, SimEventType.HitBlocked, j, i, w.X[j], w.Z[j], PlayerReasons.BlockedDodge);
+                        // DODGED, not a silent miss. px DM: reported by Dodge.SwingDodges below (once per dodged swing).
                         continue;
                     }
                 }
@@ -251,6 +250,8 @@ namespace CriticalMass.Sim.Core
             }
             bool answered = w.EventHead != evBefore; // b15: a structure (or Kaiju) answered: not a whiff (lane S2: StructureHit counts)
             if (feel) CombatFeel.AfterContact(w, i, hits + (answered ? 1 : 0));
+            // px DM: every enemy that dodged this swing says DODGED once (PERFECT when late); a dodged whiff stays punishable.
+            Dodge.SwingDodges(w, i, ax, az, fx, fz, range, halfRad, body, hits + (answered ? 1 : 0), dmg, report);
             // lane S2: a human's swing whose arc and reach held only what no swing can break (rock, the hill ring, own walls,
             // a breakable for a non-Miner) says so once: StructureHit StructureSolid, Value 0. Still a whiff. Bots never raise it.
             if (report && hits == 0 && !answered && PlayerSeat.Human(w, i)) SolidInArc(w, i, ax, az, fx, fz, range, cosHalf);

@@ -153,6 +153,76 @@ namespace CriticalMass.Runtime.Tests
             }
         }
 
+        // ---------------------------------------------------------------- fix round 2 (review pass 2)
+
+        [Test]
+        public void TheThirdPersonKickReadsAboutFourteenAndTwentyPixelsAtTheEnemy()
+        {
+            // measured in pass 2 at the enemy's chest: my hit 7.5-9.1 px, my kill 12.1 px (sized at the 4.4 u focus, read ~6 u deep)
+            double fov = FollowCamera.FovDefault + HitFeelTuning.FightFovAdd;
+            double enemyDepth = FollowCamera.ThirdDistance * (1 + HitFeelTuning.FightDistanceShare) + 1.15 * Math.Cos(FightFrame.YawOffsetDeg * Math.PI / 180);
+            float by = HitFeelTuning.KickU(HitFeelTuning.KickKind.ByMe, FollowCamera.ThirdDistance, fov, 1f, true);
+            float kill = HitFeelTuning.KickU(HitFeelTuning.KickKind.MyKill, FollowCamera.ThirdDistance, fov, 1f, true);
+            float onMe = HitFeelTuning.KickU(HitFeelTuning.KickKind.OnMe, FollowCamera.ThirdDistance, fov, 1f, true);
+            double pxBy = HitFeelTuning.KickPx(by, enemyDepth, fov), pxKill = HitFeelTuning.KickPx(kill, enemyDepth, fov);
+            TestContext.Progress.WriteLine($"[px kick 3P] at the enemy ({enemyDepth:0.0} u deep): my hit {pxBy:0.0} px, my kill {pxKill:0.0} px");
+            Assert.That(pxBy, Is.InRange(13.0, 17.0), "my hit about 14 px");
+            Assert.That(pxKill, Is.InRange(19.0, 24.0), "my kill about 20 px");
+            Assert.AreEqual(HitFeelTuning.KickU(HitFeelTuning.KickKind.OnMe, FollowCamera.ThirdDistance, fov), onMe, 1e-6f, "the hit on me is unchanged");
+            Assert.AreEqual(HitFeelTuning.KickU(HitFeelTuning.KickKind.ByMe, GameplayCamera.Distance, GameplayCamera.FovDeg),
+                HitFeelTuning.KickU(HitFeelTuning.KickKind.ByMe, GameplayCamera.Distance, GameplayCamera.FovDeg, 1f, false), 1e-6f, "top-down unchanged");
+            Assert.Less(HitFeelTuning.Burst3PShare, 1f, "the third-person burst is smaller");
+            Assert.LessOrEqual(HitFeelTuning.Burst3PLife, 0.2, "and shorter");
+        }
+
+        [Test]
+        public void TheDuelYawReachesThirtySixDegreesNeverJumpsAndReleasesWithoutChasing()
+        {
+            const double dt = 1.0 / 60;
+            int side = 0;
+            double y = 100, enemy = 100, off = 0, maxStep = 0;
+            for (int f = 0; f < 18; f++)   // 0.3 s
+            {
+                double ny = FightFrame.StepYaw(y, 100, true, enemy, ref side, dt, out off);
+                maxStep = Math.Max(maxStep, Math.Abs(GroundCamera.DeltaAngle(y, ny)));
+                y = ny;
+            }
+            Assert.AreEqual(FightFrame.YawOffsetDeg, Math.Abs(GroundCamera.DeltaAngle(enemy, y)), 1e-6, "36 deg off the line within 0.3 s");
+            // the target lurches 20 deg in one frame (a knock): the lens follows at most MaxStepDeg per frame
+            enemy = 120;
+            for (int f = 0; f < 30; f++)
+            {
+                double ny = FightFrame.StepYaw(y, 100, true, enemy, ref side, dt, out off);
+                maxStep = Math.Max(maxStep, Math.Abs(GroundCamera.DeltaAngle(y, ny)));
+                y = ny;
+            }
+            Assert.LessOrEqual(maxStep, FightFrame.MaxStepDeg + 1e-9, "never a one-frame jump");
+            // released (the target died or left 3.2 u): the offset eases to 0 over the follow yaw; the target is ignored
+            double before = off;
+            for (int f = 0; f < 60; f++) y = FightFrame.StepYaw(y, 100, false, 300, ref side, dt, out off);
+            Assert.AreEqual(0, off, 1e-9, "home within 1 s");
+            Assert.AreEqual(100, y, 1e-6, "on the follow yaw, not on the target");
+            Assert.Greater(Math.Abs(before), 0);
+        }
+
+        /// <summary>Gate F03, stated honestly: the drawn victim may sit at most MaxDrawnOffset (0.34 u) off its interpolated sim
+        /// spot (the 0.35 u placement check), so at 100 ms the drawn knock is min(0.8 x knock, sim body + 0.34 u): every knock
+        /// up to about 0.56 u (worst-case interpolation) reaches 0.8x; bigger ones read 0.53-0.72x at 100 ms and catch up.</summary>
+        [Test]
+        public void TheDrawnKnockPromiseIsTheEightyPercentOrTheSimBodyPlusTheLead()
+        {
+            GameConfig cfg = GameConfig.CreateDefault();
+            double decay = Knock.DecayPerTick(cfg), hz = cfg.SimHz, t = HitFeelTuning.KnockCheckSeconds;
+            foreach (double k in new[] { 0.38, 0.56, 0.9, 1.2, 1.63 })
+            {
+                double sim = k * HitFeelTuning.SimKnockShare(t * hz - 1, decay);
+                double drawn = sim + Math.Min(HitFeelTuning.KnockLead(t, k, sim), HitFeelTuning.MaxDrawnOffset);
+                double promise = Math.Min(HitFeelTuning.KnockShare * k, sim + HitFeelTuning.MaxDrawnOffset);
+                TestContext.Progress.WriteLine($"[px knock promise] {k:0.00} u: drawn {drawn:0.00} u ({drawn / k:0.00}x), promise {promise:0.00} u");
+                Assert.GreaterOrEqual(drawn, promise - 1e-9, $"knock {k} u");
+            }
+        }
+
         [Test]
         public void TheTopDownAimLeanIsCappedAndUsesTheRawAim()
         {

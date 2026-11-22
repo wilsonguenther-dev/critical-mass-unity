@@ -292,6 +292,36 @@ namespace CriticalMass.Runtime.Tests.PlayerExperience
         }
 
         [Test]
+        public void MySwingOnAStructureOrRockPlaysItsKnockAtOwnPriorityAndReportsImpactSound()
+        {
+            string[] byKind = { null, "barricade_hit", "sb_wall_hit", "wall_crack", "hit_wood", "structure_solid" };
+            int me = LocalSeat.Actor;
+            for (int kind = PlayerReasons.StructureBarricade; kind <= PlayerReasons.StructureSolid; kind++)
+            {
+                World w = NewWorld();
+                (SoundFeed feed, Rec rec) = Feed(w);
+                World.PushEvent(w, SimEventType.StructureHit, me, kind, w.X[me] + 1, w.Z[me], kind == PlayerReasons.StructureSolid ? 0 : 6);
+                World.PushEvent(w, SimEventType.AttackContact, me, -1, w.X[me], w.Z[me], 0);
+                Step(w, feed, rec);
+                Assert.AreEqual(1, rec.Plays.Count, "kind " + kind + ": one knock, and the contact is not a whiff");
+                SoundRequest r = rec.Get(byKind[kind]);
+                Assert.IsTrue(rec.Has(byKind[kind]), "kind " + kind + " plays " + byKind[kind]);
+                Assert.IsTrue(r.Own, "kind " + kind + ": own priority");
+                Assert.AreEqual((int)FeedbackChannel.ImpactSound + 1, r.Feedback, "kind " + kind + ": ImpactSound on the ledger, like a body hit");
+                Assert.AreEqual(me, r.FeedbackActor);
+                Assert.AreEqual(kind, r.Reason);
+                Assert.GreaterOrEqual(r.Gain, 1f);
+
+                rec.Plays.Clear();
+                int bot = Enemy(w);
+                World.PushEvent(w, SimEventType.StructureHit, bot, kind, w.X[bot], w.Z[bot], 6);
+                Step(w, feed, rec);
+                foreach (SoundRequest p in rec.Plays) Assert.AreEqual(0, p.Feedback, "a bot's structure hit is not my impact");
+                if (kind == PlayerReasons.StructureSolid) Assert.AreEqual(0, rec.Plays.Count, "a bot never knocks on rock");
+            }
+        }
+
+        [Test]
         public void TheAutopilotAndACriticalHitAreHeardByTheLocalPlayer()
         {
             World w = NewWorld();

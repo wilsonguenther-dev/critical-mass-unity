@@ -62,7 +62,7 @@ namespace CriticalMass.Runtime.Hud
 
         public void Show(in BannerSpec s, double now)
         {
-            Rewind(now);
+            now = Rewind(now);
             if (!HasCurrent) { Start(s, now); return; }
             if (s.Priority > Current.Priority)
             {
@@ -86,10 +86,23 @@ namespace CriticalMass.Runtime.Hud
         /// </summary>
         public void Postpone(double now)
         {
-            Rewind(now);
+            now = Rewind(now);
             if (!HasCurrent) return;
             _shownAt = now;
             if (!double.IsPositiveInfinity(_hideAt)) _hideAt = now;
+        }
+
+        /// <summary>
+        /// Review fix round 2: held back while the local player fights (PxFight). Unlike Postpone, any exit already started
+        /// (a wall-time cut, a Hide) is cancelled: the banner enters fresh with its FULL hold once the fight is over; waiting
+        /// banners stay queued and follow one at a time.
+        /// </summary>
+        public void HoldBack(double now)
+        {
+            now = Rewind(now);
+            if (!HasCurrent) return;
+            _shownAt = now;
+            _hideAt = double.PositiveInfinity;
         }
 
         /// <summary>Starts the exit of the banner on screen now (waiting banners follow).</summary>
@@ -104,7 +117,7 @@ namespace CriticalMass.Runtime.Hud
         /// <summary>Advance: when the banner on screen has finished, the next waiting one (highest priority first) starts.</summary>
         public void Update(double now)
         {
-            Rewind(now);
+            now = Rewind(now);
             if (!HasCurrent) return;
             if (now < ExitStart() + OutSeconds) return;
             if (_count == 0)
@@ -156,10 +169,20 @@ namespace CriticalMass.Runtime.Hud
             Version++;
         }
 
-        private void Rewind(double now)
+        /// <summary>
+        /// A clock that runs back more than RestartSeconds is a new match (or a replay seek): everything clears. Review fix
+        /// round 2: a SMALL step back (the interpolated sim clock jitters back a fraction of a tick around hit-stop and
+        /// slow motion, i.e. exactly during a fight) is held at the last time instead; it used to clear the queue, so a
+        /// banner raised in a fight was gone for good.
+        /// </summary>
+        public const double RestartSeconds = 1.0;
+
+        private double Rewind(double now)
         {
-            if (now < _last - 1e-9) Clear();
+            if (now < _last - RestartSeconds) { Clear(); _last = now; return now; }
+            if (now < _last) return _last;
             _last = now;
+            return now;
         }
 
         private static double EaseOut(double t)
@@ -320,9 +343,11 @@ namespace CriticalMass.Runtime.Hud
             // online-rooms-6: banners only in a live match view (never over a menu or the loading screen).
             // review fix round (defect 5): banners wait while the local player is in a fight (hit dealt or taken in the last
             // 3 s, Player/PxFight.cs) and enter after it; one message at a time, never over the fight
-            if ((Hold != null && Hold()) || !Flow.GameFlow.LiveMatchView || CriticalMass.Runtime.Hud.Player.PxFight.Active)
+            bool fight = CriticalMass.Runtime.Hud.Player.PxFight.Active;
+            if ((Hold != null && Hold()) || !Flow.GameFlow.LiveMatchView || fight)
             {
-                Queue.Postpone(now);
+                if (fight) Queue.HoldBack(now); else Queue.Postpone(now);
+                _seenVersion = -1;   // re-apply (and raise Shown) when it enters after the hold
                 _wallVersion = -1;   // the wall clock restarts when the banner enters fresh after the takeover
                 if (_canvas != null && _canvas.gameObject.activeSelf) _canvas.gameObject.SetActive(false);
                 return;

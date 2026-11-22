@@ -478,7 +478,13 @@ namespace CriticalMass.Runtime.Hud.Mechanics
             if (cam == null) return false;
             Vector3 sp = cam.WorldToScreenPoint(world);
             if (sp.z < 0f) return false;
-            return RectTransformUtility.ScreenPointToLocalPointInRectangle(_space, new Vector2(sp.x, sp.y), cam, out local);
+            // review fix round 2 (pass-2 defect 4b, the name 120-200 px off its health bar during a hit): the canvas plane
+            // sits 0.42 u in front of the camera and only follows it when the canvas syncs, so a ray cast against it while
+            // the camera kicks or swings (fight framing) lands far off. Screen pixels / scale, the same math as the health
+            // bar (Hud/Player UnitStack), keeps the name and the bar on one anchor. _space fills the screen, centre pivot.
+            float sf = _canvas != null && _canvas.scaleFactor > 0f ? _canvas.scaleFactor : 1f;
+            local = (new Vector2(sp.x, sp.y) - cam.pixelRect.center) / sf;
+            return true;
         }
 
         static Vector3 Head(World w, int id, double alpha, float lift)
@@ -519,7 +525,9 @@ namespace CriticalMass.Runtime.Hud.Mechanics
             Objective = id;
             // Integration batch 4: the job line sits on the top of the centre lane; it steps back while the autopilot banner or a
             // big-moment takeover holds the lane (HudZones), and comes back the frame after.
-            bool show = id != ObjectiveId.None && w.Match.Phase != MatchPhase.Ended && !HudZones.Blocked(HudZone.Callout, HudPriority.Tip);   // owner walk 1: lane resident, steps back for any banner
+            // review fix round 2 (pass-2 N4): no carriers-and-hill job line in Duel or the Practice Range (no Kaiju)
+            bool show = id != ObjectiveId.None && w.Match.Phase != MatchPhase.Ended && !HudZones.Blocked(HudZone.Callout, HudPriority.Tip) &&
+                        !HudState.NoKaijuIn(w.Config);   // owner walk 1: lane resident, steps back for any banner
             bool want = show;
             show = StackFade(_obj, want, !HudZones.Blocked(HudZone.Callout, HudPriority.Tip));
             if (show && want) HudText.Set(_objText, View.Mechanics.Objective.Words(id, f.Cls));

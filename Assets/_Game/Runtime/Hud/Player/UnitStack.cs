@@ -39,6 +39,33 @@ namespace CriticalMass.Runtime.Hud.Player
             return new Vector2(x, y);
         }
 
+        /// <summary>
+        /// Review fix round 2 (pass-2 defect 4): the same, kept clear of MY fighter. <paramref name="mine"/> is my fighter's
+        /// screen rect (body, name and bar, MineRect). The number goes on the enemy's side away from me: right of his name
+        /// column when I am to his left, left of it when I am to his right; if it still touches my rect it is pushed past
+        /// my rect's far edge on that side. Never over my fighter, my name or my bar.
+        /// </summary>
+        public static Vector2 NumberLeftMid(Vector2 chestPx, Vector2 tagPx, float tagScale, int size, float risePx, int stack, Rect mine, int digits)
+        {
+            Vector2 p = NumberLeftMid(chestPx, tagPx, tagScale, size, risePx, stack);
+            if (mine.width <= 0f) return p;
+            float w = digits * size * DigitW + 6f;
+            bool meRight = mine.center.x >= chestPx.x;
+            float x = meRight ? chestPx.x - NameHalfWMax - NumberSide - w : chestPx.x + NameHalfWMax + NumberSide;
+            Rect r = NumberRect(new Vector2(x, p.y), size, digits);
+            if (r.Overlaps(mine)) x = meRight ? mine.xMin - NumberSide - w : mine.xMax + NumberSide;
+            return new Vector2(x, p.y);
+        }
+
+        /// <summary>My fighter's screen rect: feet to the top of the name, as wide as the name column (or the body).</summary>
+        public static Rect MineRect(Vector2 feetPx, Vector2 tagPx, float tagScale, float halfBodyW)
+        {
+            float half = Mathf.Max(NameHalfWMax, halfBodyW);
+            float top = tagPx.y + NameHalfH * tagScale, bottom = Mathf.Min(feetPx.y, tagPx.y) - 4f;
+            float cx = (feetPx.x + tagPx.x) * 0.5f;
+            return new Rect(cx - half, bottom, 2f * half, top - bottom);
+        }
+
         public static Rect NameRect(Vector2 tagPx, float tagScale) =>
             new Rect(tagPx.x - NameHalfWMax, tagPx.y - NameHalfH * tagScale, 2f * NameHalfWMax, 2f * NameHalfH * tagScale);
 

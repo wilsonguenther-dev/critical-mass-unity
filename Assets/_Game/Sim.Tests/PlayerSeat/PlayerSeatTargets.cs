@@ -136,6 +136,25 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
         public const double EngageEnemyRadius = 8, EngageEggRadius = 6;
         public const double LongestIdleMedianMax = 20, LongestIdleWorstMax = 30, DeadOrWalkingShareMax = 0.25, RespawnToHitMedianMax = 10;
 
+        // ---- S51-S60: defence and movement verbs (lane DM, 2026-11-22; data/dm-defence/VERBS.txt)
+        /// <summary>A human's reaction: the dodge press comes this many ticks after the swing's wind-up starts (0.2 s).</summary>
+        public const int DefenceReactTicks = 6;
+        /// <summary>S51: a reactive dodge at 0.2 s avoids the swing of every class whose wind-up is long enough (measured 0.91-1.00).</summary>
+        public const double ReactiveDodgeAvoidMin = 0.70;
+        /// <summary>S52: share of avoided, threatened swings that raise HitBlocked(BlockedDodge) (measured 0.98-1.00).</summary>
+        public const double DodgeReportedMin = 0.95;
+        /// <summary>S53: a lag-6 human who side-dodges each telegraphed swing vs one who never dodges, 36 pairs x 8 vs Normal bots:
+        /// win share 0.58 -> 0.63 and health left 0.24 -> 0.29 measured; the bar sits just under.</summary>
+        public const double DodgeWinGainMin = 0.04, DodgeHpGainMin = 0.04;
+        /// <summary>S54: dodge to the side, walk back in, swing: the first landed hit is a critical (measured 0.83 vs Normal bots,
+        /// 0.89 vs a lag-6 human attacker with DodgePunishSeconds 0.8; 0.64 / 0.69 with the reward off). Owner bar: at least half.</summary>
+        public const double DodgeChainCritMin = 0.75;
+        /// <summary>S57: a reactive shield (Ability at +6 ticks) vs never, Warrior vs the six Normal bots x 8: mean health left
+        /// 0.44 -> 0.59 measured.</summary>
+        public const double ShieldHpGainMin = 0.12;
+        /// <summary>S58: a walker is stuck when under 20% of walk speed for more than this many ticks with input held.</summary>
+        public const int StuckTicksMax = 15;
+
         /// <summary>The six classes in roster order (TestCase arguments use the enum directly).</summary>
         public static readonly ClassId[] Classes = { ClassId.Warrior, ClassId.Farmer, ClassId.Miner, ClassId.Demolitions, ClassId.Builder, ClassId.Healer };
     }

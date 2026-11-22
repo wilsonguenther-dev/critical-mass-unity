@@ -35,6 +35,9 @@ namespace CriticalMass.Runtime.Hud
         /// <summary>Review fix (lane F): no Kaiju this match (Duel, Practice Range: HatchSeconds past MatchSeconds).</summary>
         public bool NoKaiju;
         public static bool NoKaijuIn(CriticalMass.Sim.Config.GameConfig c) => c != null && c.HatchSeconds > c.MatchSeconds;
+        /// <summary>Review fix round 2 (pass-2 N4): the Practice Range has no hill (lane F: MatchRules.NoHill, radius 0).</summary>
+        public bool NoHill;
+        public static bool NoHillIn(CriticalMass.Sim.Config.GameConfig c) => c != null && (c.Hill == null || c.Hill.Radius <= 0);
         /// <summary>Egg: hatch progress; hatched: Kaiju health. 0..1.</summary>
         public float KaijuMeter01;
         /// <summary>Instability over the berserk threshold, 0..1.</summary>
@@ -115,6 +118,7 @@ namespace CriticalMass.Runtime.Hud
             s.Kaiju = k.State;
             s.Hatched = m.Hatched;
             s.NoKaiju = HudState.NoKaijuIn(c);
+            s.NoHill = HudState.NoHillIn(c);
             s.UntilHatch = Math.Max(0, global::CriticalMass.Runtime.Flow.MatchSpeed.ToReal(c.HatchSeconds - m.Time));
             if (!m.Hatched || k.State == KaijuState.Egg)
                 s.KaijuMeter01 = c.HatchSeconds > 0 ? Clamp01((float)(m.Time / c.HatchSeconds)) : 1f;

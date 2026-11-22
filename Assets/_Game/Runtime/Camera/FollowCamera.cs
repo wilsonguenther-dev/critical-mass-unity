@@ -513,6 +513,31 @@ namespace CriticalMass.Runtime.Camera
     public static class FightFrame
     {
         public const double YawOffsetDeg = 36, ShoulderU = 0.9, InSeconds = 0.25, OutSeconds = 0.8;
+        /// <summary>Fix round 2: the duel yaw turns at most InDegPerSec toward the side-on view (36 deg in 0.24 s) and never more
+        /// than MaxStepDeg in one frame (a 7.2 deg one-frame jump was measured); on release (target down or past TargetRange)
+        /// the offset eases home at OutDegPerSec and the target is no longer followed (it never chases a knocked or dead body).</summary>
+        public const double InDegPerSec = 150, OutDegPerSec = 60, MaxStepDeg = 2.5;
+
+        /// <summary>One frame of the duel yaw (pure): from the last drawn yaw toward follow + the side-on offset while engaged
+        /// (the whole turn rate-limited), or the offset easing to 0 on top of the live follow yaw when released.
+        /// Returns the new drawn yaw; offset = what it adds to the follow yaw.</summary>
+        public static double StepYaw(double lastYaw, double follow, bool engaged, double enemyYaw, ref int side, double dt, out double offset)
+        {
+            if (engaged)
+            {
+                double want = follow + YawOffset(follow, enemyYaw, ref side);
+                double diff = GroundCamera.DeltaAngle(lastYaw, want);
+                double max = Math.Min(InDegPerSec * Math.Max(0, dt), MaxStepDeg);
+                double y = GroundCamera.Normalize(lastYaw + Math.Max(-max, Math.Min(max, diff)));
+                offset = GroundCamera.DeltaAngle(follow, y);
+                return y;
+            }
+            double off = GroundCamera.DeltaAngle(follow, lastYaw);
+            double step = Math.Min(OutDegPerSec * Math.Max(0, dt), MaxStepDeg);
+            off = Math.Abs(off) <= step ? 0 : off - Math.Sign(off) * step;
+            offset = off;
+            return GroundCamera.Normalize(follow + off);
+        }
         /// <summary>A target farther than this (u, centre to centre) is not framed.</summary>
         public const double TargetRange = 3.2;
         public const float FadeRadius = 0.6f;

@@ -57,6 +57,10 @@ namespace CriticalMass.Runtime.Input
         private InputAction _walk;
         private InputAction _lock;
         private bool _keyAimPressed;
+        // Tier F31 / F34: the aiming device follows the most recent real input; untouched frames resend the held raw aim.
+        private readonly AimDeviceArbiter _devices = new AimDeviceArbiter();
+        private readonly AimHold _hold = new AimHold();
+        private bool _touched;
         private bool _wasAlive;
         private double[] _enemyX = new double[64];
         private double[] _enemyZ = new double[64];
@@ -101,6 +105,9 @@ namespace CriticalMass.Runtime.Input
             ControlScheme scheme = ControlBindings.ActiveScheme;
             Aim.SetMode(scheme == ControlScheme.Gamepad ? AimResolver.Mode.Stick
                 : scheme == ControlScheme.Keyboard ? AimResolver.Mode.Keys : AimResolver.Mode.Pointer);
+            _devices.Reset();
+            _hold.Reset();
+            _touched = false;
             ReadSettings();
             GameSettings.Changed += ReadSettings;
             AimHelpSettings.Changed += ReadSettings;
@@ -124,9 +131,9 @@ namespace CriticalMass.Runtime.Input
                     }
                     else if (ctx.control != null && ctx.control.device is Mouse && (b == B.Attack || b == B.Ability))
                     {
-                        // A click aims with the mouse at once, even when the press lands in a frame Sample does not see.
+                        // The prompts learn the mouse is in the hand; the AIM does not move to a resting cursor on a click
+                        // (tier F31): AimDeviceArbiter hands the aim over only on a real mouse move.
                         ControlBindings.NoteMouseUsed();
-                        Aim.NotePointer();
                     }
                     // Lane I item 2: keyboard alone, a Farmer or Healer holds the ability key to choose the distance; the
                     // press reaches the sim on release (a tap shorter than CastDistance.TapSeconds casts at the default).
@@ -292,18 +299,31 @@ namespace CriticalMass.Runtime.Input
             bool keyAim = _keyAimPressed || (_lock != null && _lock.WasPressedThisFrame() && _lock.activeControl != null &&
                                              _lock.activeControl.device is Keyboard && !(_walk != null && _walk.IsPressed() && Aim.Current == AimResolver.Mode.Pointer));
             _keyAimPressed = false;
-            if (stick.sqrMagnitude > 0f || moveByPad) Aim.NoteStick();
-            else if (Mouse.current != null && ControlBindings.MouseUsed(Mouse.current)) Aim.NotePointer();
-            else if ((keyAim || (arrowsMove && Aim.Current == AimResolver.Mode.Pointer)) && ControlBindings.MouseIdleFor >= ControlBindings.MouseIdleSeconds)
+            // Tier F31: the device used most recently aims (a mouse MOVE, a deflected stick, the move keys or a keyboard attack
+            // key); a resting cursor never keeps the aim from a keys player (AimDeviceArbiter.PointerHoldSeconds after its
+            // last move it lets go). A click is not aim input.
+            double nowT = Time.unscaledTimeAsDouble;
+            Mouse mouse = Mouse.current;
+            Vector2 md = mouse != null ? mouse.delta.ReadValue() : Vector2.zero;
+            bool pointerMoved = AimDeviceArbiter.PointerMoved(md.x, md.y) || (_walk != null && _walk.WasPressedThisFrame());
+            bool stickUsed = stick.sqrMagnitude > 0f || moveByPad;
+            if (stickUsed) _devices.NoteStick(nowT);
+            if (pointerMoved) _devices.NotePointerMoved(nowT);
+            if (fromKeys || keyAim) _devices.NoteKeys(nowT, keyAim);
+            AimResolver.Mode aimWas = Aim.Current;
+            AimResolver.Mode aimNow = _devices.Decide(nowT, aimWas);
+            if (aimNow != aimWas)
             {
-                Aim.NoteKeys();
-                ControlBindings.SetKeyboardOnly(true);
+                Aim.SetMode(aimNow);
+                if (aimNow == AimResolver.Mode.Keys) ControlBindings.SetKeyboardOnly(true);
             }
-            else if (fromKeys && Aim.Current == AimResolver.Mode.Stick)
-            {
-                // Back from the controller to the keys: the keyboard scheme the player had before.
-                Aim.SetMode(ControlBindings.KeyboardOnly ? AimResolver.Mode.Keys : AimResolver.Mode.Pointer);
-            }
+            // Tier F34: a frame is "touched" only when the player moved a device or pressed something this frame.
+            Gamepad padNow = Gamepad.current;
+            _touched = pointerMoved || stickUsed || m.sqrMagnitude > 0f
+                       || (kbd != null && kbd.anyKey.wasPressedThisFrame)
+                       || (mouse != null && (mouse.leftButton.wasPressedThisFrame || mouse.rightButton.wasPressedThisFrame
+                           || mouse.middleButton.wasPressedThisFrame || mouse.scroll.ReadValue().sqrMagnitude > 0f))
+                       || (padNow != null && ControlBindings.GamepadUsed(padNow));
 
             // Walk to pointer acts only while the mouse aims; lock facing only while the keys aim (b14: they no longer share a key).
             bool walk = _walk != null && _walk.IsPressed() && Aim.Current == AimResolver.Mode.Pointer;
@@ -448,6 +468,16 @@ namespace CriticalMass.Runtime.Input
         void FinishAim(World w, AimDevice dev, bool thirdPerson, bool hasIntent, double ix, double iz)
         {
             int me = LocalSeat.Actor;
+            // Tier F34: with no device input this frame the raw aim is the held one, relative to the body (a moving camera,
+            // a sliding cursor projection or a push never reads as a player to the sim's idle rule).
+            if (w != null && me >= 0 && me < w.ActorCount)
+            {
+                bool hold = State.HasAim;
+                double hx = State.AimX, hz = State.AimZ;
+                _hold.Apply(_touched, w.X[me], w.Z[me], ref hold, ref hx, ref hz);
+                if (hold) State.SetAim(hx, hz);
+                else State.ClearAim();
+            }
             AimAssist.RawHasAim = State.HasAim;
             AimAssist.RawAimX = State.AimX;
             AimAssist.RawAimZ = State.AimZ;

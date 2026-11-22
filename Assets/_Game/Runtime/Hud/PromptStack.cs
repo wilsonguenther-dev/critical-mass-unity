@@ -44,7 +44,9 @@ namespace CriticalMass.Runtime.Hud
         {
             int f = Time.frameCount;
             for (int i = 0; i < Sources; i++) _wanted[i] = _wantFrame[i] >= f - 1;
-            return Assign(_wanted, (int)s, Visible(HudZones.Blocked(HudZone.Lower, HudPriority.Guide)));
+            // review fix round 2 (pass-2 defect 5): ONE prompt line in a fight (PxFight), the most relevant (station first)
+            int visible = CriticalMass.Runtime.Hud.Player.PxFight.Active ? 1 : Visible(HudZones.Blocked(HudZone.Lower, HudPriority.Guide));
+            return Assign(_wanted, (int)s, visible);
         }
 
         /// <summary>How many prompts may show: one while the lower lane is held (slot 1 is its bottom), else MaxVisible.</summary>

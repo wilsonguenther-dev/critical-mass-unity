@@ -188,6 +188,18 @@ namespace CriticalMass.Runtime.Hud.Player
             for (int i = 0; i < _healAcc.Length; i++) { _healAcc[i] = 0f; _healAge[i] = -1f; _critAt[i] = 0f; }
         }
 
+        /// <summary>My fighter's screen rect (ref px) this frame, or an empty rect (review fix round 2: numbers avoid it).</summary>
+        static Rect MyRect(World w, double alpha, UnityEngine.Camera cam, float scale)
+        {
+            int me = HudBinder.LocalActor;
+            if (cam == null || me < 0 || me >= w.ActorCount || !w.Actors[me].Alive) return default;
+            Vector3 feet = PxProject.Actor(w, me, alpha, 0f), head = PxProject.Actor(w, me, alpha, HealthBars.Lift);
+            if (!PxProject.Screen(cam, feet, 0f, out Vector2 fp) || !PxProject.Screen(cam, head, 0f, out Vector2 hp)) return default;
+            float tag = PxProject.ThirdPerson ? CriticalMass.Runtime.Camera.TagLens.Scale((head - cam.transform.position).magnitude) : 1f;
+            float halfBody = Mathf.Abs(hp.y - fp.y) / scale * 0.3f;   // a fighter is about 0.6 of his height wide on screen
+            return UnitStack.MineRect(fp / scale, hp / scale, tag, halfBody);
+        }
+
         public void Tick(World w, double alpha, UnityEngine.Camera cam, float scale, float dt)
         {
             for (int i = 0; i < _healAcc.Length; i++)
@@ -200,6 +212,7 @@ namespace CriticalMass.Runtime.Hud.Player
                 _healAge[i] = -1f;
             }
             bool calm = CriticalMass.Runtime.Menu.GameSettings.ReduceMotion;
+            Rect mine = MyRect(w, alpha, cam, scale);
             for (int k = 0; k < Pool; k++)
             {
                 Num n = _nums[k];
@@ -219,7 +232,8 @@ namespace CriticalMass.Runtime.Hud.Player
                     { PxUi.Alpha(n.Group, 0f); continue; }
                     float tag = PxProject.ThirdPerson ? CriticalMass.Runtime.Camera.TagLens.Scale((head - cam.transform.position).magnitude) : 1f;
                     int sz = n.Text.fontSize;
-                    n.Text.rectTransform.anchoredPosition = UnitStack.NumberLeftMid(cp / scale, hp / scale, tag, sz, (rp.y - cp.y) / scale, n.Stack);
+                    Rect avoid = n.Actor == HudBinder.LocalActor ? default : mine;   // a number on me stays beside me
+                    n.Text.rectTransform.anchoredPosition = UnitStack.NumberLeftMid(cp / scale, hp / scale, tag, sz, (rp.y - cp.y) / scale, n.Stack, avoid, Mathf.Max(1, n.Text.text.Length));
                 }
                 else
                 {

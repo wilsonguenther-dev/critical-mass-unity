@@ -974,6 +974,10 @@ namespace CriticalMass.Runtime.View.Affordance
             return new Vector2(x, y);
         }
 
+        /// <summary>Review fix round 2: a refused "hands full" prompt never shows; in a fight only a doable one does.</summary>
+        public static bool WorthPrompting(AffTarget t, bool fight) =>
+            t != null && t.Has && (t.Valid || (!fight && t.Why != AffWords.HandsFull));
+
         /// <summary>One prompt line: "F  PLACE BLOCK (3)", "HOLD E  GATHER", "F  BUILD LADDER   ·   bank empty".</summary>
         public static string Line(AffTarget t, ControlDevice device)
         {
@@ -987,7 +991,10 @@ namespace CriticalMass.Runtime.View.Affordance
         void UpdatePrompt(World w, UnityEngine.Camera cam, bool terrain)
         {
             // b14: the pill takes its slot in the one prompt stack (PromptStack: after the station prompt, before the tool strip).
-            bool want = terrain && WorldFeedbackSettings.Prompts && Scan.Primary.Has;
+            // review fix round 2 (pass-2 defect 5): never prompt an action that will be refused for full hands (the
+            // CARRYING strip says it); in a fight (PxFight) the pill is the ONE line under my feet and shows only an action
+            // I can do now
+            bool want = terrain && WorldFeedbackSettings.Prompts && Scan.Primary.Has && WorthPrompting(Scan.Primary, CriticalMass.Runtime.Hud.Player.PxFight.Active);
             int slot = -1;
             if (want) { PromptStack.Want(PromptStack.Source.Pill); slot = PromptStack.SlotOf(PromptStack.Source.Pill); }
             else PromptStack.Release(PromptStack.Source.Pill);
@@ -1074,7 +1081,8 @@ namespace CriticalMass.Runtime.View.Affordance
                 _hintThisMatch = WorldFeedbackSettings.HintDue(ci);
                 if (_hintThisMatch) WorldFeedbackSettings.NoteHinted(ci);
             }
-            bool show = inWindow && _hintThisMatch && WorldFeedbackSettings.Hints != WorldFeedbackSettings.HintsOff;
+            bool show = inWindow && _hintThisMatch && WorldFeedbackSettings.Hints != WorldFeedbackSettings.HintsOff &&
+                        !CriticalMass.Runtime.Hud.Player.PxFight.Active;   // review fix round 2: one line under my feet in a fight
             if (!show)
             {
                 if (_hintChip != null && _hintChip.gameObject.activeSelf) _hintChip.gameObject.SetActive(false);

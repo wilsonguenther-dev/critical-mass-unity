@@ -291,6 +291,9 @@ namespace CriticalMass.Sim.Config
         /// larger of this and the BotSkillConfig.SwingHesitation profile wins (Easy's profile is 0.4). Full rules only (BotAim.On).
         /// null = off (S1). Measured in data/s3-tune/.</summary>
         public double[] BotSwingHesitation = { 0.3, 0.85, 0 };   // px S3: S48 floor vs Easy 0.36 -> 0.77, vs Normal 0.25 -> 0.29; ceiling 0.63 -> 0.68-0.72
+        /// <summary>px DM (slow triage R1): BotSwingHesitation holds only a swing at a HUMAN seat. Off = every bot swing (at the
+        /// Kaiju, structures and other bots too), which cut bot damage on the Kaiju: own-Kaiju blocking 13.8 -> 42.9 s a match.</summary>
+        public bool BotSwingHesitationHumansOnly = true;
         /// <summary>[2] Melee aim delay (ticks at 30 Hz) by BotDifficulty (Normal, Easy, Hard): the bot aims at where its target
         /// was this long ago (a 0.2 s human = 6). Baseline: Normal bots landed 94% on a circle-strafing human (target 40-75%).</summary>
         public int[] BotMeleeAimDelayTicks = { 5, 12, 2 };   // px S3: Easy 8 -> 12 (S48 floor vs Easy, data/s3-tune)

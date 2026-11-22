@@ -1104,7 +1104,7 @@ namespace CriticalMass.Sim.Bots
             // that would mend is kept); every other class, and the rule off, is unchanged.
             if (output.Attack && !LightWeapons.BotKeepsPress(w, id, aimX, aimZ)) output.Attack = false;
             // DG-21 hesitation: an Easy bot holds its swing in SwingHesitation of 1/3-second windows (never for Normal).
-            if (output.Attack && BotSkill.HoldsSwing(w, id)) output.Attack = false;
+            if (output.Attack && BotSkill.HoldsSwing(w, id, st.Target[id])) output.Attack = false;
             // Sim-physics lane (DG-84 / DG-85): a Hard bot steps out of a telegraphed claw cone or slam ring, and jumps a slam.
             BotSkillConfig dsk = BotSkill.Profile(w, id);
             // b15 bot brain: a kiter uses the dodge step and the slam jump at every skill level.
