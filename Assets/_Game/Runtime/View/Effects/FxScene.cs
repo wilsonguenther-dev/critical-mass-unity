@@ -596,15 +596,13 @@ namespace CriticalMass.Runtime.View.Effects
                 away.y = 0f;
                 if (away.sqrMagnitude > 1e-4f)
                 {
-                    Vector3 an = away.normalized;
-                    contact = vc + an * (float)(r + 0.2);
-                    // round 3: the impact frame keeps its punch: a small bright star on the NEAR side at the contact point
-                    // and short spark lines flying away from the lens (0.35 u, 0.1 s: a small part of him, never his body)
-                    Vector3 near = vc - an * (float)(r * 0.9);
-                    AddBurst(t, near, CriticalMass.Runtime.View.Anim.HitFeelTuning.NearSpark3PSize, 0, seed + 7, Vector3.zero,
-                        S(CriticalMass.Runtime.View.Anim.HitFeelTuning.NearSpark3PLife));
+                    // fix round 5 (impact pop): the burst on his NEAR side beside his body centre, toward the attacker's
+                    // weapon side (HitFeelTuning.ContactSpark3P), 0.8 of the own size: it pops on the impact frame, touches
+                    // his edge and never covers his centre. Short spark lines fly off it.
+                    float size3 = CriticalMass.Runtime.View.Anim.HitFeelTuning.BurstSize(death ? (byte)2 : e.Tier, e.Local, e.Value) * CriticalMass.Runtime.View.Anim.HitFeelTuning.Burst3PShare;
+                    contact = CriticalMass.Runtime.View.Anim.HitFeelTuning.ContactSpark3P(vc, lens.transform.position, SimSpace.ToWorld(e.DirX, 0, e.DirZ), (float)r, size3);
                     for (int k = 0; k < CriticalMass.Runtime.View.Anim.HitFeelTuning.NearSpark3PLines; k++)
-                        AddSpark(t, near, e.DirX, e.DirZ, seed + 7, (uint)(k + 150), 1);
+                        AddSpark(t, contact, e.DirX, e.DirZ, seed + 7, (uint)(k + 150), 1);
                 }
             }
             _lastHitThird = third;

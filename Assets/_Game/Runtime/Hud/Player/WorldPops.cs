@@ -154,6 +154,14 @@ namespace CriticalMass.Runtime.Hud.Player
                 case SimEventType.Purify:
                     if (e.A == me) Verb(w, "PURIFIED", PlayerReasons.WorldPurify, e.X, e.Z, me, (float)e.Value);
                     return;
+                case SimEventType.Terraform:
+                    // fix round 5 (item 5, gate F28 "dig pop"): the ground changed under MY dig or place: pop DUG / PLACED on
+                    // the changed cell (Value 1 dug, 2 placed; refusals carry other codes and pop nothing here). Same key
+                    // as a WorldAction dig, so the two never double up.
+                    if (e.A != me) return;
+                    if (Math.Abs(e.Value - Terraform.Dug) < 1e-9) Verb(w, WorldWordsFor(PlayerReasons.WorldDig, 1), PlayerReasons.WorldDig, e.X, e.Z, me, (float)e.Value);
+                    else if (Math.Abs(e.Value - Terraform.Placed) < 1e-9) Verb(w, WorldWordsFor(PlayerReasons.WorldPlace, 1), PlayerReasons.WorldPlace, e.X, e.Z, me, (float)e.Value);
+                    return;
                 case SimEventType.WorldAction:
                     // lane S2: Value 0 = a channel START (gather / mine): the ChannelBar shows it, the pop waits for the unit
                     if (e.A == me && e.Value <= 0 && (e.B == ActionTags.WorldGather || e.B == PlayerReasons.WorldMineOre)) return;

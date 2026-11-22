@@ -83,8 +83,38 @@ namespace CriticalMass.Runtime.Input
         private readonly Action<InputAction.CallbackContext>[] _started = new Action<InputAction.CallbackContext>[ButtonActions.Length];
         private readonly Action<InputAction.CallbackContext>[] _canceled = new Action<InputAction.CallbackContext>[ButtonActions.Length];
 
+        /// <summary>Fix round 5 (item 9): the actions every seat needs (Dodge / Cancel are added when missing).</summary>
+        public static readonly string[] RequiredActions = { "Move", "Point", "Jump", "Attack", "Ability", "Interact", "DigPlace", "Pause", "Scoreboard" };
+        /// <summary>Errors logged for a missing or empty input-actions asset (one per run; tests).</summary>
+        public static int MissingActionsErrors;
+        static bool _missingLogged;
+
+        /// <summary>Fix round 5 (item 9, pure; tests): null when the asset can drive a seat, else why not.</summary>
+        public static string ActionsProblem(InputActionAsset asset)
+        {
+            if (asset == null) return "no project-wide input actions asset (InputSystem.actions is null)";
+            InputActionMap map = asset.FindActionMap("Player", false);
+            if (map == null) return "the input actions asset '" + asset.name + "' has no Player map";
+            foreach (string a in RequiredActions) if (map.FindAction(a, false) == null) return "the Player map has no '" + a + "' action";
+            return null;
+        }
+
         private void OnEnable()
         {
+            // fix round 5 (item 9): a missing or empty input-actions asset no longer throws out of the match build: ONE
+            // error, this seat hands itself to the autopilot, and the match goes on.
+            string problem = ActionsProblem(InputSystem.actions);
+            if (problem != null)
+            {
+                if (!_missingLogged) { _missingLogged = true; MissingActionsErrors++; Debug.LogError("[input] " + problem + ": the local seat plays on autopilot this match."); }
+                SimDriverBehaviour driver = GetComponent<SimDriverBehaviour>();
+                if (driver == null) driver = FindFirstObjectByType<SimDriverBehaviour>();
+                if (driver != null) driver.HumanAutopilot = true;
+                _unusable = true;
+                enabled = false;
+                return;
+            }
+            _unusable = false;
             // Review defect 0: one owner for the map's life. Dodge / Cancel are added (old assets only) with the whole asset
             // disabled, nothing is re-created that exists, and OnDisable gives the map back (PlayerActionsLifetime).
             var map = PlayerActionsLifetime.Acquire();
@@ -217,8 +247,11 @@ namespace CriticalMass.Runtime.Input
             State.CancelButton = GameSettings.CancelButton;   // b16
         }
 
+        bool _unusable;
+
         private void OnDisable()
         {
+            if (_unusable) return;   // fix round 5 (item 9): OnEnable bound nothing
             GameSettings.Changed -= ReadSettings;
             AimHelpSettings.Changed -= ReadSettings;
             _castHolding = _castRelease = false;

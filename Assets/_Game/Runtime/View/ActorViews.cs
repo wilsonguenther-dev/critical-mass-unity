@@ -384,6 +384,12 @@ namespace CriticalMass.Runtime.View
             double x = hasFx && fx.Corpse ? fx.CorpseX : Lerp(w.PrevX[i], w.X[i], a);
             double z = hasFx && fx.Corpse ? fx.CorpseZ : Lerp(w.PrevZ[i], w.Z[i], a);
             if (_stressHill) StressPlace(map.Hill, i, ref x, ref z);
+            // fix round 5 (item 7): a fresh knock is drawn at the current tick, not up to a tick behind it (HitFeelTuning.KnockAlphaLead)
+            if (!(hasFx && fx.Corpse) && _fx != null && _fx.Knock(i, out double kAge, out _, out _, out _, out _, out _))
+            {
+                double share = Anim.HitFeelTuning.KnockAlphaLead(kAge);
+                if (share > 0) { x += (w.X[i] - x) * share; z += (w.Z[i] - z) * share; }
+            }
             double h = CriticalMass.Runtime.GroundHeight.Body(map, x, z);   // b15: on the pit floor / on top of a stack (+ b14 bridge deck)
             // b12-jz / b14 ladder fix: up the near ladder, along the rock top, down the far ladder; on the rungs the fighter
             // faces the ladder (the wall), going up and coming down
@@ -464,6 +470,7 @@ namespace CriticalMass.Runtime.View
                 + B16.JumpRefusedView.Offset(w, i, a); // b16 [11]: the refused-jump stumble
             Material teamMat = CriticalMass.Runtime.Progression.TrimMaterials.ForActor(ArtMaterials.ForTeam(m.Spec, actor.Team), i);   // b15 profile: colour trim (fixed colours only; cached, no allocation)
             m.SetMaterial(hasFx && fx.Flash ? _fx.FlashMaterial(teamMat, fx.FlashOwn) : teamMat);
+            if (i == LocalSeat.Actor) PredictPress(i, w, cfg, m, slot, actor, simTime);
             // Animation pass: clips, timing, facing spring, squash and the level of detail live in Anim.ActorAnimator.
             slot.Anim.Pose(m, w, cfg, i, a, simTime, dSim, basePos, _fx, hasFx, in fx, ref _poseState);
             PostPose(i, m, in _poseState);
@@ -535,13 +542,43 @@ namespace CriticalMass.Runtime.View
             slot.Anim.TakeSwingCommit(out _);
             if (i == me)
             {
-                if (swingTick != _swingSeenTick) { _swingSeenTick = swingTick; _swingSeenFrame = Time.frameCount; _swingReported = false; }
-                if (!_swingReported && swingTick >= 0 && Time.frameCount - _swingSeenFrame >= 2)
+                // fix round 5 (item 4): a predicted press starts the 2-frame count on the press frame; the sim's SwingTick
+                // that follows it does not restart the count (one report per press)
+                if (_predStartFrame == Time.frameCount) { _swingSeenFrame = Time.frameCount; _swingReported = false; _swingFromPredict = true; }
+                if (swingTick != _swingSeenTick)
+                {
+                    _swingSeenTick = swingTick;
+                    if (!_swingFromPredict) { _swingSeenFrame = Time.frameCount; _swingReported = false; }
+                    _swingFromPredict = false;
+                }
+                if (!_swingReported && (swingTick >= 0 || _swingFromPredict) && Time.frameCount - _swingSeenFrame >= 2)
                 {
                     _swingReported = true;
                     PlayerFeedback.Report(FeedbackChannel.SwingCommit, i, slot.Anim.SwingWeightNow, src);
                 }
             }
+        }
+
+        // fix round 5 (item 4): the press seen on the frame it happens (HumanInputSource's latch, read only), so the wind-up
+        // pose starts on that frame instead of after the sim's next tick plus the commit rise (5-6 frames in the Editor).
+        CriticalMass.Runtime.Input.HumanInputSource _human;
+        int _humanLookFrame = int.MinValue, _predStartFrame = int.MinValue;
+        bool _intentWas, _swingFromPredict;
+
+        private void PredictPress(int i, World w, GameConfig cfg, ModelView m, CharSlot slot, Actor actor, double simTime)
+        {
+            if (_human == null && Time.frameCount >= _humanLookFrame)
+            {
+                _human = FindFirstObjectByType<CriticalMass.Runtime.Input.HumanInputSource>();
+                _humanLookFrame = Time.frameCount + 30;
+            }
+            bool intent = _human != null && _human.isActiveAndEnabled && _human.State.AttackIntent;
+            if (intent && !_intentWas && actor != null && actor.Alive && Combat.AttackReady(w, i))
+            {
+                slot.Anim.PredictSwing(m, actor, cfg, simTime);
+                if (slot.Anim.Predicting) _predStartFrame = Time.frameCount;
+            }
+            _intentWas = intent;
         }
 
         Anim.ImpactCueLedger.Seen[] _cues;

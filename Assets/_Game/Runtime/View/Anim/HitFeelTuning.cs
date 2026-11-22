@@ -32,6 +32,19 @@ namespace CriticalMass.Runtime.View.Anim
         /// <summary>Round 3: in third person the own-hit flash lasts 180 ms wall so it spans the impact frame AND the hit-stop
         /// hold (the review saw no flash on the victim at impact); starts stay one per FlashMinGapSeconds (under 3 a second).</summary>
         public const double FlashOwn3PSeconds = 0.18;
+        /// <summary>Fix round 5 (impact pop): the share of the CMToon `_HitFlash` term, the colour laid UNSHADED over the
+        /// whole lit body on the flash frames (after bands, time of day, rim and base map). Full flash 0.92 white; under
+        /// reduce flashing 0.45 of the cream (no white frame). Before this the flash only set the albedo colours to white:
+        /// the shading bands and time-of-day grade kept a cream fighter almost the same, and a textured model (Warrior /
+        /// Builder base map) ignored them entirely, so no flash showed on the victim at 1080p.</summary>
+        public const float FlashShareFull = 0.92f, FlashShareSafe = 0.45f;
+        public static readonly UnityEngine.Color FlashWhite = new UnityEngine.Color(1f, 0.99f, 0.96f, 1f);
+        /// <summary>The `_HitFlash` vector for a flash copy (rgb colour, a share).</summary>
+        public static UnityEngine.Vector4 HitFlashVector(bool reduceFlashing)
+        {
+            UnityEngine.Color c = reduceFlashing ? FlashCream : FlashWhite;
+            return new UnityEngine.Vector4(c.r, c.g, c.b, reduceFlashing ? FlashShareSafe : FlashShareFull);
+        }
         public static double FlashSeconds(bool own, bool thirdPerson) => own && thirdPerson ? FlashOwn3PSeconds : FlashSeconds(own);
         /// <summary>A new flash may start on a victim whose last flash began `sinceLast` wall seconds ago.</summary>
         public static bool FlashAllowed(double sinceLast) => !(sinceLast < FlashMinGapSeconds);
@@ -58,6 +71,23 @@ namespace CriticalMass.Runtime.View.Anim
         /// <summary>The lead's cap, and the cap of everything drawn off the interpolated sim spot (the play-mode placement
         /// check allows 0.35 u; GameplaySanityPlayTests).</summary>
         public const float MaxKnockLead = 0.34f, MaxDrawnOffset = 0.34f;
+
+        /// <summary>
+        /// Fix round 5 (item 7: big knocks drew at 0.53-0.72 of the sim body's travel at 100 ms). The clamp was the
+        /// interpolation itself: a fighter is drawn Lerp(PrevX, X, alpha), up to one whole tick BEHIND the sim, and in a
+        /// knock's first ticks one tick is 0.3-0.5 u of travel, more than the 0.34 u lead cap could make up. While a knock
+        /// is fresh the victim is drawn at the CURRENT tick's position (share 1 of the gap from the interpolated spot to X),
+        /// fading back to plain interpolation between KnockAlphaHold and KnockAlphaFade s, when the slide has all but stopped
+        /// (no visible step). Pure; ActorViews applies it before the knock lead.
+        /// </summary>
+        public const double KnockAlphaHold = 0.3, KnockAlphaFade = 0.45;
+
+        public static double KnockAlphaLead(double age)
+        {
+            if (!(age >= 0) || age >= KnockAlphaFade) return 0;
+            if (age <= KnockAlphaHold) return 1;
+            return 1 - (age - KnockAlphaHold) / (KnockAlphaFade - KnockAlphaHold);
+        }
 
         static double Smooth(double x) => x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3 - 2 * x);
         static double EaseOut(double x) => x <= 0 ? 0 : x >= 1 ? 1 : 1 - (1 - x) * (1 - x);
@@ -127,6 +157,21 @@ namespace CriticalMass.Runtime.View.Anim
         /// <summary>The attack pose blends in to full over this many sim seconds after the press (ease-out): local player 0.05
         /// (0.89 at 2 frames of 60 fps), everyone else 0.075 (0.89 at 3 frames). Was a smoothstep over the whole wind-up.</summary>
         public const double CommitRiseLocal = 0.05, CommitRiseOther = 0.075;
+        /// <summary>Fix round 5 (item 4): the local press is shown before the sim's tick takes it (presentation only): the
+        /// wind-up pose starts on the press frame and holds at most PredictHoldShare of the wind-up until the sim's swing
+        /// starts; if the sim has not started it within PredictTimeout (s, wall) the pose fades out like a feint.</summary>
+        public const double PredictTimeout = 0.12, PredictHoldShare = 0.35;
+
+        /// <summary>Fix round 5 (pure; tests): the predicted swing's age (s into the wind-up) and weight, `wall` s after the
+        /// press. Null age past the timeout (the caller aborts).</summary>
+        public static bool PredictedSwing(double wall, double windupSeconds, out double age, out float weight)
+        {
+            age = 0; weight = 0f;
+            if (!(wall >= 0) || wall > PredictTimeout) return false;
+            age = Math.Min(wall, windupSeconds * PredictHoldShare);
+            weight = CommitWeight(wall + 1.0 / 60.0, true);   // the press frame already draws one frame's rise
+            return true;
+        }
         /// <summary>The weight the tests hold at 2 frames (local) and 3 frames (others) after the press.</summary>
         public const float CommitAtCheck = 0.8f;
         /// <summary>The render rate the frame counts are written against.</summary>
@@ -212,13 +257,38 @@ namespace CriticalMass.Runtime.View.Anim
 
         // ---- fix round 2 (review pass 2): third person
         /// <summary>Own hit burst in third person: this share of the size, at most this long (s wall), drawn behind the victim.</summary>
-        public const float Burst3PShare = 0.6f;
+        /// <para>Fix round 5 (impact pop): 0.6 behind him read thin (pass 4), full size over him hid him (pass 2): 0.8 of the
+        /// burst, on the NEAR side, beside his body centre toward the attacker's weapon side (ContactSpark3P).</para>
+        public const float Burst3PShare = 0.8f;
         /// <summary>Round 3: the near-side contact spark in third person (u, s wall, spark lines): it marks the impact frame
         /// without covering more than a small part of the victim (0.35 u against a ~1 x 2 u body).</summary>
         public const float NearSpark3PSize = 0.35f;
         public const double NearSpark3PLife = 0.1;
         public const int NearSpark3PLines = 4;
-        public const double Burst3PLife = 0.16;
+        public const double Burst3PLife = 0.2;
+
+        /// <summary>Fix round 5: how far past the burst's own radius its centre sits beside the victim's centre, across the
+        /// view (u): the burst touches his weapon-side edge but never covers his body centre.</summary>
+        public const float Burst3PSideClear = 0.08f;
+
+        /// <summary>
+        /// Fix round 5 (pure; tests): where the third-person contact burst goes. On the victim's camera-near surface at chest
+        /// height (chest + toward the lens x radius), moved across the view (the lens right, flat) to the attacker's weapon
+        /// side (the attacker's right, from hitDir = attacker -> victim) by burst radius + Burst3PSideClear, so the burst's
+        /// edge sits on his side and his body centre stays clear.
+        /// </summary>
+        public static UnityEngine.Vector3 ContactSpark3P(UnityEngine.Vector3 chest, UnityEngine.Vector3 lens, UnityEngine.Vector3 hitDir, float radius, float burstSize)
+        {
+            UnityEngine.Vector3 toLens = lens - chest; toLens.y = 0f;
+            if (toLens.sqrMagnitude < 1e-6f) toLens = -hitDir;
+            toLens.y = 0f;
+            toLens = toLens.sqrMagnitude > 1e-6f ? toLens.normalized : UnityEngine.Vector3.back;
+            UnityEngine.Vector3 across = new UnityEngine.Vector3(toLens.z, 0f, -toLens.x);   // perpendicular to the view, flat
+            UnityEngine.Vector3 d = hitDir; d.y = 0f;
+            UnityEngine.Vector3 weapon = d.sqrMagnitude > 1e-6f ? new UnityEngine.Vector3(d.z, 0f, -d.x) : across;   // attacker's right
+            if (UnityEngine.Vector3.Dot(weapon, across) < 0f) across = -across;
+            return chest + toLens * radius + across * (burstSize * 0.5f + Burst3PSideClear);
+        }
         /// <summary>
         /// Third-person kick multipliers: the kick moves the lens, and a lens translation shifts a point by u / depth, so at the
         /// enemy's chest (about 6 u deep, not the 4.4 u focus) my hit measured 7.5-9.1 px and my kill 12.1 px. These bring them

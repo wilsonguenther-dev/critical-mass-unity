@@ -67,6 +67,7 @@ Shader "CM/Toon"
         [Toggle] _WobbleUV4Y ("Wobble Weight From UV4.y (hair, scarf, tabard)", Float) = 0
         _SmoothNormals ("Smoothed Normals From UV3 (characters, 0 imported)", Range(0, 1)) = 0
         _KaijuGlow ("Kaiju Type Glow (rgb hue, a strength; 0 off)", Color) = (0, 0, 0, 0)
+        _HitFlash ("Hit Flash (rgb colour, a share; CombatFx flash copies only)", Vector) = (1, 1, 1, 0)
         _KaijuPattern ("Kaiju Glow Pattern (0 none, 1 crest, 2 plates, 3 bands, 4 spots, 5 spine)", Range(0, 5)) = 0
         _KaijuTone ("Kaiju Tone (rgb tint, a saturation; a 0 = not a Kaiju)", Vector) = (1, 1, 1, 0)
         _TeamTopTint ("Team Tint On Top-Facing Fixed Colours (characters: headgear, shoulders)", Range(0, 1)) = 0
@@ -176,6 +177,7 @@ Shader "CM/Toon"
                 // Glows are self-lit: unshaded, no rim.
                 color = selfLit > 0.5h ? albedo : color;
                 color = CMToonWater(color, input.positionWS, normalWS);
+                color = lerp(color, _HitFlash.rgb, saturate(_HitFlash.a));   // px impact pop: the unshaded hit flash
                 return half4(CMToonFog(color, input.positionWS), 1.0);
             }
             ENDHLSL

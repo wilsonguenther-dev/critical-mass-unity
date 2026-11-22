@@ -96,8 +96,16 @@ namespace CriticalMass.Runtime.Hud.Mechanics
         }
     }
 
+    /// <summary>Fix round 5 (item 6, review pass 4: the enemy's name dropped off his health bar on the impact frame). The
+    /// name tags were placed in this LateUpdate at the default order 0, BEFORE CameraShake (150) adds the hit kick, while the
+    /// bars are placed by GameHud (200), AFTER it: on a kick frame they were projected through two different cameras and
+    /// parted by the kick (14-20 px). This runs after both (210), so name and bar use the camera as it renders.</summary>
+    [DefaultExecutionOrder(DepthHud.LateOrder)]
     public sealed class DepthHud : MonoBehaviour
     {
+        /// <summary>After CameraShake (150) and GameHud (200), before LowViewTags (1100).</summary>
+        public const int LateOrder = 210;
+
         public const int SortingOrder = 14;
         public const int Tags = 20, Bubbles = 8, Floats = 10, Coins = 8, MaxSources = 12, MaxPowers = 6;
         /// <summary>Bot name tags show within this many sim units of the local player.</summary>

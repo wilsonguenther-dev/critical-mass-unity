@@ -629,7 +629,7 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
         public static bool Line(string id, string what, string measured, string target, bool pass)
         {
             Console.WriteLine("[px] " + id + " | " + what + " | " + measured + " | " + target + " | " + (pass ? "PASS" : "FAIL"));
-            string dir = Environment.GetEnvironmentVariable("CM_PX_DATA_DIR");
+            string dir = DataDir();
             if (!string.IsNullOrEmpty(dir))
             {
                 try
@@ -644,9 +644,19 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
             return pass;
         }
 
-        public static void Csv(string file, string header, string row)
+        /// <summary>CM_PX_DATA_DIR with a leading "~" expanded (the shell does not expand it inside quotes; a literal "~"
+        /// once wrote the data into a folder named "~" in the worktree).</summary>
+        static string DataDir()
         {
             string dir = Environment.GetEnvironmentVariable("CM_PX_DATA_DIR");
+            if (!string.IsNullOrEmpty(dir) && (dir == "~" || dir.StartsWith("~/")))
+                dir = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), dir.Length > 2 ? dir.Substring(2) : "");
+            return dir;
+        }
+
+        public static void Csv(string file, string header, string row)
+        {
+            string dir = DataDir();
             if (string.IsNullOrEmpty(dir)) return;
             try
             {

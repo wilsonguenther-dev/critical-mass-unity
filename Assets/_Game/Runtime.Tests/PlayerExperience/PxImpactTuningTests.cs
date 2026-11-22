@@ -273,9 +273,101 @@ namespace CriticalMass.Runtime.Tests
             Assert.LessOrEqual(HitFeelTuning.FlashSeconds(true, true), HitFeelTuning.FlashMinGapSeconds * 0.6);
             Assert.AreEqual(HitFeelTuning.FlashSeconds(true), HitFeelTuning.FlashSeconds(true, false));
             Assert.AreEqual(HitFeelTuning.FlashSeconds(false), HitFeelTuning.FlashSeconds(false, true));
-            Assert.LessOrEqual(HitFeelTuning.NearSpark3PSize, 0.35f);
-            Assert.LessOrEqual(HitFeelTuning.NearSpark3PLife, 0.1);
             Assert.That(HitFeelTuning.NearSpark3PLines, Is.InRange(3, 4));
+        }
+
+        /// <summary>Fix round 5 (impact pop): the third-person burst sits on the victim's camera-near side, beside his body
+        /// centre across the view by more than its own radius (his centre stays clear), on the attacker's weapon side, and
+        /// within a burst of him (never floating off); bigger than the pass-4 0.6 share, smaller than the pass-2 full size.</summary>
+        [Test]
+        public void TheThirdPersonBurstSitsNearSideBesideTheVictimNeverOverHisCentre()
+        {
+            float r = 0.4f;
+            float size = HitFeelTuning.BurstSize(0, true, 20) * HitFeelTuning.Burst3PShare;
+            Assert.That(HitFeelTuning.Burst3PShare, Is.InRange(0.7f, 0.9f));
+            var chest = new UnityEngine.Vector3(0f, 0.95f, 0f);
+            foreach (float camDeg in new[] { 0f, 36f, -36f, 90f, 180f })
+            {
+                float a = camDeg * UnityEngine.Mathf.Deg2Rad;
+                var lens = chest + new UnityEngine.Vector3(UnityEngine.Mathf.Sin(a), 0.8f, -UnityEngine.Mathf.Cos(a)) * 3.2f;   // a 3P lens 3.2 u off, any yaw
+                var hitDir = new UnityEngine.Vector3(UnityEngine.Mathf.Sin(a + 0.4f), 0f, UnityEngine.Mathf.Cos(a + 0.4f));   // attacker roughly between lens and him
+                UnityEngine.Vector3 p = HitFeelTuning.ContactSpark3P(chest, lens, hitDir, r, size);
+                UnityEngine.Vector3 toLens = lens - chest; toLens.y = 0f; toLens.Normalize();
+                UnityEngine.Vector3 across = new UnityEngine.Vector3(toLens.z, 0f, -toLens.x);
+                UnityEngine.Vector3 off = p - chest;
+                Assert.Greater(UnityEngine.Vector3.Dot(off, toLens), 0.9f * r, "near side at " + camDeg);
+                float side = UnityEngine.Mathf.Abs(UnityEngine.Vector3.Dot(off, across));
+                Assert.Greater(side, size * 0.5f, "his centre clear of the burst at " + camDeg);
+                Assert.Less(side, size * 0.5f + r, "the burst still touches his edge at " + camDeg);
+                UnityEngine.Vector3 weapon = new UnityEngine.Vector3(hitDir.z, 0f, -hitDir.x);
+                Assert.Greater(UnityEngine.Vector3.Dot(off, across) * UnityEngine.Vector3.Dot(weapon, across), 0f, "on the weapon side at " + camDeg);
+                Assert.AreEqual(chest.y, p.y, 1e-4f, "chest height");
+            }
+        }
+
+        /// <summary>Fix round 5 (item 4): the predicted wind-up commits on the press frame (>= 0.8 of the pose by 2 frames of
+        /// 60 fps after it), holds short of the strike while the sim's tick is pending, and gives up after the timeout.</summary>
+        [Test]
+        public void APredictedPressCommitsTheWindupWithinTwoFrames()
+        {
+            double windup = 12 / 30.0;
+            Assert.IsTrue(HitFeelTuning.PredictedSwing(0, windup, out double a0, out float w0));
+            Assert.Greater(w0, 0.3f, "the press frame already moves");
+            Assert.IsTrue(HitFeelTuning.PredictedSwing(2 / 60.0, windup, out _, out float w2));
+            Assert.GreaterOrEqual(w2, 0.8f, "committed by 2 frames");
+            Assert.IsTrue(HitFeelTuning.PredictedSwing(0.1, windup, out double a6, out _));
+            Assert.LessOrEqual(a6, windup * HitFeelTuning.PredictHoldShare + 1e-9, "never the strike before the sim swings");
+            Assert.IsFalse(HitFeelTuning.PredictedSwing(HitFeelTuning.PredictTimeout + 0.01, windup, out _, out _), "a refused press fades");
+        }
+
+        /// <summary>Fix round 5 (item 9): a missing or empty input-actions asset is named (so OnEnable logs one error and
+        /// hands the seat to the autopilot) instead of throwing; a complete Player map passes.</summary>
+        [Test]
+        public void AMissingOrEmptyInputActionsAssetIsNamedNotThrown()
+        {
+            Assert.IsNotNull(CriticalMass.Runtime.Input.HumanInputSource.ActionsProblem(null));
+            var asset = UnityEngine.ScriptableObject.CreateInstance<UnityEngine.InputSystem.InputActionAsset>();
+            try
+            {
+                StringAssert.Contains("no Player map", CriticalMass.Runtime.Input.HumanInputSource.ActionsProblem(asset));
+                var map = asset.AddActionMap("Player");
+                map.AddAction("Move");
+                StringAssert.Contains("'Point'", CriticalMass.Runtime.Input.HumanInputSource.ActionsProblem(asset));
+                foreach (string a in CriticalMass.Runtime.Input.HumanInputSource.RequiredActions)
+                    if (map.FindAction(a, false) == null) map.AddAction(a);
+                Assert.IsNull(CriticalMass.Runtime.Input.HumanInputSource.ActionsProblem(asset));
+            }
+            finally { UnityEngine.Object.DestroyImmediate(asset); }
+        }
+
+        /// <summary>Fix round 5 (item 8): the first-match class-pick card's body line is 26 px at 1080p (at least 22 if it must
+        /// shrink), three lines fit its box, and DIFFICULTY is above the 16 px floor.</summary>
+        [Test]
+        public void TheClassPickCardBodyTextIsReadableAt1080p()
+        {
+            Assert.GreaterOrEqual(CriticalMass.Runtime.Menus.StarterPick.BodyType, 26);
+            Assert.GreaterOrEqual(CriticalMass.Runtime.Menus.StarterPick.BodyTypeMin, 22);
+            Assert.LessOrEqual(3 * CriticalMass.Runtime.Menus.StarterPick.BodyType * CriticalMass.Runtime.Menus.StarterPick.BodyLineSpacing,
+                CriticalMass.Runtime.Menus.StarterPick.BodyBoxH, "three lines fit the box");
+            Assert.Greater(CriticalMass.Runtime.Menus.StarterPick.DifficultyType, CriticalMass.Runtime.Hud.Style.UiScale.TypeMin);
+        }
+
+        static int OrderOf(Type t)
+        {
+            var a = (UnityEngine.DefaultExecutionOrder)Attribute.GetCustomAttribute(t, typeof(UnityEngine.DefaultExecutionOrder));
+            return a != null ? a.order : 0;
+        }
+
+        /// <summary>Fix round 5 (item 6): the enemy name tags (DepthHud) are placed after the hit kick (CameraShake) and after
+        /// the health bars (GameHud), through the same camera, so the name never parts from his bar on an impact frame; and
+        /// before LowViewTags, which scales and hides them afterwards.</summary>
+        [Test]
+        public void NameTagsArePlacedAfterTheKickLikeTheHealthBars()
+        {
+            int tags = OrderOf(typeof(CriticalMass.Runtime.Hud.Mechanics.DepthHud));
+            Assert.Greater(tags, OrderOf(typeof(CameraShake)), "after the kick is applied");
+            Assert.GreaterOrEqual(tags, OrderOf(typeof(CriticalMass.Runtime.Hud.GameHud)), "with the bars' camera");
+            Assert.Less(tags, OrderOf(typeof(CriticalMass.Runtime.View.LowViewTags)), "before the low-view tag pass");
         }
 
         [Test]
@@ -348,11 +440,12 @@ namespace CriticalMass.Runtime.Tests
             GameConfig cfg = GameConfig.CreateDefault();
             double decay = Knock.DecayPerTick(cfg), hz = cfg.SimHz;
             double t = HitFeelTuning.KnockCheckSeconds;
-            // the interpolated sim body alone, one tick behind at worst (2 of the 3 ticks in 100 ms), for the knocks up to a
-            // Warrior-on-Warrior swing (0.56 u); bigger knocks are below (the 0.35 u placement check limits the lead)
+            // fix round 5 (item 7): a fresh knock is drawn at the CURRENT tick (KnockAlphaLead 1), no longer up to a tick
+            // behind it, so the sim body's share at 100 ms is the full 3 ticks
+            Assert.AreEqual(1.0, HitFeelTuning.KnockAlphaLead(t), 1e-9, "no interpolation lag at 100 ms");
             foreach (double k in new[] { 0.19, 0.3, 0.44, 0.56 })
             {
-                double sim = k * HitFeelTuning.SimKnockShare(t * hz - 1, decay);
+                double sim = k * HitFeelTuning.SimKnockShare(t * hz, decay);
                 double drawn = sim + HitFeelTuning.KnockLead(t, k, sim);
                 TestContext.Progress.WriteLine($"[px knock] {k:0.00} u: sim alone {sim:0.000} u, drawn {drawn:0.000} u ({drawn / k:0.00}x) at {t * 1000:0} ms");
                 Assert.GreaterOrEqual(drawn, HitFeelTuning.KnockShare * k - 1e-9, $"knock {k} u: at least 0.8x drawn by 100 ms");
@@ -373,6 +466,31 @@ namespace CriticalMass.Runtime.Tests
             Assert.AreEqual(0, HitFeelTuning.KnockLead(HitFeelTuning.KnockLeadFadeTo, 1.0, 0.0), "the lead is gone by 0.6 s even against a wall");
             Assert.AreEqual(0, HitFeelTuning.KnockLead(0.05, 0.5, 0.6), "no lead once the body is past the want");
             Assert.LessOrEqual(HitFeelTuning.MaxDrawnOffset, 0.35f, "inside the play-mode placement check (0.35 u)");
+        }
+
+        /// <summary>Fix round 5 (item 7): big knocks (up to 1.6 u) draw at least the sim body's own travel at 100 ms (the old
+        /// one-tick interpolation lag drew 0.53-0.72 of it), and the lag returns smoothly once the slide is over.</summary>
+        [Test]
+        public void BigKnocksDrawAtLeastTheSimBodyTravelAtAHundredMilliseconds()
+        {
+            GameConfig cfg = GameConfig.CreateDefault();
+            double decay = Knock.DecayPerTick(cfg), hz = cfg.SimHz, t = HitFeelTuning.KnockCheckSeconds;
+            foreach (double k in new[] { 0.9, 1.2, 1.6 })
+            {
+                double sim = k * HitFeelTuning.SimKnockShare(t * hz, decay);          // the sim body at 100 ms
+                double lagged = k * HitFeelTuning.SimKnockShare(t * hz - 1, decay);   // the old draw: one tick behind
+                double drawn = lagged + (sim - lagged) * HitFeelTuning.KnockAlphaLead(t) + HitFeelTuning.KnockLead(t, k, sim);
+                TestContext.Progress.WriteLine($"[px big knock] {k:0.00} u: sim body {sim:0.000}, old draw {lagged / sim:0.00}x of it, now {drawn / sim:0.00}x");
+                Assert.GreaterOrEqual(drawn, sim - 1e-9, $"knock {k} u drawn at least the sim body's travel");
+            }
+            Assert.AreEqual(0.0, HitFeelTuning.KnockAlphaLead(HitFeelTuning.KnockAlphaFade), 1e-9, "plain interpolation after the slide");
+            double prev = 1;
+            for (double a = HitFeelTuning.KnockAlphaHold; a <= HitFeelTuning.KnockAlphaFade; a += 1 / 60.0)
+            {
+                double v = HitFeelTuning.KnockAlphaLead(a);
+                Assert.LessOrEqual(prev - v, 0.12 + 1e-9, "fades over several frames, no step");
+                prev = v;
+            }
         }
 
         // ---------------------------------------------------------------- 1d. burst

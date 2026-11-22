@@ -83,6 +83,45 @@ namespace CriticalMass.Runtime.View.Anim
         /// <summary>Fix round 2: the attack pose weight drawn this frame when a swing clip is playing (0 otherwise).</summary>
         public float SwingWeightNow => _kind == 1 && _actClip != null ? _lastActW : 0f;
 
+        // fix round 5 (item 4): a local press shown before the sim's tick takes it (presentation only).
+        bool _predicting;
+        double _predWall;
+        int _predSwingTick;
+        float _predFloor;
+        double _predFloorT;
+        public bool Predicting => _predicting;
+
+        /// <summary>Fix round 5 (item 4): the local player pressed attack this frame and the sim would accept it next step:
+        /// start the attack clip's wind-up now (the sim's AttackStart continues it without a crossfade).</summary>
+        public void PredictSwing(ModelView m, Actor actor, GameConfig cfg, double simTime)
+        {
+            if (m == null || actor == null || _predicting || (_kind == 1 && _actClip != null && _lastActW > 0f)) return;
+            string clip = AttackTiming.AttackClip(m, actor.Cls);
+            if (clip == null || !m.HasClip(clip)) return;
+            if (_actClip != null && _lastActW > 0f)
+            {
+                _prevClip = _actClip; _prevTime = _lastActTime; _prevW = _lastActW; _prevLoop = false; _prevAt = simTime; _slot = 1 - _slot;
+            }
+            _feinting = false;
+            _whiffTwist = _whiffPitch = 0f;
+            _kind = 1;
+            _actClip = clip;
+            if (!_reachMeasured || _tipModel != m || _vcClip != clip) MeasureReach(m, actor, clip);
+            if (_exModel != m || _exClip != clip)
+            {
+                _exModel = m;
+                _exClip = clip;
+                _exTime = AttackTiming.ExtremeNow(m, clip, ViewContact(clip, ClipFacts.Contact(clip, m.ClipLength(clip) * 0.5f)));
+            }
+            _actExtreme = _exTime;
+            _swingStartFrame = Time.frameCount; _commitPending = true; _commitReady = false;
+            _lastActW = 0f;
+            _predicting = true;
+            _predWall = Time.unscaledTimeAsDouble;
+            _predSwingTick = actor.SwingTick;
+            _predFloor = 0f;
+        }
+
         public bool TakeSwingCommit(out float weight)
         {
             weight = _commitW;
@@ -741,6 +780,27 @@ namespace CriticalMass.Runtime.View.Anim
             double hz = w.Config.SimHz;
             double len = m.ClipLength(_actClip);
             double windup = AttackTiming.SwingWindupSeconds(actor, hz);   // the sim's own swing: contact on SwingTick + SwingWindup
+            if (_predicting)
+            {
+                // fix round 5 (item 4): before the sim's tick: the wind-up from the press, held short of the strike
+                double cfgWindup = (double)w.Dur.AttackWindup[(int)actor.Cls] / hz;
+                if (actor.SwingTick == _predSwingTick && HitFeelTuning.PredictedSwing(Time.unscaledTimeAsDouble - _predWall, cfgWindup, out double pAge, out float pW))
+                {
+                    t = AttackTiming.ClipTime(pAge, ViewContact(_actClip, ClipFacts.Contact(_actClip, (float)(len * 0.5))), len, cfgWindup, _actExtreme);
+                    actW = pW;
+                    return true;
+                }
+                if (actor.SwingTick == _predSwingTick && commit)
+                {
+                    // the sim refused (cooldown, stun, TNT): fade it out like a feint
+                    _predicting = false;
+                    _feinting = true;
+                    _feintAt = simTime;
+                    _feintFromT = _lastActTime;
+                    _feintFromW = Math.Max(_lastActW, 0.01f);
+                }
+                else if (actor.SwingTick != _predSwingTick) _predicting = false;
+            }
             double age = AttackTiming.SwingAge(actor, w.Tick, alpha, hz);
             double rawAge = age;
             if (combat != null && hasFx) age = combat.AttackTime(i, age, fx); // the attacker freezes on contact during the hold
@@ -752,6 +812,13 @@ namespace CriticalMass.Runtime.View.Anim
             if (whiff && age > windup) contactAge = windup + (age - windup) * HitFeelTuning.WhiffRate;   // swing through
             t = AttackTiming.ClipTime(contactAge, ViewContact(_actClip, ClipFacts.Contact(_actClip, (float)(len * 0.5))), len, windup, _actExtreme);
             actW = AttackTiming.Envelope(age, t, len, windup, i == LocalSeat.Actor);
+            if (_predFloor > 0f)
+            {
+                // fix round 5 (item 4): after a predicted start the pose never drops below what the press frame drew, and
+                // the clip never steps back before the predicted wind-up time, until the sim's own envelope passes them
+                if (actW >= _predFloor && t >= _predFloorT) _predFloor = 0f;
+                else { actW = Math.Max(actW, _predFloor); t = Math.Max(t, _predFloorT); }
+            }
             // feint: the sim dropped the wind-up (b16 CANCEL Value 1): rewind to the start and fade out, visibly aborted
             if (feed != null && i < feed.FeintTick.Length && feed.FeintTick[i] >= actor.SwingTick && actor.SwingTick > 0 && feed.FeintTick[i] != _feintSeen)
             {
@@ -886,7 +953,12 @@ namespace CriticalMass.Runtime.View.Anim
             if (clip != null && !m.HasClip(clip)) clip = null;
             // a skill cue (not a melee press this tick) plays its own clip on the ability timing
             if (cue != null && !attack && m.HasClip(cue)) { clip = cue; kind = 2; }
-            if (_actClip != null && _lastActW > 0f)
+            // fix round 5 (item 4): the sim took the predicted press: continue the same clip, no crossfade, the pose never dips
+            bool fromPredict = _predicting && kind == 1 && clip != null && clip == _actClip;
+            _predicting = false;
+            if (fromPredict) { _predFloor = _lastActW; _predFloorT = _lastActTime; }
+            else _predFloor = 0f;
+            if (_actClip != null && _lastActW > 0f && !fromPredict)
             {
                 _prevClip = _actClip;
                 _prevTime = _lastActTime;
@@ -909,7 +981,8 @@ namespace CriticalMass.Runtime.View.Anim
             _actExtreme = kind == 1 && clip != null ? _exTime : -1;
             if (kind == 1 && clip != null) { _swingStartFrame = Time.frameCount; _commitPending = true; _commitReady = false; }
             _actStart = simTime - aa;
-            _lastActW = 0f;
+            if (fromPredict) { _commitPending = false; _commitReady = false; }   // the press frame already committed
+            _lastActW = fromPredict ? _predFloor : 0f;
             _breakAt = -1;
             _idleT = 0;
         }
