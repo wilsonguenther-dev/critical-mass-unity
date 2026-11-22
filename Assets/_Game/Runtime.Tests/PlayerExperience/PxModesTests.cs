@@ -205,12 +205,43 @@ namespace CriticalMass.Runtime.Tests.PlayerExperience
                     Assert.AreEqual(StarterPick.Does(c), p.CardLine(c));
                 }
                 Assert.AreEqual(3, p.RecommendedMarks, "three RECOMMENDED marks");
+                // pass 3 review: the labels existed but drew nothing. Every label must have its words, a font, a colour
+                // that differs from what it sits on, and a preferred width above zero.
+                foreach (ClassId c in StarterPick.Order)
+                {
+                    Color card = p.CardItem(c).Body.FillColor;
+                    foreach (Text t in p.CardLabels(c)) AssertDraws(t, card, c + " " + t.name);
+                    Text bw = p.BadgeWord(c);
+                    if (!p.IsRecommended(c)) { Assert.IsNull(bw, c + " has no badge"); continue; }
+                    var pill = bw.transform.parent.GetComponent<CriticalMass.Runtime.Hud.Ui.VectorShape>();
+                    Assert.IsNotNull(pill);
+                    AssertDraws(bw, pill.FillColor, c + " badge");
+                    Assert.AreEqual("RECOMMENDED", bw.text);
+                    // the tab sits above the card, never over the name
+                    RectTransform tab = (RectTransform)pill.transform, cardRt = (RectTransform)p.CardItem(c).transform;
+                    Vector3[] a = new Vector3[4], b = new Vector3[4];
+                    tab.GetWorldCorners(a);
+                    cardRt.GetWorldCorners(b);
+                    Assert.GreaterOrEqual(a[0].y, b[1].y - 1f, c + ": the tab's bottom edge is at or above the card's top edge");
+                }
                 foreach (ClassId c in new[] { ClassId.Farmer, ClassId.Warrior, ClassId.Miner }) Assert.IsTrue(p.IsRecommended(c), c + " is marked");
             }
             finally
             {
                 Object.DestroyImmediate(go);
             }
+        }
+
+        static void AssertDraws(Text t, Color behind, string what)
+        {
+            Assert.IsNotNull(t, what);
+            Assert.IsFalse(string.IsNullOrEmpty(t.text), what + ": has words");
+            Assert.IsNotNull(t.font, what + ": has a font");
+            Assert.Greater(t.color.a, 0.2f, what + ": is not transparent");
+            float d = Mathf.Abs(t.color.r - behind.r) + Mathf.Abs(t.color.g - behind.g) + Mathf.Abs(t.color.b - behind.b);
+            Assert.Greater(d, 0.3f, what + ": its colour differs from what it sits on");
+            Assert.Greater(t.preferredWidth, 0f, what + ": draws something");
+            Assert.IsTrue(t.gameObject.activeInHierarchy || !t.transform.root.gameObject.activeSelf, what + ": active");
         }
 
         [Test]

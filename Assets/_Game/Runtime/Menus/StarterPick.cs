@@ -32,6 +32,34 @@ namespace CriticalMass.Runtime.Menus
         readonly Dictionary<ClassId, MenuItem> _cards = new Dictionary<ClassId, MenuItem>();
         readonly Dictionary<ClassId, Text[]> _texts = new Dictionary<ClassId, Text[]>();
         readonly Dictionary<ClassId, GameObject> _marks = new Dictionary<ClassId, GameObject>();
+        readonly Dictionary<ClassId, Text> _badgeWords = new Dictionary<ClassId, Text>();
+        readonly List<KeyValuePair<Text, string>> _words = new List<KeyValuePair<Text, string>>();
+
+        /// <summary>Gives a label its words through the containment rule (and remembers them so OnShow re-applies them
+        /// once the canvas has its real size).</summary>
+        void Words(Text t, string s)
+        {
+            if (t == null) return;
+            _words.Add(new KeyValuePair<Text, string>(t, s));
+            Apply(t, s);
+        }
+
+        static void Apply(Text t, string s)
+        {
+            ContainedText c = ContainedText.Of(t);
+            if (c != null) c.SetSource(s);
+            else t.text = s;
+        }
+
+        protected override void OnShow()
+        {
+            for (int i = 0; i < _words.Count; i++) Apply(_words[i].Key, _words[i].Value);
+        }
+
+        /// <summary>Tests: the labels of card c (name, line, difficulty word) and its badge word (null if not recommended).</summary>
+        public Text[] CardLabels(ClassId c) => _texts.TryGetValue(c, out Text[] t) ? t : null;
+        public Text BadgeWord(ClassId c) => _badgeWords.TryGetValue(c, out Text t) ? t : null;
+        public MenuItem CardItem(ClassId c) => _cards.TryGetValue(c, out MenuItem m) ? m : null;
 
         /// <summary>px lane F (pass 2 review: "cards have empty bodies"): what card c shows (tests and captures).</summary>
         public string CardTitle(ClassId c) => _texts.TryGetValue(c, out Text[] t) ? t[0].text : null;
@@ -85,10 +113,12 @@ namespace CriticalMass.Runtime.Menus
 
         protected override void BuildContent(RectTransform space)
         {
-            MenuUi.Label(space, "Title", CMTokens.Display, UiScale.TypeDisplay, Cream, TextAnchor.MiddleLeft, 152f, 52f, 1300f, 70f, "PICK YOUR FIGHTER", 4f);
-            MenuUi.Label(space, "Sub", CMTokens.Ui, UiScale.TypeBody, CMTokens.WithAlpha(Cream, 0.88f), TextAnchor.MiddleLeft, 152f, 124f, 1500f, 40f,
-                "New here? The top row is the easiest start. You can switch class at every respawn.", 2f);
-            MenuUi.Label(space, "Recommended", CMTokens.Ui, UiScale.TypeMin, Brass, TextAnchor.MiddleLeft, 152f, Row0 - 34f, 600f, 28f, "RECOMMENDED TO START", 2f);
+            // pass 3 review: labels given their words at creation showed blank in the standalone copy (the containment rule,
+            // ContainedText, is attached by HudText.Make before the box is placed); every label here is built empty and gets
+            // its words through Words() -> ContainedText.SetSource, as the screens that render (VersusSetup) do via HudText.Set.
+            Words(MenuUi.Label(space, "Title", CMTokens.Display, UiScale.TypeDisplay, Cream, TextAnchor.MiddleLeft, 152f, 52f, 1300f, 70f, "", 4f), "PICK YOUR FIGHTER");
+            Words(MenuUi.Label(space, "Sub", CMTokens.Ui, UiScale.TypeBody, CMTokens.WithAlpha(Cream, 0.88f), TextAnchor.MiddleLeft, 152f, 118f, 1500f, 40f, "", 2f),
+                "New here? The top row is the easiest start. You can switch class at every respawn.");
             for (int i = 0; i < Order.Length; i++)
             {
                 int col = i % 3, row = i / 3;
@@ -110,29 +140,24 @@ namespace CriticalMass.Runtime.Menus
             card.Submitted = () => Pick(pick);
             _cards[c] = card;
             Transform t = card.transform;
-            Text name = MenuUi.Label(t, "Name", CMTokens.Display, UiScale.TypeLead, Cream, TextAnchor.MiddleLeft, 28f, 24f, CardW - 56f, 54f, FlowWords.ClassName(c), 3f);
+            Text name = MenuUi.Label(t, "Name", CMTokens.Display, UiScale.TypeLead, Cream, TextAnchor.MiddleLeft, 28f, 24f, CardW - 56f, 54f, "", 3f);
             MenuUi.Fit(name, UiScale.TypeSmall);
-            Text line = MenuUi.Label(t, "Does", CMTokens.Ui, UiScale.TypeBody, Cream, TextAnchor.UpperLeft, 28f, 88f, CardW - 56f, 104f, Does(c), 2f);
+            Words(name, FlowWords.ClassName(c));
+            Text line = MenuUi.Label(t, "Does", CMTokens.Ui, UiScale.TypeBody, Cream, TextAnchor.UpperLeft, 28f, 88f, CardW - 56f, 104f, "", 2f);
             line.horizontalOverflow = HorizontalWrapMode.Wrap;
-            line.verticalOverflow = VerticalWrapMode.Overflow;   // never truncate to nothing when the text scale grows
+            line.lineSpacing = 1.05f;
+            Words(line, Does(c));
+            Text dl = MenuUi.Label(t, "Difficulty Label", CMTokens.Ui, UiScale.TypeMin, CMTokens.WithAlpha(Cream, 0.75f), TextAnchor.MiddleLeft, 28f, 198f, 140f, 28f, "", 2f);
+            Words(dl, "DIFFICULTY");
             if (recommended)
             {
-                // the RECOMMENDED badge on the card itself (the row heading alone was missed in the review)
-                VectorShape badge = MenuUi.Shape(t, "Recommended Badge", ShapeKind.RoundRect, CardW - 236f, 26f, 208f, 40f, Brass, 12f);
+                // a corner tab ABOVE the card (pass 3: a pill inside the card covered the name): brass tab, navy word
+                VectorShape badge = MenuUi.Shape(space, "Recommended Tab " + c, ShapeKind.RoundRect, x + 18f, y - 36f, 220f, 34f, Brass, 10f);
                 badge.RimPx = 0f;
-                Text bt = MenuUi.Label(badge.transform, "Word", CMTokens.Ui, UiScale.TypeMin, Navy, TextAnchor.MiddleCenter, 0f, 0f, 208f, 40f, "RECOMMENDED", 0f);
-                bt.raycastTarget = false;
+                Text bt = MenuUi.Label(badge.transform, "Word", CMTokens.Ui, UiScale.TypeMin, Navy, TextAnchor.MiddleCenter, 0f, 0f, 220f, 34f, "", 0f);
+                Words(bt, "RECOMMENDED");
                 _marks[c] = badge.gameObject;
-                MenuUi.Fit(name, UiScale.TypeSmall);
-                name.rectTransform.sizeDelta = new Vector2(CardW - 56f - 220f, name.rectTransform.sizeDelta.y);
-            }
-            line.lineSpacing = 1.05f;
-            Text dl = MenuUi.Label(t, "Difficulty Label", CMTokens.Ui, UiScale.TypeMin, CMTokens.WithAlpha(Cream, 0.75f), TextAnchor.MiddleLeft, 28f, 198f, 140f, 28f, "DIFFICULTY", 2f);
-            for (int k = 0; k < 3; k++)
-            {
-                VectorShape pip = MenuUi.Shape(t, "Pip " + k, ShapeKind.Diamond, 180f + k * 34f, 200f, 24f, 24f, k < Pips(c) ? Brass : CMTokens.MeterEmpty.Color, 4f);
-                pip.RimPx = 0f;
-                pip.OutlinePx = 2f;
+                _badgeWords[c] = bt;
             }
             _texts[c] = new[] { name, line, dl };
         }
