@@ -255,6 +255,7 @@ namespace CriticalMass.Runtime.Audio.Sound
             bool m = GameSettings.MasterVolume <= 0.001f || GameSettings.EffectsVolume <= 0.001f;
             if (m && !_muted) StopAll(false);
             _muted = m;
+            if (m) MusicDirector.LowHealthDuck = 1f;
         }
 
         private void OnRelic(int index) => PlayUiCue(SoundTable.EdgeCue(SoundEdge.RelicPickup), 1f);
@@ -400,6 +401,9 @@ namespace CriticalMass.Runtime.Audio.Sound
             CueDef c = SoundTable.Cue(r.Cue);
             if (c == null) return;
             if (!PlayCue(r.Cue, r.X, r.Z, r.Own, r.Threat, r.Gain, r.Rate, r.Tick)) return;
+            // px lane F: the cue really started: write it to the player-feedback ledger (value = its mixer gain).
+            if (r.Feedback > 0 && _lastSlot >= 0)
+                CriticalMass.Runtime.Game.PlayerFeedback.Report((CriticalMass.Runtime.Game.FeedbackChannel)(r.Feedback - 1), r.FeedbackActor, _lastGain, _src[_lastSlot], r.Reason);
             if (c.Layer != null) PlayCue(SoundTable.IndexOf(c.Layer), r.X, r.Z, r.Own, r.Threat, r.Gain * c.LayerGain, r.Rate, r.Tick);
         }
 
@@ -447,10 +451,52 @@ namespace CriticalMass.Runtime.Audio.Sound
 
         // ------------------------------------------------------------------ playing
 
-        private void PlayUiCue(int cue, float gain)
+        private bool PlayUiCue(int cue, float gain)
         {
-            if (cue < 0) return;
-            PlayCue(cue, _lx, _lz, true, false, gain, 1f, Time.frameCount);
+            if (cue < 0) return false;
+            return PlayCue(cue, _lx, _lz, true, false, gain, 1f, Time.frameCount);
+        }
+
+        // px lane F: the slot and mixer gain of the last cue PlayCue started (the feedback ledger's source and value).
+        private int _lastSlot = -1;
+        private float _lastGain;
+        private double _nextBeat;
+        private int _heartCue = -2;
+
+        /// <summary>
+        /// px lane F: the autopilot cue outside the event stream (a HUD or flow caller). AutopilotChanged itself is routed by
+        /// the feed (SoundTable Pick.Autopilot), so the event never needs this. Captioned ("Autopilot on" / "You have control").
+        /// </summary>
+        public static bool PlayAutopilot(bool on) => Instance != null && Instance.PlayUiCue(SoundTable.IndexOf(on ? "autopilot_on" : "autopilot_off"), 1f);
+
+        /// <summary>
+        /// px lane F, combine hook for CriticalHit (A victim, B attacker, Value kind 1 counter / 2 punish / 3 back hit): a hard
+        /// crack with a high ring at the victim, own priority when I am either side, a little brighter for a back hit. The event
+        /// itself is routed by the feed (SoundTable Pick.Critical); this is for a caller outside the event stream.
+        /// </summary>
+        public static bool PlayCritical(int victim, int attacker, int kind)
+        {
+            SoundDirector d = Instance;
+            World w = d != null && d._driver != null ? d._driver.World : null;
+            if (w == null || victim < 0 || victim >= w.ActorCount) return false;
+            int cue = SoundTable.IndexOf("critical_hit");
+            bool own = victim == LocalSeat.Actor || attacker == LocalSeat.Actor;
+            return d.PlayCue(cue, w.X[victim], w.Z[victim], own, victim == LocalSeat.Actor, own ? 1f : 0.7f, kind == 3 ? 1.08f : 1f, w.Tick);
+        }
+
+        /// <summary>px lane F: one heartbeat every 1 / rate seconds while the feed's Heartbeat is on; the music dips slightly.</summary>
+        private void UpdateHeartbeat()
+        {
+            float rate = _feed.Heart.Rate;
+            bool live = rate > 0f && !_paused && !_muted && !_title;
+            MusicDirector.LowHealthDuck = live ? Heartbeat.MusicDuck : 1f;
+            double now = Time.unscaledTimeAsDouble;
+            if (!live) { _nextBeat = 0; return; }
+            if (now < _nextBeat) return;
+            _nextBeat = now + 1.0 / rate;
+            if (_heartCue == -2) _heartCue = SoundTable.IndexOf("heartbeat");
+            if (PlayUiCue(_heartCue, 1f) && _lastSlot >= 0)
+                CriticalMass.Runtime.Game.PlayerFeedback.Report(CriticalMass.Runtime.Game.FeedbackChannel.LowHealthCue, LocalSeat.Actor, rate, _src[_lastSlot]);
         }
 
         /// <summary>Gain after distance (0 = inaudible), pan and the low-pass cutoff for a cue at sim (x, z).</summary>
@@ -517,6 +563,8 @@ namespace CriticalMass.Runtime.Audio.Sound
         {
             SoundDirector d = Instance;
             World w = d != null && d._driver != null ? d._driver.World : null;
+            // px lane F: the sim's StructureHit event already played this knock (SoundFeed Pick.Structure): no second one.
+            if (w != null && w.Tick - d._feed.LastStructureTick <= 3) return false;
             bool wall = w != null && CriticalMass.Sim.Core.BuilderWalls.IsWallSlot(w, slot);
             return PlayCueAt(wall ? "sb_wall_hit" : "barricade_hit", simX, simZ);
         }
@@ -567,6 +615,8 @@ namespace CriticalMass.Runtime.Audio.Sound
             int slot = _plan.Request(cue, SoundSpace.Priority(c.Priority, g, own, threat), now, clip.length / pitch + delay, own);
             if (slot < 0) { Refused++; return false; }
             AudioSource s = _src[slot];
+            _lastSlot = slot;
+            _lastGain = gain;
             s.Stop();
             s.clip = clip;
             s.pitch = pitch;
@@ -699,6 +749,7 @@ namespace CriticalMass.Runtime.Audio.Sound
                 }
                 UpdateLoops(w);
                 UpdateBirds(w);
+                UpdateHeartbeat();
                 if (Time.unscaledTimeAsDouble >= _levelUpAt)
                 {
                     _levelUpAt = double.MaxValue;

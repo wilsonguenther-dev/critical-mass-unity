@@ -9,7 +9,8 @@
 #              [--player-args "FLAGS"]   (feat/ground-camera: the same as --extra, word-split; both kept)
 #   air-run.sh --id RUN_ID --exec 'COMMAND' [--lock-wait S]   (tools/remote-run.sh: any command, same queue lock, run
 #              by bash in ~/cm-remote/work with ~/cm-remote/env.sh sourced: ffmpeg, the Python venv, dotnet on PATH;
-#              output in runs/<id>/output.txt)
+#              output in runs/<id>/output.txt) [--exec-timeout S]   (feat/air-test-machine: hard limit for --exec in
+#              seconds, the whole process group is stopped and the state is "done 124"; 0 = none, the default)
 # Everything lives under ~/cm-remote: builds/<commit>/CriticalMass.app, runs/<id>/ (Player.log, perf*.json,
 # samples.tsv, run.env, data/ with shot-*.png), lock.d/ (one job at a time), and the run's "state" file the
 # caller polls: "uploaded", "waiting <who holds the lock>", "running <pid>", "done <exit code>".
@@ -18,7 +19,7 @@
 set -u
 BASE="$HOME/cm-remote"
 ID=""; BUILD=""; MATCHES=1; TITLE_S=12; TIMEOUT=900; QUALITY=""; SPEED=""; NOVSYNC=""; W=1920; H=1080; SHOTS=""; FPSCAP=""; CAMYAW=""; EXTRA=""; PLAYERARGS=""
-KEEP=2; LOCK_WAIT=3600; EXEC=""
+KEEP=2; LOCK_WAIT=3600; EXEC=""; EXEC_TIMEOUT=0
 while [ $# -gt 0 ]; do
   case "$1" in
     --id) ID="$2"; shift 2 ;;
@@ -41,6 +42,7 @@ while [ $# -gt 0 ]; do
     --keep) KEEP="$2"; shift 2 ;;
     --exec) EXEC="$2"; shift 2 ;;
     --lock-wait) LOCK_WAIT="$2"; shift 2 ;;
+    --exec-timeout) EXEC_TIMEOUT="$2"; shift 2 ;;
     *) echo "air-run: unknown flag $1" >&2; exit 64 ;;
   esac
 done
@@ -76,7 +78,8 @@ done
 pid=""; cafe=""; muted_before=""; prefs=""
 DOMAIN="com.drivia.criticalmass"   # the player's PlayerPrefs on macOS: exported before the run, restored after
 cleanup() {
-  [ -n "$pid" ] && kill "$pid" 2>/dev/null && sleep 2 && kill -9 "$pid" 2>/dev/null
+  if [ -n "$pid" ] && [ -n "$EXEC" ]; then kill -TERM -"$pid" 2>/dev/null; sleep 2; kill -9 -"$pid" 2>/dev/null
+  elif [ -n "$pid" ]; then kill "$pid" 2>/dev/null && sleep 2 && kill -9 "$pid" 2>/dev/null; fi
   [ -n "$cafe" ] && kill "$cafe" 2>/dev/null
   if [ "$prefs" = 1 ]; then defaults import "$DOMAIN" "$RUN/prefs-before.plist" 2>/dev/null
   elif [ "$prefs" = 0 ]; then defaults delete "$DOMAIN" 2>/dev/null; fi
@@ -94,10 +97,15 @@ free_gb=$(df -g "$HOME" | awk 'NR==2{print $4}')
 
 if [ -n "$EXEC" ]; then
   mkdir -p "$BASE/work"; echo "running $$" > "$STATE"; say "exec: $EXEC"
-  ( cd "$BASE/work" && { [ -f "$BASE/env.sh" ] && . "$BASE/env.sh"; } ; exec caffeinate -i bash -c "$EXEC" ) > "$RUN/output.txt" 2>&1 &
-  pid=$!
+  # Own process group (perl setpgrp, macOS has no setsid): an abort or the hard limit stops the command AND every
+  # child it started (dotnet test processes, ffmpeg), not only caffeinate. pid = pgid.
+  ( cd "$BASE/work" && { [ -f "$BASE/env.sh" ] && . "$BASE/env.sh"; } ; exec perl -e 'setpgrp(0,0); exec @ARGV' caffeinate -i bash -c "$EXEC" ) > "$RUN/output.txt" 2>&1 &
+  pid=$!; es=$(date +%s)
+  stop_group() { kill -TERM -"$pid" 2>/dev/null; sleep 3; kill -9 -"$pid" 2>/dev/null; wait "$pid" 2>/dev/null; pid=""; }
   while kill -0 "$pid" 2>/dev/null; do
-    if [ -e "$RUN/ABORT" ]; then kill "$pid" 2>/dev/null; sleep 2; kill -9 "$pid" 2>/dev/null; wait "$pid" 2>/dev/null; pid=""; finish 130; fi
+    if [ -e "$RUN/ABORT" ]; then say "aborted by the caller"; stop_group; finish 130; fi
+    if [ "$EXEC_TIMEOUT" -gt 0 ] && [ $(( $(date +%s) - es )) -ge "$EXEC_TIMEOUT" ]; then
+      say "hard limit ${EXEC_TIMEOUT} s reached: stopping the job"; stop_group; finish 124; fi
     sleep 1
   done
   wait "$pid"; code=$?; pid=""; finish "$code"

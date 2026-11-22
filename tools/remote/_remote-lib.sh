@@ -4,7 +4,9 @@
 # job there through ~/cm-remote/bin/air-run.sh, which holds the box's queue lock (~/cm-remote/lock.d).
 REMOTE_HOST="${CM_REMOTE_HOST:-wilsons-macbook-air.local}"
 REMOTE_USER="${CM_REMOTE_USER:-$USER}"
-SSH_OPTS=(-o BatchMode=yes -o ConnectTimeout=15 -o ServerAliveInterval=20 -o ServerAliveCountMax=6)
+# No agent, X11 or port forwarding, ever (security seat 2026-11-21): nothing on the box can borrow the main Mac's keys.
+SSH_OPTS=(-o BatchMode=yes -o ConnectTimeout=15 -o ServerAliveInterval=20 -o ServerAliveCountMax=6
+  -o ForwardAgent=no -o ForwardX11=no -o ClearAllForwardings=yes)
 REMOTE_JOB=""
 
 rssh() { ssh "${SSH_OPTS[@]}" "$REMOTE_USER@$REMOTE_HOST" "$@"; }

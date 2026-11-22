@@ -1,0 +1,879 @@
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text.RegularExpressions;
+using CriticalMass.Runtime.Game;
+using CriticalMass.Runtime.Menu;
+using CriticalMass.Sim.Config;
+using CriticalMass.Sim.Core;
+using CriticalMass.Sim.Grid;
+using NUnit.Framework;
+using UnityEngine;
+using UnityEngine.InputSystem;
+using UnityEngine.InputSystem.Controls;
+using UnityEngine.TestTools;
+using CameraView = CriticalMass.Runtime.Camera.CameraView;
+using CameraShake = CriticalMass.Runtime.Camera.CameraShake;
+using Object = UnityEngine.Object;
+using T = CriticalMass.Runtime.PlayTests.PlayerSeat.PlayerSeatFeedbackTargets;
+
+namespace CriticalMass.Runtime.PlayTests.PlayerSeat
+{
+    /// <summary>
+    /// Player-seat gate, tier F (player-agency audit 6.4 F1-F19, the lead's F20-F34): real devices press, and the test reads
+    /// what the player is shown. A cue that exists today is read in its real state (damage-number slots, camera shake offset,
+    /// audio sources, particle systems, screen text); a cue the rebuild adds is read from the PlayerFeedback ledger, and its
+    /// Source must be an active, enabled object. Core tests run in BOTH views (TopDown = a fresh install, ThirdPerson = how the
+    /// owner plays); every test asserts the idle autopilot never drove the player.
+    /// </summary>
+    [TestFixture, Category("PlayerSeat")]
+    public sealed class PlayerSeatFeedbackTests : PlayerSeatFixture
+    {
+        static readonly ClassId[] Classes = { ClassId.Warrior, ClassId.Farmer, ClassId.Miner, ClassId.Demolitions, ClassId.Builder, ClassId.Healer };
+        static readonly CameraView[] Views = { CameraView.TopDown, CameraView.ThirdPerson };
+
+        bool _guardSaved;
+        bool _guardIdle;
+
+        public override void Setup()
+        {
+            base.Setup();
+            _guardIdle = HumanControlGuard.IdleAutopilotEnabled;
+            _guardSaved = true;
+            // the wall-clock idle guard (45 s of real time) would take the seat on a slow runner: the SIM's autopilot rule is the one under test
+            HumanControlGuard.IdleAutopilotEnabled = false;
+        }
+
+        public override void TearDown()
+        {
+            if (_guardSaved) HumanControlGuard.IdleAutopilotEnabled = _guardIdle;
+            _guardSaved = false;
+            base.TearDown();
+        }
+
+        // ------------------------------------------------------------------ one landed hit, watched
+
+        sealed class Watch
+        {
+            public bool Hit;
+            public double Dealt, Knock;
+            public int HitTick = -1, LedgerAtHit;
+            public double ModelMoved;
+            public double KickPeak;
+            public int SoundsBefore, SoundsPeak;
+            public bool Seen;
+            public int SeenFrame = -1;
+            public string Note = "";
+        }
+
+        /// <summary>
+        /// Loads cls in view, puts a passive Farmer at 0.8 x the range in front (screen right top-down; camera forward third
+        /// person), taps attack, and after the Hit watches 6 frames (3 ticks), calling cue each frame until it says true.
+        /// </summary>
+        IEnumerator HitAndWatch(ClassId cls, CameraView view, Func<Watch, bool> cue, Watch r, bool reduceMotion = false, bool gamepad = false, bool loaded = false)
+        {
+            if (!loaded) yield return Load(cls, view, reduceMotion);
+            FrontDir(view, out double dx, out double dz);
+            double dist = T.StandShareOfRange * W.Config.Class(cls).AttackRange;
+            int e = Isolate(ClassId.Farmer, dist, dx, dz);
+            double px = W.X[e], pz = W.Z[e];
+            bool pinned = true;
+            Action before = () =>
+            {
+                if (pinned) Pin(e, px, pz);
+                else { W.Actors[e].AttackCd = Math.Max(W.Actors[e].AttackCd, 1); W.Actors[e].AbilityCd = Math.Max(W.Actors[e].AbilityCd, 1); }
+                if (W.Demolitions != null && W.Demolitions.TntReadyTick != null) W.Demolitions.TntReadyTick[0] = int.MaxValue / 2;   // the melee swing, not the TNT
+            };
+            for (int i = 0; i < 3; i++) yield return TickFrame(before);
+            int head = W.EventHead;
+            r.SoundsBefore = PlayingSources();
+            AssertAtControls("the press");
+            PressAttack(view, gamepad);
+            int budget = W.Dur.AttackWindup[(int)cls] + T.ContactSlackTicks + 1;
+            Transform model = S.ActorModel(e);
+            Vector3 m0 = model != null ? model.position : Vector3.zero;
+            for (int t = 0; t < budget && !r.Hit; t++)
+            {
+                yield return TickFrame(before);
+                if (t == 0) ReleaseAttack(gamepad);
+                List<SimEvent> hits = Events(head, SimEventType.Hit).Where(x => x.A == e && x.B == 0).ToList();
+                if (hits.Count > 0)
+                {
+                    r.Hit = true;
+                    r.Dealt = hits[0].Value;
+                    r.HitTick = W.Tick;
+                    r.LedgerAtHit = LedgerCursor;
+                    List<SimEvent> kn = Events(head, SimEventType.Knock).Where(x => x.A == e).ToList();
+                    r.Knock = kn.Count > 0 ? kn[0].Impulse : 0;
+                    pinned = false;
+                }
+            }
+            if (!r.Hit) { r.Note = "no Hit within wind-up + " + T.ContactSlackTicks + " ticks (" + string.Join(" ", Events(head, SimEventType.AttackContact).Select(x => "contact v" + x.Value)) + ")"; yield break; }
+            for (int f = 0; f < T.CueFrames; f++)
+            {
+                r.KickPeak = Math.Max(r.KickPeak, CameraShake.Applied.magnitude);
+                r.SoundsPeak = Math.Max(r.SoundsPeak, PlayingSources());
+                if (model != null) r.ModelMoved = Math.Max(r.ModelMoved, Vector3.Distance(model.position, m0));
+                if (!r.Seen && cue(r)) { r.Seen = true; r.SeenFrame = f; }
+                if (f < T.CueTicks) yield return TickFrame(before);
+                else yield return null;
+            }
+            r.KickPeak = Math.Max(r.KickPeak, CameraShake.Applied.magnitude);
+            if (!r.Seen && cue(r)) { r.Seen = true; r.SeenFrame = T.CueFrames; }
+            AssertAtControls("the end of the watch");
+        }
+
+        static string Tag(ClassId c, CameraView v) => c + " " + v;
+
+        // ------------------------------------------------------------------ F1-F4 (per class, both views)
+
+        [UnityTest]
+        public IEnumerator F01_Mouse_ClickOnEnemy_DamageNumberWithin100ms([ValueSource(nameof(Classes))] ClassId x, [ValueSource(nameof(Views))] CameraView v)
+        {
+            var r = new Watch();
+            yield return HitAndWatch(x, v, q => DamageNumberShown(q.Dealt), r);
+            Assert.IsTrue(Line("F01 DamageNumber", Tag(x, v), r.Hit ? (r.Seen ? "number " + Math.Round(r.Dealt) + " shown at frame " + r.SeenFrame : "hit " + Math.Round(r.Dealt) + ", no active damage-number slot with it in 6 frames") : r.Note, "within 6 frames", r.Hit && r.Seen));
+        }
+
+        [UnityTest]
+        public IEnumerator F02_Mouse_ClickOnEnemy_HealthBarDrops([ValueSource(nameof(Classes))] ClassId x, [ValueSource(nameof(Views))] CameraView v)
+        {
+            var r = new Watch();
+            FeedbackEntry got = default;
+            yield return HitAndWatch(x, v, q => Ledger(FeedbackChannel.EnemyHealthBar, Enemy, out got, q.LedgerAtHit) && got.SimTick >= q.HitTick, r);
+            double share = r.Hit ? W.Actors[Enemy].Hp / W.Actors[Enemy].MaxHp : 0;
+            Assert.IsTrue(Line("F02 EnemyHealthBar", Tag(x, v), r.Hit ? (r.Seen ? "bar fill " + got.Value.ToString("0.00") + " (hp share " + share.ToString("0.00") + ")" : "no EnemyHealthBar ledger entry after the hit") : r.Note, "bar = hp share +-0.1 within 6 frames", r.Hit && r.Seen && Math.Abs(got.Value - share) <= 0.1));
+        }
+
+        [UnityTest]
+        public IEnumerator F03_Mouse_ClickOnEnemy_VictimFlashAndKnockVisible([ValueSource(nameof(Classes))] ClassId x, [ValueSource(nameof(Views))] CameraView v)
+        {
+            var r = new Watch();
+            yield return HitAndWatch(x, v, q => Ledger(FeedbackChannel.HitFlash, Enemy, out _, q.LedgerAtHit), r);
+            bool knockOk = r.Knock <= 0 || r.ModelMoved >= T.KnockVisibleShare * r.Knock;
+            bool knockLedger = Ledger(FeedbackChannel.KnockVisual, Enemy, out _, r.LedgerAtHit);
+            Assert.IsTrue(Line("F03 VictimFlashAndKnock", Tag(x, v), r.Hit ? "flash " + (r.Seen ? "at frame " + r.SeenFrame : "none") + ", model moved " + r.ModelMoved.ToString("0.00") + " u of sim knock " + r.Knock.ToString("0.00") + ", KnockVisual " + knockLedger : r.Note, "flash and knock >= 0.8 x sim within 6 frames", r.Hit && r.Seen && knockOk && knockLedger));
+        }
+
+        [UnityTest]
+        public IEnumerator F04_Mouse_ClickOnEnemy_ImpactSound([ValueSource(nameof(Classes))] ClassId x, [ValueSource(nameof(Views))] CameraView v)
+        {
+            var r = new Watch();
+            yield return HitAndWatch(x, v, q => Ledger(FeedbackChannel.ImpactSound, -1, out _, q.LedgerAtHit), r);
+            Assert.IsTrue(Line("F04 ImpactSound", Tag(x, v), r.Hit ? "ImpactSound ledger " + r.Seen + "; audio sources playing " + r.SoundsBefore + " -> peak " + r.SoundsPeak : r.Note, "an impact sound within 6 frames", r.Hit && r.Seen));
+        }
+
+        // ------------------------------------------------------------------ F25 / F26 / F30 / F33 (both views)
+
+        [UnityTest]
+        public IEnumerator F25_HitMarker_AtReticle([ValueSource(nameof(Views))] CameraView v)
+        {
+            var r = new Watch();
+            yield return HitAndWatch(ClassId.Warrior, v, q => Ledger(FeedbackChannel.HitMarker, -1, out _, q.LedgerAtHit), r);
+            Assert.IsTrue(Line("F25 HitMarker", Tag(ClassId.Warrior, v), r.Hit ? (r.Seen ? "marker at frame " + r.SeenFrame : "no HitMarker") : r.Note, "a hit marker within 6 frames", r.Hit && r.Seen));
+        }
+
+        [UnityTest]
+        public IEnumerator F26_Whiff_DiffersFromHit([ValueSource(nameof(Views))] CameraView v)
+        {
+            yield return Load(ClassId.Warrior, v);
+            // a swing at empty air first: nobody in reach
+            FrontDir(v, out double dx, out double dz);
+            int e = Isolate(ClassId.Farmer, 9, dx, dz);
+            double px = W.X[e], pz = W.Z[e];
+            for (int i = 0; i < 3; i++) yield return TickFrame(() => Pin(e, px, pz));
+            int cursor = PlayerFeedback.Head;
+            AssertAtControls("the whiff");
+            PressAttack(v);
+            for (int t = 0; t < W.Dur.AttackWindup[(int)ClassId.Warrior] + T.CueTicks + 2; t++)
+            {
+                yield return TickFrame(() => Pin(e, px, pz));
+                if (t == 0) ReleaseAttack();
+            }
+            bool whiffCue = Ledger(FeedbackChannel.WhiffCue, 0, out _, cursor) || Ledger(FeedbackChannel.WhiffCue, -1, out _, cursor);
+            bool whiffImpact = Ledger(FeedbackChannel.ImpactSound, -1, out _, cursor);
+            while (!Combat.AttackReady(W, 0)) yield return TickFrame(() => Pin(e, px, pz));
+            var r = new Watch();
+            yield return HitAndWatch(ClassId.Warrior, v, q => Ledger(FeedbackChannel.ImpactSound, -1, out _, q.LedgerAtHit), r, loaded: true);
+            bool hitWhiffCue = Ledger(FeedbackChannel.WhiffCue, 0, out _, r.LedgerAtHit);
+            Assert.IsTrue(Line("F26 WhiffDiffersFromHit", Tag(ClassId.Warrior, v), "whiff: WhiffCue " + whiffCue + ", impact sound " + whiffImpact + "; hit: impact sound " + r.Seen + ", WhiffCue " + hitWhiffCue, "a whiff cue only on the whiff, an impact only on the hit", whiffCue && !whiffImpact && r.Hit && r.Seen && !hitWhiffCue));
+        }
+
+        [UnityTest]
+        public IEnumerator F30_SwingPose_Within2Frames([ValueSource(nameof(Views))] CameraView v)
+        {
+            yield return Load(ClassId.Warrior, v);
+            FrontDir(v, out double dx, out double dz);
+            int e = Isolate(ClassId.Farmer, 0.8 * W.Config.Class(ClassId.Warrior).AttackRange, dx, dz);
+            double px = W.X[e], pz = W.Z[e];
+            for (int i = 0; i < 3; i++) yield return TickFrame(() => Pin(e, px, pz));
+            int head = W.EventHead, cursor = PlayerFeedback.Head;
+            AssertAtControls("the press");
+            PressAttack(v);
+            yield return TickFrame(() => Pin(e, px, pz));
+            ReleaseAttack();
+            bool started = Events(head, SimEventType.AttackStart).Any(q => q.A == 0);
+            float best = 0;
+            for (int f = 0; f < T.SwingPoseFrames; f++)
+            {
+                if (Ledger(FeedbackChannel.SwingCommit, 0, out FeedbackEntry got, cursor)) best = Math.Max(best, got.Value);
+                yield return null;
+            }
+            if (Ledger(FeedbackChannel.SwingCommit, 0, out FeedbackEntry last, cursor)) best = Math.Max(best, last.Value);
+            AssertAtControls("the end");
+            Assert.IsTrue(Line("F30 SwingPose", Tag(ClassId.Warrior, v), "sim accepted " + started + ", SwingCommit pose weight " + best.ToString("0.00"), ">= 0.8 within 2 frames", started && best >= T.SwingPoseWeight));
+        }
+
+        [UnityTest]
+        public IEnumerator F33_CameraKick_OnMyHit([ValueSource(nameof(Views))] CameraView v)
+        {
+            var r = new Watch();
+            yield return HitAndWatch(ClassId.Warrior, v, q => false, r);
+            Assert.IsTrue(Line("F33 CameraKick_MyHit", Tag(ClassId.Warrior, v), r.Hit ? "peak camera offset " + r.KickPeak.ToString("0.000") + " u" : r.Note, ">= " + T.CameraKickMine + " u", r.Hit && r.KickPeak >= T.CameraKickMine));
+        }
+
+        [UnityTest]
+        public IEnumerator F33_CameraKick_ReduceMotion_IsZero([ValueSource(nameof(Views))] CameraView v)
+        {
+            var r = new Watch();
+            yield return HitAndWatch(ClassId.Warrior, v, q => false, r, reduceMotion: true);
+            bool ledger = Ledger(FeedbackChannel.CameraKick, -1, out FeedbackEntry k, r.LedgerAtHit) && k.Value > 0;
+            Assert.IsTrue(Line("F33 CameraKick_ReduceMotion", Tag(ClassId.Warrior, v), r.Hit ? "peak camera offset " + r.KickPeak.ToString("0.000") + " u, CameraKick reported " + ledger : r.Note, "0 (and no kick reported)", r.Hit && r.KickPeak <= T.CameraKickReduced + 1e-4 && !ledger));
+        }
+
+        // ------------------------------------------------------------------ hits on me: F20 / F21 / F33 (both views)
+
+        sealed class Taken
+        {
+            public bool Hit;
+            public int Attacker = -1, LedgerAtHit;
+            public double Bearing, KickPeak;
+            public string Note = "";
+        }
+
+        /// <summary>An enemy Warrior bot 1.2 u in front is let swing; the player stands still (no input: under 15 s, no autopilot).</summary>
+        IEnumerator TakeHit(CameraView v, Taken r)
+        {
+            yield return Load(ClassId.Farmer, v);
+            FrontDir(v, out double dx, out double dz);
+            int e = Isolate(ClassId.Warrior, 1.2, dx, dz);
+            int head = W.EventHead;
+            for (int t = 0; t < S.Ticks(6) && !r.Hit; t++)
+            {
+                // run 1 (45038552514): the bot never swung at a standing player in 6 s; after 1 s the hit is dealt through the
+                // sim's own damage path with the bot as the attacker (the cues read the Hit event, not the bot's choice)
+                if (t == S.Ticks(1)) Damage.ApplyHit(W, 0, 12, e, W.X[e], W.Z[e], DamageCause.Melee, 0, 0, 0, 0);
+                yield return TickFrame();
+                SimEvent[] hits = Events(head, SimEventType.Hit).Where(q => q.A == 0).ToArray();
+                if (hits.Length > 0)
+                {
+                    r.Hit = true;
+                    r.Attacker = hits[0].B;
+                    r.LedgerAtHit = LedgerCursor;
+                    r.Bearing = BearingDeg(W.X[0], W.Z[0], W.X[e], W.Z[e]);
+                }
+            }
+            if (!r.Hit) { r.Note = "the bot never hit the player in 6 s"; yield break; }
+            for (int f = 0; f < T.CueFrames; f++)
+            {
+                r.KickPeak = Math.Max(r.KickPeak, CameraShake.Applied.magnitude);
+                if (f < T.CueTicks) yield return TickFrame();
+                else yield return null;
+            }
+            r.KickPeak = Math.Max(r.KickPeak, CameraShake.Applied.magnitude);
+            AssertAtControls("after the hit on me");
+        }
+
+        [UnityTest]
+        public IEnumerator F20_HitOnMe_DirectionIndicator([ValueSource(nameof(Views))] CameraView v)
+        {
+            var r = new Taken();
+            yield return TakeHit(v, r);
+            FeedbackEntry dd = default;
+            bool shown = r.Hit && Ledger(FeedbackChannel.DamageDirection, 0, out dd, r.LedgerAtHit);
+            double gap = shown ? AngleGap(dd.Value, r.Bearing) : 999;
+            Assert.IsTrue(Line("F20 DamageDirection", "Farmer " + v, r.Hit ? (shown ? "indicator " + dd.Value.ToString("0") + " deg, attacker at " + r.Bearing.ToString("0") + " deg (sim bearing)" : "no DamageDirection") : r.Note, "within " + T.DirectionMaxDegrees + " deg, 6 frames", shown && gap <= T.DirectionMaxDegrees));
+        }
+
+        [UnityTest]
+        public IEnumerator F21_HitOnMe_HurtVignetteAndSound([ValueSource(nameof(Views))] CameraView v)
+        {
+            var r = new Taken();
+            yield return TakeHit(v, r);
+            bool vig = r.Hit && Ledger(FeedbackChannel.OwnHurtVignette, 0, out _, r.LedgerAtHit);
+            bool snd = r.Hit && Ledger(FeedbackChannel.OwnHurtSound, 0, out _, r.LedgerAtHit);
+            Assert.IsTrue(Line("F21 OwnHurt", "Farmer " + v, r.Hit ? "vignette " + vig + ", hurt sound " + snd : r.Note, "both within 6 frames", vig && snd));
+        }
+
+        [UnityTest]
+        public IEnumerator F33_CameraKick_OnHitOnMe([ValueSource(nameof(Views))] CameraView v)
+        {
+            var r = new Taken();
+            yield return TakeHit(v, r);
+            Assert.IsTrue(Line("F33 CameraKick_OnMe", "Farmer " + v, r.Hit ? "peak camera offset " + r.KickPeak.ToString("0.000") + " u" : r.Note, ">= " + T.CameraKickOnMe + " u", r.Hit && r.KickPeak >= T.CameraKickOnMe));
+        }
+
+        // ------------------------------------------------------------------ F22 / F23 (both views)
+
+        [UnityTest]
+        public IEnumerator F22_LowHealth_PulseAndHeartbeat([ValueSource(nameof(Views))] CameraView v)
+        {
+            yield return Load(ClassId.Warrior, v);
+            Isolate(ClassId.Farmer, 30, 1, 0);
+            Actor a = W.Actors[0];
+            a.Hp = a.MaxHp * (T.LowHealthShare - 0.05);
+            int cursor = PlayerFeedback.Head;
+            for (int t = 0; t < S.Ticks(2); t++) { a.Hp = Math.Min(a.Hp, a.MaxHp * (T.LowHealthShare - 0.05)); yield return TickFrame(); }
+            int pulses = LedgerCount(FeedbackChannel.LowHealthCue, 0, cursor);
+            AssertAtControls("the end");
+            Assert.IsTrue(Line("F22 LowHealth", "Warrior " + v, "LowHealthCue entries in 2 s: " + pulses, "1 to " + (2 * T.LowHealthMaxHz + 1) + " (a pulse at most 2 Hz)", pulses >= 1 && pulses <= 2 * T.LowHealthMaxHz + 1));
+        }
+
+        [UnityTest]
+        public IEnumerator F23_HealthBars_OverUnitsInView([ValueSource(nameof(Views))] CameraView v)
+        {
+            yield return Load(ClassId.Warrior, v);
+            FrontDir(v, out double dx, out double dz);
+            int e = Isolate(ClassId.Farmer, 3, dx, dz);
+            Put(1, ClassId.Miner, W.X[0] + 1.5 * dx - 1.0 * dz, W.Z[0] + 1.5 * dz + 1.0 * dx);
+            double ex = W.X[e], ez = W.Z[e], ax = W.X[1], az = W.Z[1];
+            int cursor = PlayerFeedback.Head;
+            for (int t = 0; t < 10; t++) yield return TickFrame(() => { Pin(e, ex, ez); Pin(1, ax, az); });
+            bool enemyBar = Ledger(FeedbackChannel.EnemyHealthBar, e, out _, cursor), allyBar = Ledger(FeedbackChannel.AllyHealthBar, 1, out _, cursor);
+            AssertAtControls("the end");
+            Assert.IsTrue(Line("F23 HealthBarsInView", "Warrior " + v, "enemy bar " + enemyBar + ", ally bar " + allyBar + " (both at full health, no hit)", "both shown, always on", enemyBar && allyBar));
+        }
+
+        // ------------------------------------------------------------------ F31: no mouse aim, third person and top-down
+
+        /// <summary>Screen-intent components of the sim direction (dx, dz) in this view (top-down: screen; third person: camera).</summary>
+        void Intent(CameraView v, double dx, double dz, out double right, out double up)
+        {
+            if (v == CameraView.TopDown) { SanityWorld.ToScreenIntent(dx, dz, out right, out up); return; }
+            CameraForward(out double fx, out double fz);
+            UnityEngine.Camera cam = UnityEngine.Camera.main;
+            Vector3 rt = cam != null ? cam.transform.right : Vector3.right;
+            rt.y = 0;
+            SimSpace.ToSim(rt, out double rx, out double rz);
+            SimSpace.ToSim(Vector3.zero, out double ox, out double oz);
+            rx -= ox; rz -= oz;
+            double l = Math.Sqrt(rx * rx + rz * rz);
+            if (l > 1e-9) { rx /= l; rz /= l; }
+            up = dx * fx + dz * fz;
+            right = dx * rx + dz * rz;
+        }
+
+        sealed class Chase
+        {
+            public int Swings, Landed;
+            public bool Died;
+        }
+
+        /// <summary>A Normal Farmer bot fights the player, who closes in with keys or the left stick only and presses attack when in reach.</summary>
+        IEnumerator NoMouseFight(CameraView v, bool keys, double offDeg, Chase c, bool lagCursor = false)
+        {
+            yield return Load(ClassId.Warrior, v);
+            FrontDir(v, out double fdx, out double fdz);
+            int e = Isolate(ClassId.Farmer, 3, fdx, fdz);
+            double reach = W.Config.Class(ClassId.Warrior).AttackRange;
+            int head = W.EventHead;
+            var hx = new Queue<Vector2>();
+            bool held = false;
+            Key[] prev = new Key[0];
+            for (int t = 0; t < S.Ticks(T.AssistMaxSeconds) && c.Swings < T.AssistSwings; t++)
+            {
+                if (!W.Actors[0].Alive) { c.Died = true; break; }
+                if (!W.Actors[e].Alive) { W.Actors[e].Hp = W.Actors[e].MaxHp; Put(e, ClassId.Farmer, W.X[0] + 3 * fdx, W.Z[0] + 3 * fdz); }
+                W.Actors[e].Hp = Math.Max(W.Actors[e].Hp, 1);   // never dies: the measure is the land rate
+                double dx = W.X[e] - W.X[0], dz = W.Z[e] - W.Z[0], d = Math.Sqrt(dx * dx + dz * dz);
+                if (d > 1e-6) { dx /= d; dz /= d; }
+                double ang = offDeg * Math.PI / 180;
+                double rdx = dx * Math.Cos(ang) - dz * Math.Sin(ang), rdz = dx * Math.Sin(ang) + dz * Math.Cos(ang);
+                bool close = d <= 0.8 * reach;
+                Intent(v, rdx, rdz, out double right, out double up);
+                if (close) { right *= 0.2; up *= 0.2; }
+                if (keys)
+                {
+                    var want = new List<Key>();
+                    if (up > 0.38) want.Add(Key.W); else if (up < -0.38) want.Add(Key.S);
+                    if (right > 0.38) want.Add(Key.D); else if (right < -0.38) want.Add(Key.A);
+                    if (close) want.Clear();
+                    foreach (Key k in prev) if (!want.Contains(k)) Release(Kb[k]);
+                    foreach (Key k in want) if (!prev.Contains(k)) Press(Kb[k]);
+                    prev = want.ToArray();
+                }
+                else Set(Pad.leftStick, new Vector2((float)right, (float)up));
+                hx.Enqueue(new Vector2((float)W.X[e], (float)W.Z[e]));
+                if (hx.Count > T.CursorLagTicks + 1) hx.Dequeue();
+                if (lagCursor) { Vector2 old = hx.Peek(); Set(Ms.position, ScreenOf(old.x, old.y)); }
+                if (held) { if (keys || lagCursor) Release(Ms.leftButton); else Release(Pad.rightTrigger); held = false; }
+                else if (d <= reach + 0.2 && Combat.AttackReady(W, 0))
+                {
+                    if (keys || lagCursor) Press(Ms.leftButton); else Press(Pad.rightTrigger);
+                    held = true;
+                }
+                yield return TickFrame();
+                if (MechRules.Autopiloted(W, 0)) AssertAtControls("tick " + t);
+            }
+            foreach (Key k in prev) Release(Kb[k]);
+            c.Swings = Events(head, SimEventType.AttackStart).Count(q => q.A == 0 && q.B == Combat.KindAttack);
+            c.Landed = Events(head, SimEventType.AttackContact).Count(q => q.A == 0 && q.Value > 0);
+            AssertAtControls("the end");
+        }
+
+        [UnityTest]
+        public IEnumerator F31_StickOnly_LandsOnBot([ValueSource(nameof(Views))] CameraView v)
+        {
+            var c = new Chase();
+            yield return NoMouseFight(v, false, 0, c);
+            double share = c.Swings > 0 ? (double)c.Landed / c.Swings : 0;
+            Assert.IsTrue(Line("F31 StickOnly", "Warrior " + v + " vs a Normal Farmer bot", c.Landed + " of " + c.Swings + " swings landed (" + share.ToString("0.00") + ")" + (c.Died ? ", died" : ""), ">= " + T.AssistLandMin, c.Swings >= 4 && share >= T.AssistLandMin));
+        }
+
+        [UnityTest]
+        public IEnumerator F31_KeysOnly_LandsOnBot([ValueSource(nameof(Views))] CameraView v)
+        {
+            var c = new Chase();
+            yield return NoMouseFight(v, true, 0, c);
+            double share = c.Swings > 0 ? (double)c.Landed / c.Swings : 0;
+            Assert.IsTrue(Line("F31 KeysOnly", "Warrior " + v + " vs a Normal Farmer bot (mouse never moved)", c.Landed + " of " + c.Swings + " swings landed (" + share.ToString("0.00") + ")" + (c.Died ? ", died" : ""), ">= " + T.AssistLandMin, c.Swings >= 4 && share >= T.AssistLandMin));
+        }
+
+        // ------------------------------------------------------------------ top-down only (a fresh install): F5-F19, F24, F27-F29, F32, F34
+
+        [UnityTest]
+        public IEnumerator F05_Gamepad_RightTrigger_NoStick_HitsEnemyInFront([ValueSource(nameof(Classes))] ClassId x)
+        {
+            yield return Load(x, CameraView.TopDown);
+            // walk at the enemy with the left stick (screen right) for a few ticks so the body faces it, then RT with the right stick at rest
+            Set(Pad.leftStick, new Vector2(1, 0));
+            for (int i = 0; i < 6; i++) yield return TickFrame();
+            Set(Pad.leftStick, Vector2.zero);
+            var r = new Watch();
+            yield return HitAndWatch(x, CameraView.TopDown, q => true, r, gamepad: true, loaded: true);
+            Assert.IsTrue(Line("F05 Gamepad_RT_NoStick", x.ToString(), r.Hit ? "hit " + Math.Round(r.Dealt) : r.Note, "a Hit within wind-up + 3", r.Hit));
+        }
+
+        [UnityTest]
+        public IEnumerator F06_Gamepad_StrafingEnemy_AssistLands()
+        {
+            var c = new Chase();
+            yield return NoMouseFight(CameraView.TopDown, false, T.StickOffDegrees, c);
+            double share = c.Swings > 0 ? (double)c.Landed / c.Swings : 0;
+            Assert.IsTrue(Line("F06 Gamepad_StickOff20", "Warrior vs a Normal Farmer bot, stick 20 deg off", c.Landed + " of " + c.Swings + " (" + share.ToString("0.00") + ")", ">= " + T.AssistLandMin, c.Swings >= 4 && share >= T.AssistLandMin));
+        }
+
+        [UnityTest]
+        public IEnumerator F07_Mouse_StrafingEnemy_AssistLands()
+        {
+            var c = new Chase();
+            yield return NoMouseFight(CameraView.TopDown, true, 0, c, lagCursor: true);
+            double share = c.Swings > 0 ? (double)c.Landed / c.Swings : 0;
+            Assert.IsTrue(Line("F07 Mouse_CursorLag0.2s", "Warrior vs a Normal Farmer bot, cursor 6 ticks behind", c.Landed + " of " + c.Swings + " (" + share.ToString("0.00") + ")", ">= " + T.AssistLandMin, c.Swings >= 4 && share >= T.AssistLandMin));
+        }
+
+        [UnityTest]
+        public IEnumerator F08_ReachPreview_LitOnlyWhenHittable()
+        {
+            yield return Load(ClassId.Warrior, CameraView.TopDown);
+            FrontDir(CameraView.TopDown, out double dx, out double dz);
+            double reach = W.Config.Class(ClassId.Warrior).AttackRange;
+            int e = Isolate(ClassId.Farmer, 3 * reach, dx, dz);
+            double fx = W.X[e], fz = W.Z[e];
+            Set(Ms.position, ScreenOf(fx, fz));
+            int far = PlayerFeedback.Head;
+            for (int t = 0; t < 6; t++) yield return TickFrame(() => Pin(e, fx, fz));
+            bool litFar = Ledger(FeedbackChannel.HittableCue, e, out FeedbackEntry lf, far) && lf.Value > 0;
+            double nx = W.X[0] + 0.7 * reach * dx, nz = W.Z[0] + 0.7 * reach * dz;
+            Set(Ms.position, ScreenOf(nx, nz));
+            int near = PlayerFeedback.Head;
+            for (int t = 0; t < 6; t++) yield return TickFrame(() => Pin(e, nx, nz));
+            bool litNear = Ledger(FeedbackChannel.HittableCue, e, out FeedbackEntry ln, near) && ln.Value > 0;
+            AssertAtControls("the end");
+            Assert.IsTrue(Line("F08 HittableCue", "Warrior, enemy at 3x then 0.7x reach under the cursor", "lit far " + litFar + ", lit near " + litNear, "off far, on near", !litFar && litNear));
+        }
+
+        [UnityTest]
+        public IEnumerator F09_Kill_ConfirmLineAndSting()
+        {
+            yield return Load(ClassId.Warrior, CameraView.TopDown);
+            FrontDir(CameraView.TopDown, out double dx, out double dz);
+            int e = Isolate(ClassId.Farmer, 0.8 * W.Config.Class(ClassId.Warrior).AttackRange, dx, dz);
+            double px = W.X[e], pz = W.Z[e];
+            W.Actors[e].Hp = 1;
+            int head = W.EventHead, cursor = PlayerFeedback.Head;
+            AssertAtControls("the press");
+            PressAttack(CameraView.TopDown);
+            bool died = false;
+            int frames = 0;
+            for (int t = 0; t < W.Dur.AttackWindup[0] + 12 && frames < T.KillConfirmFrames; t++)
+            {
+                yield return TickFrame(() => { if (W.Actors[e].Alive) Pin(e, px, pz); });
+                if (t == 0) ReleaseAttack();
+                if (!died) died = Events(head, SimEventType.Death).Any(q => q.A == e && q.B == 0);
+                else frames++;
+            }
+            bool confirm = Ledger(FeedbackChannel.KillConfirm, e, out _, cursor) || Ledger(FeedbackChannel.KillConfirm, -1, out _, cursor);
+            bool sting = Ledger(FeedbackChannel.KillSound, -1, out _, cursor);
+            AssertAtControls("the end");
+            Assert.IsTrue(Line("F09 KillConfirm", "Warrior kills a Farmer", "death " + died + ", confirm " + confirm + ", sting " + sting, "both within 6 frames", died && confirm && sting));
+        }
+
+        [UnityTest]
+        public IEnumerator F10_Kill_FeedLineNeverDropped()
+        {
+            yield return Load(ClassId.Warrior, CameraView.TopDown);
+            FrontDir(CameraView.TopDown, out double dx, out double dz);
+            int e = Isolate(ClassId.Farmer, 0.8 * W.Config.Class(ClassId.Warrior).AttackRange, dx, dz);
+            double px = W.X[e], pz = W.Z[e];
+            // eight kills by others in the second before mine: crimson bots knock out azure bots
+            int killer = e + 1;
+            Put(killer, ClassId.Warrior, W.X[0] - 12, W.Z[0]);
+            for (int k = 0; k < T.FeedFlood; k++)
+            {
+                int victim = 1 + k;
+                Put(victim, ClassId.Miner, W.X[0] - 12 + 0.6, W.Z[0] + 0.3 * k);
+                Damage.ApplyHit(W, victim, 9999, killer, W.X[killer], W.Z[killer], DamageCause.Melee, 0, 0, 0, 0);
+                yield return TickFrame(() => Pin(e, px, pz));
+            }
+            W.Actors[e].Hp = 1;
+            int head = W.EventHead;
+            PressAttack(CameraView.TopDown);
+            bool died = false;
+            bool you = false;
+            for (int t = 0; t < W.Dur.AttackWindup[0] + T.ScreenFrames && !you; t++)
+            {
+                yield return TickFrame(() => { if (W.Actors[e].Alive) Pin(e, px, pz); });
+                if (t == 0) ReleaseAttack();
+                if (!died) died = Events(head, SimEventType.Death).Any(q => q.A == e && q.B == 0);
+                if (died) you = ScreenTexts().Any(s => s.Contains("YOU"));
+            }
+            AssertAtControls("the end");
+            Assert.IsTrue(Line("F10 FeedNeverDrops", "8 kills by others then mine", "my kill " + died + ", a YOU line on screen " + you, "my line shows", died && you));
+        }
+
+        IEnumerator KillAndRead(Func<bool> check, Action<bool, bool> done)
+        {
+            yield return Load(ClassId.Warrior, CameraView.TopDown);
+            FrontDir(CameraView.TopDown, out double dx, out double dz);
+            int e = Isolate(ClassId.Farmer, 0.8 * W.Config.Class(ClassId.Warrior).AttackRange, dx, dz);
+            double px = W.X[e], pz = W.Z[e];
+            W.Actors[e].Hp = 1;
+            int head = W.EventHead;
+            PressAttack(CameraView.TopDown);
+            bool died = false, ok = false;
+            for (int t = 0; t < W.Dur.AttackWindup[0] + T.ScreenFrames && !ok; t++)
+            {
+                yield return TickFrame(() => { if (W.Actors[e].Alive) Pin(e, px, pz); });
+                if (t == 0) ReleaseAttack();
+                if (!died) died = Events(head, SimEventType.Death).Any(q => q.A == e && q.B == 0);
+                if (died) ok = check();
+            }
+            done(died, ok);
+        }
+
+        [UnityTest]
+        public IEnumerator F11_PlayerCard_ShowsLiveKills()
+        {
+            int cursor = 0;
+            bool died = false, ok = false;
+            yield return KillAndRead(() => Ledger(FeedbackChannel.PersonalTally, 0, out FeedbackEntry p, cursor) && Math.Abs(p.Value - W.Actors[0].Kills) < 0.5, (d, o) => { died = d; ok = o; });
+            AssertAtControls("the end");
+            Assert.IsTrue(Line("F11 PersonalTally", "after one kill", "kill " + died + ", tally reported = Actor.Kills (" + W.Actors[0].Kills + ") " + ok, "the card counts it", died && ok));
+        }
+
+        [UnityTest]
+        public IEnumerator F32_Kill_ConfirmForEveryKill()
+        {
+            yield return Load(ClassId.Warrior, CameraView.TopDown);
+            FrontDir(CameraView.TopDown, out double dx, out double dz);
+            double dist = 0.8 * W.Config.Class(ClassId.Warrior).AttackRange;
+            int e = Isolate(ClassId.Farmer, dist, dx, dz);
+            int kills = 0, confirms = 0;
+            for (int round = 0; round < 3; round++)
+            {
+                Put(e, ClassId.Farmer, W.X[0] + dist * dx, W.Z[0] + dist * dz);
+                double px = W.X[e], pz = W.Z[e];
+                W.Actors[e].Hp = 1;
+                while (!Combat.AttackReady(W, 0)) yield return TickFrame(() => Pin(e, px, pz));
+                int head = W.EventHead, cursor = PlayerFeedback.Head;
+                PressAttack(CameraView.TopDown);
+                bool died = false;
+                int after = 0;
+                for (int t = 0; t < W.Dur.AttackWindup[0] + 12 && after < T.KillConfirmFrames; t++)
+                {
+                    yield return TickFrame(() => { if (W.Actors[e].Alive) Pin(e, px, pz); });
+                    if (t == 0) ReleaseAttack();
+                    if (!died) died = Events(head, SimEventType.Death).Any(q => q.A == e && q.B == 0);
+                    else after++;
+                }
+                if (died) kills++;
+                if (died && (Ledger(FeedbackChannel.KillConfirm, e, out _, cursor) || Ledger(FeedbackChannel.KillConfirm, -1, out _, cursor))) confirms++;
+            }
+            AssertAtControls("the end");
+            Assert.IsTrue(Line("F32 KillConfirmEveryKill", "three kills in a row", confirms + " confirms for " + kills + " kills", "one per kill, none dropped", kills == 3 && confirms == 3));
+        }
+
+        [UnityTest]
+        public IEnumerator F12_Scoreboard_ShowsDamageAndHealing()
+        {
+            yield return Load(ClassId.Warrior, CameraView.TopDown);
+            Press(Kb.tabKey);
+            bool dmg = false, heal = false;
+            for (int f = 0; f < T.ScreenFrames && !(dmg && heal); f++)
+            {
+                yield return null;
+                List<string> texts = ScreenTexts();
+                dmg = texts.Any(s => s.Contains("DMG") || s.Contains("DAMAGE"));
+                heal = texts.Any(s => s.Contains("HEAL"));
+            }
+            Release(Kb.tabKey);
+            AssertAtControls("the end");
+            Assert.IsTrue(Line("F12 ScoreboardDmgHeal", "TAB held", "DMG column " + dmg + ", HEAL column " + heal, "both", dmg && heal));
+        }
+
+        [UnityTest]
+        public IEnumerator F13_BlockedHit_ShowsReason()
+        {
+            yield return Load(ClassId.Warrior, CameraView.TopDown);
+            FrontDir(CameraView.TopDown, out double dx, out double dz);
+            int e = Isolate(ClassId.Farmer, 0.8 * W.Config.Class(ClassId.Warrior).AttackRange, dx, dz);
+            double px = W.X[e], pz = W.Z[e];
+            int head = W.EventHead, cursor = PlayerFeedback.Head;
+            Action keep = () => { Pin(e, px, pz); W.Actors[e].SpawnProtect = 2; };
+            keep();
+            PressAttack(CameraView.TopDown);
+            for (int t = 0; t < W.Dur.AttackWindup[0] + T.CueTicks + 3; t++)
+            {
+                yield return TickFrame(keep);
+                if (t == 0) ReleaseAttack();
+            }
+            bool blocked = Events(head, SimEventType.HitBlocked).Any(q => q.A == e && q.B == 0);
+            bool tag = Ledger(FeedbackChannel.BlockedTag, e, out FeedbackEntry b, cursor);
+            AssertAtControls("the end");
+            Assert.IsTrue(Line("F13 BlockedTag", "hit a spawn-protected Farmer", "HitBlocked event " + blocked + ", BlockedTag " + (tag ? "reason " + b.Reason : "none"), "IMMUNE (reason " + PlayerReasons.BlockedSpawnProtect + ") within 100 ms", tag && b.Reason == PlayerReasons.BlockedSpawnProtect));
+        }
+
+        [UnityTest]
+        public IEnumerator F14_Death_RecapNamesKiller()
+        {
+            yield return Load(ClassId.Warrior, CameraView.TopDown);
+            int e = Isolate(ClassId.Farmer, 1.2, 1, 0);
+            Damage.ApplyHit(W, 0, 9999, e, W.X[e], W.Z[e], DamageCause.Melee, 0, 0, 0, 0);
+            bool named = false;
+            for (int f = 0; f < T.ScreenFrames * 2 && !named; f++)
+            {
+                yield return TickFrame();
+                named = ScreenTexts().Any(s => s.Contains("FARMER"));
+            }
+            Assert.IsTrue(Line("F14 DeathRecap", "killed by a Farmer bot", "FARMER on screen " + named, "the recap names the killer", named));
+        }
+
+        [UnityTest]
+        public IEnumerator F15_Objective_PointerToHill()
+        {
+            yield return Load(ClassId.Warrior, CameraView.TopDown);
+            Isolate(ClassId.Farmer, 30, 1, 0);
+            var pad = W.Map.Pads[0];
+            Put(0, ClassId.Warrior, pad.X, pad.Z);
+            bool shown = false;
+            var re = new Regex(@"\d+\s*M\b");
+            for (int f = 0; f < T.ScreenFrames && !shown; f++)
+            {
+                yield return TickFrame();
+                shown = ScreenTexts().Any(s => re.IsMatch(s));
+            }
+            AssertAtControls("the end");
+            Assert.IsTrue(Line("F15 ObjectivePointer", "at the home pad, hill off screen", "a distance on screen " + shown, "a pointer with a distance", shown));
+        }
+
+        [UnityTest]
+        public IEnumerator F16_Feed_ShowsMyAllegiance()
+        {
+            yield return Load(ClassId.Farmer, CameraView.TopDown);
+            Isolate(ClassId.Farmer, 30, 1, 0);
+            Put(0, ClassId.Farmer, W.Map.Shrine.X, W.Map.Shrine.Z + 2.3);
+            W.Actors[0].Carry = CarryKind.Biomass;
+            W.Actors[0].CarryAmount = 3;
+            int head = W.EventHead, cursor = PlayerFeedback.Head;
+            Press(Kb.eKey);
+            for (int t = 0; t < 16; t++) yield return TickFrame();
+            Release(Kb.eKey);
+            for (int f = 0; f < T.CueFrames; f++) yield return TickFrame();
+            bool fed = Events(head, SimEventType.DeliverBiomass).Any(q => q.A == 0);
+            bool pop = Ledger(FeedbackChannel.ObjectivePop, 0, out FeedbackEntry p, cursor) || Ledger(FeedbackChannel.WorldActionPop, 0, out p, cursor);
+            AssertAtControls("the end");
+            Assert.IsTrue(Line("F16 FeedPop", "Farmer feeds 3 with E", "delivered " + fed + ", pop " + (pop ? p.Value.ToString("0.0") : "none"), "+" + T.DeliveryAllegiance + " where it happens", fed && pop && Math.Abs(p.Value - T.DeliveryAllegiance) < 1));
+        }
+
+        [UnityTest]
+        public IEnumerator F17_Ability_CastCueForEveryClass([ValueSource(nameof(Classes))] ClassId x)
+        {
+            yield return Load(x, CameraView.TopDown);
+            FrontDir(CameraView.TopDown, out double dx, out double dz);
+            int e = Isolate(ClassId.Farmer, 3.5, dx, dz);
+            double px = W.X[e], pz = W.Z[e];
+            Put(1, ClassId.Miner, W.X[0] - dz, W.Z[0] + dx);   // an ally for the Healer's pulse
+            W.Actors[1].Hp = W.Actors[1].MaxHp * 0.5;
+            W.Actors[0].AbilityCd = 0;
+            Set(Ms.position, ScreenOf(px, pz));
+            for (int i = 0; i < 2; i++) yield return TickFrame(() => Pin(e, px, pz));
+            int sounds = PlayingSources(), fx = PlayingParticles(), head = W.EventHead;
+            Press(Ms.rightButton);
+            bool cue = false;
+            for (int f = 0; f < T.CueFrames && !cue; f++)
+            {
+                if (f < T.CueTicks) yield return TickFrame(() => Pin(e, px, pz)); else yield return null;
+                if (f == 0) Release(Ms.rightButton);
+                cue = PlayingSources() > sounds || PlayingParticles() > fx;
+            }
+            string ev = string.Join(" ", Events(head, SimEventType.Ability).Where(q => q.A == 0).Select(q => "Ability v" + q.Value));
+            AssertAtControls("the end");
+            Assert.IsTrue(Line("F17 AbilityCastCue", x.ToString(), "a new sound or particle system within 6 frames " + cue + " (" + (ev.Length > 0 ? ev : "no Ability event") + ")", "a cast cue", cue));
+        }
+
+        [UnityTest]
+        public IEnumerator F18_Prompts_BindingsMatchVerbs([ValueSource(nameof(Classes))] ClassId x)
+        {
+            yield return Load(x, CameraView.TopDown);
+            for (int f = 0; f < 20; f++) yield return null;
+            List<string> texts = ScreenTexts();
+            // the classes whose F press is not a dig (S33: the Warrior and the Farmer have no dig; the Miner's F is MINE)
+            bool noDig = x == ClassId.Warrior || x == ClassId.Farmer || x == ClassId.Miner;
+            string bad = noDig ? texts.FirstOrDefault(s => s.Contains("DIG")) : null;
+            Assert.IsTrue(Line("F18 PromptsMatchVerbs", x.ToString(), bad != null ? "prompt \"" + bad.Replace("\n", " ") + "\" for a verb the class lacks" : "no stray dig prompt", "every prompt maps to a real verb", bad == null));
+        }
+
+        [UnityTest, Category("PlayerSeat.Graphics")]
+        public IEnumerator F19_Screenshot_HitFrameShowsNumber()
+        {
+            if (SystemInfo.graphicsDeviceType == UnityEngine.Rendering.GraphicsDeviceType.Null) Assert.Ignore("F19 needs a graphics run (loop/gates/remote playmode --graphics software)");
+            yield return Load(ClassId.Warrior, CameraView.TopDown);
+            FrontDir(CameraView.TopDown, out double dx, out double dz);
+            int e = Isolate(ClassId.Farmer, 0.8 * W.Config.Class(ClassId.Warrior).AttackRange, dx, dz);
+            double px = W.X[e], pz = W.Z[e];
+            yield return new WaitForEndOfFrame();
+            Texture2D before = ScreenCapture.CaptureScreenshotAsTexture();
+            PressAttack(CameraView.TopDown);
+            for (int t = 0; t < W.Dur.AttackWindup[0] + 4; t++) { yield return TickFrame(() => Pin(e, px, pz)); if (t == 0) ReleaseAttack(); }
+            yield return new WaitForEndOfFrame();
+            Texture2D after = ScreenCapture.CaptureScreenshotAsTexture();
+            Vector2 at = ScreenOf(px, pz);
+            int changed = 0, n = 0;
+            for (int y = -40; y <= 40; y += 2)
+                for (int xx = -40; xx <= 40; xx += 2)
+                {
+                    int sx = Mathf.Clamp((int)at.x + xx, 0, before.width - 1), sy = Mathf.Clamp((int)at.y + 20 + y, 0, before.height - 1);
+                    Color a = before.GetPixel(sx, sy), b = after.GetPixel(sx, sy);
+                    n++;
+                    if (Mathf.Abs(a.r - b.r) + Mathf.Abs(a.g - b.g) + Mathf.Abs(a.b - b.b) > 0.3f) changed++;
+                }
+            Object.Destroy(before);
+            Object.Destroy(after);
+            Assert.IsTrue(Line("F19 HitFramePixels", "the frame 4 ticks after a hit, 80 px around the victim", changed + " of " + n + " samples changed", "the number's pixels show (>= 5%)", changed >= n / 20));
+        }
+
+        [UnityTest]
+        public IEnumerator F24_H_NeverHidesHudByAccident()
+        {
+            yield return Load(ClassId.Warrior, CameraView.TopDown);
+            bool before = SettingsExtras.CleanHud;
+            Press(Kb.hKey);
+            yield return null;
+            Release(Kb.hKey);
+            for (int f = 0; f < 3; f++) yield return null;
+            bool after = SettingsExtras.CleanHud;
+            Assert.IsTrue(Line("F24 H_KeepsHud", "one H press in a match (H also dismisses tips)", "clean HUD " + before + " -> " + after, "the HUD stays (one job per button)", !after));
+        }
+
+        [UnityTest]
+        public IEnumerator F27_WallHit_ShowsChipsBarAndSound()
+        {
+            yield return Load(ClassId.Warrior, CameraView.TopDown);
+            Isolate(ClassId.Farmer, 30, 1, 0);
+            SanityWorld.FromScreenIntent(1, 0, out double dx, out double dz);
+            int cx = (int)Math.Floor(W.X[0] + 1.2 * dx), cz = (int)Math.Floor(W.Z[0] + 1.2 * dz);
+            MinerBarricadeConfig mb = W.Config.Abilities.MinerBarricade;
+            Barricade b = W.Barricades.First(q => !q.Active);
+            b.Active = true; b.Owner = W.ActorCount / 2 + 3; b.Team = TeamId.Crimson; b.Cx = cx; b.Cz = cz; b.Hp = mb.MaxHp; b.Ttl = mb.LifetimeSeconds;
+            b.PrevCell = W.Map.Cells[cz * W.Map.Width + cx];
+            MapGrid.SetCell(W, cx, cz, Cell.Barricade);
+            yield return TickFrame();
+            double hp0 = b.Hp;
+            int cursor = PlayerFeedback.Head;
+            Set(Ms.position, ScreenOf(cx + 0.5, cz + 0.5));
+            Press(Ms.leftButton);
+            for (int t = 0; t < W.Dur.AttackWindup[0] + T.CueFrames; t++) { yield return TickFrame(); if (t == 0) Release(Ms.leftButton); }
+            bool burst = Ledger(FeedbackChannel.ImpactBurst, -1, out _, cursor), sound = Ledger(FeedbackChannel.ImpactSound, -1, out _, cursor);
+            bool chipped = b.Hp < hp0;
+            AssertAtControls("the end");
+            Assert.IsTrue(Line("F27 WallHitCue", "Warrior swings at an enemy barricade", "chipped " + chipped + " (" + hp0.ToString("0") + " -> " + b.Hp.ToString("0") + "), chips/bar cue " + burst + ", knock sound " + sound, "chips and a sound within 100 ms", chipped && burst && sound));
+        }
+
+        [UnityTest]
+        public IEnumerator F28_WorldVerb_PopsWhereItHappens()
+        {
+            yield return Load(ClassId.Builder, CameraView.TopDown);
+            Isolate(ClassId.Farmer, 30, 1, 0);
+            W.Walls.Tool[0] = 0;   // DIG
+            SanityWorld.FromScreenIntent(1, 0, out double dx, out double dz);
+            Set(Ms.position, ScreenOf(W.X[0] + 1.6 * dx, W.Z[0] + 1.6 * dz));
+            yield return TickFrame();
+            int head = W.EventHead, cursor = PlayerFeedback.Head;
+            Press(Kb.fKey);
+            yield return TickFrame();
+            Release(Kb.fKey);
+            for (int f = 0; f < T.CueFrames; f++) yield return TickFrame();
+            var dug = Events(head, SimEventType.Terraform).Where(q => q.A == 0).ToList();
+            bool pop = Ledger(FeedbackChannel.WorldActionPop, 0, out FeedbackEntry p, cursor);
+            AssertAtControls("the end");
+            Assert.IsTrue(Line("F28 WorldActionPop", "Builder DIG with F", "Terraform " + (dug.Count > 0 ? "v" + dug[0].Value : "none") + ", pop " + (pop ? "reason " + p.Reason : "none"), "a pop with WorldDig (" + PlayerReasons.WorldDig + ")", pop && p.Reason == PlayerReasons.WorldDig));
+        }
+
+        [UnityTest]
+        public IEnumerator F29_Refusal_ShowsReasonWord()
+        {
+            yield return Load(ClassId.Warrior, CameraView.TopDown);
+            Isolate(ClassId.Farmer, 30, 1, 0);
+            W.Actors[0].AbilityCd = 5;   // on cooldown
+            int head = W.EventHead, cursor = PlayerFeedback.Head;
+            Press(Ms.rightButton);
+            yield return TickFrame();
+            Release(Ms.rightButton);
+            for (int f = 0; f < T.CueFrames; f++) yield return TickFrame();
+            bool refused = Events(head, SimEventType.ActionRefused).Any(q => q.A == 0);
+            bool tag = Ledger(FeedbackChannel.RefusalTag, 0, out FeedbackEntry r, cursor);
+            AssertAtControls("the end");
+            Assert.IsTrue(Line("F29 RefusalTag", "ability pressed on cooldown", "ActionRefused " + refused + ", RefusalTag " + (tag ? "reason " + r.Reason : "none"), "COOLDOWN (" + PlayerReasons.RefusedCooldown + ") shown", tag && r.Reason == PlayerReasons.RefusedCooldown));
+        }
+
+        [UnityTest]
+        public IEnumerator F34_Autopilot_TakeoverIsShown()
+        {
+            yield return Load(ClassId.Warrior, CameraView.TopDown);
+            Isolate(ClassId.Farmer, 30, 1, 0);
+            AssertAtControls("the start");
+            bool taken = false, shown = false;
+            int takeTick = -1;
+            for (int t = 0; t < S.Ticks(T.IdleSeconds + 4) && !shown; t++)
+            {
+                S.Tick(1);
+                if (t % 10 == 0) yield return null;
+                if (!taken && MechRules.Autopiloted(W, 0)) { taken = true; takeTick = t; }
+                if (taken)
+                {
+                    var presence = S.Driver.GetComponent<CriticalMass.Runtime.Spectator.PlayerPresence>();
+                    shown = (presence != null && presence.BannerVisible) || ScreenTexts().Any(s => s.Contains("AUTOPILOT"));
+                }
+            }
+            for (int f = 0; f < T.CueFrames && taken && !shown; f++)
+            {
+                yield return null;
+                var presence = S.Driver.GetComponent<CriticalMass.Runtime.Spectator.PlayerPresence>();
+                shown = (presence != null && presence.BannerVisible) || ScreenTexts().Any(s => s.Contains("AUTOPILOT"));
+            }
+            Assert.IsTrue(Line("F34 AutopilotShown", "no input for " + T.IdleSeconds + " s", "taken " + taken + (taken ? " at " + (takeTick / W.Config.SimHz).ToString("0.0") + " s" : "") + ", announced " + shown, "an AUTOPILOT banner the moment it takes over", taken && shown));
+        }
+    }
+}

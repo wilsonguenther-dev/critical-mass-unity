@@ -66,8 +66,16 @@ namespace CriticalMass.Sim.Bots
         public static bool HoldsSwing(World w, int id)
         {
             BotSkillConfig sk = Profile(w, id);
-            if (sk == null || !(sk.SwingHesitation > 0)) return false;
-            return Roll(w, id, SaltSwing, w.Tick / SwingWindowTicks) < sk.SwingHesitation;
+            double h = sk != null ? sk.SwingHesitation : 0;
+            // px S3: bots by human limits (Full rules) also hesitate by difficulty (CombatFeelConfig.BotSwingHesitation).
+            if (BotAim.On(w))
+            {
+                double[] mh = w.Config.Depth.CombatFeel.BotSwingHesitation;
+                int k = (int)Of(w, id);
+                if (mh != null && k < mh.Length && mh[k] > h) h = mh[k];
+            }
+            if (!(h > 0)) return false;
+            return Roll(w, id, SaltSwing, w.Tick / SwingWindowTicks) < h;
         }
 
         /// <summary>False when this think's ability decision is held back (AbilityChance); true always for Normal.</summary>

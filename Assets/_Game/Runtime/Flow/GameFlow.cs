@@ -35,6 +35,10 @@ namespace CriticalMass.Runtime.Flow
         public CriticalMass.Sim.Core.BotDifficulty BotDifficulty;
         /// <summary>Home lobby: the mode this setup came from (Custom = match setup and today's rules bit for bit).</summary>
         public MatchMode Mode;
+        /// <summary>px lane F: the duel's enemy class / the range dummy's class (other modes ignore it).</summary>
+        public ClassId EnemyClass;
+        /// <summary>px lane F: what the range dummy does (other modes ignore it).</summary>
+        public RangeDummy Dummy;
 
         public static MatchSetupChoice Default => new MatchSetupChoice
         {
@@ -104,7 +108,7 @@ namespace CriticalMass.Runtime.Flow
             BotDifficulty = s.BotDifficulty,
             Backdrop = false,
             Mode = s.Mode,
-            Rules = PlayModes.Rules(s.Mode),
+            Rules = PlayModes.Rules(s),   // px lane F: the choice's rules (a duel's enemy class, the range dummy); else the mode's
         };
     }
 

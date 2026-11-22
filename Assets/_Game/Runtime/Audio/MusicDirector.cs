@@ -108,6 +108,9 @@ namespace CriticalMass.Runtime.Audio
         /// <summary>Game flow: menus are up with no match running (title music). Off when the match starts.</summary>
         public static void SetMenuMusic(bool on) => _menuMusic = on;
 
+        /// <summary>px lane F: the music's extra gain while the low-health heartbeat plays (SoundDirector sets it; 1 = none).</summary>
+        public static float LowHealthDuck = 1f;
+
         /// <summary>Lowers the music for the next seconds (announcer lines).</summary>
         public static void Duck(float seconds) => _duckUntil = Mathf.Max(_duckUntil, Time.unscaledTime + seconds);
 
@@ -498,7 +501,7 @@ namespace CriticalMass.Runtime.Audio
             // Gain: smooth toward the state's gain, the voice duck and the pause duck (attack 0.15 s, release 0.4 s).
             float target = GainFor(_state, w);
             _gain = Mathf.MoveTowards(_gain, target, dt / 0.6f);
-            float duckTarget = (now < _duckUntil ? FilmDuck : 1f) * FilmBed * (paused ? PauseGain : 1f);
+            float duckTarget = (now < _duckUntil ? FilmDuck : 1f) * FilmBed * (paused ? PauseGain : 1f) * LowHealthDuck;
             float rate = duckTarget < _duck ? dt / 0.15f : dt / 0.4f;
             _duck = Mathf.MoveTowards(_duck, duckTarget, rate);
 

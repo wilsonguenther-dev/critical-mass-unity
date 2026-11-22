@@ -511,13 +511,23 @@ namespace CriticalMass.Sim.Core
         /// Miner id digs the cell for the aim point. Returns Dug or the refusal code (cell unchanged, Terraform event pushed
         /// either way). Checks alive / miner / carry not full / rate cap / DigRefusal in that order.
         /// </summary>
-        public static int Dig(World w, int id, double aimX, double aimZ)
+        public static int Dig(World w, int id, double aimX, double aimZ) => DigCore(w, id, aimX, aimZ, false);
+
+        /// <summary>
+        /// Lane S2: a human Miner's dig away from an ore vein (Blacksmith.TakeMinerPress): exactly the Builder's DIG rule (reach,
+        /// keep-outs, body overlap, route guard, team rate cap, the same Terraform event with Dug or the refusal code), but the
+        /// spoil is not carried (the Miner has no PLACE), so the carry never fills and the mode never flips.
+        /// </summary>
+        public static int MinerDig(World w, int id, double aimX, double aimZ) => DigCore(w, id, aimX, aimZ, true);
+
+        static int DigCore(World w, int id, double aimX, double aimZ, bool spoil)
         {
             Actor a = w.Actors[id];
             double ax = double.IsFinite(aimX) ? aimX : w.X[id];
             double az = double.IsFinite(aimZ) ? aimZ : w.Z[id];
             TerraformState t = w.Terraform;
-            if (!a.Alive || a.Cls != OwnerClass(w) || t.Carried[id] >= CarryMax(w.Config)) return Refuse(w, id, -1, ax, az, RefusedTarget);
+            bool cls = spoil ? a.Cls == ClassId.Miner : a.Cls == OwnerClass(w);
+            if (!a.Alive || !cls || (!spoil && t.Carried[id] >= CarryMax(w.Config))) return Refuse(w, id, -1, ax, az, RefusedTarget);
             if (!TargetCell(w, id, aimX, aimZ, out int cx, out int cz)) return Refuse(w, id, -1, ax, az, RefusedOutside);
             int i = cz * w.Map.Width + cx;
             if (WaitTicks(w, a.Team) > 0) return Refuse(w, id, i, cx + 0.5, cz + 0.5, RefusedRate);
@@ -525,8 +535,11 @@ namespace CriticalMass.Sim.Core
             if (why != 0) return Refuse(w, id, i, cx + 0.5, cz + 0.5, why);
             if (LiftDig(w, cx, cz)) TerrainHeight.CommitDig(w, id, cx, cz);   // b15: one level off (a top block, or a pit one deeper)
             else Commit(w, id, cx, cz, Cell.Void);
-            t.Carried[id]++;
-            if (t.Carried[id] >= CarryMax(w.Config)) t.Mode[id] = (byte)TerraformMode.Place; // DG-09: a full carry switches to Place
+            if (!spoil)
+            {
+                t.Carried[id]++;
+                if (t.Carried[id] >= CarryMax(w.Config)) t.Mode[id] = (byte)TerraformMode.Place; // DG-09: a full carry switches to Place
+            }
             World.PushEvent(w, SimEventType.Terraform, id, i, cx + 0.5, cz + 0.5, Dug);
             return Dug;
         }

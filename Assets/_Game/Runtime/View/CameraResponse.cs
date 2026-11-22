@@ -63,6 +63,33 @@ namespace CriticalMass.Runtime.View.Reactions
             return Mathf.Clamp01(f.Shock * fall);
         }
 
+        private static CameraResponse _instance;
+        private void OnEnable() => _instance = this;
+
+        /// <summary>Hit rumble requests (px lane C; counted with no controller too: tests).</summary>
+        public static int HitRumbleRequests;
+
+        /// <summary>
+        /// px lane C (2026-11-22): every landed hit BY the local player and ON the local player rumbles (the audit measured 0:
+        /// a light hit's shock 0.10 never reached RumbleThreshold). Light 50 ms, heavy 105 ms (HitFeelTuning), honouring the
+        /// Vibration setting and reduce motion (half strength), like the force rumble.
+        /// </summary>
+        public static void HitRumble(bool heavy)
+        {
+            HitRumbleRequests++;
+            if (_instance == null) return;
+            _instance.RumbleRequests++;
+            float ms = heavy ? CriticalMass.Runtime.View.Anim.HitFeelTuning.RumbleHeavyMs : CriticalMass.Runtime.View.Anim.HitFeelTuning.RumbleLightMs;
+            _instance._rumbleUntil = Mathf.Max(_instance._rumbleUntil, Time.unscaledTime + ms / 1000f);
+            Gamepad pad = Gamepad.current;
+            if (pad == null || !CriticalMass.Runtime.Input.ControllerSettings.Vibration) return;
+            float scale = ReactionBudget.MotionScale < 1f ? 0.5f : 1f;
+            float lo = heavy ? CriticalMass.Runtime.View.Anim.HitFeelTuning.RumbleHeavyLow : CriticalMass.Runtime.View.Anim.HitFeelTuning.RumbleLightLow;
+            float hi = heavy ? CriticalMass.Runtime.View.Anim.HitFeelTuning.RumbleHeavyHigh : CriticalMass.Runtime.View.Anim.HitFeelTuning.RumbleLightHigh;
+            pad.SetMotorSpeeds(lo * scale, hi * scale);
+            _instance._rumbling = true;
+        }
+
         private void Start()
         {
             _driver = GetComponent<SimDriverBehaviour>();
@@ -76,7 +103,11 @@ namespace CriticalMass.Runtime.View.Reactions
             if (_canvas != null) Destroy(_canvas.gameObject);
         }
 
-        private void OnDisable() => StopRumble();
+        private void OnDisable()
+        {
+            StopRumble();
+            if (_instance == this) _instance = null;
+        }
 
         private void Update()
         {

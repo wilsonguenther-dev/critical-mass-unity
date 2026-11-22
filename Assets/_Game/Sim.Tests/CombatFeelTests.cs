@@ -89,7 +89,18 @@ namespace CriticalMass.Sim.Tests
             return w;
         }
 
-        private static readonly InputFrame Idle = SimInput.EmptyInput();
+        // px S1 [1]: "no input" carries no aim (NaN = HasAim 0, the facing holds). EmptyInput aims at the world origin (0, 0), a
+        // real point: with the swing tracking the aim during the wind-up, an idle frame turned every scripted swing away from
+        // its target (the hit tests below press once, then step with no frame).
+        private static readonly InputFrame Idle = NoAim();
+
+        private static InputFrame NoAim()
+        {
+            InputFrame f = SimInput.EmptyInput();
+            f.AimX = double.NaN;
+            f.AimZ = double.NaN;
+            return f;
+        }
 
         /// <summary>One tick: frames for actor 0 and the enemy (null = no input), then the full sim step.</summary>
         internal static void Tick(World w, InputFrame me, InputFrame foe)
@@ -207,6 +218,9 @@ namespace CriticalMass.Sim.Tests
                         // b16: on the Warrior's column the Healer's limit is 9 s (his one-on-one guard, SoloGuard: she is the
                         // class every other one beats, and he beats every class).
                         double hi = atk == ClassId.Healer ? (def == ClassId.Warrior ? 9 : 7) : 6;
+                        // px S1 [3] re-baseline: the Warrior's one-on-one guard is SoloGuard 0.45 (was 0.2) so a 50%-landing human
+                        // Warrior wins his duels (human-seat probe pass3): a lone attacker needs about 8 s on him (Healer 11 s).
+                        if (def == ClassId.Warrior) hi = atk == ClassId.Healer ? 12 : 9;
                         if (double.IsNaN(r.Seconds) || r.Seconds < 3 || r.Seconds > hi + 1e-9) bad.Add(atk + " on " + def + ": " + S(r.Seconds) + " s");
                     }
                     Console.WriteLine("[ttk " + arm + "] " + atk + ": " + row);
@@ -348,6 +362,9 @@ namespace CriticalMass.Sim.Tests
             World w = Arena(ClassId.Miner, ClassId.Farmer);
             int e = Foe(w);
             CombatFeelConfig f = w.Config.Depth.CombatFeel;
+            // px S1 [3]: the Miner hits 19 now (19 x SUNDER 1.15 reaches the Farmer's Poise 20: a heavy stagger). This test is
+            // the light-stagger ladder, so it keeps the b16 pick of 17 (a light hit every time).
+            f.Classes[(int)ClassId.Miner].AttackDamage = 17;
             var stuns = new List<int>();
             for (int k = 0; k < 4; k++)
             {
@@ -536,6 +553,10 @@ namespace CriticalMass.Sim.Tests
             w.Actors[0].IsHuman = true;
             Assert.AreEqual(a1, Healer.MendTarget(w, 0, X0 - 3, Z0), "player: nearest the aim");
             double before = w.Actors[a1].Hp;
+            // lane S2: TryMend reads her live aim; without one a player now mends the most hurt (the bots' rule), so aim at a1
+            w.HasAim[0] = 1;
+            w.Inputs[0].AimX = X0 - 3;
+            w.Inputs[0].AimZ = Z0;
             Assert.IsTrue(Healer.TryMend(w, 0));
             Assert.AreEqual(w.Config.Depth.CombatFeel.MendHeal, w.Actors[a1].Hp - before, 1e-9, "MendHeal");
             Console.WriteLine("{\"item\":\"b15 healer\",\"rowReach\":" + h.AttackRange + ",\"rowDamage\":" + h.AttackDamage + ",\"mendRange\":" + CombatFeel.MendRange(w.Config) +

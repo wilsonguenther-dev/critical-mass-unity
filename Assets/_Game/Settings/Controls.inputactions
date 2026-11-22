@@ -221,6 +221,15 @@
                     "processors": "",
                     "interactions": "",
                     "initialStateCheck": false
+                },
+                {
+                    "name": "Look",
+                    "type": "Button",
+                    "id": "6a33e77a-9466-4c71-98f6-21308b07cc8d",
+                    "expectedControlType": "Button",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
                 }
             ],
             "bindings": [
@@ -985,12 +994,12 @@
                 },
                 {
                     "name": "",
-                    "id": "360dc137-ad6c-41b5-9be8-1245e7eb6cde",
-                    "path": "<Gamepad>/leftStickPress",
-                    "interactions": "MultiTap",
+                    "id": "91064320-ab53-4948-9b51-afaf0a05d0d3",
+                    "path": "<Keyboard>/backquote",
+                    "interactions": "",
                     "processors": "",
-                    "groups": "Gamepad",
-                    "action": "CameraView",
+                    "groups": "KeyboardMouse",
+                    "action": "Look",
                     "isComposite": false,
                     "isPartOfComposite": false
                 }

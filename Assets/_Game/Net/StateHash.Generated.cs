@@ -144,6 +144,10 @@ namespace CriticalMass.Net
             A(ref h, o.AbilityZ);
             M(ref h, o.ActorCount);
             A(ref h, o.Aggression);
+            M(ref h, o.AimHistCap);
+            A(ref h, o.AimHistTick);
+            A(ref h, o.AimHistX);
+            A(ref h, o.AimHistZ);
             A(ref h, o.AnchorTime);
             A(ref h, o.AnchorX);
             A(ref h, o.AnchorZ);
@@ -853,6 +857,7 @@ namespace CriticalMass.Net
             A(ref h, o.HillWeighted);
             A(ref h, o.IdleTicks);
             M(ref h, o.Intercepts);
+            H_PlayerSeatState(ref h, o.Seat);
             A(ref h, o.Surplus);
             A(ref h, o.SurplusLock);
             M(ref h, o.Takeovers);
@@ -1089,6 +1094,10 @@ namespace CriticalMass.Net
             A(ref h, o.BufferTick);
             M(ref h, o.Buffered);
             A(ref h, o.CancelUsed);
+            A(ref h, o.CritFrom);
+            A(ref h, o.CritKind);
+            A(ref h, o.CritTick);
+            M(ref h, o.Crits);
             A(ref h, o.FeintLockUntil);
             M(ref h, o.Feints);
             M(ref h, o.HitCancels);
@@ -1116,7 +1125,9 @@ namespace CriticalMass.Net
             M(ref h, o.Swings);
             D(ref h, o.TntSelfDamage);
             M(ref h, o.TntSelfHits);
+            A(ref h, o.WhiffRecoverUntil);
             M(ref h, o.Whiffs);
+            A(ref h, o.WoundedUntil);
         }
 
         private static void H_TerrainHeightState(ref ulong h, global::CriticalMass.Sim.Core.TerrainHeightState o)
@@ -1251,6 +1262,19 @@ namespace CriticalMass.Net
             D(ref h, o.Plant);
             D(ref h, o.Water);
             D(ref h, o.Wood);
+        }
+
+        private static void H_PlayerSeatState(ref ulong h, global::CriticalMass.Sim.Core.PlayerSeatState o)
+        {
+            if (o == null) { M(ref h, 0x4E554C4CL); return; }
+            A(ref h, o.AimDir);
+            A(ref h, o.AimSet);
+            A(ref h, o.AimX);
+            A(ref h, o.AimZ);
+            A(ref h, o.CancelMark);
+            A(ref h, o.CancelTick);
+            A(ref h, o.PrevMask);
+            A(ref h, o.RefusedTick);
         }
 
     }

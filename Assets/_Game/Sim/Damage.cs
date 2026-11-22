@@ -95,18 +95,30 @@ namespace CriticalMass.Sim.Core
             if (w.Match.Phase == MatchPhase.Ended) return 0;
             Actor t = w.Actors[targetId];
             if (!t.Alive) return 0;
-            if (t.SpawnProtect > 0) return 0;
             bool fromActor = sourceId >= 0 && sourceId < w.ActorCount;
+            // lane S2: a swing, blast or mine that reaches an enemy body and deals nothing says why (HitBlocked, view only).
+            bool report = (cause == DamageCause.Melee || cause == DamageCause.Explosion) && fromActor && w.Actors[sourceId].Team != t.Team && PlayerSeat.On(w);
+            if (t.SpawnProtect > 0)
+            {
+                if (report) Blocked(w, targetId, sourceId, PlayerReasons.BlockedSpawnProtect, 0);
+                return 0;
+            }
             if (fromActor && w.Actors[sourceId].Team == t.Team) return 0;
-            if (B13Hooks.Immune(w, targetId, cause)) return 0;   // b13-hook
+            if (B13Hooks.Immune(w, targetId, cause))   // b13-hook
+            {
+                if (report) Blocked(w, targetId, sourceId, Dodge.Immune(w, targetId, cause) ? PlayerReasons.BlockedDodge : PlayerReasons.BlockedImmune, 0);
+                return 0;
+            }
             // The id written to lastAttacker and the events: the actor, KaijuSource, else -1.
             int credit = fromActor || sourceId == KaijuSource ? sourceId : -1;
 
             amount *= B13Hooks.DamageScale(w, sourceId, targetId, cause);   // b13-hook
             double dmg = amount;
+            double shieldSaved = 0;
             if (t.Cls == ClassId.Warrior && t.AbilityActive > 0 && IsFrontal(w, targetId, srcX, srcZ))
             {
                 dmg *= 1 - w.Config.Abilities.WarriorShield.DamageReduction;
+                shieldSaved = amount - dmg;
             }
 
             // U-066 Ward: soaks the hit (an explosion goes through and breaks it). A fully soaked hit still marks the attacker
@@ -114,6 +126,7 @@ namespace CriticalMass.Sim.Core
             dmg = Pickups.Absorb(w, targetId, dmg, cause, credit);
             if (!(dmg > 0))
             {
+                if (report) Blocked(w, targetId, sourceId, PlayerReasons.BlockedWard, 0);   // lane S2 (WardAbsorb is kept)
                 t.GatherProgress = 0;
                 t.LastAttacker = credit;
                 t.LastCause = cause;
@@ -132,6 +145,14 @@ namespace CriticalMass.Sim.Core
             int tier = Knock.Tier(w.Config, dmg, t.Hp <= 0);
             if (physics) World.PushEvent(w, SimEventType.Hit, targetId, credit, tx, tz, dmg, null, cause, 0, dirX, dirZ, eff, tier, 0, 0);
             else World.PushEvent(w, SimEventType.Hit, targetId, credit, tx, tz, dmg, null, cause);
+            if (report)
+            {
+                // lane S2: the hit landed but something cut it: the shield (Radius = damage saved) or the Farmer's staff inside
+                // her close range ("TOO CLOSE", Radius = damage lost). Informational, after the Hit.
+                if (shieldSaved > 0) Blocked(w, targetId, sourceId, PlayerReasons.BlockedShield, shieldSaved);
+                double lost = GlancingLost(w, targetId, sourceId, srcX, srcZ, cause, dmg);
+                if (lost > 0) Blocked(w, targetId, sourceId, PlayerReasons.BlockedGlancing, lost);
+            }
             // CM-64: a hit during a delivery wind-up at the shrine loses that delivery (DeliverIntercepted).
             Delivery.InterruptDelivery(w, targetId, credit);
 
@@ -159,8 +180,34 @@ namespace CriticalMass.Sim.Core
                 else World.PushEvent(w, SimEventType.Death, targetId, credit, tx, tz, dmg, null, cause);
                 return dmg;
             }
+            // px S3: TNT and mine blasts (DamageCause.Explosion) open the "wounded" window too, as a landed melee hit does in
+            // CombatFeel.ApplyStrike (heal and fountain cut, low-HP slow); WoundedSeconds 0 = off. Full rules only.
+            if (cause == DamageCause.Explosion && dmg > 0 && fromActor && w.Actors[sourceId].Team != t.Team && CombatFeel.On(w))
+            {
+                double ws = CombatFeel.Cfg(w).WoundedSeconds;
+                if (ws > 0) w.Depth.Feel.WoundedUntil[targetId] = w.Tick + CombatFeel.Ticks(w, ws);
+            }
             if (physics && (eff > 0 || stunTicks > 0)) Knock.Push(w, targetId, sourceId, dirX, dirZ, eff, stunTicks, tier, cause);
             return dmg;
+        }
+
+        /// <summary>Lane S2: HitBlocked: A = the target, B = the attacker, (X, Z) = the target, Value = PlayerReasons.Blocked*,
+        /// Radius = the damage the cut saved (BlockedShield) or lost (BlockedGlancing), else 0.</summary>
+        static void Blocked(World w, int target, int source, int why, double amount)
+        {
+            World.PushEvent(w, SimEventType.HitBlocked, target, source, w.X[target], w.Z[target], why, null, DamageCause.None, amount);
+        }
+
+        /// <summary>Lane S2: the damage a melee hit of dealt lost to the Farmer's close-range rule (CombatFeel.DamageMul: share
+        /// FarmerCloseShare inside FarmerCloseRange of the swing's origin), else 0.</summary>
+        static double GlancingLost(World w, int target, int source, double srcX, double srcZ, DamageCause cause, double dealt)
+        {
+            if (cause != DamageCause.Melee || w.Actors[source].Cls != ClassId.Farmer) return 0;
+            CombatFeelConfig f = CombatFeel.Cfg(w);
+            if (!(f.FarmerCloseShare > 0) || !(f.FarmerCloseShare < 1)) return 0;
+            double dx = w.X[target] - srcX, dz = w.Z[target] - srcZ;
+            if (dx * dx + dz * dz >= f.FarmerCloseRange * f.FarmerCloseRange) return 0;
+            return dealt * (1 - f.FarmerCloseShare) / f.FarmerCloseShare;
         }
     }
 }

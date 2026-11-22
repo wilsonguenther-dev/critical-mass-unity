@@ -31,6 +31,17 @@ namespace CriticalMass.Runtime.View.Effects
         public Vector3 Nudge;
         /// <summary>Uniform scale (the corpse pop: 1 -> 1.2 -> 0).</summary>
         public float Scale;
+        // ---- px lane C (2026-11-22)
+        /// <summary>The last hit involved the local player (attacker or victim): own-hit emphasis.</summary>
+        public bool Own;
+        /// <summary>The flash's peak strength (1 = full white; the safe cream tint share under reduce flashing) and whether it
+        /// is an own-hit flash; FlashNew is true on the first frame of a new flash (the ledger's HitFlash report).</summary>
+        public float FlashStrength;
+        public bool FlashOwn, FlashNew;
+        /// <summary>True on the first frame of a new hit-stop on this body, with its length in wall ms (HitStop report), and
+        /// whether it is an own-hit hold.</summary>
+        public bool HoldNew, HoldOwn;
+        public float HoldMs;
     }
 
     /// <summary>Legacy blood on/off (cm.blood): on = any GORE level but Off. GoreGate is the one switch; CombatFx re-reads it live.</summary>
@@ -85,6 +96,14 @@ namespace CriticalMass.Runtime.View.Effects
         private Transform _shaken;
         private Vector3 _shakeRestore;
         private int _foliageTries;
+        // px lane C: per-victim flash rate limit (WCAG 2.3.1) and the first-frame flags for the ledger
+        private double[] _flashStart;
+        private bool[] _flashOwn, _flashPending;
+        private int[] _flashHitSeen, _holdSeen;
+        private readonly Dictionary<Material, Material> _tintOther = new Dictionary<Material, Material>();
+        private MeshRenderer _airRenderer;
+        /// <summary>The renderer that draws the air fx layer (bursts, trails): the ledger's source for ImpactBurst / WhiffCue.</summary>
+        public Object FxSource => _airRenderer != null ? (Object)_airRenderer : this;
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
         private FxGallery _gallery;
         /// <summary>The gallery (development builds and the editor).</summary>
@@ -113,7 +132,10 @@ namespace CriticalMass.Runtime.View.Effects
         }
         /// <summary>White flash length, sim seconds: about 2.5 frames at 60 fps; at GORE Off the whole-silhouette flash is the
         /// main hit read, so it holds about 0.1 s (warm white: never a team hue, never the heal glow's green).</summary>
-        public double FlashSeconds => _scene != null ? _scene.S(_scene.Gore == GoreLevel.Off ? 0.1 : 0.045) : 0.09;
+        public double FlashSeconds => FlashSecondsFor(false);
+
+        /// <summary>px lane C: flash length (sim s) for an own-hit or other flash (HitFeelTuning: 120 / 100 ms wall).</summary>
+        public double FlashSecondsFor(bool own) => _scene != null ? _scene.S(HitFeelTuning.FlashSeconds(own)) : HitFeelTuning.FlashSeconds(own) * 2;
 
         private void Awake()
         {
@@ -136,6 +158,14 @@ namespace CriticalMass.Runtime.View.Effects
             _bus.FootfallWorld = _driver != null ? _driver.World : null;
             CriticalMass.Runtime.View.Anim.Footfalls.Register(_bus);   // DG-93: measured footfalls feed the one force bus
             _launch = new LaunchPlan[World.ActorCapacity(cfg)];
+            int cap = World.ActorCapacity(cfg);
+            _flashStart = new double[cap];
+            _flashOwn = new bool[cap];
+            _flashPending = new bool[cap];
+            _flashHitSeen = new int[cap];
+            _holdSeen = new int[cap];
+            for (int k = 0; k < cap; k++) { _flashStart[k] = double.NegativeInfinity; _flashHitSeen[k] = _holdSeen[k] = int.MinValue; }
+            CriticalMass.Runtime.Camera.FightState.Reset();
             _scene.KaijuFootfall = OnKaijuFootfall;
             _ground = new FxMeshBuilder("Fx Ground", GroundVerts, GroundVerts * 3);
             _air = new FxMeshBuilder("Fx Air", AirVerts, AirVerts * 3);
@@ -149,6 +179,7 @@ namespace CriticalMass.Runtime.View.Effects
             _solidMat = Mat(sh, "Fx Solid", 2, 1, 0, 2460);
             _groundGo = Layer("Fx Ground", _ground, _groundMat);
             _airGo = Layer("Fx Air", _air, _airMat);
+            _airRenderer = _airGo.GetComponent<MeshRenderer>();
             _solidGo = Layer("Fx Solid", _solid, _solidMat);
             BuildVignette();
             PrewarmFlash();
@@ -180,6 +211,7 @@ namespace CriticalMass.Runtime.View.Effects
             if (WorldForceBus.Active == _bus) WorldForceBus.Active = null;
             if (_bus != null) CriticalMass.Runtime.View.Anim.Footfalls.Unregister(_bus);
             foreach (Material m in _flash.Values) if (m != null) Destroy(m);
+            foreach (Material m in _tintOther.Values) if (m != null) Destroy(m);
             foreach (Material m in _tint.Values) if (m != null) Destroy(m);
             if (_vignetteRed != null) Destroy(_vignetteRed);
             if (_vignetteNavy != null) Destroy(_vignetteNavy);
@@ -234,6 +266,7 @@ namespace CriticalMass.Runtime.View.Effects
             _seenTick = w.Tick;
             _seenHead = w.EventHead;
             _feed.OnTick(w, _scene, _audio, this);
+            CriticalMass.Runtime.Camera.FightState.Evaluate(w, Time.unscaledTimeAsDouble);   // px lane C
             _scene.OnTickState(w);
             _bus.FootfallWorld = w;
             _bus.OnTick(w);
@@ -261,6 +294,11 @@ namespace CriticalMass.Runtime.View.Effects
             FillTicks(_feed.LastDealtTick);
             System.Array.Clear(_feed.HoldTier, 0, _feed.HoldTier.Length);
             _feed.KaijuDealtTick = int.MinValue / 2;
+            _feed.ResetPx();
+            if (_flashStart != null)
+                for (int k = 0; k < _flashStart.Length; k++) { _flashStart[k] = double.NegativeInfinity; _flashPending[k] = false; _flashHitSeen[k] = _holdSeen[k] = int.MinValue; }
+            CriticalMass.Runtime.View.WallDamage.StructureHits.Clear();
+            CriticalMass.Runtime.Camera.FightState.Reset();
             if (_launch != null) System.Array.Clear(_launch, 0, _launch.Length);
             _vignetteAt = double.NegativeInfinity;
         }
@@ -336,6 +374,78 @@ namespace CriticalMass.Runtime.View.Effects
                 _vignetteAmount = e.Kind == FxKind.Block ? 0.25 : Mathf.Clamp((float)(e.Value / 40.0), 0.3f, 0.95f);
             }
             ShakeFor(ref e, w);
+            PxImpact(ref e, w);
+        }
+
+        /// <summary>
+        /// px lane C (2026-11-22): the camera and controller answer a hit by or on the local player (kick, rumble, fight
+        /// state), the ledger hears the burst and the whiff the moment FxScene spawned them, and structure hits reach the
+        /// wall views through StructureHits (no HP polling once the event flows).
+        /// </summary>
+        private void PxImpact(ref FxEvent e, World w)
+        {
+            int me = LocalSeat.Actor;
+            switch (e.Kind)
+            {
+                case FxKind.Hit:
+                case FxKind.Death:
+                {
+                    bool onMe = e.A == me, byMe = e.B == me && e.A != me;
+                    if (!onMe && !byMe) return;
+                    // lead's call 12: when the sim's crit rule is on, the CriticalHit event (FxKind.Critical below) drives the
+                    // critical look; only with the rule off does the top tier that is not a kill stand in for it.
+                    if (e.Kind == FxKind.Hit && e.Tier >= 2 && !CritRuleOn(w)) { OnCritical(e.A, e.B, 0); return; }
+                    CriticalMass.Runtime.Camera.FightState.MarkCombat(Time.unscaledTimeAsDouble);
+                    HitFeelTuning.KickKind k = e.Kind == FxKind.Death ? (onMe ? HitFeelTuning.KickKind.MyDeath : HitFeelTuning.KickKind.MyKill)
+                        : onMe ? HitFeelTuning.KickKind.OnMe : HitFeelTuning.KickKind.ByMe;
+                    CriticalMass.Runtime.Camera.CameraShake.Kick(k, SimSpace.ToWorld(e.DirX, 0, e.DirZ), e.A);
+                    CriticalMass.Runtime.View.Reactions.CameraResponse.HitRumble(e.Tier >= 1 || e.Kind == FxKind.Death);
+                    if (_scene != null && _scene.LastBurstSize > 0f) PlayerFeedback.Report(FeedbackChannel.ImpactBurst, e.A, _scene.LastBurstSize, FxSource);
+                    return;
+                }
+                case FxKind.Critical:
+                    if (e.A == me || (e.B == me && e.A != me)) OnCritical(e.A, e.B, (int)e.Value);
+                    return;
+                case FxKind.Contact:
+                    if (e.A == me && e.Value <= 0) PlayerFeedback.Report(FeedbackChannel.WhiffCue, me, 1f, FxSource);
+                    return;
+                case FxKind.StructureHit:
+                    CriticalMass.Runtime.View.WallDamage.StructureHits.Push(ref e);
+                    if (e.A == me) CriticalMass.Runtime.Camera.FightState.MarkCombat(Time.unscaledTimeAsDouble);
+                    return;
+            }
+        }
+
+        /// <summary>
+        /// CRITICAL HIT (lead's call 12, 2026-11-22), view only: kind 0 = the top-tier look (Tier 2, not a kill), 1 counter,
+        /// 2 punish, 3 back hit (lane S1's SimEventType.CriticalHit Value). For hits by or on the local player: the two-stage
+        /// burst, radial lines and the gold follow-through (FxScene.SpawnCritical), 140 ms hit-stop on both fighters
+        /// (CombatFeed.CritHoldTick), the full-body Hit_B and a bigger recoil (CombatFeed.CritTick, read by ActorAnimator and
+        /// ActorViews), a 1.6x camera kick plus a 2 deg FOV punch (zero under REDUCE MOTION) and the heavy rumble. Ledger:
+        /// ImpactBurst (stage-2 size), CameraKick (in CameraShake.Kick), HitStop (ActorViews, 140 ms). Call it the tick of
+        /// the Hit (after FxScene spawned it).
+        /// </summary>
+        /// <summary>True when the sim's earned-crit rule is live (Full combat feel and CritEnabled): the CriticalHit event exists.</summary>
+        private static bool CritRuleOn(World w) => w != null && CombatFeel.On(w) && CombatFeel.Cfg(w).CritEnabled;
+
+        public void OnCritical(int victim, int attacker, int kind)
+        {
+            World w = _driver != null ? _driver.World : null;
+            if (w == null || _feed == null || victim < 0 || victim >= w.ActorCount) return;
+            int me = LocalSeat.Actor;
+            bool onMe = victim == me, byMe = attacker == me && victim != me;
+            if (!onMe && !byMe) return;
+            int tick = _feed.LastHitTick[victim];
+            _feed.CritTick[victim] = tick;
+            _feed.CritKind[victim] = (byte)Mathf.Clamp(kind, 0, 255);
+            _feed.CritHoldTick[victim] = tick;
+            if (attacker >= 0 && attacker < w.ActorCount) _feed.CritHoldTick[attacker] = tick;
+            CriticalMass.Runtime.Camera.FightState.MarkCombat(Time.unscaledTimeAsDouble);
+            CriticalMass.Runtime.Camera.CameraShake.Kick(onMe ? HitFeelTuning.KickKind.CritOnMe : HitFeelTuning.KickKind.CritByMe,
+                SimSpace.ToWorld(_feed.HitDirX[victim], 0, _feed.HitDirZ[victim]), victim);
+            CriticalMass.Runtime.Camera.CameraShake.FovPunch(HitFeelTuning.CritFovPunchDeg);
+            CriticalMass.Runtime.View.Reactions.CameraResponse.HitRumble(true);
+            if (_scene != null) PlayerFeedback.Report(FeedbackChannel.ImpactBurst, victim, _scene.SpawnCritical(attacker), FxSource);
         }
 
         /// <summary>
@@ -346,11 +456,8 @@ namespace CriticalMass.Runtime.View.Effects
         {
             // feat/hit-feel-2: the hit nudge for the local player is on by default at a low strength (CameraShake.Nudge: the
             // shake setting once the player has set it, off with reduce motion).
-            if (e.Kind == FxKind.Hit && w.ActorCount > 0)
-            {
-                float n = Anim.HitFeel.Nudge(e.A == 0, e.B == 0);
-                if (n > 0f) CriticalMass.Runtime.Camera.CameraShake.Nudge(n);
-            }
+            // px lane C: the hit nudge (trauma, x0.3 in third person: 0.004 u) is replaced by the directional hit kick
+            // (CameraShake.Kick, PxImpact), which the shake slider does not scale.
             if (w.ActorCount == 0 || FeelGate.ShakeScale <= 0f) return;
             float amount = ShakeAmount(e.Kind, e.A == LocalSeat.Actor, e.Value, DistanceToLocal(w, e.X, e.Z), w.Config.Kaiju.SlamRadius);
             if (amount > 0f) CriticalMass.Runtime.Camera.CameraShake.Impulse(amount);
@@ -585,7 +692,10 @@ namespace CriticalMass.Runtime.View.Effects
                     Vector3 axis = Vector3.Cross(Vector3.up, d);
                     if (tumble != 0f && axis.sqrMagnitude > 1e-6f) fx.Lean = Quaternion.AngleAxis(tumble, axis.normalized);
                 }
-                fx.Flash = dt < FlashSeconds;
+                bool ownDeath = i == LocalSeat.Actor || (i < _feed.LastHitBy.Length && _feed.LastHitBy[i] == LocalSeat.Actor);
+                fx.Flash = dt < FlashSecondsFor(ownDeath);
+                fx.FlashOwn = ownDeath;
+                fx.FlashStrength = HitFeelTuning.FlashStrength(FeelGate.ReduceFlashing, ownDeath);
                 if (dt > _scene.CorpseSeconds)
                 {
                     float p = (float)((dt - _scene.CorpseSeconds) / _scene.PopSeconds);
@@ -599,7 +709,30 @@ namespace CriticalMass.Runtime.View.Effects
             if (hitT >= 0 && hitT < 2.0)
             {
                 fx.HitT = hitT;
-                fx.Flash = hitT < FlashSeconds;
+                // px lane C: one flash per hit, at most one start per FlashMinGapSeconds per victim (under 3 a second), own
+                // hits longer and (under reduce flashing) a stronger safe tint; FlashNew marks its first visible frame.
+                int by = _feed.LastHitBy[i];
+                bool own = i == LocalSeat.Actor || by == LocalSeat.Actor;
+                fx.Own = own;
+                int ht = _feed.LastHitTick[i];
+                if (ht != _flashHitSeen[i])
+                {
+                    _flashHitSeen[i] = ht;
+                    double t0 = ht / hz;
+                    if (HitFeelTuning.FlashAllowed((t0 - _flashStart[i]) / _scene.S(1.0)))
+                    {
+                        _flashStart[i] = t0;
+                        _flashOwn[i] = own;
+                        _flashPending[i] = true;
+                    }
+                }
+                double ft = now - _flashStart[i];
+                bool fOwn = _flashOwn[i];
+                fx.Flash = ft >= 0 && ft < FlashSecondsFor(fOwn);
+                fx.FlashOwn = fOwn;
+                fx.FlashStrength = HitFeelTuning.FlashStrength(FeelGate.ReduceFlashing, fOwn);
+                if (fx.Flash && _flashPending[i]) { fx.FlashNew = true; _flashPending[i] = false; }
+                else if (!fx.Flash && ft >= 0) _flashPending[i] = false;
                 double up = _scene.S(0.035), down = _scene.S(0.22);
                 double env = hitT < up ? hitT / up : System.Math.Max(0, 1 - (hitT - up) / down);
                 if (env > 0)
@@ -616,12 +749,52 @@ namespace CriticalMass.Runtime.View.Effects
             }
             if (holdT >= 0 && holdT < 2.0)
             {
-                double hold = HoldFor(_feed.HoldTier[i]);
+                bool crit = _feed.CritHoldTick[i] == _feed.HoldTick[i];   // a critical hit: 140 ms on both fighters
+                double holdWall = crit ? HitFeelTuning.HoldCritWallSeconds(FeelGate.ReduceMotion) : Anim.HitFeel.HoldWallSeconds(_feed.HoldTier[i], FeelGate.ReduceMotion);
+                double hold = crit ? (_scene != null ? _scene.S(holdWall) : holdWall * 2) : HoldFor(_feed.HoldTier[i]);
                 fx.Holding = holdT < hold;
                 fx.HoldOffset = System.Math.Min(holdT, hold);
+                // px lane C: the ledger's HitStop for the victim and the attacker (own when either is the local player)
+                int hk = _feed.HoldTick[i];
+                if (hk != _holdSeen[i] && fx.Holding)
+                {
+                    _holdSeen[i] = hk;
+                    fx.HoldNew = hold > 0;
+                    fx.HoldMs = (float)(holdWall * 1000);
+                    int me = LocalSeat.Actor;
+                    fx.HoldOwn = OwnVictimAt(i, hk) || (_feed.LastHitBy[i] == me && _feed.LastHitTick[i] == hk);
+                }
                 any = true;
             }
             return any;
+        }
+
+        /// <summary>px lane C: the hold of `attacker` at tick hk is an own hit: it is the local player, or it hit the local player then.</summary>
+        private bool OwnVictimAt(int attacker, int hk)
+        {
+            int me = LocalSeat.Actor;
+            if (attacker == me) return true;
+            return me < _feed.LastHitBy.Length && _feed.LastHitBy[me] == attacker && _feed.LastHitTick[me] == hk;
+        }
+
+        /// <summary>
+        /// px lane C: actor i's last sim knock for the drawn lead (ActorViews): age (WALL s), the knock (u), the sim spot it
+        /// started from and its unit direction (sim). False when there is none younger than 1 s.
+        /// </summary>
+        public bool Knock(int i, out double ageWall, out double knock, out double x0, out double z0, out double dirX, out double dirZ)
+        {
+            ageWall = knock = x0 = z0 = dirX = dirZ = 0;
+            if (_feed == null || i < 0 || i >= _feed.KnockTick.Length || _scene == null) return false;
+            double hz = _driver.Config.SimHz;
+            double age = (SimNow() - _feed.KnockTick[i] / hz) / _scene.S(1.0);
+            if (!(age >= 0 && age < 1.0)) return false;
+            ageWall = age;
+            knock = _feed.KnockU[i];
+            x0 = _feed.KnockX[i];
+            z0 = _feed.KnockZ[i];
+            dirX = _feed.KnockDirX[i];
+            dirZ = _feed.KnockDirZ[i];
+            return knock > 0;
         }
 
         /// <summary>The Attack clip time for actor i, held during a heavy hit that happened after the swing began.</summary>
@@ -633,10 +806,14 @@ namespace CriticalMass.Runtime.View.Effects
         }
 
         /// <summary>A flat white copy of a CM/Toon material (outline kept), cached per source.</summary>
-        public Material FlashMaterial(Material source)
+        public Material FlashMaterial(Material source) => FlashMaterial(source, true);
+
+        /// <summary>px lane C: the flash material for an own-hit or other flash: full white, or under reduce flashing the safe
+        /// cream fill + rim at HitFeelTuning.FlashSafeOwn / FlashSafeOther (was a 30% tint).</summary>
+        public Material FlashMaterial(Material source, bool own)
         {
             if (source == null) return null;
-            if (FeelGate.ReduceFlashing) return TintMaterial(source);
+            if (FeelGate.ReduceFlashing) return TintMaterial(source, own);
             if (_flash.TryGetValue(source, out Material m)) return m;
             m = new Material(source) { name = source.name + " (Flash)" };
             Color white = new Color(1f, 0.98f, 0.94f, 1f);
@@ -651,15 +828,24 @@ namespace CriticalMass.Runtime.View.Effects
         }
 
         /// <summary>Reduce flashing: a copy of a CM/Toon material with its colours 30% toward white (no white frame).</summary>
-        public Material TintMaterial(Material source)
+        public Material TintMaterial(Material source) => TintMaterial(source, true);
+
+        public Material TintMaterial(Material source, bool own)
         {
             if (source == null) return null;
-            if (_tint.TryGetValue(source, out Material m)) return m;
-            m = new Material(source) { name = source.name + " (Tint)" };
-            Color white = new Color(1f, 0.98f, 0.94f, 1f);
+            Dictionary<Material, Material> cache = own ? _tint : _tintOther;
+            if (cache.TryGetValue(source, out Material m)) return m;
+            m = new Material(source) { name = source.name + (own ? " (Tint)" : " (Tint other)") };
+            Color cream = HitFeelTuning.FlashCream;
+            float k = HitFeelTuning.FlashStrength(true, own);
             foreach (string p in FlashColours)
-                if (m.HasProperty(p)) m.SetColor(p, Color.Lerp(m.GetColor(p), white, FeelGate.ReducedFlashTint));
-            _tint[source] = m;
+                if (m.HasProperty(p)) m.SetColor(p, Color.Lerp(m.GetColor(p), cream, k));
+            // a solid, team-neutral pulse: flatten the shading toward the cream and light the rim in it (no white frame)
+            if (m.HasProperty("_ShadowTintAmount")) m.SetFloat("_ShadowTintAmount", m.GetFloat("_ShadowTintAmount") * (1f - k));
+            if (m.HasProperty("_ShadowMultiplier")) m.SetFloat("_ShadowMultiplier", Mathf.Lerp(m.GetFloat("_ShadowMultiplier"), 0.9f, k));
+            if (m.HasProperty("_RimColor")) m.SetColor("_RimColor", cream);
+            if (m.HasProperty("_RimStrength")) m.SetFloat("_RimStrength", Mathf.Max(m.GetFloat("_RimStrength"), 1f));
+            cache[source] = m;
             return m;
         }
 
@@ -680,6 +866,8 @@ namespace CriticalMass.Runtime.View.Effects
                     FlashMaterial(ArtMaterials.ForTeam(spec, TeamId.Crimson));
                     TintMaterial(ArtMaterials.ForTeam(spec, TeamId.Azure));
                     TintMaterial(ArtMaterials.ForTeam(spec, TeamId.Crimson));
+                    TintMaterial(ArtMaterials.ForTeam(spec, TeamId.Azure), false);
+                    TintMaterial(ArtMaterials.ForTeam(spec, TeamId.Crimson), false);
                 }
                 catch (System.InvalidOperationException)
                 {
@@ -689,7 +877,7 @@ namespace CriticalMass.Runtime.View.Effects
         }
 
         /// <summary>Flash materials created (bounded: class models x 2 teams; all made in Start).</summary>
-        public int FlashMaterialCount => _flash.Count + _tint.Count;
+        public int FlashMaterialCount => _flash.Count + _tint.Count + _tintOther.Count;
 
         private static readonly string[] FlashColours =
         {

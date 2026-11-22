@@ -48,6 +48,11 @@ namespace CriticalMass.Runtime.Camera
         public const string ActionName = "CameraView";
         /// <summary>Camera shake share kept in ground view (a 0.32 u shake at 3 u from the pivot is a lot).</summary>
         public const float ShakeLimit = 0.3f;
+        /// <summary>px lane C: fight framing weight 0..1 (eased in HitFeelTuning.StepFight) and the pivot lift at full (u).</summary>
+        double _fightW;
+        public const double FightLift = 0.15;
+        public static double FightFraming => Current != null ? Current._fightW : 0;
+        static double Smooth01(double x) => x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3 - 2 * x);
         /// <summary>Mouse look degrees per pixel and right stick degrees per second (yaw, pitch).</summary>
         public const float MouseDegPerPx = 0.14f, StickYawDegPerSec = 160f, StickPitchDegPerSec = 90f;
         /// <summary>Off-screen threat ring: enemies within this many u outside the view get a pointer.</summary>
@@ -324,7 +329,15 @@ namespace CriticalMass.Runtime.Camera
                 rig = _view == CameraView.FirstPerson ? FollowCamera.FirstRig : FollowCamera.ThirdRig;
                 PlayFollow(w, target, facing, paused ? 0 : dt, snap, orbitYaw, orbitPitch, rig, ref tx, ref tz);
                 orbitYaw = orbitPitch = 0;   // PlayFollow owns the yaw and pitch
+                // px lane C: fight framing (third person): an enemy close in front or a hit in the last 2 s eases the camera back
+                // 12% and a little up, FOV +3, over 0.4 s; home over 1 s. Never under reduce motion, never in first person.
+                bool fight = !rig.FirstPerson && !CriticalMass.Runtime.View.Effects.FeelGate.ReduceMotion && FightState.InFight;
+                _fightW = snap ? (fight ? 1 : 0) : CriticalMass.Runtime.View.Anim.HitFeelTuning.StepFight(_fightW, fight, paused ? 0 : dt);
+                double fw = Smooth01(_fightW);
+                extra += rig.Distance * CriticalMass.Runtime.View.Anim.HitFeelTuning.FightDistanceShare * fw;
+                lift += FightLift * fw;
             }
+            else _fightW = 0;
 
             GatherCylinders(w, tx, tz, target);
             var f = new GroundFollowInput
@@ -687,7 +700,7 @@ namespace CriticalMass.Runtime.Camera
             }
             Vector3 pos = SimSpace.ToWorld(_follow.CamX, _follow.CamY, _follow.CamZ);
             _cam.transform.SetPositionAndRotation(pos, Quaternion.Euler((float)_follow.Pitch, (float)_follow.Yaw, 0f));
-            float fov = Mode == GroundViewMode.Play ? _fov : GroundCamera.FovDeg;
+            float fov = Mode == GroundViewMode.Play ? _fov + (float)(CriticalMass.Runtime.View.Anim.HitFeelTuning.FightFovAdd * Smooth01(_fightW)) : GroundCamera.FovDeg;
             if (_cam.fieldOfView != fov) _cam.fieldOfView = fov;
             if (_cam.nearClipPlane != GroundCamera.NearClip) _cam.nearClipPlane = GroundCamera.NearClip;
             if (_cam.farClipPlane != GroundCamera.FarClip) _cam.farClipPlane = GroundCamera.FarClip;

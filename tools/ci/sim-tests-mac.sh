@@ -21,7 +21,7 @@ cp "$NUNIT" "$OUT/"
 find "$ROOT/Assets/_Game/Sim" "$ROOT/Assets/_Game/Net" "$ROOT/Assets/_Game/Sim.Tests" -name '*.cs' -not -path '*~/*' > "$OUT/files.txt"
 "$S/NetCoreRuntime/dotnet" "$S/DotNetSdkRoslyn/csc.dll" -nologo -nostdlib -noconfig -langversion:9 -nowarn:1591,0618 \
   "-define:UNITY_INCLUDE_TESTS;${DEFINES}" -r:"$API/mscorlib.dll" -r:"$API/System.dll" -r:"$API/System.Core.dll" \
-  -r:"$API/Facades/netstandard.dll" -r:"$API/Facades/System.Runtime.dll" -r:"$OUT/nunit.framework.dll" \
+  -r:"$API/Facades/netstandard.dll" -r:"$API/Facades/System.Runtime.dll" -r:"$API/System.Net.Http.dll" -r:"$OUT/nunit.framework.dll" \
   -target:exe -out:"$OUT/simtests.exe" "$ROOT/tools/ci/mac/Runner.cs" @"$OUT/files.txt" > "$OUT/csc.txt" 2>&1
 c=$?; grep -E "error CS" "$OUT/csc.txt" | sed -E "s#${ROOT}/##" | head -40; echo "sim-tests-mac: csc exit $c (defines UNITY_INCLUDE_TESTS;${DEFINES})"
 [[ $c -eq 0 ]] || exit 2
