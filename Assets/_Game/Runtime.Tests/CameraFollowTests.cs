@@ -122,7 +122,8 @@ namespace CriticalMass.Runtime.Tests
                 a.AimZ = 30;
                 f.Step(a);
             }
-            Assert.AreEqual(GameplayCamera.LookAheadMax, Math.Sqrt(f.LaX * f.LaX + f.LaZ * f.LaZ), 1e-3);
+            // lane C fix round (review defect 3): the aim lean alone is capped at CameraFollow.AimLeanMax.
+            Assert.AreEqual(Math.Min(GameplayCamera.LookAheadMax, CameraFollow.AimLeanMax), Math.Sqrt(f.LaX * f.LaX + f.LaZ * f.LaZ), 1e-3);
         }
 
         [Test]

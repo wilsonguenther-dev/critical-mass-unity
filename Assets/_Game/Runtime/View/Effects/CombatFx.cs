@@ -719,7 +719,8 @@ namespace CriticalMass.Runtime.View.Effects
                 {
                     _flashHitSeen[i] = ht;
                     double t0 = ht / hz;
-                    if (HitFeelTuning.FlashAllowed((t0 - _flashStart[i]) / _scene.S(1.0)))
+                    // fix round (defect 6): a shield-blocked hit never flashes the victim (the block look shows instead)
+                    if (_feed.BlockTick[i] != ht && HitFeelTuning.FlashAllowed((t0 - _flashStart[i]) / _scene.S(1.0)))
                     {
                         _flashStart[i] = t0;
                         _flashOwn[i] = own;

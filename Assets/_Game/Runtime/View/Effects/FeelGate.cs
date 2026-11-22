@@ -134,6 +134,8 @@ namespace CriticalMass.Runtime.View.Effects
             { FxKind.Feint, FeelGating.None },
             { FxKind.Blocked, FeelGating.None },
             { FxKind.StructureHit, FeelGating.None },
+            { FxKind.Critical, FeelGating.None },
+            { FxKind.Dig, FeelGating.None },
         };
 
         static readonly Dictionary<FeelEffect, FeelGating> EffectTable = new Dictionary<FeelEffect, FeelGating>

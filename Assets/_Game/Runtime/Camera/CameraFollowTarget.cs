@@ -115,8 +115,11 @@ namespace CriticalMass.Runtime.Camera
             if (_input != null && !Driver.HumanAutopilot && _input.State.HasAim)
             {
                 f.HasAim = true;
-                f.AimX = _input.State.AimX;
-                f.AimZ = _input.State.AimZ;
+                // lane C fix round (review defect 3): lean toward where the PLAYER points (the raw aim), never toward the
+                // aim-assisted target: the assisted aim pulled the top-down view 40-51 px toward the target from the press.
+                bool raw = CriticalMass.Runtime.Input.AimAssist.RawHasAim;
+                f.AimX = raw ? CriticalMass.Runtime.Input.AimAssist.RawAimX : _input.State.AimX;
+                f.AimZ = raw ? CriticalMass.Runtime.Input.AimAssist.RawAimZ : _input.State.AimZ;
             }
             if (_override)
             {

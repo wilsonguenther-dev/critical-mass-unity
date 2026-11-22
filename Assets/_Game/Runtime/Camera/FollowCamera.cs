@@ -1,4 +1,6 @@
 using System;
+using CriticalMass.Sim.Config;
+using CriticalMass.Sim.Core;
 using CriticalMass.Sim.Grid;
 using UnityEngine;
 
@@ -493,6 +495,88 @@ namespace CriticalMass.Runtime.Camera
             if (d.sqrMagnitude > FollowCamera.FighterDrawDistance * FollowCamera.FighterDrawDistance) return false;
             var b = new Bounds(p + new Vector3(0f, h * 0.5f, 0f), new Vector3(r * 2f, h, r * 2f));
             return GeometryUtility.TestPlanesAABB(Planes, b);
+        }
+    }
+
+    /// <summary>
+    /// Fight framing for third person (lane C fix round, review defect 2, 2026-11-22): at melee range (1.15 u) the enemy stood
+    /// exactly behind the player's own fighter for every class (the Builder's ladder hid him 100%). With a fight target
+    /// (the lock, the hittable target, else the nearest enemy close in front) the camera swings to view the duel from
+    /// the side: the yaw is held at least YawOffsetDeg off the line from the player to the target (side kept for the whole
+    /// fight) and the lens shifts ShoulderU toward the side the enemy is drawn on, so the enemy's centre leaves the player's
+    /// screen rectangle (PxImpactTuningTests, every class at 1.15 u and 2 u, 16:9). Eases in over InSeconds, out over
+    /// OutSeconds; never while the player is steering the camera (manual look); never in first person or reduce motion.
+    /// When the player's model still covers the target, GroundView points the see-through dither at the target's chest
+    /// (FadeRadius), which dithers the covering parts of the own model and any wall in front.
+    /// Pure maths; GroundView applies it.
+    /// </summary>
+    public static class FightFrame
+    {
+        public const double YawOffsetDeg = 36, ShoulderU = 0.9, InSeconds = 0.25, OutSeconds = 0.8;
+        /// <summary>A target farther than this (u, centre to centre) is not framed.</summary>
+        public const double TargetRange = 3.2;
+        public const float FadeRadius = 0.6f;
+
+        /// <summary>The yaw (deg) to add to the follow yaw so the camera looks at least YawOffsetDeg off the line toward the
+        /// target (enemyYaw: the camera yaw that would look straight from the player at it). side: +1 the camera turns right
+        /// of the line (the enemy is drawn left), -1 the other way; 0 = choose (the nearer side) and keep. 0 when already clear.</summary>
+        public static double YawOffset(double followYaw, double enemyYaw, ref int side)
+        {
+            double d = GroundCamera.DeltaAngle(enemyYaw, followYaw);
+            if (Math.Abs(d) >= YawOffsetDeg) { if (side == 0) side = d >= 0 ? 1 : -1; return 0; }
+            if (side == 0) side = d >= 0 ? 1 : -1;
+            return side * YawOffsetDeg - d;
+        }
+
+        /// <summary>The lens shift (u along the camera's right): toward the side the enemy is drawn on.</summary>
+        public static double Shoulder(int side) => -side * ShoulderU;
+
+        public static double Step(double w, bool on, double dt) =>
+            dt <= 0 ? w : on ? Math.Min(1, w + dt / InSeconds) : Math.Max(0, w - dt / OutSeconds);
+
+        /// <summary>Estimated drawn silhouette (half width beyond the body radius, height) per class: weapons, shield, the
+        /// Builder's back ladder. Estimates from the review sheets; not measured meshes.</summary>
+        public static void Silhouette(ClassId c, double radius, out double halfWidth, out double height)
+        {
+            halfWidth = radius + 0.15;
+            height = c == ClassId.Builder ? 2.7 : c == ClassId.Warrior ? 2.3 : 2.15;
+        }
+
+        /// <summary>
+        /// Screen margin (normalised device units, 2 = screen width / height) by which the target's chest centre lies outside
+        /// the player's drawn screen rectangle, for the third-person rig at full fight framing: the camera pose is GroundFollow's
+        /// (pivot at PivotHeight + lift over the fighter, the lens Distance back along yaw / pitch, shifted by the shoulder),
+        /// open ground, 16:9. Positive = clear. yawOffDeg / shoulder: what the framing adds (0 / 0 = the old camera).
+        /// </summary>
+        public static double Margin(double halfWidth, double height, double enemyDist, double distance, double pivotHeight, double pitchDeg,
+                                    double fovDeg, double yawOffDeg, double shoulder, double aspect = 16.0 / 9.0)
+        {
+            // camera frame: looking along +z at yaw 0; the enemy sits on the line at yaw -yawOffDeg (the camera turned right of it)
+            double pr = pitchDeg * Math.PI / 180, fy = -Math.Sin(pr), fz = Math.Cos(pr);
+            double cx = shoulder, cy = pivotHeight - fy * distance, cz = -fz * distance;
+            double f = 1 / Math.Tan(fovDeg * Math.PI / 360);
+            double minX = 9, maxX = -9, minY = 9, maxY = -9;
+            for (int k = 0; k < 16; k++)
+            {
+                double a = k * Math.PI / 8;
+                for (int j = 0; j < 2; j++)
+                {
+                    Project(halfWidth * Math.Cos(a) - cx, j * height - cy, halfWidth * Math.Sin(a) - cz, pr, f, aspect, out double sx, out double sy);
+                    minX = Math.Min(minX, sx); maxX = Math.Max(maxX, sx); minY = Math.Min(minY, sy); maxY = Math.Max(maxY, sy);
+                }
+            }
+            double th = yawOffDeg * Math.PI / 180;
+            Project(-enemyDist * Math.Sin(th) - cx, 1.0 - cy, enemyDist * Math.Cos(th) - cz, pr, f, aspect, out double ex, out double ey);
+            return Math.Max(Math.Max(minX - ex, ex - maxX), Math.Max(minY - ey, ey - maxY));
+        }
+
+        static void Project(double x, double y, double z, double pitchRad, double f, double aspect, out double sx, out double sy)
+        {
+            double cp = Math.Cos(pitchRad), sp = Math.Sin(pitchRad);
+            double z2 = z * cp - y * sp, y2 = z * sp + y * cp;
+            if (z2 < 1e-4) z2 = 1e-4;
+            sx = x / z2 * f / aspect;
+            sy = y2 / z2 * f;
         }
     }
 }

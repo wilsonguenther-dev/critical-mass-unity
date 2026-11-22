@@ -57,12 +57,108 @@ namespace CriticalMass.Runtime.Tests
         [Test]
         public void TheKickSpringsOutAndBackInAboutAHundredAndFiftyMilliseconds()
         {
-            Assert.AreEqual(0f, HitFeelTuning.KickEnvelope(0), 1e-6f, "starts at rest");
+            Assert.AreEqual(1f, HitFeelTuning.KickEnvelope(0), 1e-6f, "fix round: full ON the impact frame");
             Assert.AreEqual(1f, HitFeelTuning.KickEnvelope(HitFeelTuning.KickRise), 1e-4f, "full at the rise");
             Assert.AreEqual(0f, HitFeelTuning.KickEnvelope(HitFeelTuning.KickReturn), 1e-6f, "home again");
             Assert.That(HitFeelTuning.KickReturn, Is.InRange(0.12, 0.18));
             Assert.LessOrEqual(HitFeelTuning.KickRise, 0.034, "out within 2 frames (inside the 100 ms impact window)");
             Assert.AreEqual(0f, HitFeelTuning.KickEnvelope(-0.01), "nothing before");
+        }
+
+        // ---------------------------------------------------------------- fix round (Editor review 2026-11-22)
+
+        static readonly ClassId[] Six = { ClassId.Warrior, ClassId.Farmer, ClassId.Miner, ClassId.Demolitions, ClassId.Builder, ClassId.Healer };
+
+        /// <summary>Defect 2: at melee range the old third-person camera drew the enemy behind my fighter; the duel framing
+        /// must put the enemy's chest centre outside my drawn screen rectangle for every class at 1.15 u and 2 u, 16:9.</summary>
+        [Test]
+        public void TheDuelFramingShowsTheEnemyBesideMyFighterForEveryClass()
+        {
+            GameConfig cfg = GameConfig.CreateDefault();
+            double dist = FollowCamera.ThirdDistance * (1 + HitFeelTuning.FightDistanceShare);
+            double piv = FollowCamera.ThirdPivotHeight + GroundView.FightLift;
+            foreach (ClassId c in Six)
+            {
+                FightFrame.Silhouette(c, cfg.Class(c).Radius, out double hw, out double ht);
+                double old = FightFrame.Margin(hw, ht, 1.15, FollowCamera.ThirdDistance, FollowCamera.ThirdPivotHeight, FollowCamera.ThirdPitch, FollowCamera.FovDefault, 0, 0);
+                Assert.Less(old, 0, c + ": the old camera hid the enemy (the defect reproduced in numbers)");
+                foreach (double d in new[] { 1.15, 2.0 })
+                    foreach (int fov in new[] { FollowCamera.FovMin, FollowCamera.FovDefault, FollowCamera.FovMax })
+                    {
+                        double m = FightFrame.Margin(hw, ht, d, dist, piv, FollowCamera.ThirdPitch, fov + HitFeelTuning.FightFovAdd,
+                            FightFrame.YawOffsetDeg, FightFrame.Shoulder(1));
+                        TestContext.Progress.WriteLine($"[px duel] {c} at {d} u, FOV {fov}: margin old {old * 960:0} px -> {m * 960:0} px (1920 wide)");
+                        Assert.Greater(m, 0, $"{c} at {d} u, FOV {fov}: the enemy's centre is clear of my fighter");
+                    }
+            }
+            Assert.LessOrEqual(FightFrame.InSeconds, 0.3, "eases in under 0.3 s");
+            Assert.Greater(FightFrame.OutSeconds, FightFrame.InSeconds, "eases out slower");
+        }
+
+        [Test]
+        public void TheDuelYawOnlyTurnsAsFarAsNeededAndKeepsItsSide()
+        {
+            int side = 0;
+            Assert.AreEqual(FightFrame.YawOffsetDeg, FightFrame.YawOffset(100, 100, ref side), 1e-9, "on the line: swing the full offset");
+            Assert.AreEqual(1, side);
+            Assert.AreEqual(FightFrame.YawOffsetDeg - 10, FightFrame.YawOffset(110, 100, ref side), 1e-9, "part way: only the rest");
+            Assert.AreEqual(0, FightFrame.YawOffset(150, 100, ref side), 1e-9, "already side-on: nothing");
+            Assert.AreEqual(FightFrame.YawOffsetDeg + 5, FightFrame.YawOffset(95, 100, ref side), 1e-9, "the side is kept (no flip-flop)");
+            int s2 = 0;
+            Assert.AreEqual(-FightFrame.YawOffsetDeg + 10, FightFrame.YawOffset(90, 100, ref s2), 1e-9, "the nearer side is chosen");
+            Assert.AreEqual(FightFrame.ShoulderU, FightFrame.Shoulder(-1), 1e-9);
+            Assert.AreEqual(1.0, FightFrame.Step(0, true, FightFrame.InSeconds), 1e-9);
+            Assert.AreEqual(0.0, FightFrame.Step(1, false, FightFrame.OutSeconds), 1e-9);
+        }
+
+        /// <summary>Defect 3: the kick must reach the lens through CameraShake's real LateUpdate, full on the impact frame,
+        /// independent of the shake slider, and come off again with Reset.</summary>
+        [Test]
+        public void TheHitKickMovesTheRealCameraOnTheImpactFrame()
+        {
+            Assume.That(!FeelGate.ReduceMotion, "reduce motion is on on this machine: the kick is rightly zero");
+            var go = new UnityEngine.GameObject("px-kick-cam");
+            float? keep = GameSettings.HitKickOverride;
+            try
+            {
+                go.tag = "MainCamera";
+                var cam = go.AddComponent<UnityEngine.Camera>();
+                cam.fieldOfView = (float)GameplayCamera.FovDeg;
+                go.transform.position = new UnityEngine.Vector3(3, 20, -10);
+                go.transform.rotation = UnityEngine.Quaternion.Euler(60, 0, 0);
+                var shake = go.AddComponent<CameraShake>();
+                var flags = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic;
+                typeof(CameraShake).GetMethod("OnEnable", flags).Invoke(shake, null);
+                GameSettings.HitKickOverride = 1f;
+                UnityEngine.Vector3 home = go.transform.position;
+                float u = CameraShake.Kick(HitFeelTuning.KickKind.ByMe, UnityEngine.Vector3.right, 1);
+                Assert.Greater(u, 0f);
+                Assert.AreEqual(HitFeelTuning.KickU(HitFeelTuning.KickKind.ByMe, CameraShake.FocusDistance(), cam.fieldOfView), u, 1e-4f);
+                typeof(CameraShake).GetMethod("LateUpdate", flags).Invoke(shake, null);
+                float moved = (go.transform.position - home).magnitude;
+                TestContext.Progress.WriteLine($"[px kick] real LateUpdate moved the lens {moved:0.000} u = {HitFeelTuning.KickPx(moved, CameraShake.FocusDistance(), cam.fieldOfView):0.0} px at 1080p");
+                Assert.AreEqual(u, moved, 1e-3f, "full kick on the impact frame");
+                Assert.Greater(UnityEngine.Vector3.Dot(go.transform.position - home, UnityEngine.Vector3.right), 0f, "along the hit");
+                CameraShake.Reset();
+                Assert.AreEqual(0f, (go.transform.position - home).magnitude, 1e-5f, "taken off before the next frame's input");
+                Assert.Greater(CameraShake.KickFrames, 0, "the frame counter the Editor review reads saw it");
+            }
+            finally
+            {
+                GameSettings.HitKickOverride = keep;
+                var flags = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic;
+                var s = go.GetComponent<CameraShake>();
+                if (s != null) typeof(CameraShake).GetMethod("OnDisable", flags).Invoke(s, null);
+                UnityEngine.Object.DestroyImmediate(go);
+            }
+        }
+
+        [Test]
+        public void TheTopDownAimLeanIsCappedAndUsesTheRawAim()
+        {
+            double px = HitFeelTuning.KickPx((float)CameraFollow.AimLeanMax, GameplayCamera.Distance, GameplayCamera.FovDeg);
+            TestContext.Progress.WriteLine($"[px lean] top-down aim lean cap {CameraFollow.AimLeanMax} u = {px:0} px at 1080p (was up to 51 px measured)");
+            Assert.LessOrEqual(px, 30, "the aim lean never drifts the view more than about 30 px");
         }
 
         [Test]
@@ -356,6 +452,65 @@ namespace CriticalMass.Runtime.Tests
         {
             public readonly System.Collections.Generic.List<FxEvent> Got = new System.Collections.Generic.List<FxEvent>();
             public void OnFx(ref FxEvent e, World w) => Got.Add(e);
+        }
+
+        /// <summary>Defect 6: a shield-cut hit decodes as a Block (block look, no flash), in either event order.</summary>
+        [Test]
+        public void AShieldCutHitDecodesAsABlockAndADigAsADig()
+        {
+            foreach (bool blockedFirst in new[] { true, false })
+            {
+                World w = NewWorld(ClassId.Warrior);
+                w.Tick = 60;
+                var feed = new CombatFeed(World.ActorCapacity(w.Config));
+                var sink = new Sink();
+                feed.OnTick(w, sink);
+                sink.Got.Clear();
+                int e = Enemy(w);
+                if (blockedFirst) World.PushEvent(w, SimEventType.HitBlocked, 0, e, w.X[0], w.Z[0], PlayerReasons.BlockedShield);
+                World.PushEvent(w, SimEventType.Hit, 0, e, w.X[0], w.Z[0], 3);
+                if (!blockedFirst) World.PushEvent(w, SimEventType.HitBlocked, 0, e, w.X[0], w.Z[0], PlayerReasons.BlockedShield);
+                feed.OnTick(w, sink);
+                Assert.IsTrue(sink.Got.Exists(x => x.Kind == FxKind.Block && x.A == 0), $"blocked first {blockedFirst}: the hit reads as a block");
+                Assert.IsFalse(sink.Got.Exists(x => x.Kind == FxKind.Hit && x.A == 0), "and not as a hit");
+                Assert.AreEqual(60, feed.BlockTick[0], "no flash for it");
+            }
+            {
+                World w = NewWorld(ClassId.Miner);
+                w.Tick = 70;
+                var feed = new CombatFeed(World.ActorCapacity(w.Config));
+                var sink = new Sink();
+                feed.OnTick(w, sink);
+                World.PushEvent(w, SimEventType.Terraform, 0, 5, w.X[0] + 1, w.Z[0], 1);    // Terraform.Dug
+                World.PushEvent(w, SimEventType.Terraform, 0, -1, w.X[0] + 1, w.Z[0], -2);  // refused: lane D words it
+                feed.OnTick(w, sink);
+                Assert.AreEqual(1, sink.Got.FindAll(x => x.Kind == FxKind.Dig).Count, "the dig hits the cell once; a refusal draws nothing");
+            }
+            foreach (FxKind k in new[] { FxKind.Critical, FxKind.Dig, FxKind.Blocked, FxKind.StructureHit, FxKind.Contact })
+                Assert.IsTrue(FeelGate.TryGating(k, out _), "gating entry for " + k);
+        }
+
+        /// <summary>Defect 12: first person is hidden (the owner's ruling): the setting refuses it while the switch is off.</summary>
+        [Test]
+        public void TheSettingRefusesFirstPersonWhileItIsHidden()
+        {
+            bool sw = FollowCamera.FirstPersonEnabled;
+            bool hadView = UnityEngine.PlayerPrefs.HasKey(GameSettings.CameraViewKey);
+            int view = UnityEngine.PlayerPrefs.GetInt(GameSettings.CameraViewKey, 1);
+            bool ground = GameSettings.GroundCamera;
+            try
+            {
+                FollowCamera.FirstPersonEnabled = false;
+                GameSettings.CameraView = CameraView.FirstPerson;
+                Assert.AreEqual(CameraView.ThirdPerson, GameSettings.CameraView);
+                Assert.AreEqual((int)CameraView.ThirdPerson, UnityEngine.PlayerPrefs.GetInt(GameSettings.CameraViewKey, -1), "stored as third person");
+            }
+            finally
+            {
+                FollowCamera.FirstPersonEnabled = sw;
+                if (hadView) UnityEngine.PlayerPrefs.SetInt(GameSettings.CameraViewKey, view); else UnityEngine.PlayerPrefs.DeleteKey(GameSettings.CameraViewKey);
+                GameSettings.GroundCamera = ground;
+            }
         }
 
         [Test]

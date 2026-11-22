@@ -192,7 +192,11 @@ namespace CriticalMass.Runtime.View.Anim
         public const float KickShareByMe = 0.011f, KickShareOnMe = 0.018f, KickShareKill = 0.016f, KickShareDeath = 0.026f;
         public const float KickMinByMe = 0.04f, KickMinOnMe = 0.08f, KickMinKill = 0.07f, KickMinDeath = 0.12f;
         /// <summary>Kick envelope (wall s): out in KickRise, spring back by KickReturn.</summary>
-        public const double KickRise = 0.025, KickReturn = 0.15;
+        /// <para>Fix round (review defect 3): full on the impact frame (KickRise 0; it was 25 ms, a partial first frame) and back
+        /// by 0.18 s; CameraShake ages it per rendered frame (at most 1/30 s a frame) so a slow frame never skips it.</para>
+        public const double KickRise = 0.0, KickReturn = 0.18;
+        /// <summary>The longest frame step the kick and punch age by (s): a hitch or a slow capture still shows it.</summary>
+        public const float KickMaxFrameStep = 1f / 30f;
 
         public enum KickKind { ByMe, OnMe, MyKill, MyDeath, CritByMe, CritOnMe }
 
