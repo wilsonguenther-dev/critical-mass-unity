@@ -210,7 +210,9 @@ namespace CriticalMass.Runtime.Hud
 
         // ---------------------------------------------------------------- 01 MATCH
 
-        const int Pips = 5;
+        /// <summary>b16 finish: ten hill pips, one per hill point (a Warrior fills two), so the pips and the number agree.</summary>
+        public const int Pips = 10;
+        const float PipPitch = 11f;
         Text _clock, _scoreA, _scoreC, _hillWord, _onHillA, _onHillC;
         VectorShape _hillBar, _medallion, _medallionHalf;
         readonly VectorShape[] _pipsA = new VectorShape[Pips], _pipsC = new VectorShape[Pips];
@@ -294,17 +296,18 @@ namespace CriticalMass.Runtime.Hud
             Shape(c, team + " Panel", ShapeKind.Chamfer, x, 4f, 308f, 64f, Panel, 14f);
             float shieldX = azure ? x - 6f : x + 308f - 52f;
             Icon(c, team + " Crest", UiIcons.Crest[(int)team], shieldX - 6f, 0f, 70f, 70f);   // illustrated crest (v2)
-            float pipX0 = azure ? x + 64f : x + 308f - 64f - Pips * 22f;
+            float pipX0 = azure ? x + 64f : x + 308f - 64f - Pips * PipPitch;
             for (int i = 0; i < Pips; i++)
             {
                 int slot = azure ? i : Pips - 1 - i;
-                VectorShape p = Shape(c, team + " Pip " + i, ShapeKind.Diamond, pipX0 + slot * 22f, 14f, 18f, 24f, Empty);
-                p.OutlinePx = 2f;
+                VectorShape p = Shape(c, team + " Pip " + i, ShapeKind.Diamond, pipX0 + slot * PipPitch, 13f, 10f, 22f, Empty);
+                p.OutlinePx = 1.5f;
                 p.RimPx = 0f;
                 pips[i] = p;
             }
-            onHill = CriticalMass.Runtime.Menu.MenuUi.Fit(Label(c, team + " On Hill", CMTokens.Ui, UiScale.TypeMin, Cream, azure ? TextAnchor.MiddleLeft : TextAnchor.MiddleRight,
-                pipX0, 40f, Pips * 22f, 20f, "0 ON HILL", 2f), 14);
+            // b16 finish: the count at TypeSmall (18, never under 16) in cream, so "HILL 10/10" reads at 1080p (was 16 -> ~9 px brass)
+            onHill = CriticalMass.Runtime.Menu.MenuUi.Fit(Label(c, team + " On Hill", CMTokens.Ui, UiScale.TypeSmall, Cream, azure ? TextAnchor.MiddleLeft : TextAnchor.MiddleRight,
+                pipX0 - 2f, 37f, Pips * PipPitch + 4f, 26f, "HILL 0/10", 2f), UiScale.TypeMin);
             score = CriticalMass.Runtime.Menu.MenuUi.Fit(Label(c, team + " Score", CMTokens.Mono, UiScale.TypeDisplay, Cream, azure ? TextAnchor.MiddleRight : TextAnchor.MiddleLeft,
                 azure ? 168f : 500f, 4f, 132f, 64f, "0"), 44);
         }
@@ -776,10 +779,32 @@ namespace CriticalMass.Runtime.Hud
             if (_capWordsFor != cap)
             {
                 _capWords = new string[cap + 1];
-                for (int i = 0; i <= cap; i++) _capWords[i] = i + "/" + cap + " ON HILL";
+                for (int i = 0; i <= cap; i++) _capWords[i] = "HILL " + i + "/" + cap;   // b16 finish: short enough for 18 px
                 _capWordsFor = cap;
             }
             return _capWords[Math.Max(0, Math.Min(cap, counted))];
+        }
+
+        /// <summary>
+        /// b16 finish: how many of the ten pips are lit. With a hill cap each pip is one counted hill point (a Warrior
+        /// fills two), the same number the words show; without one (classic rules) each body fills two pips, up to the
+        /// "5+ ON HILL" the words say. Pure (tests).
+        /// </summary>
+        public static int PipsLit(int bodies, int counted, int cap) =>
+            cap > 0 ? Math.Max(0, Math.Min(Math.Min(cap, Pips), counted)) : Math.Max(0, Math.Min(5, bodies)) * 2;
+
+        /// <summary>b16 finish: pips drawn (a cap under ten hides the rest; no cap shows all ten). Pure (tests).</summary>
+        public static int PipsShown(int cap) => cap > 0 ? Math.Min(cap, Pips) : Pips;
+
+        static void ApplyPips(VectorShape[] pips, int lit, int shown, bool full, Color team)
+        {
+            Color on = full ? CMTokens.ToolBrass.Color : team;   // the whole row turns brass at the cap: full, at a glance
+            for (int i = 0; i < pips.Length; i++)
+            {
+                bool vis = i < shown;
+                if (pips[i].gameObject.activeSelf != vis) pips[i].gameObject.SetActive(vis);
+                pips[i].SetFill(i < lit ? on : Empty);
+            }
         }
 
         void ApplyMatch(HudState s)
@@ -793,19 +818,18 @@ namespace CriticalMass.Runtime.Hud
                 // b16 the hill count: "7/10 ON HILL" (weighted, a Warrior counts 2), brass at the cap so players learn it
                 HudText.Set(_onHillA, CapWord(s.CountedAzure, s.HillCap));
                 HudText.Set(_onHillC, CapWord(s.CountedCrimson, s.HillCap));
-                _onHillA.color = s.CountedAzure >= s.HillCap ? CMTokens.ToolBrass.Color : Cream;
-                _onHillC.color = s.CountedCrimson >= s.HillCap ? CMTokens.ToolBrass.Color : Cream;
             }
             else
             {
                 HudText.Set(_onHillA, OnHillA[Math.Min(5, s.OnHillAzure)]);
                 HudText.Set(_onHillC, OnHillA[Math.Min(5, s.OnHillCrimson)]);
             }
-            for (int i = 0; i < Pips; i++)
-            {
-                _pipsA[i].SetFill(i < s.OnHillAzure ? CMTokens.Azure.Color : Empty);
-                _pipsC[i].SetFill(i < s.OnHillCrimson ? CMTokens.Crimson.Color : Empty);
-            }
+            // b16 finish: cream words always (brass text on navy read ~9 px dark gold); the cap shows as a brass pip row
+            _onHillA.color = Cream;
+            _onHillC.color = Cream;
+            int shown = PipsShown(s.HillCap);
+            ApplyPips(_pipsA, PipsLit(s.OnHillAzure, s.CountedAzure, s.HillCap), shown, s.HillCap > 0 && s.CountedAzure >= s.HillCap, CMTokens.Azure.Color);
+            ApplyPips(_pipsC, PipsLit(s.OnHillCrimson, s.CountedCrimson, s.HillCap), shown, s.HillCap > 0 && s.CountedCrimson >= s.HillCap, CMTokens.Crimson.Color);
             bool anyHeld = s.ScoreAzure + s.ScoreCrimson > 0;
             _hillBar.SetFill(anyHeld ? CMTokens.Azure.Color : CMTokens.Stone.Color);
             _hillBar.SetEmpty(anyHeld ? CMTokens.Crimson.Color : CMTokens.Stone.Color);

@@ -126,11 +126,14 @@ namespace CriticalMass.Runtime.Hud.Ui
             }
         }
 
+        /// <summary>b16 finish: the smallest keycap letter, px at 1080p (the HUD text floor is 12).</summary>
+        public const int MinCapPx = 12;
+
         static float CapScale(GlyphKind kind)
         {
             switch (kind)
             {
-                case GlyphKind.Key: return 0.46f;
+                case GlyphKind.Key: return 0.5f;   // b16 finish: was 0.46 (14 px on a 30 px key)
                 case GlyphKind.FaceButton: return 0.56f;
                 case GlyphKind.Bumper: return 0.4f;
                 case GlyphKind.Trigger: return 0.4f;
@@ -145,11 +148,18 @@ namespace CriticalMass.Runtime.Hud.Ui
             float h = Height;
             GlyphSpec s = Spec;
             GlyphWidth = GlyphWidthFor(s.Kind, s.Cap, h);
+            Rect cr = InputGlyphGraphic.CapRect(s.Kind);
+            // b16 finish (Editor review: the results screen's "Enter" / "Esc" caps were illegible pale boxes at 1080p): a
+            // cap's letters are never under MinCapPx and never shrink; the key grows to hold them at that size instead.
+            int capPx = Mathf.Max(MinCapPx, Mathf.RoundToInt(h * CapScale(s.Kind)));
+            Cap.fontSize = capPx;
+            if (!string.IsNullOrEmpty(s.Cap) && (s.Kind == GlyphKind.Key || s.Kind == GlyphKind.SmallButton) && cr.width > 0.01f)
+                GlyphWidth = Mathf.Max(GlyphWidth, Mathf.Ceil(TextFit.WidthOf(Cap, s.Cap, capPx) / cr.width) + h * 0.3f);
+            ContainedText fit = ContainedText.Of(Cap);
+            if (fit != null) fit.Configure(capPx, capPx, 1);
             RectTransform g = Graphic.rectTransform;
             g.sizeDelta = new Vector2(GlyphWidth, h);
             g.anchoredPosition = Vector2.zero;
-            Cap.fontSize = Mathf.Max(8, Mathf.RoundToInt(h * CapScale(s.Kind)));
-            Rect cr = InputGlyphGraphic.CapRect(s.Kind);
             RectTransform c = Cap.rectTransform;
             c.anchorMin = new Vector2(cr.xMin, cr.yMin);
             c.anchorMax = new Vector2(cr.xMax, cr.yMax);
