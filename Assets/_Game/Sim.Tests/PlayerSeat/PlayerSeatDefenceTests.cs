@@ -375,6 +375,50 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
             Assert.IsTrue(ok);
         }
 
+        // ------------------------------------------------------------------ S61: the real game's match says IMMUNE (gate F13)
+
+        [TestCase(true, false)]
+        [TestCase(false, false)]
+        [TestCase(true, true)]
+        public void S61_BootMatch_SpawnProtectedHit_SaysImmune(bool onItsPad, bool fightsBack)
+        {
+            // the world the game's Boot scene creates (SimDriverBehaviour.Awake: GameConfig.CreateDefault(), 16 a side, seed
+            // 1337, Azure Warrior; a menu MatchRequest only changes match length, hatch, passive bots and the class mix), not
+            // the gate rig's Full profile. Spawn protection is pad-bound (Combat: it ends beyond pad.R + 1 of the pad centre at
+            // the start of every tick), so a protected enemy is only protected on its own pad: off it, the hit lands. And
+            // swinging drops the swinger's own protection (Combat: "attacking drops protection"): a bot that fights back is
+            // not protected when the hit lands. Gate F13's staging had both (target off its pad, a live bot), not a rules gap.
+            GameConfig cfg = GameConfig.CreateDefault();
+            if (!fightsBack) cfg.Bots.PassiveSeconds = 60;   // the menu's guided first match: bots leave the human alone
+            World w = World.CreateWorld(new WorldOptions { Seed = cfg.Seed, TeamSize = cfg.TeamSize, HumanTeam = TeamId.Azure, HumanClass = ClassId.Warrior, Config = cfg });
+            bool seatOn = CriticalMass.Sim.Core.PlayerSeat.On(w), feelOn = CombatFeel.On(w);
+            int e = PlayerSeatRig.EnemySlot(w);
+            for (int j = 1; j < w.ActorCount; j++) if (j != e) PlayerSeatRig.Remove(w, j);
+            PadDef pad = w.Map.Pads[(int)TeamId.Crimson];
+            double ex = onItsPad ? pad.X : w.Map.Hill.X, ez = onItsPad ? pad.Z : w.Map.Hill.Z;
+            PlayerSeatRig.Place(w, e, ClassId.Farmer, ex, ez);
+            PlayerSeatRig.Place(w, 0, ClassId.Warrior, ex - 1.2, ez);
+            w.Actors[e].SpawnProtect = 3;
+            var seat = new Seat { W = w, Me = 0, Spy = new EventSpy(w), Frames = new InputFrame[w.ActorCount] };
+            seat.Human = new HumanModel(0, -1) { Fight = false };
+            int mark = seat.Spy.Mark;
+            seat.Human.PressAttack = true;
+            for (int t = 0; t < w.Dur.AttackWindup[(int)ClassId.Warrior] + 4; t++)
+            {
+                seat.Human.AimOverrideX = w.X[e]; seat.Human.AimOverrideZ = w.Z[e];
+                seat.Human.MoveOverrideX = seat.Human.MoveOverrideZ = 0;
+                w.X[e] = ex; w.Z[e] = ez; w.Vx[e] = w.Vz[e] = 0;
+                seat.Step();
+            }
+            int hits = seat.Spy.Hits(0, e, mark).Count;
+            int immune = seat.Spy.Since(mark, SimEventType.HitBlocked, q => q.A == e && q.B == 0 && (int)q.Value == PlayerReasons.BlockedSpawnProtect).Count;
+            bool ok = PxLog.Line("S61 BootMatch_SpawnProtectedHit_SaysImmune", "the Boot match's config (16 a side, defaults): Warrior swings at a spawn-protected Farmer " + (onItsPad ? "on its pad" : "off its pad (at the hill)") + (fightsBack ? ", the bot swings back" : ", passive bot"),
+                "PlayerSeat.On " + seatOn + ", CombatFeel.On " + feelOn + "; Hit " + hits + ", HitBlocked IMMUNE " + immune,
+                onItsPad && !fightsBack ? "the rules on, no hit, one IMMUNE" : "the rules on, protection gone: the hit lands, no IMMUNE",
+                seatOn && feelOn && (onItsPad && !fightsBack ? hits == 0 && immune == 1 : hits == 1 && immune == 0));
+            Assert.IsTrue(ok);
+        }
+
         // ------------------------------------------------------------------ S58: movement never sticks or shivers
 
         /// <summary>Holds one move direction from (x0, z0) toward (x1, z1); false = not reached, stuck (under 20% of walk speed
