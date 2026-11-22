@@ -528,7 +528,7 @@ namespace CriticalMass.Sim.Tests.Net
             {
                 { RulesProfile.Classic, 0x5C912AEED16BC302UL },
                 { RulesProfile.PhysicsOnly, 0x0836DA5FD21C4854UL },
-                { RulesProfile.Full, 0x0B1E594CAC2A34E0UL },   // batch 16 combined (sim run 44953083481); chat alone matched the base 0x48A817A4B2B3F068
+                { RulesProfile.Full, 0x7405E7FB77B99BD4UL },   // player-experience combine 2026-11-22 (was 0x0B1E594CAC2A34E0): batch 16 combined (sim run 44953083481); chat alone matched the base 0x48A817A4B2B3F068
             };
             foreach (KeyValuePair<RulesProfile, ulong> kv in pins)
             {
