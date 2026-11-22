@@ -468,6 +468,17 @@ namespace CriticalMass.Sim.Core
         /// SwingTrackLockTicks before the contact tick: from then on it is locked, so a late side-step or a dodge still beats it.
         /// Plain arithmetic on doubles in actor-id order: deterministic, no allocation.
         /// </summary>
+        /// <summary>px DM (call 18): bot i's swing is at a human seat, or its target is not known (no bot state, no target): the
+        /// human-limit tracking applies; at the Kaiju or another actor that is not a human seat it does not.</summary>
+        static bool SwingAtHuman(World w, int i)
+        {
+            if (!Bots.BotBrain.TryGetBotsState(w, out Bots.BotsState bst) || bst.Target == null || i >= bst.Target.Length) return true;
+            int t = bst.Target[i];
+            if (t == Bots.BotsState.TargetKaiju) return false;
+            if (t < 0 || t >= w.ActorCount) return true;
+            return w.Actors[t].IsHuman;
+        }
+
         public static void TrackSwing(World w, int i)
         {
             CombatFeelConfig f = Cfg(w);
@@ -480,7 +491,8 @@ namespace CriticalMass.Sim.Core
             if (f.SwingTrackDegPerSecondByClass != null && c < f.SwingTrackDegPerSecondByClass.Length && f.SwingTrackDegPerSecondByClass[c] > 0)
                 deg = f.SwingTrackDegPerSecondByClass[c];
             // [2] human limits: a bot corrects its wound-up swing at BotSwingTrackScale of the rate (by difficulty).
-            if (!a.IsHuman && f.BotHumanLimits && f.BotSwingTrackScale != null)
+            if (!a.IsHuman && f.BotHumanLimits && f.BotSwingTrackScale != null
+                && (!f.BotSwingTrackHumansOnly || SwingAtHuman(w, i)))
             {
                 int k = (int)Bots.BotSkill.Of(w, i);
                 if (k < f.BotSwingTrackScale.Length) deg *= f.BotSwingTrackScale[k];

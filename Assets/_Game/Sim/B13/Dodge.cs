@@ -363,7 +363,7 @@ namespace CriticalMass.Sim.Core
                 int before = w.Tick - last;
                 bool perfect = before >= 1 && before <= dc.PerfectDodgeTicks;
                 if (report) World.PushEvent(w, SimEventType.HitBlocked, j, i, w.X[j], w.Z[j], PlayerReasons.BlockedDodge, null, DamageCause.None, dmg, 0, 0, 0, perfect ? 1 : 0, 0, 0);
-                if (!dc.DodgeReward) continue;
+                if (!dc.DodgeReward || (dc.DodgeRewardHumansOnly && !w.Actors[j].IsHuman)) continue;   // px DM call 18: the dodger is a human seat
                 if (hits <= 0 && CombatFeel.On(w))
                 {
                     int until = w.Tick + CombatFeel.Ticks(w, dc.DodgePunishSeconds);
