@@ -260,12 +260,7 @@ namespace CriticalMass.Runtime.PlayTests
         public IEnumerator OnlineChatPausePanelEscOrderAndWheel()
         {
             Assert.IsFalse(ChatSettings.TypedText, "typed chat ships off");
-#if UNITY_EDITOR
-            // a batch-mode Editor has no focused Game view: let the virtual keyboard reach the game (restored in TearDown)
-            _editorInput = InputSystem.settings.editorInputBehaviorInPlayMode;
-            InputSystem.settings.editorInputBehaviorInPlayMode = InputSettings.EditorInputBehaviorInPlayMode.AllDeviceInputAlwaysGoesToGameView;
-            _restoreInput = true;
-#endif
+
             var net = new CriticalMass.Net.LoopbackNetwork(7, 0, 0, 0);
             OnlineMatch.HostRoom(net.CreatePeer(), null, "Host");
             Assert.IsTrue(OnlineMatch.InRoom, "the loopback room did not open");
@@ -312,6 +307,12 @@ namespace CriticalMass.Runtime.PlayTests
             yield return Capture("p2-chat-2-after-callout");
 
             // Esc order: typing first, then the pause menu (the keyboard joins only now, so the wheel above ran on the pad)
+#if UNITY_EDITOR
+            // a batch-mode Editor has no focused Game view: let the virtual keyboard reach the game (restored in TearDown)
+            _editorInput = InputSystem.settings.editorInputBehaviorInPlayMode;
+            InputSystem.settings.editorInputBehaviorInPlayMode = InputSettings.EditorInputBehaviorInPlayMode.AllDeviceInputAlwaysGoesToGameView;
+            _restoreInput = true;
+#endif
             var kb = InputSystem.AddDevice<Keyboard>("B16CapKeyboard");
             _devices.Add(kb);
             ChatSettings.TypedText = true;
