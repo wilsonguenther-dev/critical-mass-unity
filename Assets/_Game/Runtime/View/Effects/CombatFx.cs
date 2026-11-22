@@ -846,6 +846,8 @@ namespace CriticalMass.Runtime.View.Effects
             if (m.HasProperty("_ShadowMultiplier")) m.SetFloat("_ShadowMultiplier", 0.86f);
             if (m.HasProperty("_ShadowTintAmount")) m.SetFloat("_ShadowTintAmount", 0);
             if (m.HasProperty("_RimStrength")) m.SetFloat("_RimStrength", 0);
+            // fix round 5: the unshaded flash term (CMToon _HitFlash) so the whole body reads white on the impact frame
+            if (m.HasProperty(HitFlashId)) m.SetVector(HitFlashId, HitFeelTuning.HitFlashVector(false));
             _flash[source] = m;
             return m;
         }
@@ -868,6 +870,7 @@ namespace CriticalMass.Runtime.View.Effects
             if (m.HasProperty("_ShadowMultiplier")) m.SetFloat("_ShadowMultiplier", Mathf.Lerp(m.GetFloat("_ShadowMultiplier"), 0.9f, k));
             if (m.HasProperty("_RimColor")) m.SetColor("_RimColor", cream);
             if (m.HasProperty("_RimStrength")) m.SetFloat("_RimStrength", Mathf.Max(m.GetFloat("_RimStrength"), 1f));
+            if (m.HasProperty(HitFlashId)) m.SetVector(HitFlashId, HitFeelTuning.HitFlashVector(true));
             cache[source] = m;
             return m;
         }
@@ -901,6 +904,8 @@ namespace CriticalMass.Runtime.View.Effects
 
         /// <summary>Flash materials created (bounded: class models x 2 teams; all made in Start).</summary>
         public int FlashMaterialCount => _flash.Count + _tint.Count + _tintOther.Count;
+
+        public static readonly int HitFlashId = Shader.PropertyToID("_HitFlash");
 
         private static readonly string[] FlashColours =
         {

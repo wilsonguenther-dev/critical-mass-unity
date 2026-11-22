@@ -76,6 +76,10 @@ CBUFFER_START(UnityPerMaterial)
     half4 _KaijuTone;
     // b14 polish (team read from above): share of the team cloth laid over top-facing fixed (code 0) colours.
     half _TeamTopTint;
+    // px impact pop (fix round 5): the hit flash. rgb the flash colour, a the share (0 off on every material but the
+    // CombatFx flash copies). Applied UNSHADED after the bands, time of day, rim and base map in the main pass, so the
+    // whole body reads as one flat bright silhouette on the impact frame whatever its texture or the light.
+    half4 _HitFlash;
 CBUFFER_END
 
 // Outside the per-material block (textures are not CBUFFER members; SRP Batcher compatible).

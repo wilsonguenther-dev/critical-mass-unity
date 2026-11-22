@@ -61,6 +61,12 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
             public int HitTick = -1, LedgerAtHit;
             public double ModelMoved;
             public double KickPeak;
+            /// <summary>fix round 5: the rendered frame the hit was presented on (Time.frameCount), the kick's own size in
+            /// px at 1080p at the fixed point's distance and the rendered frame (0 = the hit frame) it peaked on.</summary>
+            public int HitFrame = int.MaxValue / 2, KickPxFrame = -1;
+            public double KickPxPeak;
+            /// <summary>fix round 5: the first rendered frame (0 = the hit frame) the victim drew with the hit flash on.</summary>
+            public int FlashFrame = -1;
             public int SoundsBefore, SoundsPeak;
             public bool Seen;
             public double CamPxPeak, SimMoved100, ModelMoved100, ModelMovedFull, SimMovedFull;
@@ -112,6 +118,7 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
                     r.Hit = true;
                     r.Dealt = hits[0].Value;
                     r.HitTick = W.Tick;
+                    r.HitFrame = Time.frameCount;   // the hit is decoded in this frame's sim step: its LateUpdate presents it
                     r.LedgerAtHit = pre;   // only cues reported from the hit's own tick on
                     r.HitX = px; r.HitZ = pz;   // where the pinned victim stood when the blow landed
                     List<SimEvent> kn = Events(head, SimEventType.Knock).Where(x => x.A == e).ToList();
@@ -125,13 +132,23 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
                 r.KickPeak = Math.Max(r.KickPeak, CameraShake.Applied.magnitude);
                 r.SoundsPeak = Math.Max(r.SoundsPeak, PlayingSources());
                 if (model != null) r.ModelMoved = Math.Max(r.ModelMoved, Vector3.Distance(model.position, m0));
-                if (cam0 != null)
+                // fix round 5 (item 3): a coroutine resumes AFTER CameraShakeReset (Update, order -1000) took the last frame's
+                // shake off the camera, so the old sample never saw the kick at all (its 6 px at "frame 3" was the follow
+                // drift). Sample the frame that was RENDERED: the camera as its LateUpdate left it, i.e. plus the kick it
+                // applied (CameraShake.KickApplied, kept until the next LateUpdate), and count rendered frames since the hit
+                // frame (0 = the frame that presented the hit), not loop passes.
+                int rendered = Time.frameCount - 1 - r.HitFrame;
+                // fix round 5 (item 1): the victim's drawn material carries the unshaded flash (CMToon _HitFlash share) on
+                // the rendered frame that presented the hit (materials stay as that frame's LateUpdate set them)
+                if (rendered >= 0 && r.FlashFrame < 0 && model != null && FlashShare(model) >= CriticalMass.Runtime.View.Anim.HitFeelTuning.FlashShareSafe) r.FlashFrame = rendered;
+                if (cam0 != null && rendered >= 0)
                 {
-                    // defect 3: the camera's answer in screen pixels at 1080p: a fixed world point (my feet) moves on screen
-                    Vector3 pn = cam0.WorldToScreenPoint(fixedPoint);
+                    Vector3 pn = cam0.WorldToScreenPoint(fixedPoint - CameraShake.KickApplied);
                     double moved = new Vector2(pn.x - px0.x, pn.y - px0.y).magnitude * 1080.0 / Math.Max(1, Screen.height);
-                    if (moved > r.CamPxPeak) { r.CamPxPeak = moved; r.CamPxFrame = f; }
-                    if (moved >= 6 && r.CamPx6Frame < 0) r.CamPx6Frame = f;   // the promise: 6 px reached within 2 frames
+                    if (moved > r.CamPxPeak) { r.CamPxPeak = moved; r.CamPxFrame = rendered; }
+                    if (moved >= 6 && r.CamPx6Frame < 0) r.CamPx6Frame = rendered;   // the promise: 6 px within 2 rendered frames
+                    double kickPx = CameraShake.KickApplied.magnitude * 1080.0 / Math.Max(1e-3, 2 * Math.Tan(cam0.fieldOfView * Math.PI / 360) * Math.Max(0.5, Vector3.Distance(cam0.transform.position, fixedPoint)));
+                    if (kickPx > r.KickPxPeak) { r.KickPxPeak = kickPx; r.KickPxFrame = rendered; }
                 }
                 if (!r.Seen && cue(r)) { r.Seen = true; r.SeenFrame = f; }
                 // one rendered step = 16.7 ms of real time (60 fps): cues on unscaled time (camera kick, fades) see real time pass
@@ -155,6 +172,19 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
         }
 
         static string Tag(ClassId c, CameraView v) => c + " " + v;
+
+        /// <summary>fix round 5: the largest CMToon `_HitFlash` share on the drawn renderers under a fighter's model.</summary>
+        static float FlashShare(Transform model)
+        {
+            float best = 0f;
+            foreach (Renderer rr in model.GetComponentsInChildren<Renderer>())
+            {
+                if (rr == null || !rr.enabled || !rr.gameObject.activeInHierarchy) continue;
+                foreach (Material mm in rr.sharedMaterials)
+                    if (mm != null && mm.HasProperty(CriticalMass.Runtime.View.Effects.CombatFx.HitFlashId)) best = Mathf.Max(best, mm.GetVector(CriticalMass.Runtime.View.Effects.CombatFx.HitFlashId).w);
+            }
+            return best;
+        }
 
         // ------------------------------------------------------------------ F1-F4 (per class, both views)
 
@@ -187,7 +217,7 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
             // sliding at 100 ms), and the drawn slide reaches >= 0.8 x the sim knock (Knock Impulse) once it is over
             bool knockOk = r.Knock <= 0 || (r.ModelMoved100 >= T.KnockVisibleShare * r.SimMoved100 && r.ModelMovedFull >= T.KnockVisibleShare * r.Knock);
             bool knockLedger = Ledger(FeedbackChannel.KnockVisual, Enemy, out _, r.LedgerAtHit);
-            Check("F03 VictimFlashAndKnock", Tag(x, v), r.Hit ? "flash " + (r.Seen ? "at frame " + r.SeenFrame : "none") + ", at 100 ms model " + r.ModelMoved100.ToString("0.00") + " u vs sim body " + r.SimMoved100.ToString("0.00") + " u; whole slide model " + r.ModelMovedFull.ToString("0.00") + " u (sim " + r.SimMovedFull.ToString("0.00") + ") vs sim knock " + r.Knock.ToString("0.00") + " u, KnockVisual " + knockLedger + (r.Seen && knockLedger ? "" : " [" + r.Dump + "]") : r.Note, "flash and knock >= 0.8 x sim within 6 frames", r.Hit && r.Seen && knockOk && knockLedger);
+            Check("F03 VictimFlashAndKnock", Tag(x, v), r.Hit ? "flash " + (r.Seen ? "at frame " + r.SeenFrame : "none") + ", drawn flash share on rendered frame " + r.FlashFrame + " (0 = the hit frame), at 100 ms model " + r.ModelMoved100.ToString("0.00") + " u vs sim body " + r.SimMoved100.ToString("0.00") + " u; whole slide model " + r.ModelMovedFull.ToString("0.00") + " u (sim " + r.SimMovedFull.ToString("0.00") + ") vs sim knock " + r.Knock.ToString("0.00") + " u, KnockVisual " + knockLedger + (r.Seen && knockLedger ? "" : " [" + r.Dump + "]") : r.Note, "flash and knock >= 0.8 x sim within 6 frames", r.Hit && r.Seen && r.FlashFrame == 0 && knockOk && knockLedger);
         }
 
         [UnityTest]
@@ -1037,7 +1067,7 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
         {
             var r = new Watch();
             yield return HitAndWatch(ClassId.Warrior, v, q => false, r);
-            Check("D3 HitMovesCamera", Tag(ClassId.Warrior, v), r.Hit ? "a fixed world point moved " + r.CamPxPeak.ToString("0.0") + " px at 1080p (16.7 ms frames), peak at frame " + r.CamPxFrame + ", first >= 6 px at frame " + r.CamPx6Frame : r.Note, ">= 6 px within 2 frames of the hit (reduce motion off)", r.Hit && r.CamPx6Frame >= 0 && r.CamPx6Frame <= 2);
+            Check("D3 HitMovesCamera", Tag(ClassId.Warrior, v), r.Hit ? "a fixed world point moved " + r.CamPxPeak.ToString("0.0") + " px at 1080p, peak at rendered frame " + r.CamPxFrame + ", first >= 6 px at rendered frame " + r.CamPx6Frame + "; kick alone " + r.KickPxPeak.ToString("0.0") + " px peaking at rendered frame " + r.KickPxFrame + " (0 = the hit frame)" : r.Note, ">= 6 px by rendered frame 1 and the kick's peak by rendered frame 1 (reduce motion off)", r.Hit && r.CamPx6Frame >= 0 && r.CamPx6Frame <= 1 && r.KickPxFrame >= 0 && r.KickPxFrame <= 1);
         }
 
         static Rect UiRect(Object src)

@@ -32,6 +32,19 @@ namespace CriticalMass.Runtime.View.Anim
         /// <summary>Round 3: in third person the own-hit flash lasts 180 ms wall so it spans the impact frame AND the hit-stop
         /// hold (the review saw no flash on the victim at impact); starts stay one per FlashMinGapSeconds (under 3 a second).</summary>
         public const double FlashOwn3PSeconds = 0.18;
+        /// <summary>Fix round 5 (impact pop): the share of the CMToon `_HitFlash` term, the colour laid UNSHADED over the
+        /// whole lit body on the flash frames (after bands, time of day, rim and base map). Full flash 0.92 white; under
+        /// reduce flashing 0.45 of the cream (no white frame). Before this the flash only set the albedo colours to white:
+        /// the shading bands and time-of-day grade kept a cream fighter almost the same, and a textured model (Warrior /
+        /// Builder base map) ignored them entirely, so no flash showed on the victim at 1080p.</summary>
+        public const float FlashShareFull = 0.92f, FlashShareSafe = 0.45f;
+        public static readonly UnityEngine.Color FlashWhite = new UnityEngine.Color(1f, 0.99f, 0.96f, 1f);
+        /// <summary>The `_HitFlash` vector for a flash copy (rgb colour, a share).</summary>
+        public static UnityEngine.Vector4 HitFlashVector(bool reduceFlashing)
+        {
+            UnityEngine.Color c = reduceFlashing ? FlashCream : FlashWhite;
+            return new UnityEngine.Vector4(c.r, c.g, c.b, reduceFlashing ? FlashShareSafe : FlashShareFull);
+        }
         public static double FlashSeconds(bool own, bool thirdPerson) => own && thirdPerson ? FlashOwn3PSeconds : FlashSeconds(own);
         /// <summary>A new flash may start on a victim whose last flash began `sinceLast` wall seconds ago.</summary>
         public static bool FlashAllowed(double sinceLast) => !(sinceLast < FlashMinGapSeconds);
