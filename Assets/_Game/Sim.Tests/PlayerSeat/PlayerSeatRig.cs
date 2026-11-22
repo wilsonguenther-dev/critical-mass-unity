@@ -108,6 +108,8 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
         public double ApproachShare = 0.8;
         /// <summary>False = the model never presses attack (it only moves / aims).</summary>
         public bool Fight = true;
+        /// <summary>The model holds its first swing this many ticks (two human seats never press on the very same tick).</summary>
+        public int HoldFireTicks;
         /// <summary>One-tick buttons for the next frame (the test sets them; the model clears them after one tick).</summary>
         public bool PressAttack, PressAbility, PressDigPlace, PressDodge, PressCancel, PressJump, PressSwitch, HoldInteract;
         /// <summary>Optional move override for the next frame (NaN = the model's own move).</summary>
@@ -166,7 +168,7 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
                     mx = -uz * _strafeDir + ux * k;
                     mz = ux * _strafeDir + uz * k;
                 }
-                want = Fight && d <= reach && Combat.AttackReady(w, Me);
+                want = Fight && _seen > HoldFireTicks && d <= reach && Combat.AttackReady(w, Me);
                 ax = tx;
                 az = tz;
                 if (HalfMiss && want && !_prevWant) _landNext = !_landNext;
@@ -272,6 +274,8 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
         public InputFrame Scratch = SimInput.EmptyInput();
         /// <summary>Keeps the target's health above this share each tick (land-rate runs that must not end in a kill); 0 = off.</summary>
         public double KeepThemAbove;
+        /// <summary>Keeps the human seat's health above this share each tick (bot land-rate runs); 0 = off.</summary>
+        public double KeepMeAbove;
         /// <summary>True: the human seat's Demolitions TNT is never ready (so the primary is the pry bar swing).</summary>
         public bool NoTnt;
         /// <summary>
@@ -304,6 +308,7 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
                 AutopilotTicks++;
                 if (!AllowAutopilot) throw new InvalidOperationException("player-seat rig: the idle autopilot drove the human seat at tick " + W.Tick + " (the model stopped giving input); the measurement would be a bot's, not the player's");
             }
+            if (KeepMeAbove > 0 && W.Actors[Me].Alive && W.Actors[Me].Hp < KeepMeAbove * W.Actors[Me].MaxHp) W.Actors[Me].Hp = W.Actors[Me].MaxHp;
             if (KeepThemAbove > 0 && Them >= 0 && W.Actors[Them].Alive && W.Actors[Them].Hp < KeepThemAbove * W.Actors[Them].MaxHp) W.Actors[Them].Hp = W.Actors[Them].MaxHp;
         }
 

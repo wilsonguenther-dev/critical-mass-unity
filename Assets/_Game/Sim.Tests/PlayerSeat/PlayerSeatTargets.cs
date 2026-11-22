@@ -66,6 +66,9 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
         /// <summary>S45: each middle class (lag-6 human vs the other three as Normal bots) wins a share in this band.</summary>
         public const double MiddleShareMin = 0.30, MiddleShareMax = 0.70;
 
+        /// <summary>PLAN P3: the share of all 30 non-mirror 1v1s a lag-6 human wins against Normal bots ("the deciding factor in a fight").</summary>
+        public const double OverallDuelShareMin = 0.50;
+
         // ---- S6 / S41: healing against focus
         /// <summary>S6: a 50% human kills a target mended by one enemy Healer bot within this.</summary>
         public const double KillThroughHealerMaxSeconds = 20;
@@ -80,7 +83,7 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
         /// <summary>S11: a lag-6 human Warrior lands the finishing hit within this...</summary>
         public const double ChaseSeconds = 4;
         /// <summary>... in a share of 8 angles in this band (above the top: no escape at all for the runner, against Travis's rule).</summary>
-        public const double ChaseCatchShareMin = 0.50, ChaseCatchShareMax = 0.90;
+        public const double ChaseCatchShareMin = 0.40, ChaseCatchShareMax = 0.80;   // PLAN.md P3 (40 to 80%); the gate brief's first numbers were 0.50 / 0.90
 
         // ---- S42: bot fairness
         /// <summary>S42: a Normal bot's land rate against a lag-6 circle-strafing human lies in this band.</summary>
