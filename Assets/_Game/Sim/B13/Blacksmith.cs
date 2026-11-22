@@ -225,6 +225,16 @@ namespace CriticalMass.Sim.Core
             if (!On(w) || id < 0 || id >= w.ActorCount || w.Actors[id].Cls != ClassId.Miner) return false;
             HutState h = w.Hut;
             int code = Refusal(w, id, out int vein);
+            // lane S2 (lead's call 1): away from every vein a human Miner DIGS the cell ahead with the Builder's dig rule (no
+            // carry, no place); at a vein he mines as before. Bots never dig. Busy (getting up, airborne, dead) stays a refusal.
+            if (code != RefusedBusy && VeinInReach(w, id) < 0 && MinerDigs(w, id))
+            {
+                h.ChannelVein[id] = -1;
+                h.ChannelTicks[id] = 0;
+                bool hasAim = w.HasAim[id] == 1;
+                Terraform.MinerDig(w, id, hasAim ? w.Inputs[id].AimX : double.NaN, hasAim ? w.Inputs[id].AimZ : double.NaN);
+                return true;
+            }
             if (code != 0)
             {
                 h.ChannelVein[id] = -1;
@@ -234,8 +244,19 @@ namespace CriticalMass.Sim.Core
             }
             h.ChannelVein[id] = vein;
             h.ChannelTicks[id] = 0;
+            // lane S2: the MINE channel starts now and says so (the ore itself is OreMined when the channel completes)
+            if (PlayerSeat.On(w))
+                World.PushEvent(w, SimEventType.WorldAction, id, PlayerReasons.WorldMineOre, w.Depth.Sources[vein].X, w.Depth.Sources[vein].Z, 0, null, DamageCause.None, Durations.T30(w.Config, w.Config.Depth.Hut.MineTicks) / w.Config.SimHz);
             return true;
         }
+
+        /// <summary>Lane S2: a human Miner's F away from a vein digs (PlayerSeatConfig.MinerDigsAwayFromVein, Full rules, the
+        /// Builder owns terrain so Terraform never digs for the Miner otherwise).</summary>
+        public static bool MinerDigs(World w, int id) =>
+            PlayerSeat.On(w) && PlayerSeat.Cfg(w).MinerDigsAwayFromVein && w.Actors[id].IsHuman && Terraform.OwnerClass(w) != ClassId.Miner;
+
+        /// <summary>Lane S2: AttackStart.B kind of the HAUL cast (after Combat.KindTnt = 7).</summary>
+        public const int KindHaul = 8;
 
         /// <summary>A Miner's ability press (cooldown spent): HAUL. True = taken (every press while on), so Abilities skips it.</summary>
         public static bool TakeMinerAbility(World w, int id)
@@ -244,6 +265,14 @@ namespace CriticalMass.Sim.Core
             Actor a = w.Actors[id];
             w.Hut.HaulLeft[id] = Math.Max(1, Durations.T30(w.Config, w.Config.Depth.Hut.HaulTicks));
             a.AbilityCd = w.Config.Class(ClassId.Miner).AbilityCooldown;
+            if (PlayerSeat.On(w))
+            {
+                // lane S2: HAUL raises the cast events every other ability raises (Ability Value 1, then AttackStart with its kind).
+                a.AnimAction = 0;
+                World.PushEvent(w, SimEventType.Ability, id, -1, w.X[id], w.Z[id], 1);
+                double fx = JsMath.Cos(a.Facing), fz = JsMath.Sin(a.Facing);
+                World.PushEvent(w, SimEventType.AttackStart, id, KindHaul, w.X[id], w.Z[id], a.Facing, null, DamageCause.None, 0, fx, fz, 0, 0, 0, 0);
+            }
             return true;
         }
 
@@ -359,7 +388,10 @@ namespace CriticalMass.Sim.Core
                 if (a.Carry == CarryKind.Ore && a.DeliverTicks > 0) Delivery.CancelDelivery(a);
                 int v = h.ChannelVein[id];
                 if (v < 0) continue;
-                if (!a.Alive || a.Cls != ClassId.Miner || !w.Inputs[id].Terraform || a.StandUp > 0 || v >= list.Length)
+                // lane S2 (gate S15): a human seat's TAP starts the channel and it runs to its unit (moving out of reach, a
+                // get-up or a Cancel press stops it; a hit restarts it); a bot, as before, mines only while F is held.
+                bool tap = PlayerSeat.Human(w, id);
+                if (!a.Alive || a.Cls != ClassId.Miner || (!w.Inputs[id].Terraform && !tap) || (tap && PlayerSeat.PressedCancel(w, id)) || a.StandUp > 0 || v >= list.Length)
                 {
                     Cancel(h, id);
                     continue;
@@ -384,7 +416,7 @@ namespace CriticalMass.Sim.Core
                 h.MinedBy[id]++;
                 h.Mined[(int)a.Team]++;
                 World.PushEvent(w, SimEventType.OreMined, id, v, s.X, s.Z, a.CarryAmount, BiomassType.Ore, DamageCause.None);
-                if (a.CarryAmount >= cap || s.Charges <= 0) Cancel(h, id);
+                if (a.CarryAmount >= cap || s.Charges <= 0 || (tap && !w.Inputs[id].Terraform)) Cancel(h, id);   // lane S2: one unit per tap; held F keeps mining
             }
             HutChoices.VoteSystem(w);   // b15-hook: rule B, the team votes on each hut level (nothing with the rule off)
         }

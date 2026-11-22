@@ -82,12 +82,14 @@ namespace CriticalMass.Sim.Core
                 if (a.Cls == ClassId.Demolitions && lw == null && !feel) continue;
                 // b15: with her TNT ready the attack press is the throw (Demolitions.AttackThrowsNow, before Combat next tick);
                 // the pry bar swings only while the TNT cools down (a held press no longer pry-swings the TNT away for good).
-                if (feel && a.Cls == ClassId.Demolitions && w.Config.Abilities.DemolitionsTnt.ThrowOnAttack && w.Tick >= w.Demolitions.TntReadyTick[i]) continue;
+                // lane S2: an enemy point-blank inside her pry-bar arc gets the pry bar and the TNT stays ready (Demolitions.PointBlank).
+                if (feel && a.Cls == ClassId.Demolitions && w.Config.Abilities.DemolitionsTnt.ThrowOnAttack && w.Tick >= w.Demolitions.TntReadyTick[i] && !Demolitions.PointBlank(w, i)) continue;
                 if (a.Cls == ClassId.Healer)
                 {
                     // DG-40 (U-061): the attack press mends a hurt ally FIRST (support first); the lantern swings only when
                     // nobody can be mended, so a Healer among her team heals and a Healer caught alone defends herself.
-                    if (Healer.TryMend(w, i))
+                    // lane S2: a human Healer whose aim is on an enemy inside her lantern reach swings it (Healer.AimsAtEnemy).
+                    if (!(feel && Healer.AimsAtEnemy(w, i)) && Healer.TryMend(w, i))
                     {
                         if (feel) CombatFeel.TookPress(w, i);
                         continue;
@@ -174,6 +176,7 @@ namespace CriticalMass.Sim.Core
             int hits = 0;
             bool feel = CombatFeel.On(w); // b15 combat feel
             bool walls = Phys.On(w, cfg.Physics.WallsBlockHits); // DG-83: no hits through walls or barricades
+            bool report = PlayerSeat.On(w); // lane S2: blocked contacts and structure answers (view-only events)
             int count = SpatialHash.QueryCircle(w.Hash, ax, az, range + maxTargetRadius, candidates);
             for (int k = 0; k < count; k++)
             {
@@ -181,8 +184,10 @@ namespace CriticalMass.Sim.Core
                 if (j == i) continue;
                 Actor t = w.Actors[j];
                 if (!t.Alive || t.Team == a.Team) continue;
-                // DG-16 passive window: a bot's swing never hurts the human slot yet.
-                if (!a.IsHuman && t.IsHuman && w.Match.Time < cfg.Bots.PassiveSeconds) continue;
+                // DG-16 passive window: a bot's swing never hurts the human slot yet (lane S2: decided after reach and arc, so a
+                // contact inside them can say why; the outcome is the same skip).
+                bool passive = !a.IsHuman && t.IsHuman && w.Match.Time < cfg.Bots.PassiveSeconds;
+                if (passive && !report) continue;
                 double dx = w.X[j] - ax;
                 double dz = w.Z[j] - az;
                 double reach = range + cfg.Class(t.Cls).Radius;
@@ -191,9 +196,24 @@ namespace CriticalMass.Sim.Core
                 if (d2 > 1e-12)
                 {
                     double dot = (dx * fx + dz * fz) / Math.Sqrt(d2);
-                    if (dot < (body ? WidenedCos(halfRad, cfg.Class(t.Cls).Radius, Math.Sqrt(d2)) : cosHalf) - 1e-9) continue;
+                    if (dot < (body ? WidenedCos(halfRad, cfg.Class(t.Cls).Radius, Math.Sqrt(d2)) : cosHalf) - 1e-9)
+                    {
+                        // lane S2: a target inside the reach whose dodge carried it out of the arc (it dashed past or through):
+                        // DODGED, not a silent miss. The outcome is the same skip.
+                        if (report && Dodge.Immune(w, j, DamageCause.Melee)) World.PushEvent(w, SimEventType.HitBlocked, j, i, w.X[j], w.Z[j], PlayerReasons.BlockedDodge);
+                        continue;
+                    }
                 }
-                if (walls && !SegmentClear.Clear(w.Map, ax, az, w.X[j], w.Z[j])) continue;
+                if (passive)
+                {
+                    World.PushEvent(w, SimEventType.HitBlocked, j, i, w.X[j], w.Z[j], PlayerReasons.BlockedPassive);   // lane S2
+                    continue;
+                }
+                if (walls && !SegmentClear.Clear(w.Map, ax, az, w.X[j], w.Z[j]))
+                {
+                    if (report) World.PushEvent(w, SimEventType.HitBlocked, j, i, w.X[j], w.Z[j], PlayerReasons.BlockedWall);   // lane S2: a wall between
+                    continue;
+                }
                 if (cap > 0 && hits >= cap) break;
                 hits++;
                 // b15 combat feel: the per-target multiplier (sunder, Farmer close range, Miner pierce, Builder at home) is read
@@ -226,9 +246,40 @@ namespace CriticalMass.Sim.Core
                     evBefore = -1; // b15: a Kaiju hit is not a whiff
                 }
             }
-            if (feel) CombatFeel.AfterContact(w, i, hits + (w.EventHead != evBefore ? 1 : 0));
+            bool answered = w.EventHead != evBefore; // b15: a structure (or Kaiju) answered: not a whiff (lane S2: StructureHit counts)
+            if (feel) CombatFeel.AfterContact(w, i, hits + (answered ? 1 : 0));
+            // lane S2: a human's swing whose arc and reach held only what no swing can break (rock, the hill ring, own walls,
+            // a breakable for a non-Miner) says so once: StructureHit StructureSolid, Value 0. Still a whiff. Bots never raise it.
+            if (report && hits == 0 && !answered && PlayerSeat.Human(w, i)) SolidInArc(w, i, ax, az, fx, fz, range, cosHalf);
             // DG-69: the contact tick, even on a whiff.
             if (lane) World.PushEvent(w, SimEventType.AttackContact, i, -1, ax + fx * range, az + fz * range, hits, null, DamageCause.None, 0, fx, fz, 0, 0, 0, 0);
+        }
+
+        /// <summary>
+        /// Lane S2: the first cell (row-major) whose centre is within range and inside the arc and that no swing of this actor
+        /// can damage (Wall, an own-team barricade or wall cell, a breakable when not a Miner) pushes one StructureHit:
+        /// A = the attacker, B = StructureSolid, (X, Z) = the cell centre, Value 0, Radius 1.
+        /// </summary>
+        private static void SolidInArc(World w, int i, double ax, double az, double fx, double fz, double range, double cosHalf)
+        {
+            Grid.MapDef map = w.Map;
+            int x0 = Math.Max(0, JsMath.FloorToInt(ax - range)), x1 = Math.Min(map.Width - 1, JsMath.FloorToInt(ax + range));
+            int z0 = Math.Max(0, JsMath.FloorToInt(az - range)), z1 = Math.Min(map.Height - 1, JsMath.FloorToInt(az + range));
+            bool miner = w.Actors[i].Cls == ClassId.Miner;
+            for (int cz = z0; cz <= z1; cz++)
+            {
+                for (int cx = x0; cx <= x1; cx++)
+                {
+                    byte t = map.Cells[cz * map.Width + cx];
+                    bool solid = t == Cell.Wall || t == Cell.Barricade || t == Cell.LowWall || (!miner && (t == Cell.BreakableIntact || t == Cell.BreakableCracked));
+                    if (!solid) continue;
+                    double dx = cx + 0.5 - ax, dz = cz + 0.5 - az, d2 = dx * dx + dz * dz;
+                    if (d2 > range * range) continue;
+                    if (d2 > 1e-12 && (dx * fx + dz * fz) / Math.Sqrt(d2) < cosHalf - 1e-9) continue;
+                    World.PushEvent(w, SimEventType.StructureHit, i, PlayerReasons.StructureSolid, cx + 0.5, cz + 0.5, 0, null, DamageCause.Melee, 1);
+                    return;
+                }
+            }
         }
 
         /// <summary>DG-100 (S13): cosine of the arc half-angle widened by asin(min(1, r / d)) for a target of radius r at distance d.</summary>

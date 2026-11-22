@@ -779,7 +779,7 @@ namespace CriticalMass.Sim.Core
         }
 
         /// <summary>A TNT blast of `team` at (x, z): every ENEMY wall cell whose centre is within r loses BuildConfig.TntDamage.</summary>
-        public static void BlastWalls(World w, TeamId team, double x, double z, double r)
+        public static void BlastWalls(World w, TeamId team, double x, double z, double r, int owner = -1)
         {
             if (!On(w)) return;
             double dmg = w.Config.Depth.Build.TntDamage;
@@ -791,7 +791,11 @@ namespace CriticalMass.Sim.Core
                 if (b.Team == team || b.Hp <= 0) continue;
                 double dx = b.Cx + 0.5 - x;
                 double dz = b.Cz + 0.5 - z;
-                if (dx * dx + dz * dz <= r * r) b.Hp -= dmg;
+                if (dx * dx + dz * dz <= r * r)
+                {
+                    b.Hp -= dmg;
+                    if (PlayerSeat.On(w)) Barricades.StructureHit(w, owner, slot, dmg);   // lane S2
+                }
             }
         }
 

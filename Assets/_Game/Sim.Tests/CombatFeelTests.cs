@@ -536,6 +536,10 @@ namespace CriticalMass.Sim.Tests
             w.Actors[0].IsHuman = true;
             Assert.AreEqual(a1, Healer.MendTarget(w, 0, X0 - 3, Z0), "player: nearest the aim");
             double before = w.Actors[a1].Hp;
+            // lane S2: TryMend reads her live aim; without one a player now mends the most hurt (the bots' rule), so aim at a1
+            w.HasAim[0] = 1;
+            w.Inputs[0].AimX = X0 - 3;
+            w.Inputs[0].AimZ = Z0;
             Assert.IsTrue(Healer.TryMend(w, 0));
             Assert.AreEqual(w.Config.Depth.CombatFeel.MendHeal, w.Actors[a1].Hp - before, 1e-9, "MendHeal");
             Console.WriteLine("{\"item\":\"b15 healer\",\"rowReach\":" + h.AttackRange + ",\"rowDamage\":" + h.AttackDamage + ",\"mendRange\":" + CombatFeel.MendRange(w.Config) +

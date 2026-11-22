@@ -19,6 +19,8 @@ namespace CriticalMass.Sim.Core
         public readonly int[] HillWeighted = new int[2], HillCounted = new int[2];
         /// <summary>Counters (tests, the balance probe): autopilot take-overs and hand-backs; intercept switches.</summary>
         public int Takeovers, Handbacks, Intercepts;
+        /// <summary>Player-experience lane S2: the human seat's press edges, refusal rate limit and idle aim anchor (PlayerSeat.cs).</summary>
+        public PlayerSeatState Seat = new PlayerSeatState();
 
         public void Init(World w)
         {
@@ -27,6 +29,8 @@ namespace CriticalMass.Sim.Core
             Auto = new byte[cap];
             Surplus = new byte[cap];
             SurplusLock = new int[cap];
+            if (Seat == null) Seat = new PlayerSeatState();
+            Seat.Init(w);
             Clear();
         }
 
@@ -37,6 +41,7 @@ namespace CriticalMass.Sim.Core
             Array.Clear(HillWeighted, 0, 2);
             Array.Clear(HillCounted, 0, 2);
             Takeovers = Handbacks = Intercepts = 0;
+            Seat?.Clear();
             if (IdleTicks == null) return;
             Array.Clear(IdleTicks, 0, IdleTicks.Length);
             Array.Clear(Auto, 0, Auto.Length);
@@ -70,6 +75,19 @@ namespace CriticalMass.Sim.Core
         }
 
         /// <summary>
+        /// Lane S2 (player-experience 2026-11-22): what a person at the controls can cause, for actor id: HasInput(f), the
+        /// Cancel button, a class pick, and (PlayerSeat.On) an aim (relative to the body) that moved IdleAimUnits or turned
+        /// IdleAimDegrees since input last counted (not while the autopilot plays: then a move or a button hands back). A mouse player waiting to heal, or a third-person player turning the camera, is not idle.
+        /// </summary>
+        public static bool HasInput(World w, int id, InputFrame f)
+        {
+            if (f == null) return false;
+            bool any = HasInput(f) || (PlayerSeat.On(w) && (f.Cancel || f.ClassPick >= 0));
+            bool aim = PlayerSeat.AimMoved(w, id, f, any, Autopiloted(w, id));
+            return any || aim;
+        }
+
+        /// <summary>
         /// MatchTick, for every human frame before it is applied: true = the autopilot plays actor id this tick (its frame is
         /// replaced by the bot input, the same input a dropped player's fighter gets). The first frame with input hands the
         /// fighter back on that tick. Every machine sees the same frames, so every machine decides the same.
@@ -84,13 +102,14 @@ namespace CriticalMass.Sim.Core
                 s.Auto[id] = 0;
                 return false;
             }
-            if (HasInput(f))
+            if (HasInput(w, id, f))
             {
                 s.IdleTicks[id] = 0;
                 if (s.Auto[id] != 0)
                 {
                     s.Auto[id] = 0;
                     s.Handbacks++;
+                    if (PlayerSeat.On(w)) World.PushEvent(w, SimEventType.AutopilotChanged, id, -1, w.X[id], w.Z[id], 0);   // lane S2
                 }
                 return false;
             }
@@ -100,6 +119,7 @@ namespace CriticalMass.Sim.Core
             {
                 s.Auto[id] = 1;
                 s.Takeovers++;
+                if (PlayerSeat.On(w)) World.PushEvent(w, SimEventType.AutopilotChanged, id, -1, w.X[id], w.Z[id], 1);   // lane S2
             }
             return true;
         }

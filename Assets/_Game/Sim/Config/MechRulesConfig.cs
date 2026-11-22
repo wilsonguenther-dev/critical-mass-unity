@@ -22,7 +22,7 @@ namespace CriticalMass.Sim.Config
         /// player gets) until his next input, which hands the fighter back on that tick. Off while the bots are passive
         /// (Bots.PassiveSeconds over 0: the guided match, practice and the demo, where reading without input is the point).</summary>
         public bool AfkAutopilot = true;
-        public double AfkSeconds = 15;
+        public double AfkSeconds = 30;   // lane S2 (2026-11-22): 15 -> 30, a player holding a spot or reading the vote card is not idle
         /// <summary>The director's two extra Kaiju feeders (ahead, or 10 s behind) become a share of the team:
         /// ceil(FeedExtraShare x team size) = 2 at 16, 1 at 8, 1 at 5 (before: 2 at every size, 3 of 5 bots off the hill at 5v5).</summary>
         // b16 combine: OFF (two extras at every size, as before b16). On, 5v5 and 8v8 blowouts rose and the Kaiju owner won 0.976 of

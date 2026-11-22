@@ -853,6 +853,7 @@ namespace CriticalMass.Net
             A(ref h, o.HillWeighted);
             A(ref h, o.IdleTicks);
             M(ref h, o.Intercepts);
+            H_PlayerSeatState(ref h, o.Seat);
             A(ref h, o.Surplus);
             A(ref h, o.SurplusLock);
             M(ref h, o.Takeovers);
@@ -1251,6 +1252,19 @@ namespace CriticalMass.Net
             D(ref h, o.Plant);
             D(ref h, o.Water);
             D(ref h, o.Wood);
+        }
+
+        private static void H_PlayerSeatState(ref ulong h, global::CriticalMass.Sim.Core.PlayerSeatState o)
+        {
+            if (o == null) { M(ref h, 0x4E554C4CL); return; }
+            A(ref h, o.AimDir);
+            A(ref h, o.AimSet);
+            A(ref h, o.AimX);
+            A(ref h, o.AimZ);
+            A(ref h, o.CancelMark);
+            A(ref h, o.CancelTick);
+            A(ref h, o.PrevMask);
+            A(ref h, o.RefusedTick);
         }
 
     }

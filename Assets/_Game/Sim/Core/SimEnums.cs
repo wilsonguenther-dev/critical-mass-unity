@@ -266,6 +266,9 @@ namespace CriticalMass.Sim.Core
         /// <summary>A world action by an actor that changed the world and has no other event: A = the actor,
         /// B = PlayerReasons.World* kind, (X, Z) = where, Value = amount (cells, units).</summary>
         WorldAction,
+        /// <summary>Lane S2: the idle-player autopilot took over (Value 1) or handed back (Value 0) actor A's fighter, on the tick it
+        /// happened: A = the actor, B = -1, (X, Z) = the actor, Value = 1 on / 0 off. The HUD announces both.</summary>
+        AutopilotChanged,
     }
 
     /// <summary>CM b13 [K]: the Kaiju type decided by the biomass mix at the hatch (Elder = today's Kaiju; appended members only).</summary>
