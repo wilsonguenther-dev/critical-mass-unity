@@ -252,7 +252,8 @@ namespace CriticalMass.Runtime.Hud.Mechanics
         {
             TeamId enemy = team == TeamId.Azure ? TeamId.Crimson : TeamId.Azure;
             bool ownTrails = Comeback.Trailing(w, team), enemyTrails = Comeback.Trailing(w, enemy);
-            bool show = ownTrails || enemyTrails;
+            // review fix round 2 (pass-2 N4): no RALLY in Duel or the Practice Range (no Kaiju: lane F's small modes)
+            bool show = (ownTrails || enemyTrails) && !HudState.NoKaijuIn(w.Config);
             if (show && !_rally.gameObject.activeSelf) _rally.gameObject.SetActive(true);   // hidden by TickLevers
             // a one-time banner per team, the first tick that team earns RALLY credit (the announcer line, both teams see it)
             for (int t = 0; t < 2; t++)

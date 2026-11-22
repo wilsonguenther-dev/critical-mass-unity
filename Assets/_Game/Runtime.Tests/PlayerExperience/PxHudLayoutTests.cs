@@ -48,6 +48,41 @@ namespace CriticalMass.Runtime.Tests.PlayerExperience
         }
 
         [Test]
+        public void NumbersNeverSitOnMyOwnFighter()
+        {
+            // review fix round 2 (pass-2 defect 4): close third person put the number 80 px right of the enemy, where I
+            // stand. My fighter (body + name + bar) is a screen rect; the number goes on the enemy's far side from it.
+            Vector2 tag = new Vector2(960f, 640f);
+            foreach (var c in Cameras)
+            {
+                bool third = c.cam.StartsWith("third");
+                Vector2 chest = tag - new Vector2(0f, c.chestBelow);
+                Rect name = UnitStack.NameRect(tag, c.tagScale);
+                Rect bar = UnitStack.BarRect(tag, c.tagScale, HealthBars.MaxW * HealthBars.FocusScale, 10f);
+                Rect words = UnitStack.TagRect(tag, c.tagScale, 0, 520f);
+                // me: in third person near the camera (big, lower on screen); top-down about the enemy's size
+                float myH = third ? 520f : c.chestBelow * 2.2f;
+                foreach (float dx in new[] { -220f, -120f, -60f, 0f, 60f, 80f, 120f, 220f })
+                {
+                    Vector2 myFeet = new Vector2(960f + dx, (third ? 90f : chest.y - c.chestBelow * 0.9f));
+                    Vector2 myTag = myFeet + new Vector2(0f, myH);
+                    Rect mine = UnitStack.MineRect(myFeet, myTag, 1f, myH * 0.3f);
+                    foreach (DamageNumbers.Kind k in System.Enum.GetValues(typeof(DamageNumbers.Kind)))
+                    {
+                        int size = DamageNumbers.SizeFor(k, third);
+                        for (int stack = 0; stack <= 2; stack++)
+                        {
+                            Rect n = UnitStack.NumberRect(UnitStack.NumberLeftMid(chest, tag, c.tagScale, size, c.risePx, stack, mine, 4), size, 4);
+                            string at = c.cam + " me at dx " + dx + " " + k + " stack " + stack;
+                            Assert.IsFalse(n.Overlaps(mine), at + ": number over my fighter / my name / my bar");
+                            Assert.IsFalse(n.Overlaps(name) || n.Overlaps(bar) || n.Overlaps(words), at + ": number over his name, bar or words");
+                        }
+                    }
+                }
+            }
+        }
+
+        [Test]
         public void WordRowsStackUpwardWithoutOverlap()
         {
             Vector2 tag = new Vector2(400f, 300f);

@@ -808,8 +808,16 @@ namespace CriticalMass.Runtime.Hud
             // b15 D0: the owner's own Kaiju stands on the hill, so the owner scores nothing; the word says so from each side's
             // point of view (words, not colour alone: brass ink is a second cue)
             // b15 view polish (item 8): that state is now the pill under the hill meter (ApplyKaijuPill); the word stays the hill's.
-            HudText.Set(_hillWord, HillWord(s.Hill));
+            HudText.Set(_hillWord, s.NoHill ? string.Empty : HillWord(s.Hill));
             _hillWord.color = Cream;
+            if (s.NoHill)
+            {
+                // review fix round 2 (pass-2 N4): the range has no hill: no "HILL n/10", no on-hill counts, no pips
+                HudText.Set(_onHillA, string.Empty);
+                HudText.Set(_onHillC, string.Empty);
+                ApplyPips(_pipsA, 0, 0, false, CMTokens.Azure.Color);
+                ApplyPips(_pipsC, 0, 0, false, CMTokens.Crimson.Color);
+            }
             ApplyKaijuPill(s);
         }
 
@@ -1070,6 +1078,9 @@ namespace CriticalMass.Runtime.Hud
             _ground.Watch(w.Map, w.GridVersion);
             if (_mapFog != null) _mapFog.Sync();
             _mapHill.SetFill(s.Hill == HillState.Neutral ? Navy : HillColour(s.Hill));
+            // review fix round 2 (pass-2 N4): no KAIJU on the minimap in a mode without one, no hill where there is none
+            if (_mapEgg.Rt.gameObject.activeSelf == s.NoKaiju) _mapEgg.Rt.gameObject.SetActive(!s.NoKaiju);
+            if (_mapHill.gameObject.activeSelf == s.NoHill) _mapHill.gameObject.SetActive(!s.NoHill);
             bool eggOnMap = !s.Hatched || s.Kaiju == KaijuState.Egg;
             _mapEgg.Set(eggOnMap ? UiIcons.MapEgg : KaijuIcon(s, false), _tier);
             if (s.Hatched) PlaceOnMap(_mapEgg.Rt, w.Kaiju.X, w.Kaiju.Z);
@@ -1159,6 +1170,7 @@ namespace CriticalMass.Runtime.Hud
             // sized per camera, heal / Kaiju / wall numbers)
             // player-experience lane D: health bars over every unit in view, hit marker, damage direction, kill confirm,
             // tags and pops (Hud/Player); replaces the 3-second overhead hearts
+            PlayerFeedback.CurrentTick = w.Tick;   // review fix round 2 (gate tier F): ledger entries carry the sim tick
             PlayerHud?.Tick(w, s, Driver != null ? Driver.Alpha : 1.0, cam, scale, dt, w.EventHead);   // GameHud is the allowed event reader
         }
 
