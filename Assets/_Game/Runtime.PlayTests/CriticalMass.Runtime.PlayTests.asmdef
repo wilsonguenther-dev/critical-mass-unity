@@ -3,6 +3,7 @@
     "rootNamespace": "CriticalMass.Runtime.PlayTests",
     "references": [
         "CriticalMass.Sim",
+        "CriticalMass.Net",
         "CriticalMass.Runtime",
         "Unity.InputSystem",
         "UnityEngine.TestRunner",

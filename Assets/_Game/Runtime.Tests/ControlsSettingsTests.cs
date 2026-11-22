@@ -101,6 +101,19 @@ namespace CriticalMass.Runtime.Tests
         }
 
         [Test]
+        public void TheCameraViewHasItsOwnPadButtonApartFromTheScoreboard()
+        {
+            // b16 finish (Editor review: View was both the scoreboard hold and the camera double tap)
+            CollectionAssert.AreEqual(new[] { "<Gamepad>/leftStickPress" }, Paths(A("CameraView"), G));
+            Assert.IsTrue(ControlSchemes.IsDoubleTap(A("CameraView").bindings.First(b => b.path == "<Gamepad>/leftStickPress")));
+            CollectionAssert.DoesNotContain(Paths(A("CameraView"), G), "<Gamepad>/select");
+            InputAction view = A("CameraView");
+            int idx = -1;
+            for (int i = 0; i < view.bindings.Count; i++) if (view.bindings[i].path == "<Gamepad>/leftStickPress") idx = i;
+            StringAssert.StartsWith("DOUBLE-TAP ", ControlBindings.Display(view, idx), "the controls screen reads the binding");
+        }
+
+        [Test]
         public void EverySettingsRowFindsItsBinding()
         {
             foreach (ControlRow row in ControlBindings.Rows)
