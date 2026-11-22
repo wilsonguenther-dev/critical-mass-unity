@@ -126,13 +126,11 @@ namespace CriticalMass.Runtime.Audio.Sound
         {
             if (Instance != null && Instance != this) { Destroy(this); return; }
             Instance = this;
-            LoadClips();
-            BuildVoices();
-            _plan = VoicePlanner.FromTable(Voices);
-            _subLast = new double[SoundTable.Cues.Length];
-            for (int i = 0; i < _subLast.Length; i++) _subLast[i] = double.NegativeInfinity;
+            // px lane F round 4: the pass 4 capture threw ~735,000 NullReferenceExceptions at "_plan.BusyCount" (one a frame):
+            // _plan is only null when Awake stopped before it (the first exception scrolled out of the 2000-line console).
+            // The build is now InitCore (caught, logged once) and LateUpdate retries it every 2 s and skips the frame quietly.
             for (int i = 0; i < FuseVoices; i++) _fuseSlot[i] = -1;
-            _captions = new SoundCaptions(transform);
+            InitCore();
             ReadMute();
             GameSettings.Changed += ReadMute;
             SceneManager.sceneLoaded += OnSceneLoaded;
@@ -141,6 +139,48 @@ namespace CriticalMass.Runtime.Audio.Sound
             SystemEvents.AudioDeviceChanged += OnDeviceChanged;
             Footfalls.Register(this);
             BigMomentsAudio.Sink = this;
+        }
+
+        bool _initWarned;
+        double _initRetryAt;
+
+        /// <summary>True when the voices, clips and planner exist (LateUpdate runs only then).</summary>
+        internal bool Ready => _plan != null && _src != null && _clips != null && _subLast != null && _captions != null;
+
+        /// <summary>Builds what is missing of clips, voices, planner and captions; never throws (logs once).</summary>
+        private bool InitCore()
+        {
+            try
+            {
+                if (_clips == null) LoadClips();
+                if (_src == null || Array.IndexOf(_src, null) >= 0) BuildVoices();
+                if (_plan == null) _plan = VoicePlanner.FromTable(Voices);
+                if (_subLast == null)
+                {
+                    var sub = new double[SoundTable.Cues.Length];
+                    for (int i = 0; i < sub.Length; i++) sub[i] = double.NegativeInfinity;
+                    _subLast = sub;
+                }
+                if (_captions == null) _captions = new SoundCaptions(transform);
+            }
+            catch (Exception e)
+            {
+                if (!_initWarned) { _initWarned = true; Debug.LogWarning("[CM.Audio] sound director not ready (" + e.GetType().Name + ": " + e.Message + "); retrying every 2 s"); }
+            }
+            return Ready;
+        }
+
+        /// <summary>Tests: hold the init retry (edit mode builds nothing).</summary>
+        internal void HoldInitForTests() => _initRetryAt = double.MaxValue;
+
+        /// <summary>LateUpdate's guard (tests call it): false = not built yet, the frame is skipped without a throw.</summary>
+        internal bool UpdateGuard()
+        {
+            if (Ready) return true;
+            double now = Time.unscaledTimeAsDouble;
+            if (now < _initRetryAt) return false;
+            _initRetryAt = now + 2.0;
+            return InitCore();
         }
 
         private void OnDestroy()
@@ -685,6 +725,7 @@ namespace CriticalMass.Runtime.Audio.Sound
 
         private void LateUpdateBody()
         {
+            if (!UpdateGuard()) return;
             if (_driver == null && (_lookupFrames++ % 15) == 0)
             {
                 _driver = FindAnyObjectByType<SimDriverBehaviour>();
