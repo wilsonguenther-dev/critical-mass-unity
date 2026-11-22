@@ -33,6 +33,7 @@ namespace CriticalMass.Sim.Core
         public const int ButtonDodge = 5;
         public const int ButtonCancel = 6;
         public const int ButtonJump = 7;
+        public const int ButtonStationBuy = 8;  // lane S2: InputFrame.StationBuy (a HUD click, not a held key)
 
         // ---- ActionRefused.Value (why)
         public const int RefusedCooldown = 1;       // still cooling down
@@ -47,6 +48,7 @@ namespace CriticalMass.Sim.Core
         public const int RefusedTeamLimit = 10;     // a team-wide cap or rate limit
         public const int RefusedCarrying = 11;      // lane S2: the load you carry forbids it (a corruption carrier cannot dodge)
         public const int RefusedInAir = 12;         // lane S2: already in the air (a jump pressed mid-flight that will not land in time)
+        public const int RefusedRuleOff = 13;       // lane S2: this match's rules retired the action (the hut replaced the station ladder)
 
         // ---- WorldAction.B
         public const int WorldDig = 1;

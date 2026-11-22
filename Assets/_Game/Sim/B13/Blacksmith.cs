@@ -388,7 +388,10 @@ namespace CriticalMass.Sim.Core
                 if (a.Carry == CarryKind.Ore && a.DeliverTicks > 0) Delivery.CancelDelivery(a);
                 int v = h.ChannelVein[id];
                 if (v < 0) continue;
-                if (!a.Alive || a.Cls != ClassId.Miner || !w.Inputs[id].Terraform || a.StandUp > 0 || v >= list.Length)
+                // lane S2 (gate S15): a human seat's TAP starts the channel and it runs to its unit (moving out of reach, a
+                // get-up or a Cancel press stops it; a hit restarts it); a bot, as before, mines only while F is held.
+                bool tap = PlayerSeat.Human(w, id);
+                if (!a.Alive || a.Cls != ClassId.Miner || (!w.Inputs[id].Terraform && !tap) || (tap && PlayerSeat.PressedCancel(w, id)) || a.StandUp > 0 || v >= list.Length)
                 {
                     Cancel(h, id);
                     continue;
@@ -413,7 +416,7 @@ namespace CriticalMass.Sim.Core
                 h.MinedBy[id]++;
                 h.Mined[(int)a.Team]++;
                 World.PushEvent(w, SimEventType.OreMined, id, v, s.X, s.Z, a.CarryAmount, BiomassType.Ore, DamageCause.None);
-                if (a.CarryAmount >= cap || s.Charges <= 0) Cancel(h, id);
+                if (a.CarryAmount >= cap || s.Charges <= 0 || (tap && !w.Inputs[id].Terraform)) Cancel(h, id);   // lane S2: one unit per tap; held F keeps mining
             }
             HutChoices.VoteSystem(w);   // b15-hook: rule B, the team votes on each hut level (nothing with the rule off)
         }

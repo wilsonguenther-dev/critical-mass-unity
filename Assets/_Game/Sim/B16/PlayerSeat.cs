@@ -12,7 +12,7 @@ namespace CriticalMass.Sim.Core
     /// </summary>
     public sealed class PlayerSeatState
     {
-        public const int Buttons = 8; // index = PlayerReasons.Button* (1..7); 0 unused
+        public const int Buttons = 9; // index = PlayerReasons.Button* (1..8); 0 unused
         /// <summary>Per actor: the buttons held on the previous tick (bit = PlayerReasons.Button*).</summary>
         public int[] PrevMask;
         /// <summary>Per actor x Buttons: the last tick an ActionRefused was raised for that button (rate limit).</summary>
@@ -142,6 +142,13 @@ namespace CriticalMass.Sim.Core
                     s.CancelMark[i] = FeelCount(w);
                 }
             }
+        }
+
+        /// <summary>Lane S2: actor id held Cancel this tick (read from the press mask, since Combat clears the input).</summary>
+        public static bool PressedCancel(World w, int id)
+        {
+            PlayerSeatState s = S(w);
+            return s != null && s.PrevMask != null && id >= 0 && id < s.PrevMask.Length && (s.PrevMask[id] & (1 << PlayerReasons.ButtonCancel)) != 0;
         }
 
         static int FeelCount(World w) => w.Depth.Feel.Feints + w.Depth.Feel.HitCancels;

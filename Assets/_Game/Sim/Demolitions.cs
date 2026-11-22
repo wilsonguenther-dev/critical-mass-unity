@@ -657,11 +657,11 @@ namespace CriticalMass.Sim.Core
         /// <summary>
         /// Lane S2 (Full rules): a living enemy within PlayerSeatConfig.PointBlankRange (centre to centre) inside her pry-bar arc
         /// (the class row arc, widened by the body as Combat does) along her aim. Then an attack press swings instead of
-        /// throwing. Every actor (bots too). The DigPlace key always throws.
+        /// throwing. Human seats only (a bot keeps its throw; its press is already range-gated). The DigPlace key always throws.
         /// </summary>
         public static bool PointBlank(World w, int id)
         {
-            if (!PlayerSeat.On(w)) return false;
+            if (!PlayerSeat.Human(w, id)) return false;   // a person at the controls (bots keep throwing: gate S42 bot fairness)
             double r = PlayerSeat.Cfg(w).PointBlankRange;
             if (!(r > 0)) return false;
             PlayerSeat.AimDir(w, id, out double fx, out double fz);

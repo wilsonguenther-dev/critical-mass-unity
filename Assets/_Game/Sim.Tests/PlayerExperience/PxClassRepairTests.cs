@@ -257,10 +257,16 @@ namespace CriticalMass.Sim.Tests
             far.Place(f2, ClassId.Farmer, 60.5, 40.5);
             far.Head = far.W.EventHead;
             far.Aim(60.5, 40.5);
-            far.Tap(Attack, 2);
-            int t2 = far.Ev(SimEventType.TntThrown).Count;
-            Line("Demolitions, TNT ready, enemy at 4 u: TNT thrown", t2, "1");
+            far.Tap(Attack, 0);
+            int t2 = far.Ev(SimEventType.TntThrown).Count;   // lead (b): counted on the press tick itself
+            Line("Demolitions, TNT ready, enemy at 4 u: TNT thrown on the press tick", t2, "1");
             Assert.AreEqual(1, t2);
+            far.Step(2);
+            far.Head = far.W.EventHead;
+            far.Tap((f, on) => f.Cancel = on, 2);   // lead (3): Cancel right after a throw is not silent
+            int cancelRefused = far.Count(SimEventType.ActionRefused, e => e.A == 0 && e.B == PlayerReasons.ButtonCancel);
+            Line("Demolitions Cancel right after a TNT throw: ActionRefused (Cancel)", cancelRefused, "1");
+            Assert.AreEqual(1, cancelRefused);
 
             var key = new Rig(ClassId.Demolitions);
             int f3 = key.Foe();
@@ -287,7 +293,11 @@ namespace CriticalMass.Sim.Tests
             r.W.Actors[a2].Hp = r.W.Actors[a2].MaxHp * 0.3;
             r.Head = r.W.EventHead;
             r.Aim(56.5, 45.5); // nowhere near either
-            r.Tap(Attack, 2);
+            r.Tap(Attack, 0);
+            int castSameTick = r.Ev(SimEventType.HealCast).Count;   // lead (b): a press consumed by a mend answers on its tick
+            Line("Healer mend press: HealCast on the press tick", castSameTick, ">= 1");
+            Assert.GreaterOrEqual(castSameTick, 1);
+            r.Step(2);
             List<SimEvent> heals = r.Ev(SimEventType.HealLanded);
             int target = heals.Count > 0 ? heals[0].A : -1;
             Line("S25 human Healer, aim on neither ally: mended actor (30% one = " + a2 + ")", target, a2.ToString());
