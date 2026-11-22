@@ -290,7 +290,7 @@ namespace CriticalMass.Sim.Tests
         /// <summary>
         /// BALANCE vs control (Dodge.On false; 5v5 Full 1 to 20 and 16v16 1337, 4242, 7, 99, 2024, 31337). Limits: win share
         /// within 0.15 (5v5, and all 26 together); median first knock-out -10% / +20%; kills per minute -25% / +10%; class kill
-        /// shares within 0.08; hill lead changes +-30%; dodges per bot-minute (Normal) between 0.3 and 1.2 (px DM: S1 cut the Normal bot's melee dodge chance 0.35 -> 0.10 under human limits on purpose, x0.29 of the old 1-4 band; measured 0.56-0.60); Kaiju slam damage share
+        /// shares within 0.08; hill lead changes +-30%; dodges per bot-minute (Normal) between 1 and 4 (px DM call 18: the human-limit 0.10 dodge chance applies only to a human's swings, so bot-versus-bot dodging is the b13 rate again); Kaiju slam damage share
         /// printed (expected to fall).
         /// b14-c item 4: SLOW (it is 88 whole matches: 58 s on the .NET gate, 1174 s in the Unity EditMode job, whose per-test
         /// timeout is 180 s); the always-run part is DodgeSmokeBotsDodgeAtTheNormalRateOnTwoSeeds. Item 5: the win shares are
@@ -334,7 +334,7 @@ namespace CriticalMass.Sim.Tests
                 Limit(failures, tag + " kills per minute", kOn, kOff, kOff > 0 && kOn >= kOff * 0.75 - 1e-9 && kOn <= kOff * 1.10 + 1e-9, "-25% / +10%");
                 Limit(failures, tag + " hill lead changes", arms[0].LeadChanges, arms[1].LeadChanges, Math.Abs(arms[0].LeadChanges - arms[1].LeadChanges) <= 0.30 * Math.Max(1, arms[1].LeadChanges) + 1e-9, "+-30%");
                 double dpm = arms[0].Dodges / Math.Max(1e-9, arms[0].BotMinutes);
-                Limit(failures, tag + " dodges per bot-minute (Normal)", dpm, arms[1].Dodges / Math.Max(1e-9, arms[1].BotMinutes), dpm >= 0.3 && dpm <= 1.2, "0.3 to 1.2");
+                Limit(failures, tag + " dodges per bot-minute (Normal)", dpm, arms[1].Dodges / Math.Max(1e-9, arms[1].BotMinutes), dpm >= 1 && dpm <= 4, "1 to 4");
                 string[] kn = { "", "slam", "tnt", "claw", "melee" };
                 for (int k = 1; k <= 4; k++)
                     Console.WriteLine("{\"item\":\"b13-jd threats\",\"size\":" + size + ",\"threat\":\"" + kn[k] + "\",\"seenPerBotMin\":" + (arms[0].Seen[k] / Math.Max(1e-9, arms[0].BotMinutes)).ToString("F2") +

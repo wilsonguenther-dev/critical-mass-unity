@@ -31,6 +31,7 @@ namespace CriticalMass.Runtime.Hud.Player
             public float Lift;
             public int Stack;
             public bool Row;
+            public int Key;
             public bool Active;
         }
 
@@ -105,7 +106,9 @@ namespace CriticalMass.Runtime.Hud.Player
             s.Row = actor >= 0;
             s.Lift = s.Row ? HealthBars.Lift : lift;
             s.Stack = Mathf.Min(stack, 3);
-            int size = strong ? StrongSize : SoftSize;
+            int size = NextSize > 0 ? NextSize : strong ? StrongSize : SoftSize;   // review fix round 3: PERFECT a little larger
+            NextSize = 0;
+            s.Key = key;
             s.Text.fontSize = size;
             s.Text.color = ink;
             ContainedText.Of(s.Text)?.Configure(size, Mathf.Min(size, 14), 1);
@@ -121,6 +124,16 @@ namespace CriticalMass.Runtime.Hud.Player
             s.Group.alpha = 1f;   // visible the frame it is raised (the ledger reports it then)
             if (!s.Rt.gameObject.activeSelf) s.Rt.gameObject.SetActive(true);
             return s.Text;
+        }
+
+        /// <summary>One-shot font size for the next Show (0 = the strong / soft size).</summary>
+        public int NextSize;
+
+        /// <summary>Review fix round 3: takes down the words shown under key (BLOCKED wins over a TOO CLOSE on the same hit).</summary>
+        public void Hide(int key)
+        {
+            for (int i = 0; i < _slots.Length; i++)
+                if (_slots[i].Active && _slots[i].Key == key) { _slots[i].Active = false; PxUi.Show(_slots[i].Rt, false); }
         }
 
         public void Clear()

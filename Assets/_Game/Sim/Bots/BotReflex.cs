@@ -56,7 +56,8 @@ namespace CriticalMass.Sim.Bots
             double chance = kind == KindTnt ? dc.TntChance[d] : dc.DodgeChance[d];   // b13 r3: TNT has its own, lower roll
             // px S1 [3]: bots by human limits: an average human sidesteps few melee swings (BotMeleeDodgeChance, Easy/Normal/Hard).
             double[] md = BotAim.On(w) ? w.Config.Depth.CombatFeel.BotMeleeDodgeChance : null;
-            if (kind == KindMelee && md != null && d < md.Length) chance = md[d];
+            // px DM (lead's call 18): only against a human attacker (BotMeleeDodgeHumansOnly); a bot's swing gets the b13 chance.
+            if (kind == KindMelee && md != null && d < md.Length && (!w.Config.Depth.CombatFeel.BotMeleeDodgeHumansOnly || BotAim.IsHumanSeat(w, (key >> 3) & 63))) chance = md[d];
             if (!(Roll(w.Opts.Seed, w.Tick, id) < chance)) return;
             if (!HillAware(w, s, dc, id, ax, az, dmg, ref dx, ref dz)) return;   // b13 r3: never off the hill unless lethal
             s.PressedByKind[kind]++;

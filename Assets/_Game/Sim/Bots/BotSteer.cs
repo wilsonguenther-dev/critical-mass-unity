@@ -626,7 +626,7 @@ namespace CriticalMass.Sim.Bots
                         // DG-69: with a wind-up the bot swings at where the target will be on the contact tick.
                         int windup = w.Dur.AttackWindup[(int)a.Cls];
                         // px S1 [2]: human limits: the target where it was BotMeleeAimDelayTicks ago, its lead and aim error.
-                        if (BotAim.On(w)) BotAim.Perceive(w, st, id, t, windup, out tx, out tz);
+                        if (BotAim.On(w) && (!w.Config.Depth.CombatFeel.BotAimHumansOnly || BotAim.IsHumanSeat(w, t))) BotAim.Perceive(w, st, id, t, windup, out tx, out tz);
                         else if (windup > 0)
                         {
                             // b15 combat feel: the lead is capped at BotLeadSeconds. A 0.40 s wind-up led the whole way swung the

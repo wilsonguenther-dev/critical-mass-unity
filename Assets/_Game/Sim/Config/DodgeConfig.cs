@@ -35,6 +35,9 @@ namespace CriticalMass.Sim.Config
         /// (CombatFeel crit kind 2). The attacker's own whiff recovery (0.33 to 0.47 s) was too short: a 0.2 s human who dodged
         /// landed the punish 2% (side dodge) to 16% (dodge through) of the time; data/dm-defence/VERBS.txt.</summary>
         public double DodgePunishSeconds = 0.8;
+        /// <summary>px DM (lead's call 18): the DodgePunishSeconds window only when the dodger is a human seat; a bot's dodge leaves
+        /// the attacker its own whiff recovery (batch 16).</summary>
+        public bool DodgeRewardHumansOnly = true;
         /// <summary>A dodge started this many ticks or fewer before the contact tick is PERFECT (HitBlocked Tier 1).</summary>
         public int PerfectDodgeTicks = 2;
         /// <summary>Share of the dodge cooldown a PERFECT dodge gives back (0 = none).</summary>

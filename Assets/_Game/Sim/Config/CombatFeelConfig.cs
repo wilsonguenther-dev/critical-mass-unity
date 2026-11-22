@@ -294,6 +294,13 @@ namespace CriticalMass.Sim.Config
         /// <summary>px DM (slow triage R1): BotSwingHesitation holds only a swing at a HUMAN seat. Off = every bot swing (at the
         /// Kaiju, structures and other bots too), which cut bot damage on the Kaiju: own-Kaiju blocking 13.8 -> 42.9 s a match.</summary>
         public bool BotSwingHesitationHumansOnly = true;
+        /// <summary>px DM (lead's call 18): the human-limit aim (BotAim.Perceive: aim delay, lead, aim error) only when the bot's
+        /// melee target is a human seat; at other bots it aims as on batch 16.</summary>
+        public bool BotAimHumansOnly = true;
+        /// <summary>px DM (call 18): BotSwingTrackScale only while the bot's target is a human seat.</summary>
+        public bool BotSwingTrackHumansOnly = true;
+        /// <summary>px DM (call 18): BotMeleeDodgeChance only against a human attacker; a bot's swing is dodged at DodgeConfig.DodgeChance.</summary>
+        public bool BotMeleeDodgeHumansOnly = true;
         /// <summary>[2] Melee aim delay (ticks at 30 Hz) by BotDifficulty (Normal, Easy, Hard): the bot aims at where its target
         /// was this long ago (a 0.2 s human = 6). Baseline: Normal bots landed 94% on a circle-strafing human (target 40-75%).</summary>
         public int[] BotMeleeAimDelayTicks = { 5, 12, 2 };   // px S3: Easy 8 -> 12 (S48 floor vs Easy, data/s3-tune)

@@ -89,6 +89,31 @@ namespace CriticalMass.Runtime.Hud.Player
         /// <summary>One frame: events since the last frame, then every piece's animation and placement.</summary>
         /// <param name="head">the world's event head, passed in by GameHud (the one allowed reader of the event ring here,
         /// WorldReactionsTests.NoNewReaderOfWorldEventsOutsideTheBus)</param>
+        /// <summary>Within this of an enemy (any class's reach, 2.3 u, plus a step) the fight is on.</summary>
+        public const double EngageReach = 3.0;
+
+        /// <summary>
+        /// Review fix round 3 (pass-3 defect 2: the prompt stack was still up through the FIRST swing, PxFight began at the
+        /// first hit): I am in a fight from my attack press (a swing winding up), or while a living enemy is within reach of
+        /// me, or an enemy winding up a swing is that close. Read only.
+        /// </summary>
+        public static bool Engaged(World w, int me)
+        {
+            if (w == null || me < 0 || me >= w.ActorCount || !w.Actors[me].Alive) return false;
+            if (w.Actors[me].SwingPending) return true;
+            CriticalMass.Sim.Config.TeamId team = w.Actors[me].Team;
+            double mx = w.X[me], mz = w.Z[me], r2 = EngageReach * EngageReach;
+            for (int i = 0; i < w.ActorCount; i++)
+            {
+                if (i == me) continue;
+                Actor a = w.Actors[i];
+                if (!a.Alive || a.Team == team) continue;
+                double dx = w.X[i] - mx, dz = w.Z[i] - mz;
+                if (dx * dx + dz * dz <= r2) return true;
+            }
+            return false;
+        }
+
         public void Tick(World w, HudState s, double alpha, UnityEngine.Camera cam, float scale, float dt, int head)
         {
             if (w == null || cam == null) return;
@@ -97,6 +122,7 @@ namespace CriticalMass.Runtime.Hud.Player
             _critWorld = w;
             _critMe = me;
             _critAlpha = alpha;
+            if (Engaged(w, me)) PxFight.Mark();   // review fix round 3: the fight starts before the first hit lands
             if (!ReferenceEquals(w, _world) || w.Epoch != _epoch)
             {
                 _world = w;
@@ -176,7 +202,7 @@ namespace CriticalMass.Runtime.Hud.Player
                     if (e.B == me && e.A != me) Tags.OnBlocked(w, e.A, (int)e.Value, e.X, e.Z, e.Radius);
                     else if (e.A == me && e.B != me)
                     {
-                        Tags.OnDefended(w, me, e.B, (int)e.Value, e.Radius);
+                        Tags.OnDefended(w, me, e.B, (int)e.Value, e.Radius, e.Tier);
                         if (ActionTags.IsDefence((int)e.Value)) DefendedAt = Time.unscaledTime;
                         PxFight.Mark();
                     }

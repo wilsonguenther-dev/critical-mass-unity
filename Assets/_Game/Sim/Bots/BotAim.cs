@@ -20,6 +20,10 @@ namespace CriticalMass.Sim.Bots
 
         public static bool On(World w) => CombatFeel.On(w) && w.Config.Depth.CombatFeel.BotHumanLimits;
 
+        /// <summary>px DM (lead's call 18): actor id t is a human seat (a person's seat, autopilot or not). Human-limit rules
+        /// whose HumansOnly switch is on apply only in an exchange with one.</summary>
+        public static bool IsHumanSeat(World w, int t) => t >= 0 && t < w.ActorCount && w.Actors[t].IsHuman;
+
         /// <summary>BotsThink, once per tick: every actor's position into the ring slot of this tick.</summary>
         public static void Record(World w, BotsState st)
         {
