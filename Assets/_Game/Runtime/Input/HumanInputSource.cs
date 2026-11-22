@@ -259,7 +259,7 @@ namespace CriticalMass.Runtime.Input
             }
             // b14: number keys 1 to 7 pick a Builder tool directly (BuilderTool order); ignored for every other class.
             Keyboard kbd = Keyboard.current;
-            if (kbd != null && !Online.OnlineChatHud.EatsKeys && InputContext.DigSwitchOwnsWheel(InputContext.Current))
+            if (kbd != null && !Online.OnlineChatHud.EatsKeys && !CriticalMass.Runtime.Hud.Mechanics.StationPanel.IsOpen && InputContext.DigSwitchOwnsWheel(InputContext.Current))
             {
                 if (kbd.digit1Key.wasPressedThisFrame) State.PickBuilderTool(0);
                 else if (kbd.digit2Key.wasPressedThisFrame) State.PickBuilderTool(1);
@@ -397,7 +397,7 @@ namespace CriticalMass.Runtime.Input
 
         readonly AimAssistBrain _assist = new AimAssistBrain();
         AimCandidate[] _cand = new AimCandidate[64];
-        double _lastAssistTime = -1;
+        double _lastAssistTime = -1, _lastRawX, _lastRawZ, _lastRawInputAt = -100;
         bool _levelsRead;
         readonly AimHelpLevel[] _levels = new AimHelpLevel[3];
         // Item 2 (keys): the ability key is being held to choose a distance; released and waiting for the next step.
@@ -462,6 +462,13 @@ namespace CriticalMass.Runtime.Input
             if (!_levelsRead) ReadLevels();
             AimHelpLevel level = _levels[(int)dev];
             AimAssistTuning tun = AimAssistTuning.For(level);
+            // The idle pull only follows real input (Idle rule for lane S2: an untouched aim stays constant).
+            double rdx = State.AimX - _lastRawX, rdz = State.AimZ - _lastRawZ;
+            double tnow = Time.unscaledTimeAsDouble;
+            if (State.MoveHeld || rdx * rdx + rdz * rdz > AimAssistTunables.IdleInputMoveUnits * AimAssistTunables.IdleInputMoveUnits) _lastRawInputAt = tnow;
+            _lastRawX = State.AimX;
+            _lastRawZ = State.AimZ;
+            if (tnow - _lastRawInputAt > AimAssistTunables.IdlePullNeedsInputSeconds) tun.IdleBend = 0;
             GameConfig cfg = w.Config;
             Actor self = w.Actors[me];
             double px = w.X[me], pz = w.Z[me];

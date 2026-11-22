@@ -37,6 +37,10 @@ namespace CriticalMass.Runtime.Input
         /// <summary>Share turned outside attacks (a gentle pull, the facing stays the player's own). Third person: 0 (the
         /// auto-follow camera follows the facing while standing, so an idle pull would steer the camera).</summary>
         public const double IdleBendLow = 0.0, IdleBendHigh = 0.2;
+        /// <summary>The idle pull only acts within this long (s) of real input (a move held, or the raw aim moving more than
+        /// IdleInputMoveUnits): an idle player's aim never drifts on its own, so the sim's idle rule (lane S2 counts aim
+        /// changes) is never fooled by the assist.</summary>
+        public const double IdlePullNeedsInputSeconds = 1.0, IdleInputMoveUnits = 0.05;
         /// <summary>After the attack ends (button up and the wind-up resolved) the bend holds this long (s).</summary>
         public const double StickySeconds = 0.4;
         /// <summary>The bots' own lead (CombatFeelConfig.BotLeadSeconds): the aim goes to position + velocity x lead.</summary>
