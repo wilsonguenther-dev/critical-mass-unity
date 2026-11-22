@@ -156,6 +156,64 @@ namespace CriticalMass.Runtime.Tests.PlayerExperience
         }
 
         [Test]
+        public void NothingScoresOnTheRangeAndTheDuelSaysHowItIsWon()
+        {
+            MatchSetupChoice c = PlayModes.RangeChoice(MatchSetupChoice.Default, ClassId.Warrior, ClassId.Farmer, RangeDummy.Standing, BotDifficulty.Normal);
+            World w = Build(c, out GameConfig cfg);
+            Assert.AreEqual(0, w.Config.Hill.Radius, "the range has no hill to hold");
+            int ticks = (int)(60 * cfg.SimHz);   // a minute: the review saw 10 hill points 20 s in
+            for (int i = 0; i < ticks; i++) SimStep.Step(w);
+            Assert.AreEqual(0, w.Match.HillSeconds.Azure, 1e-9, "no hill time for me");
+            Assert.AreEqual(0, w.Match.HillSeconds.Crimson, 1e-9, "none for the dummy");
+            Assert.AreEqual(HillState.Neutral, w.Match.HillState);
+            Assert.AreEqual(MatchPhase.Playing, w.Match.Phase, "and nothing ends it");
+
+            MatchSetupChoice d = PlayModes.DuelChoice(MatchSetupChoice.Default, ClassId.Warrior, ClassId.Farmer, BotDifficulty.Normal);
+            World dw = Build(d, out GameConfig dcfg);
+            Assert.Greater(dw.Config.Hill.Radius, 0, "a duel keeps the hill: it is how a duel is won");
+            StringAssert.Contains("3:00", VersusSetup.HowToWin(MatchMode.Duel));
+            StringAssert.Contains("hill", VersusSetup.HowToWin(MatchMode.Duel));
+            StringAssert.Contains("No knock-out limit", VersusSetup.HowToWin(MatchMode.Duel));
+            StringAssert.Contains("NOTHING SCORES", VersusSetup.HowToWin(MatchMode.Range));
+            var go = new GameObject("Px How Test");
+            try
+            {
+                VersusSetup v = go.AddComponent<VersusSetup>();
+                v.Bind(MatchMode.Duel);
+                Assert.AreEqual(VersusSetup.HowToWin(MatchMode.Duel), v.HowLine, "the duel screen says it");
+                v.Bind(MatchMode.Range);
+                Assert.AreEqual(VersusSetup.HowToWin(MatchMode.Range), v.HowLine);
+            }
+            finally
+            {
+                Object.DestroyImmediate(go);
+            }
+        }
+
+        [Test]
+        public void EveryStarterCardShowsItsNameItsLineAndThreeCarryTheRecommendedMark()
+        {
+            var go = new GameObject("Px Starter Cards Test");
+            try
+            {
+                StarterPick p = go.AddComponent<StarterPick>();
+                p.EnsureBuilt();
+                foreach (ClassId c in StarterPick.Order)
+                {
+                    Assert.IsFalse(string.IsNullOrEmpty(p.CardTitle(c)), c + ": a title");
+                    Assert.IsFalse(string.IsNullOrEmpty(p.CardLine(c)), c + ": one line on what you do");
+                    Assert.AreEqual(StarterPick.Does(c), p.CardLine(c));
+                }
+                Assert.AreEqual(3, p.RecommendedMarks, "three RECOMMENDED marks");
+                foreach (ClassId c in new[] { ClassId.Farmer, ClassId.Warrior, ClassId.Miner }) Assert.IsTrue(p.IsRecommended(c), c + " is marked");
+            }
+            finally
+            {
+                Object.DestroyImmediate(go);
+            }
+        }
+
+        [Test]
         public void OtherModesKeepTheirRulesBitForBit()
         {
             foreach (MatchMode m in new[] { MatchMode.Custom, MatchMode.Quick, MatchMode.FullBattle, MatchMode.Training, MatchMode.Practice, MatchMode.Spectate, MatchMode.Demo })
@@ -168,6 +226,7 @@ namespace CriticalMass.Runtime.Tests.PlayerExperience
                 Assert.AreEqual(a.PassiveBotSeconds, b.PassiveBotSeconds, m.ToString());
                 Assert.AreEqual(0, b.OnlyClassPlusOne, m + ": the roster mix is untouched");
                 Assert.IsFalse(b.NoKaiju, m + ": the Kaiju still hatches");
+                Assert.IsFalse(b.NoHill, m + ": the hill still scores");
                 Assert.AreEqual(c.TeamSize, PlayModes.Normalize(c).TeamSize, m + ": Normalize leaves it alone");
             }
         }

@@ -221,7 +221,7 @@ namespace CriticalMass.Runtime.Menus
                 case MatchMode.Practice: return "No pressure: the bots never target you. Learn the hill, the egg and your class.";
                 case MatchMode.Training: return "Follow " + Hud.MascotGuide.MascotName + ". One step at a time, then a real fight.";
                 case MatchMode.Duel: return "One on one on the real map. Knock them off the hill: most hill time at 3:00 wins.";
-                case MatchMode.Range: return "Hit the dummy, try every button, switch class at respawn. Nothing here can make you lose.";
+                case MatchMode.Range: return "Hit the dummy, try every button, switch class at respawn. Nothing scores and nothing here can make you lose.";
                 default: return "Hold the hill with more fighters than they have. Feed the egg and the Kaiju fights for you.";
             }
         }

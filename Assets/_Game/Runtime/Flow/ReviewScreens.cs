@@ -73,12 +73,23 @@ namespace CriticalMass.Runtime.Flow
             return true;
         }
 
+        /// <summary>The standalone copies' canvas order: above the HUD and every overlay.</summary>
+        public const int StandaloneSortingOrder = 32000;
+
         static T Standalone<T>() where T : FlowScreen
         {
             var go = GameObject.Find("Px Review Screens") ?? new GameObject("Px Review Screens");
             T s = go.GetComponent<T>();
             if (s == null) s = go.AddComponent<T>();
             s.EnsureBuilt();
+            // pass 2 review: the match HUD showed through. A screen-space-camera canvas always draws under overlay canvases
+            // (the HUD), so the standalone copy goes to an overlay canvas above everything; its wash is opaque.
+            if (s.Canvas != null)
+            {
+                s.Canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+                s.Canvas.overrideSorting = true;
+                s.Canvas.sortingOrder = StandaloneSortingOrder;
+            }
             return s;
         }
     }
