@@ -37,6 +37,9 @@ namespace CriticalMass.Runtime.Camera
     /// </summary>
     public sealed class CameraFollow
     {
+        /// <summary>Lane C fix round: the most the aim lean moves the follow goal (u).</summary>
+        public const double AimLeanMax = 0.35;
+
         /// <summary>Screen-up direction on the sim ground (HumanInputState basis, yaw 45: (-1, -1) / sqrt 2).</summary>
         private readonly double _upX, _upZ;
 
@@ -101,8 +104,13 @@ namespace CriticalMass.Runtime.Camera
             double dz = vz * CameraSpring.LookAheadSeconds;
             if (f.HasAim && !f.Override && !f.SuppressAim)
             {
-                dx += (f.AimX - hx) * GameplayCamera.AimLookAheadGain;
-                dz += (f.AimZ - hz) * GameplayCamera.AimLookAheadGain;
+                // lane C fix round (review defect 3): the aim lean is capped at AimLeanMax (u) so a swing never drifts the
+                // view toward the target (0.35 u = about 26 px at the top-down rig, 1080p).
+                double ax = (f.AimX - hx) * GameplayCamera.AimLookAheadGain, az = (f.AimZ - hz) * GameplayCamera.AimLookAheadGain;
+                double al = Math.Sqrt(ax * ax + az * az);
+                if (al > AimLeanMax) { ax *= AimLeanMax / al; az *= AimLeanMax / al; }
+                dx += ax;
+                dz += az;
             }
             if (f.Override) dx = dz = 0;
             double dl = Math.Sqrt(dx * dx + dz * dz);

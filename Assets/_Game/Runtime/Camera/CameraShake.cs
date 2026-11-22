@@ -34,13 +34,15 @@ namespace CriticalMass.Runtime.Camera
 
         // ---- px lane C (2026-11-22): the directional HIT KICK, separate from the accessibility shake slider.
         Vector3 _kickVec;
-        float _kickAt = -10f, _kickU;
+        float _kickAge = 10f, _kickU;
         /// <summary>The kick offset applied this frame (tests, captures) and the size of the last kick requested (u).</summary>
         public static Vector3 KickApplied => _instance != null ? _instance._kickNow : Vector3.zero;
         public static float LastKickU => _instance != null ? _instance._kickU : 0f;
         Vector3 _kickNow;
         /// <summary>Kicks requested (also counted when reduce motion zeroes them: tests).</summary>
-        public static int KickRequests;
+        public static int KickRequests, KickRequestsApplied;
+        /// <summary>Rendered frames that carried a kick offset (tests, the Editor review: 0 means it never reached the lens).</summary>
+        public static int KickFrames;
 
         /// <summary>
         /// px lane C: a small directional camera impulse for a hit by me, on me, my kill and my death. Position only (the aim
@@ -59,8 +61,7 @@ namespace CriticalMass.Runtime.Camera
             if (cam == null) return 0f;
             double dist = FocusDistance();
             float u = CriticalMass.Runtime.View.Anim.HitFeelTuning.KickU(kind, dist, cam.fieldOfView, scale);
-            float now = Time.unscaledTime;
-            float left = _instance._kickU * CriticalMass.Runtime.View.Anim.HitFeelTuning.KickEnvelope(now - _instance._kickAt);
+            float left = _instance._kickU * CriticalMass.Runtime.View.Anim.HitFeelTuning.KickEnvelope(_instance._kickAge);
             if (u < left) return 0f;   // a bigger kick is still running
             Transform tr = cam.transform;
             Vector3 fwd = Vector3.ProjectOnPlane(tr.forward, Vector3.up);
@@ -72,13 +73,14 @@ namespace CriticalMass.Runtime.Camera
             d.Normalize();
             _instance._kickVec = new Vector3(d.x, d.y, 0f);
             _instance._kickU = u;
-            _instance._kickAt = now;
+            _instance._kickAge = 0f;   // full on the next rendered frame (the impact frame)
+            KickRequestsApplied++;
             CriticalMass.Runtime.Game.PlayerFeedback.Report(CriticalMass.Runtime.Game.FeedbackChannel.CameraKick, victim, u, _instance);
             return u;
         }
 
         // ---- critical hits (lead's call 12): a +2 deg FOV punch, taken off again by Reset like the position offset
-        float _punchAt = -10f, _punchDeg, _fovApplied;
+        float _punchAge = 10f, _punchDeg, _fovApplied;
         UnityEngine.Camera _fovCam;
         /// <summary>The FOV added this frame (tests, captures).</summary>
         public static float FovPunchApplied => _instance != null ? _instance._fovApplied : 0f;
@@ -90,7 +92,7 @@ namespace CriticalMass.Runtime.Camera
             float scale = CriticalMass.Runtime.Menu.GameSettings.HitKickScale;
             if (scale <= 0f) return 0f;
             _instance._punchDeg = deg * Mathf.Min(1f, scale);
-            _instance._punchAt = Time.unscaledTime;
+            _instance._punchAge = 0f;
             return _instance._punchDeg;
         }
 
@@ -146,11 +148,15 @@ namespace CriticalMass.Runtime.Camera
 
         void LateUpdate()
         {
-            float now = Time.unscaledTime;
-            float ke = _kickU > 0f && !FeelGate.ReduceMotion ? CriticalMass.Runtime.View.Anim.HitFeelTuning.KickEnvelope(now - _kickAt) : 0f;
+            // fix round: the kick and the punch age by rendered frames (at most KickMaxFrameStep each), so the impact frame
+            // always carries the full kick and a slow frame or capture never skips it (wall-clock stamps did).
+            float step = Mathf.Min(Mathf.Max(0f, Time.unscaledDeltaTime), CriticalMass.Runtime.View.Anim.HitFeelTuning.KickMaxFrameStep);
+            float ke = _kickU > 0f && !FeelGate.ReduceMotion ? CriticalMass.Runtime.View.Anim.HitFeelTuning.KickEnvelope(_kickAge) : 0f;
+            _kickAge += step;
             if (_trauma > 0f && FeelGate.ShakeScale <= 0f) _trauma = 0f;
             _kickNow = Vector3.zero;
-            float pe = _punchDeg > 0f && !FeelGate.ReduceMotion ? CriticalMass.Runtime.View.Anim.HitFeelTuning.FovPunchEnvelope(now - _punchAt) : 0f;
+            float pe = _punchDeg > 0f && !FeelGate.ReduceMotion ? CriticalMass.Runtime.View.Anim.HitFeelTuning.FovPunchEnvelope(_punchAge) : 0f;
+            _punchAge += step;
             if (_trauma <= 0f && ke <= 0f && pe <= 0f) return;
             UnityEngine.Camera cam = UnityEngine.Camera.main;
             if (cam == null) return;
@@ -175,6 +181,7 @@ namespace CriticalMass.Runtime.Camera
                 // px lane C: the hit kick, its own size (never times Limit), along the hit in the screen plane.
                 _kickNow = (tr.right * _kickVec.x + tr.up * _kickVec.y) * (_kickU * ke);
                 off += _kickNow;
+                KickFrames++;
             }
             tr.position += off;
             _shaken = tr;
