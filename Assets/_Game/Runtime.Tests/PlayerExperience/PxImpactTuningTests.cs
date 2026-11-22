@@ -387,6 +387,23 @@ namespace CriticalMass.Runtime.Tests
             Assert.Greater(HitFeelTuning.PredictTimeout, 1.0 / 30.0, "longer than one sim tick, so an accepted press is not aborted");
         }
 
+        /// <summary>Fix round 6 (advisory 4): the reduce-flashing flash (the default) is clearly gentler than the intense one
+        /// (at most 30% of its unshaded share, 60% of its length) and still visible (share >= 0.2, >= 4 frames at 60 fps).</summary>
+        [Test]
+        public void TheReducedFlashIsGentlerButStillVisible()
+        {
+            UnityEngine.Vector4 safe = HitFeelTuning.HitFlashVector(true), full = HitFeelTuning.HitFlashVector(false);
+            Assert.LessOrEqual(safe.w, 0.3f * full.w + 1e-4f, "dimmer");
+            Assert.GreaterOrEqual(safe.w, 0.2f, "still visible");
+            foreach (bool own in new[] { true, false })
+                foreach (bool third in new[] { true, false })
+                {
+                    double s = HitFeelTuning.FlashSeconds(own, third, true), f = HitFeelTuning.FlashSeconds(own, third, false);
+                    Assert.Less(s, f, "shorter");
+                    Assert.GreaterOrEqual(s, 4 / 60.0 - 1e-9, "at least 4 frames");
+                }
+        }
+
         [Test]
         public void TheTopDownAimLeanIsCappedAndUsesTheRawAim()
         {

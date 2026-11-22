@@ -37,7 +37,7 @@ namespace CriticalMass.Runtime.View.Anim
         /// reduce flashing 0.45 of the cream (no white frame). Before this the flash only set the albedo colours to white:
         /// the shading bands and time-of-day grade kept a cream fighter almost the same, and a textured model (Warrior /
         /// Builder base map) ignored them entirely, so no flash showed on the victim at 1080p.</summary>
-        public const float FlashShareFull = 0.92f, FlashShareSafe = 0.45f;
+        public const float FlashShareFull = 0.92f, FlashShareSafe = 0.25f;   // round 6: safe 0.45 -> 0.25 (pass 6: only ~11% dimmer than intense)
         public static readonly UnityEngine.Color FlashWhite = new UnityEngine.Color(1f, 0.99f, 0.96f, 1f);
         /// <summary>The `_HitFlash` vector for a flash copy (rgb colour, a share).</summary>
         public static UnityEngine.Vector4 HitFlashVector(bool reduceFlashing)
@@ -46,6 +46,13 @@ namespace CriticalMass.Runtime.View.Anim
             return new UnityEngine.Vector4(c.r, c.g, c.b, reduceFlashing ? FlashShareSafe : FlashShareFull);
         }
         public static double FlashSeconds(bool own, bool thirdPerson) => own && thirdPerson ? FlashOwn3PSeconds : FlashSeconds(own);
+        /// <summary>Fix round 6 (advisory 4): under reduce flashing (the default) the flash is also SHORTER: 60% of the
+        /// intense length (own 72 ms, other 60 ms, third-person own 108 ms: still 4-6 frames at 60 fps, so it reads).</summary>
+        public const double FlashSafeLengthShare = 0.6;
+        /// <summary>Fix round 6: the share of the safe strength the reduce-flashing copy moves its albedo toward the cream.</summary>
+        public const float FlashSafeColourShare = 0.6f;
+        public static double FlashSeconds(bool own, bool thirdPerson, bool reduceFlashing) =>
+            FlashSeconds(own, thirdPerson) * (reduceFlashing ? FlashSafeLengthShare : 1.0);
         /// <summary>A new flash may start on a victim whose last flash began `sinceLast` wall seconds ago.</summary>
         public static bool FlashAllowed(double sinceLast) => !(sinceLast < FlashMinGapSeconds);
         public static double MaxFlashesPerSecond => 1.0 / FlashMinGapSeconds;

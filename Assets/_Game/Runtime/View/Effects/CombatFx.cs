@@ -137,7 +137,7 @@ namespace CriticalMass.Runtime.View.Effects
         /// <summary>px lane C: flash length (sim s) for an own-hit or other flash (HitFeelTuning: 120 / 100 ms wall).</summary>
         public double FlashSecondsFor(bool own)
         {
-            double wall = HitFeelTuning.FlashSeconds(own, CriticalMass.Runtime.Camera.GroundView.PlayActive);
+            double wall = HitFeelTuning.FlashSeconds(own, CriticalMass.Runtime.Camera.GroundView.PlayActive, FeelGate.ReduceFlashing);
             return _scene != null ? _scene.S(wall) : wall * 2;
         }
 
@@ -865,7 +865,9 @@ namespace CriticalMass.Runtime.View.Effects
             if (cache.TryGetValue(source, out Material m)) return m;
             m = new Material(source) { name = source.name + (own ? " (Tint)" : " (Tint other)") };
             Color cream = HitFeelTuning.FlashCream;
-            float k = HitFeelTuning.FlashStrength(true, own);
+            // fix round 6 (advisory 4): the albedo moves only FlashSafeColourShare of the safe strength toward the cream (the
+            // unshaded _HitFlash term carries the pulse), so the reduced flash is clearly gentler than the intense one
+            float k = HitFeelTuning.FlashStrength(true, own) * HitFeelTuning.FlashSafeColourShare;
             foreach (string p in FlashColours)
                 if (m.HasProperty(p)) m.SetColor(p, Color.Lerp(m.GetColor(p), cream, k));
             // a solid, team-neutral pulse: flatten the shading toward the cream and light the rim in it (no white frame)
