@@ -289,9 +289,15 @@ namespace CriticalMass.Runtime.PlayTests
             yield return Capture("p2-chat-0-match");
 
             // quick-chat wheel: hold D-pad right
-            InputSystem.QueueStateEvent(pad, new GamepadState().WithButton(GamepadButton.DpadRight));
+            InputSystem.QueueStateEvent(pad, new GamepadState());
+            for (int f = 0; f < 3; f++) yield return null;   // the pad becomes the active device first
             float h0 = Time.realtimeSinceStartup;
-            while (Time.realtimeSinceStartup - h0 < OnlineChatHud.HoldSeconds + 0.25f) yield return null;
+            while (Time.realtimeSinceStartup - h0 < 2f && !OnlineChatHud.WheelOpen)
+            {
+                InputSystem.QueueStateEvent(pad, new GamepadState().WithButton(GamepadButton.DpadRight));
+                yield return null;
+            }
+            Log("wheel hold took " + (Time.realtimeSinceStartup - h0).ToString("0.00") + " s (rule " + OnlineChatHud.HoldSeconds + " s)");
             bool wheel = OnlineChatHud.WheelOpen;
             Log("wheel open after hold: " + wheel);
             if (wheel)
