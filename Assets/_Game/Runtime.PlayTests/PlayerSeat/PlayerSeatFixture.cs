@@ -224,6 +224,55 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
             return false;
         }
 
+        /// <summary>The latest shown entry of channel (actor or any) since cursor.</summary>
+        protected bool LedgerLast(FeedbackChannel channel, int actor, int cursor, out FeedbackEntry entry)
+        {
+            entry = default;
+            bool any = false;
+            for (int i = Math.Max(cursor, PlayerFeedback.Head - PlayerFeedback.Capacity); i < PlayerFeedback.Head; i++)
+            {
+                FeedbackEntry e = PlayerFeedback.At(i);
+                if (e.Channel != channel || (actor >= 0 && e.Actor != actor) || !SourceShown(e.Source)) continue;
+                entry = e;
+                any = true;
+            }
+            return any;
+        }
+
+        /// <summary>The largest value of a shown channel entry since cursor (0 when none).</summary>
+        protected static double LedgerMax(FeedbackChannel channel, int cursor)
+        {
+            double m = 0;
+            for (int i = Math.Max(cursor, PlayerFeedback.Head - PlayerFeedback.Capacity); i < PlayerFeedback.Head; i++)
+            {
+                FeedbackEntry e = PlayerFeedback.At(i);
+                if (e.Channel == channel && SourceShown(e.Source)) m = Math.Max(m, e.Value);
+            }
+            return m;
+        }
+
+        protected static bool LedgerReason(FeedbackChannel channel, int reason, int cursor)
+        {
+            for (int i = Math.Max(cursor, PlayerFeedback.Head - PlayerFeedback.Capacity); i < PlayerFeedback.Head; i++)
+            {
+                FeedbackEntry e = PlayerFeedback.At(i);
+                if (e.Channel == channel && e.Reason == reason && SourceShown(e.Source)) return true;
+            }
+            return false;
+        }
+
+        /// <summary>Every ledger entry since cursor as channel:actor:value(:reason)(:hidden), for the failure line (at most 30).</summary>
+        protected static string LedgerDump(int cursor)
+        {
+            var parts = new List<string>();
+            for (int i = Math.Max(cursor, PlayerFeedback.Head - PlayerFeedback.Capacity); i < PlayerFeedback.Head && parts.Count < 30; i++)
+            {
+                FeedbackEntry e = PlayerFeedback.At(i);
+                parts.Add(e.Channel + ":" + e.Actor + ":" + e.Value.ToString("0.##") + (e.Reason != 0 ? ":r" + e.Reason : "") + (SourceShown(e.Source) ? "" : ":hidden"));
+            }
+            return parts.Count == 0 ? "ledger empty since the hit" : string.Join(" ", parts);
+        }
+
         protected int LedgerCount(FeedbackChannel channel, int actor, int cursor)
         {
             int n = 0;

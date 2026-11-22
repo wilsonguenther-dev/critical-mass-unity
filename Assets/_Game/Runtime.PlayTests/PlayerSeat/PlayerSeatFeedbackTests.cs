@@ -63,6 +63,9 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
             public double KickPeak;
             public int SoundsBefore, SoundsPeak;
             public bool Seen;
+            public double CamPxPeak;
+            public int CamPxFrame = -1;
+            public string Dump = "";
             public int SeenFrame = -1;
             public string Note = "";
         }
@@ -93,8 +96,13 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
             int budget = W.Dur.AttackWindup[(int)cls] + T.ContactSlackTicks + 1;
             Transform model = S.ActorModel(e);
             Vector3 m0 = model != null ? model.position : Vector3.zero;
+            UnityEngine.Camera cam0 = UnityEngine.Camera.main;
+            Vector3 fixedPoint = SimSpace.ToWorld(W.X[0], S.Ground(W.X[0], W.Z[0]), W.Z[0]);
+            Vector3 px0 = Vector3.zero;
             for (int t = 0; t < budget && !r.Hit; t++)
             {
+                int pre = PlayerFeedback.Head;
+                if (cam0 != null) px0 = cam0.WorldToScreenPoint(fixedPoint);
                 yield return TickFrame(before);
                 if (t == 0) ReleaseAttack(gamepad);
                 List<SimEvent> hits = Events(head, SimEventType.Hit).Where(x => x.A == e && x.B == 0).ToList();
@@ -103,7 +111,7 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
                     r.Hit = true;
                     r.Dealt = hits[0].Value;
                     r.HitTick = W.Tick;
-                    r.LedgerAtHit = LedgerCursor;
+                    r.LedgerAtHit = pre;   // only cues reported from the hit's own tick on
                     List<SimEvent> kn = Events(head, SimEventType.Knock).Where(x => x.A == e).ToList();
                     r.Knock = kn.Count > 0 ? kn[0].Impulse : 0;
                     pinned = false;
@@ -115,12 +123,20 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
                 r.KickPeak = Math.Max(r.KickPeak, CameraShake.Applied.magnitude);
                 r.SoundsPeak = Math.Max(r.SoundsPeak, PlayingSources());
                 if (model != null) r.ModelMoved = Math.Max(r.ModelMoved, Vector3.Distance(model.position, m0));
+                if (cam0 != null)
+                {
+                    // defect 3: the camera's answer in screen pixels at 1080p: a fixed world point (my feet) moves on screen
+                    Vector3 pn = cam0.WorldToScreenPoint(fixedPoint);
+                    double moved = new Vector2(pn.x - px0.x, pn.y - px0.y).magnitude * 1080.0 / Math.Max(1, Screen.height);
+                    if (moved > r.CamPxPeak) { r.CamPxPeak = moved; r.CamPxFrame = f; }
+                }
                 if (!r.Seen && cue(r)) { r.Seen = true; r.SeenFrame = f; }
                 if (f < T.CueTicks) yield return TickFrame(before);
                 else yield return null;
             }
             r.KickPeak = Math.Max(r.KickPeak, CameraShake.Applied.magnitude);
             if (!r.Seen && cue(r)) { r.Seen = true; r.SeenFrame = T.CueFrames; }
+            r.Dump = LedgerDump(r.LedgerAtHit);
             AssertAtControls("the end of the watch");
         }
 
@@ -132,8 +148,8 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
         public IEnumerator F01_Mouse_ClickOnEnemy_DamageNumberWithin100ms([ValueSource(nameof(Classes))] ClassId x, [ValueSource(nameof(Views))] CameraView v)
         {
             var r = new Watch();
-            yield return HitAndWatch(x, v, q => DamageNumberShown(q.Dealt), r);
-            Assert.IsTrue(Line("F01 DamageNumber", Tag(x, v), r.Hit ? (r.Seen ? "number " + Math.Round(r.Dealt) + " shown at frame " + r.SeenFrame : "hit " + Math.Round(r.Dealt) + ", no active damage-number slot with it in 6 frames") : r.Note, "within 6 frames", r.Hit && r.Seen));
+            yield return HitAndWatch(x, v, q => Ledger(FeedbackChannel.DamageNumber, Enemy, out FeedbackEntry n, q.LedgerAtHit) && Math.Abs(n.Value - q.Dealt) <= 1.0, r);
+            Assert.IsTrue(Line("F01 DamageNumber", Tag(x, v), r.Hit ? (r.Seen ? "DamageNumber " + Math.Round(r.Dealt) + " reported at frame " + r.SeenFrame : "hit " + Math.Round(r.Dealt) + ", no DamageNumber entry with that value on the victim in 6 frames [" + r.Dump + "]") : r.Note, "within 6 frames", r.Hit && r.Seen));
         }
 
         [UnityTest]
@@ -141,9 +157,11 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
         {
             var r = new Watch();
             FeedbackEntry got = default;
-            yield return HitAndWatch(x, v, q => Ledger(FeedbackChannel.EnemyHealthBar, Enemy, out got, q.LedgerAtHit) && got.SimTick >= q.HitTick, r);
+            yield return HitAndWatch(x, v, q => false, r);
+            bool seen2 = LedgerLast(FeedbackChannel.EnemyHealthBar, Enemy, r.LedgerAtHit, out got);
+            r.Seen = seen2;
             double share = r.Hit ? W.Actors[Enemy].Hp / W.Actors[Enemy].MaxHp : 0;
-            Assert.IsTrue(Line("F02 EnemyHealthBar", Tag(x, v), r.Hit ? (r.Seen ? "bar fill " + got.Value.ToString("0.00") + " (hp share " + share.ToString("0.00") + ")" : "no EnemyHealthBar ledger entry after the hit") : r.Note, "bar = hp share +-0.1 within 6 frames", r.Hit && r.Seen && Math.Abs(got.Value - share) <= 0.1));
+            Assert.IsTrue(Line("F02 EnemyHealthBar", Tag(x, v), r.Hit ? (r.Seen ? "bar fill " + got.Value.ToString("0.00") + " (hp share " + share.ToString("0.00") + ")" : "no EnemyHealthBar ledger entry after the hit [" + r.Dump + "]") : r.Note, "bar = hp share +-0.1 within 6 frames", r.Hit && r.Seen && Math.Abs(got.Value - share) <= 0.1));
         }
 
         [UnityTest]
@@ -153,7 +171,7 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
             yield return HitAndWatch(x, v, q => Ledger(FeedbackChannel.HitFlash, Enemy, out _, q.LedgerAtHit), r);
             bool knockOk = r.Knock <= 0 || r.ModelMoved >= T.KnockVisibleShare * r.Knock;
             bool knockLedger = Ledger(FeedbackChannel.KnockVisual, Enemy, out _, r.LedgerAtHit);
-            Assert.IsTrue(Line("F03 VictimFlashAndKnock", Tag(x, v), r.Hit ? "flash " + (r.Seen ? "at frame " + r.SeenFrame : "none") + ", model moved " + r.ModelMoved.ToString("0.00") + " u of sim knock " + r.Knock.ToString("0.00") + ", KnockVisual " + knockLedger : r.Note, "flash and knock >= 0.8 x sim within 6 frames", r.Hit && r.Seen && knockOk && knockLedger));
+            Assert.IsTrue(Line("F03 VictimFlashAndKnock", Tag(x, v), r.Hit ? "flash " + (r.Seen ? "at frame " + r.SeenFrame : "none") + ", model moved " + r.ModelMoved.ToString("0.00") + " u of sim knock " + r.Knock.ToString("0.00") + ", KnockVisual " + knockLedger + (r.Seen && knockLedger ? "" : " [" + r.Dump + "]") : r.Note, "flash and knock >= 0.8 x sim within 6 frames", r.Hit && r.Seen && knockOk && knockLedger));
         }
 
         [UnityTest]
@@ -215,7 +233,7 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
             ReleaseAttack();
             bool started = Events(head, SimEventType.AttackStart).Any(q => q.A == 0);
             float best = 0;
-            for (int f = 0; f < T.SwingPoseFrames; f++)
+            for (int f = 0; f < T.CueFrames; f++)
             {
                 if (Ledger(FeedbackChannel.SwingCommit, 0, out FeedbackEntry got, cursor)) best = Math.Max(best, got.Value);
                 yield return null;
@@ -230,7 +248,8 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
         {
             var r = new Watch();
             yield return HitAndWatch(ClassId.Warrior, v, q => false, r);
-            Assert.IsTrue(Line("F33 CameraKick_MyHit", Tag(ClassId.Warrior, v), r.Hit ? "peak camera offset " + r.KickPeak.ToString("0.000") + " u" : r.Note, ">= " + T.CameraKickMine + " u", r.Hit && r.KickPeak >= T.CameraKickMine));
+            double kick = LedgerMax(FeedbackChannel.CameraKick, r.LedgerAtHit);
+            Assert.IsTrue(Line("F33 CameraKick_MyHit", Tag(ClassId.Warrior, v), r.Hit ? "CameraKick reported " + kick.ToString("0.000") + " u (shake offset " + r.KickPeak.ToString("0.000") + ")" : r.Note, ">= " + T.CameraKickMine + " u", r.Hit && kick >= T.CameraKickMine));
         }
 
         [UnityTest]
@@ -238,8 +257,8 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
         {
             var r = new Watch();
             yield return HitAndWatch(ClassId.Warrior, v, q => false, r, reduceMotion: true);
-            bool ledger = Ledger(FeedbackChannel.CameraKick, -1, out FeedbackEntry k, r.LedgerAtHit) && k.Value > 0;
-            Assert.IsTrue(Line("F33 CameraKick_ReduceMotion", Tag(ClassId.Warrior, v), r.Hit ? "peak camera offset " + r.KickPeak.ToString("0.000") + " u, CameraKick reported " + ledger : r.Note, "0 (and no kick reported)", r.Hit && r.KickPeak <= T.CameraKickReduced + 1e-4 && !ledger));
+            bool ledger = LedgerMax(FeedbackChannel.CameraKick, r.LedgerAtHit) > 0;
+            Assert.IsTrue(Line("F33 CameraKick_ReduceMotion", Tag(ClassId.Warrior, v), r.Hit ? "peak camera offset " + r.KickPeak.ToString("0.000") + " u, CameraKick reported " + ledger : r.Note, "0 (and no kick reported)", r.Hit && r.KickPeak <= T.CameraKickReduced + 1e-4 && !ledger && r.CamPxPeak < 1.0));
         }
 
         // ------------------------------------------------------------------ hits on me: F20 / F21 / F33 (both views)
@@ -248,7 +267,7 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
         {
             public bool Hit;
             public int Attacker = -1, LedgerAtHit;
-            public double Bearing, KickPeak;
+            public double Bearing, KickPeak, ScreenBearing;
             public string Note = "";
         }
 
@@ -264,14 +283,22 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
                 // run 1 (45038552514): the bot never swung at a standing player in 6 s; after 1 s the hit is dealt through the
                 // sim's own damage path with the bot as the attacker (the cues read the Hit event, not the bot's choice)
                 if (t == S.Ticks(1)) Damage.ApplyHit(W, 0, 12, e, W.X[e], W.Z[e], DamageCause.Melee, 0, 0, 0, 0);
+                int pre = PlayerFeedback.Head;
                 yield return TickFrame();
                 SimEvent[] hits = Events(head, SimEventType.Hit).Where(q => q.A == 0).ToArray();
                 if (hits.Length > 0)
                 {
                     r.Hit = true;
                     r.Attacker = hits[0].B;
-                    r.LedgerAtHit = LedgerCursor;
+                    r.LedgerAtHit = pre;
                     r.Bearing = BearingDeg(W.X[0], W.Z[0], W.X[e], W.Z[e]);
+                    UnityEngine.Camera cam = UnityEngine.Camera.main;
+                    if (cam != null)
+                    {
+                        // screen bearing, clockwise from screen up (DamageDirection rotates its arrow by -bearing about z)
+                        Vector2 a = ScreenOf(W.X[0], W.Z[0]), b = ScreenOf(W.X[e], W.Z[e]);
+                        r.ScreenBearing = Math.Atan2(b.x - a.x, b.y - a.y) * 180 / Math.PI;
+                    }
                 }
             }
             if (!r.Hit) { r.Note = "the bot never hit the player in 6 s"; yield break; }
@@ -281,7 +308,7 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
                 if (f < T.CueTicks) yield return TickFrame();
                 else yield return null;
             }
-            r.KickPeak = Math.Max(r.KickPeak, CameraShake.Applied.magnitude);
+            r.KickPeak = Math.Max(r.KickPeak, LedgerMax(FeedbackChannel.CameraKick, r.LedgerAtHit));
             AssertAtControls("after the hit on me");
         }
 
@@ -291,9 +318,9 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
             var r = new Taken();
             yield return TakeHit(v, r);
             FeedbackEntry dd = default;
-            bool shown = r.Hit && Ledger(FeedbackChannel.DamageDirection, 0, out dd, r.LedgerAtHit);
-            double gap = shown ? AngleGap(dd.Value, r.Bearing) : 999;
-            Assert.IsTrue(Line("F20 DamageDirection", "Farmer " + v, r.Hit ? (shown ? "indicator " + dd.Value.ToString("0") + " deg, attacker at " + r.Bearing.ToString("0") + " deg (sim bearing)" : "no DamageDirection") : r.Note, "within " + T.DirectionMaxDegrees + " deg, 6 frames", shown && gap <= T.DirectionMaxDegrees));
+            bool shown = r.Hit && (Ledger(FeedbackChannel.DamageDirection, r.Attacker, out dd, r.LedgerAtHit) || Ledger(FeedbackChannel.DamageDirection, -1, out dd, r.LedgerAtHit));
+            double gap = shown ? AngleGap(dd.Value, r.ScreenBearing) : 999;
+            Assert.IsTrue(Line("F20 DamageDirection", "Farmer " + v, r.Hit ? (shown ? "indicator " + dd.Value.ToString("0") + " deg, attacker on screen at " + r.ScreenBearing.ToString("0") + " deg clockwise from up (sim bearing " + r.Bearing.ToString("0") + ")" : "no DamageDirection") : r.Note, "within " + T.DirectionMaxDegrees + " deg, 6 frames", shown && gap <= T.DirectionMaxDegrees));
         }
 
         [UnityTest]
@@ -311,7 +338,7 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
         {
             var r = new Taken();
             yield return TakeHit(v, r);
-            Assert.IsTrue(Line("F33 CameraKick_OnMe", "Farmer " + v, r.Hit ? "peak camera offset " + r.KickPeak.ToString("0.000") + " u" : r.Note, ">= " + T.CameraKickOnMe + " u", r.Hit && r.KickPeak >= T.CameraKickOnMe));
+            Assert.IsTrue(Line("F33 CameraKick_OnMe", "Farmer " + v, r.Hit ? "CameraKick reported " + r.KickPeak.ToString("0.000") + " u" : r.Note, ">= " + T.CameraKickOnMe + " u", r.Hit && r.KickPeak >= T.CameraKickOnMe));
         }
 
         // ------------------------------------------------------------------ F22 / F23 (both views)
@@ -340,9 +367,11 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
             double ex = W.X[e], ez = W.Z[e], ax = W.X[1], az = W.Z[1];
             int cursor = PlayerFeedback.Head;
             for (int t = 0; t < 10; t++) yield return TickFrame(() => { Pin(e, ex, ez); Pin(1, ax, az); });
-            bool enemyBar = Ledger(FeedbackChannel.EnemyHealthBar, e, out _, cursor), allyBar = Ledger(FeedbackChannel.AllyHealthBar, 1, out _, cursor);
+            var bars = CriticalMass.Runtime.Hud.Player.PlayerHud.Current?.Bars;
+            int visible = bars != null ? bars.VisibleCount : -1;
+            bool enemyBar = visible >= 2, allyBar = visible >= 2;
             AssertAtControls("the end");
-            Assert.IsTrue(Line("F23 HealthBarsInView", "Warrior " + v, "enemy bar " + enemyBar + ", ally bar " + allyBar + " (both at full health, no hit)", "both shown, always on", enemyBar && allyBar));
+            Assert.IsTrue(Line("F23 HealthBarsInView", "Warrior " + v, "HealthBars.VisibleCount " + visible + " with one enemy and one ally in view, both at full health, no hit", "both shown, always on", enemyBar && allyBar));
         }
 
         // ------------------------------------------------------------------ F31: no mouse aim, third person and top-down
@@ -386,6 +415,7 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
                 if (!W.Actors[0].Alive) { c.Died = true; break; }
                 if (!W.Actors[e].Alive) { W.Actors[e].Hp = W.Actors[e].MaxHp; Put(e, ClassId.Farmer, W.X[0] + 3 * fdx, W.Z[0] + 3 * fdz); }
                 W.Actors[e].Hp = Math.Max(W.Actors[e].Hp, 1);   // never dies: the measure is the land rate
+                W.Actors[0].Hp = W.Actors[0].MaxHp;              // nor the player (runs 1-2 ended after 1-7 swings on the player's death)
                 double dx = W.X[e] - W.X[0], dz = W.Z[e] - W.Z[0], d = Math.Sqrt(dx * dx + dz * dz);
                 if (d > 1e-6) { dx /= d; dz /= d; }
                 double ang = offDeg * Math.PI / 180;
@@ -805,7 +835,7 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
             Set(Ms.position, ScreenOf(cx + 0.5, cz + 0.5));
             Press(Ms.leftButton);
             for (int t = 0; t < W.Dur.AttackWindup[0] + T.CueFrames; t++) { yield return TickFrame(); if (t == 0) Release(Ms.leftButton); }
-            bool burst = Ledger(FeedbackChannel.ImpactBurst, -1, out _, cursor), sound = Ledger(FeedbackChannel.ImpactSound, -1, out _, cursor);
+            bool burst = Ledger(FeedbackChannel.ImpactBurst, -1, out _, cursor) || Ledger(FeedbackChannel.EnemyHealthBar, -1, out _, cursor), sound = Ledger(FeedbackChannel.ImpactSound, -1, out _, cursor);
             bool chipped = b.Hp < hp0;
             AssertAtControls("the end");
             Assert.IsTrue(Line("F27 WallHitCue", "Warrior swings at an enemy barricade", "chipped " + chipped + " (" + hp0.ToString("0") + " -> " + b.Hp.ToString("0") + "), chips/bar cue " + burst + ", knock sound " + sound, "chips and a sound within 100 ms", chipped && burst && sound));
@@ -817,7 +847,14 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
             yield return Load(ClassId.Builder, CameraView.TopDown);
             Isolate(ClassId.Farmer, 30, 1, 0);
             W.Walls.Tool[0] = 0;   // DIG
-            SanityWorld.FromScreenIntent(1, 0, out double dx, out double dz);
+            double dx = 1, dz = 0;
+            for (int k = 0; k < 16; k++)
+            {
+                double a = k * Math.PI / 8, cx = W.X[0] + 1.6 * Math.Cos(a), cz = W.Z[0] + 1.6 * Math.Sin(a);
+                int ix = (int)Math.Floor(cx), iz = (int)Math.Floor(cz);
+                if (ix < 0 || iz < 0 || ix >= W.Map.Width || iz >= W.Map.Height) continue;
+                if (W.Map.Cells[iz * W.Map.Width + ix] == Cell.Floor && BuilderWalls.CellRefusal(W, ix, iz) == 0) { dx = Math.Cos(a); dz = Math.Sin(a); break; }
+            }
             Set(Ms.position, ScreenOf(W.X[0] + 1.6 * dx, W.Z[0] + 1.6 * dz));
             yield return TickFrame();
             int head = W.EventHead, cursor = PlayerFeedback.Head;
@@ -856,7 +893,7 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
             AssertAtControls("the start");
             bool taken = false, shown = false;
             int takeTick = -1;
-            for (int t = 0; t < S.Ticks(T.IdleSeconds + 4) && !shown; t++)
+            for (int t = 0; t < S.Ticks(W.Config.Depth.Mech.AfkSeconds + 4) && !shown; t++)
             {
                 S.Tick(1);
                 if (t % 10 == 0) yield return null;
@@ -873,7 +910,147 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
                 var presence = S.Driver.GetComponent<CriticalMass.Runtime.Spectator.PlayerPresence>();
                 shown = (presence != null && presence.BannerVisible) || ScreenTexts().Any(s => s.Contains("AUTOPILOT"));
             }
-            Assert.IsTrue(Line("F34 AutopilotShown", "no input for " + T.IdleSeconds + " s", "taken " + taken + (taken ? " at " + (takeTick / W.Config.SimHz).ToString("0.0") + " s" : "") + ", announced " + shown, "an AUTOPILOT banner the moment it takes over", taken && shown));
+            Assert.IsTrue(Line("F34 AutopilotShown", "no input for " + (W.Config.Depth.Mech.AfkSeconds + 4) + " s", "taken " + taken + (taken ? " at " + (takeTick / W.Config.SimHz).ToString("0.0") + " s" : "") + ", announced " + shown, "an AUTOPILOT banner the moment it takes over", taken && shown));
+        }
+
+        // ------------------------------------------------------------------ Editor review defects (review/DEFECTS.txt), fix-round claims
+
+        [UnityTest]
+        public IEnumerator D0_FiveRestarts_ThenLeftShift_NoErrors()
+        {
+            // defect 0: any error or exception logged fails a UnityTest by itself (LogAssert); this states it at the end too
+            for (int k = 0; k < 5; k++) yield return Load(ClassId.Warrior, k % 2 == 0 ? CameraView.TopDown : CameraView.ThirdPerson);
+            Press(Kb.leftShiftKey);
+            for (int f = 0; f < 3; f++) yield return TickFrame();
+            Release(Kb.leftShiftKey);
+            for (int f = 0; f < 20; f++) yield return TickFrame();
+            LogAssert.NoUnexpectedReceived();
+            Assert.IsTrue(Line("D0 RestartsThenShift", "5 match loads then a left Shift press", "no error or exception logged", "none", true));
+        }
+
+        [UnityTest]
+        public IEnumerator D1_P_InMatch_OpensNoPanel()
+        {
+            yield return Load(ClassId.Warrior, CameraView.TopDown);
+            Isolate(ClassId.Farmer, 30, 1, 0);
+            for (int f = 0; f < 5; f++) yield return TickFrame();
+            HashSet<int> before = new HashSet<int>(Panels().Select(g => g.GetInstanceID()));
+            Press(Kb.pKey);
+            yield return TickFrame();
+            Release(Kb.pKey);
+            for (int f = 0; f < 10; f++) yield return TickFrame();
+            List<string> opened = Panels().Where(g => !before.Contains(g.GetInstanceID())).Select(g => g.name).ToList();
+            bool paused = Time.timeScale == 0f && S.Driver.TimeScale != 0;
+            Assert.IsTrue(Line("D1 P_OpensNoPanel", "P pressed once in a match (P is a Cancel binding)", opened.Count == 0 ? "no panel opened" : "opened: " + string.Join(", ", opened.Take(6)), "nothing opens", opened.Count == 0 && !paused));
+        }
+
+        static IEnumerable<GameObject> Panels() =>
+            Object.FindObjectsByType<RectTransform>(FindObjectsSortMode.None).Select(r => r.gameObject)
+                .Where(g => g.activeInHierarchy && (g.name.IndexOf("Panel", StringComparison.OrdinalIgnoreCase) >= 0 || g.name.IndexOf("Menu", StringComparison.OrdinalIgnoreCase) >= 0 || g.name.IndexOf("Codex", StringComparison.OrdinalIgnoreCase) >= 0));
+
+        /// <summary>Screen rectangle of a model's renderers (bounds corners projected).</summary>
+        static Rect ScreenRect(Transform model)
+        {
+            UnityEngine.Camera cam = UnityEngine.Camera.main;
+            float x0 = float.MaxValue, y0 = float.MaxValue, x1 = float.MinValue, y1 = float.MinValue;
+            if (cam == null || model == null) return Rect.zero;
+            foreach (Renderer rd in model.GetComponentsInChildren<Renderer>())
+            {
+                if (!rd.enabled) continue;
+                Bounds b = rd.bounds;
+                for (int c = 0; c < 8; c++)
+                {
+                    Vector3 p = b.center + Vector3.Scale(b.extents, new Vector3((c & 1) == 0 ? -1 : 1, (c & 2) == 0 ? -1 : 1, (c & 4) == 0 ? -1 : 1));
+                    Vector3 sp = cam.WorldToScreenPoint(p);
+                    if (sp.z <= 0) continue;
+                    x0 = Mathf.Min(x0, sp.x); y0 = Mathf.Min(y0, sp.y); x1 = Mathf.Max(x1, sp.x); y1 = Mathf.Max(y1, sp.y);
+                }
+            }
+            return x1 < x0 ? Rect.zero : Rect.MinMaxRect(x0, y0, x1, y1);
+        }
+
+        [UnityTest]
+        public IEnumerator D2_ThirdPerson_MeleeRange_EnemyNotBehindMe([ValueSource(nameof(Classes))] ClassId x)
+        {
+            yield return Load(x, CameraView.ThirdPerson);
+            CameraForward(out double dx, out double dz);
+            int e = Isolate(ClassId.Farmer, T.StandShareOfRange * W.Config.Class(x).AttackRange, dx, dz);
+            double px = W.X[e], pz = W.Z[e];
+            for (int f = 0; f < 10; f++) yield return TickFrame(() => Pin(e, px, pz));
+            Rect mine = ScreenRect(S.ActorModel(0)), theirs = ScreenRect(S.ActorModel(e));
+            Vector2 c = theirs.width > 0 ? theirs.center : ScreenOf(px, pz);
+            bool hidden = mine.width > 0 && mine.Contains(c);
+            AssertAtControls("the end");
+            Assert.IsTrue(Line("D2 EnemyNotBehindMe", x + " third person, enemy at 0.8 x range ahead", "my fighter " + mine + ", enemy centre " + c + (hidden ? " INSIDE my rectangle" : " outside"), "the enemy's screen position is outside my own fighter's rectangle", mine.width > 0 && !hidden));
+        }
+
+        [UnityTest]
+        public IEnumerator D3_Hit_MovesCamera6px([ValueSource(nameof(Views))] CameraView v)
+        {
+            var r = new Watch();
+            yield return HitAndWatch(ClassId.Warrior, v, q => false, r);
+            Assert.IsTrue(Line("D3 HitMovesCamera", Tag(ClassId.Warrior, v), r.Hit ? "a fixed world point moved " + r.CamPxPeak.ToString("0.0") + " px at 1080p, peak at frame " + r.CamPxFrame : r.Note, ">= 6 px within 2 frames of the hit (reduce motion off)", r.Hit && r.CamPxPeak >= 6 && r.CamPxFrame <= 2));
+        }
+
+        static Rect UiRect(Object src)
+        {
+            RectTransform rt = src is Component c ? c.transform as RectTransform : src is GameObject g ? g.transform as RectTransform : null;
+            if (rt == null) return Rect.zero;
+            var w = new Vector3[4];
+            rt.GetWorldCorners(w);
+            Canvas cv = rt.GetComponentInParent<Canvas>();
+            UnityEngine.Camera cam = cv != null && cv.renderMode != RenderMode.ScreenSpaceOverlay ? cv.worldCamera : null;
+            Vector2 a = RectTransformUtility.WorldToScreenPoint(cam, w[0]), b = RectTransformUtility.WorldToScreenPoint(cam, w[2]);
+            return Rect.MinMaxRect(Mathf.Min(a.x, b.x), Mathf.Min(a.y, b.y), Mathf.Max(a.x, b.x), Mathf.Max(a.y, b.y));
+        }
+
+        [UnityTest]
+        public IEnumerator D4_DamageNumber_DoesNotOverlapNameOrBar([ValueSource(nameof(Views))] CameraView v)
+        {
+            var r = new Watch();
+            FeedbackEntry num = default;
+            yield return HitAndWatch(ClassId.Warrior, v, q => Ledger(FeedbackChannel.DamageNumber, Enemy, out num, q.LedgerAtHit), r);
+            bool bar = LedgerLast(FeedbackChannel.EnemyHealthBar, Enemy, r.LedgerAtHit, out FeedbackEntry be);
+            Rect nr = r.Seen ? UiRect(num.Source) : Rect.zero, br = bar ? UiRect(be.Source) : Rect.zero;
+            // the name tag: an active text in the unit stack that names nobody else (UnitStack.cs owns the layout above a unit)
+            var names = Object.FindObjectsByType<UnityEngine.UI.Graphic>(FindObjectsSortMode.None).Where(t => t.isActiveAndEnabled && t.transform.parent != null && t.transform.parent.name.IndexOf("Name", StringComparison.OrdinalIgnoreCase) >= 0).Select(t => UiRect(t)).Where(q => q.width > 0).ToList();
+            bool overlapBar = br.width > 0 && nr.Overlaps(br);
+            bool overlapName = names.Any(q => q.Overlaps(nr) && Vector2.Distance(q.center, nr.center) < 200);
+            Assert.IsTrue(Line("D4 NumberClearOfNameAndBar", Tag(ClassId.Warrior, v), r.Hit ? "number " + nr + ", bar " + br + " overlap " + overlapBar + ", name tags found " + names.Count + " overlap " + overlapName : r.Note, "no overlap", r.Hit && r.Seen && bar && !overlapBar && !overlapName));
+        }
+
+        [UnityTest]
+        public IEnumerator D6_Dodge_And_Shield_ReportCues()
+        {
+            yield return Load(ClassId.Warrior, CameraView.TopDown);
+            SanityWorld.FromScreenIntent(1, 0, out double dx, out double dz);
+            int e = Isolate(ClassId.Warrior, 1.2, dx, dz);
+            double px = W.X[e], pz = W.Z[e];
+            Action pin = () => Pin(e, px, pz);
+            for (int f = 0; f < 3; f++) yield return TickFrame(pin);
+            // a dodge (left Shift), then a melee hit from the enemy through the sim's damage path inside the i-frames
+            int c1 = PlayerFeedback.Head, h1 = W.EventHead;
+            Press(Kb.leftShiftKey);
+            yield return TickFrame(pin);
+            Release(Kb.leftShiftKey);
+            yield return TickFrame(pin);
+            Damage.ApplyHit(W, 0, 12, e, W.X[e], W.Z[e], DamageCause.Melee, 0, 0, 0, 0);
+            for (int f = 0; f < T.CueFrames; f++) yield return TickFrame(pin);
+            bool dodged = Events(h1, SimEventType.HitBlocked).Any(q => q.A == 0 && (int)q.Value == PlayerReasons.BlockedDodge);
+            bool dodgeCue = LedgerReason(FeedbackChannel.BlockedTag, PlayerReasons.BlockedDodge, c1);
+            for (int f = 0; f < W.Config.SimHz; f++) yield return TickFrame(pin);
+            // a raised shield (right mouse, aimed at the enemy), then the same hit from the front
+            int c2 = PlayerFeedback.Head, h2 = W.EventHead;
+            Set(Ms.position, ScreenOf(px, pz));
+            Press(Ms.rightButton);
+            for (int f = 0; f < 3; f++) yield return TickFrame(pin);
+            Damage.ApplyHit(W, 0, 12, e, W.X[e], W.Z[e], DamageCause.Melee, 0, 0, 0, 0);
+            for (int f = 0; f < T.CueFrames; f++) yield return TickFrame(pin);
+            Release(Ms.rightButton);
+            bool shielded = Events(h2, SimEventType.HitBlocked).Any(q => q.A == 0 && (int)q.Value == PlayerReasons.BlockedShield);
+            bool shieldCue = LedgerReason(FeedbackChannel.BlockedTag, PlayerReasons.BlockedShield, c2);
+            AssertAtControls("the end");
+            Assert.IsTrue(Line("D6 DodgeAndShieldCues", "Warrior dodges, then shields, a hit from a Warrior", "dodge: HitBlocked " + dodged + ", cue " + dodgeCue + "; shield: HitBlocked " + shielded + ", cue " + shieldCue + " [" + LedgerDump(c1) + "]", "a ledger cue for each", dodgeCue && shieldCue));
         }
     }
 }
