@@ -225,13 +225,38 @@ namespace CriticalMass.Runtime.View.Anim
 
         // ---- fix round 2 (review pass 2): third person
         /// <summary>Own hit burst in third person: this share of the size, at most this long (s wall), drawn behind the victim.</summary>
-        public const float Burst3PShare = 0.6f;
+        /// <para>Fix round 5 (impact pop): 0.6 behind him read thin (pass 4), full size over him hid him (pass 2): 0.8 of the
+        /// burst, on the NEAR side, beside his body centre toward the attacker's weapon side (ContactSpark3P).</para>
+        public const float Burst3PShare = 0.8f;
         /// <summary>Round 3: the near-side contact spark in third person (u, s wall, spark lines): it marks the impact frame
         /// without covering more than a small part of the victim (0.35 u against a ~1 x 2 u body).</summary>
         public const float NearSpark3PSize = 0.35f;
         public const double NearSpark3PLife = 0.1;
         public const int NearSpark3PLines = 4;
-        public const double Burst3PLife = 0.16;
+        public const double Burst3PLife = 0.2;
+
+        /// <summary>Fix round 5: how far past the burst's own radius its centre sits beside the victim's centre, across the
+        /// view (u): the burst touches his weapon-side edge but never covers his body centre.</summary>
+        public const float Burst3PSideClear = 0.08f;
+
+        /// <summary>
+        /// Fix round 5 (pure; tests): where the third-person contact burst goes. On the victim's camera-near surface at chest
+        /// height (chest + toward the lens x radius), moved across the view (the lens right, flat) to the attacker's weapon
+        /// side (the attacker's right, from hitDir = attacker -> victim) by burst radius + Burst3PSideClear, so the burst's
+        /// edge sits on his side and his body centre stays clear.
+        /// </summary>
+        public static UnityEngine.Vector3 ContactSpark3P(UnityEngine.Vector3 chest, UnityEngine.Vector3 lens, UnityEngine.Vector3 hitDir, float radius, float burstSize)
+        {
+            UnityEngine.Vector3 toLens = lens - chest; toLens.y = 0f;
+            if (toLens.sqrMagnitude < 1e-6f) toLens = -hitDir;
+            toLens.y = 0f;
+            toLens = toLens.sqrMagnitude > 1e-6f ? toLens.normalized : UnityEngine.Vector3.back;
+            UnityEngine.Vector3 across = new UnityEngine.Vector3(toLens.z, 0f, -toLens.x);   // perpendicular to the view, flat
+            UnityEngine.Vector3 d = hitDir; d.y = 0f;
+            UnityEngine.Vector3 weapon = d.sqrMagnitude > 1e-6f ? new UnityEngine.Vector3(d.z, 0f, -d.x) : across;   // attacker's right
+            if (UnityEngine.Vector3.Dot(weapon, across) < 0f) across = -across;
+            return chest + toLens * radius + across * (burstSize * 0.5f + Burst3PSideClear);
+        }
         /// <summary>
         /// Third-person kick multipliers: the kick moves the lens, and a lens translation shifts a point by u / depth, so at the
         /// enemy's chest (about 6 u deep, not the 4.4 u focus) my hit measured 7.5-9.1 px and my kill 12.1 px. These bring them

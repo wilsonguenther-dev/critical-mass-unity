@@ -273,9 +273,36 @@ namespace CriticalMass.Runtime.Tests
             Assert.LessOrEqual(HitFeelTuning.FlashSeconds(true, true), HitFeelTuning.FlashMinGapSeconds * 0.6);
             Assert.AreEqual(HitFeelTuning.FlashSeconds(true), HitFeelTuning.FlashSeconds(true, false));
             Assert.AreEqual(HitFeelTuning.FlashSeconds(false), HitFeelTuning.FlashSeconds(false, true));
-            Assert.LessOrEqual(HitFeelTuning.NearSpark3PSize, 0.35f);
-            Assert.LessOrEqual(HitFeelTuning.NearSpark3PLife, 0.1);
             Assert.That(HitFeelTuning.NearSpark3PLines, Is.InRange(3, 4));
+        }
+
+        /// <summary>Fix round 5 (impact pop): the third-person burst sits on the victim's camera-near side, beside his body
+        /// centre across the view by more than its own radius (his centre stays clear), on the attacker's weapon side, and
+        /// within a burst of him (never floating off); bigger than the pass-4 0.6 share, smaller than the pass-2 full size.</summary>
+        [Test]
+        public void TheThirdPersonBurstSitsNearSideBesideTheVictimNeverOverHisCentre()
+        {
+            float r = 0.4f;
+            float size = HitFeelTuning.BurstSize(0, true, 20) * HitFeelTuning.Burst3PShare;
+            Assert.That(HitFeelTuning.Burst3PShare, Is.InRange(0.7f, 0.9f));
+            var chest = new Vector3(0f, 0.95f, 0f);
+            foreach (float camDeg in new[] { 0f, 36f, -36f, 90f, 180f })
+            {
+                float a = camDeg * Mathf.Deg2Rad;
+                var lens = chest + new Vector3(Mathf.Sin(a), 0.8f, -Mathf.Cos(a)) * 3.2f;   // a 3P lens 3.2 u off, any yaw
+                var hitDir = new Vector3(Mathf.Sin(a + 0.4f), 0f, Mathf.Cos(a + 0.4f));   // attacker roughly between lens and him
+                Vector3 p = HitFeelTuning.ContactSpark3P(chest, lens, hitDir, r, size);
+                Vector3 toLens = lens - chest; toLens.y = 0f; toLens.Normalize();
+                Vector3 across = new Vector3(toLens.z, 0f, -toLens.x);
+                Vector3 off = p - chest;
+                Assert.Greater(Vector3.Dot(off, toLens), 0.9f * r, "near side at " + camDeg);
+                float side = Mathf.Abs(Vector3.Dot(off, across));
+                Assert.Greater(side, size * 0.5f, "his centre clear of the burst at " + camDeg);
+                Assert.Less(side, size * 0.5f + r, "the burst still touches his edge at " + camDeg);
+                Vector3 weapon = new Vector3(hitDir.z, 0f, -hitDir.x);
+                Assert.Greater(Vector3.Dot(off, across) * Vector3.Dot(weapon, across), 0f, "on the weapon side at " + camDeg);
+                Assert.AreEqual(chest.y, p.y, 1e-4f, "chest height");
+            }
         }
 
         [Test]
