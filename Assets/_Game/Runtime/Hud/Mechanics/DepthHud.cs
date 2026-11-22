@@ -525,7 +525,9 @@ namespace CriticalMass.Runtime.Hud.Mechanics
             Objective = id;
             // Integration batch 4: the job line sits on the top of the centre lane; it steps back while the autopilot banner or a
             // big-moment takeover holds the lane (HudZones), and comes back the frame after.
-            bool show = id != ObjectiveId.None && w.Match.Phase != MatchPhase.Ended && !HudZones.Blocked(HudZone.Callout, HudPriority.Tip);   // owner walk 1: lane resident, steps back for any banner
+            // review fix round 2 (pass-2 N4): no carriers-and-hill job line in Duel or the Practice Range (no Kaiju)
+            bool show = id != ObjectiveId.None && w.Match.Phase != MatchPhase.Ended && !HudZones.Blocked(HudZone.Callout, HudPriority.Tip) &&
+                        !HudState.NoKaijuIn(w.Config);   // owner walk 1: lane resident, steps back for any banner
             bool want = show;
             show = StackFade(_obj, want, !HudZones.Blocked(HudZone.Callout, HudPriority.Tip));
             if (show && want) HudText.Set(_objText, View.Mechanics.Objective.Words(id, f.Cls));

@@ -808,8 +808,16 @@ namespace CriticalMass.Runtime.Hud
             // b15 D0: the owner's own Kaiju stands on the hill, so the owner scores nothing; the word says so from each side's
             // point of view (words, not colour alone: brass ink is a second cue)
             // b15 view polish (item 8): that state is now the pill under the hill meter (ApplyKaijuPill); the word stays the hill's.
-            HudText.Set(_hillWord, HillWord(s.Hill));
+            HudText.Set(_hillWord, s.NoHill ? string.Empty : HillWord(s.Hill));
             _hillWord.color = Cream;
+            if (s.NoHill)
+            {
+                // review fix round 2 (pass-2 N4): the range has no hill: no "HILL n/10", no on-hill counts, no pips
+                HudText.Set(_onHillA, string.Empty);
+                HudText.Set(_onHillC, string.Empty);
+                ApplyPips(_pipsA, 0, 0, false, CMTokens.Azure.Color);
+                ApplyPips(_pipsC, 0, 0, false, CMTokens.Crimson.Color);
+            }
             ApplyKaijuPill(s);
         }
 
@@ -1070,6 +1078,9 @@ namespace CriticalMass.Runtime.Hud
             _ground.Watch(w.Map, w.GridVersion);
             if (_mapFog != null) _mapFog.Sync();
             _mapHill.SetFill(s.Hill == HillState.Neutral ? Navy : HillColour(s.Hill));
+            // review fix round 2 (pass-2 N4): no KAIJU on the minimap in a mode without one, no hill where there is none
+            if (_mapEgg.Rt.gameObject.activeSelf == s.NoKaiju) _mapEgg.Rt.gameObject.SetActive(!s.NoKaiju);
+            if (_mapHill.gameObject.activeSelf == s.NoHill) _mapHill.gameObject.SetActive(!s.NoHill);
             bool eggOnMap = !s.Hatched || s.Kaiju == KaijuState.Egg;
             _mapEgg.Set(eggOnMap ? UiIcons.MapEgg : KaijuIcon(s, false), _tier);
             if (s.Hatched) PlaceOnMap(_mapEgg.Rt, w.Kaiju.X, w.Kaiju.Z);
