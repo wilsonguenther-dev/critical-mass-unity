@@ -60,7 +60,7 @@ namespace CriticalMass.Runtime.Camera
             UnityEngine.Camera cam = UnityEngine.Camera.main;
             if (cam == null) return 0f;
             double dist = FocusDistance();
-            float u = CriticalMass.Runtime.View.Anim.HitFeelTuning.KickU(kind, dist, cam.fieldOfView, scale);
+            float u = CriticalMass.Runtime.View.Anim.HitFeelTuning.KickU(kind, dist, cam.fieldOfView, scale, GroundView.PlayActive);
             float left = _instance._kickU * CriticalMass.Runtime.View.Anim.HitFeelTuning.KickEnvelope(_instance._kickAge);
             if (u < left) return 0f;   // a bigger kick is still running
             Transform tr = cam.transform;

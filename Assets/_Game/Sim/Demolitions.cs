@@ -665,7 +665,28 @@ namespace CriticalMass.Sim.Core
             double r = PlayerSeat.Cfg(w).PointBlankRange;
             if (!(r > 0)) return false;
             PlayerSeat.AimDir(w, id, out double fx, out double fz);
-            return PlayerSeat.EnemyInArc(w, id, r, fx, fz) >= 0;
+            if (PlayerSeat.EnemyInArc(w, id, r, fx, fz) >= 0) return true;
+            return PlayerSeat.Cfg(w).PointBlankStructures && StructureInArc(w, id, r, fx, fz);
+        }
+
+        /// <summary>px DM (review defect 9): an active enemy barricade (Builder walls included) whose cell centre is within
+        /// min(maxDist, her pry-bar reach) inside her class arc along (fx, fz): the cells Barricades.DamageBarricadesInArc chips.</summary>
+        static bool StructureInArc(World w, int id, double maxDist, double fx, double fz)
+        {
+            ClassConfig cc = w.Config.Class(w.Actors[id].Cls);
+            double r = maxDist < cc.AttackRange ? maxDist : cc.AttackRange, cosHalf = JsMath.Cos(cc.AttackArcDeg / 2 * System.Math.PI / 180);
+            TeamId team = w.Actors[id].Team;
+            Barricade[] list = w.Barricades;
+            if (list == null) return false;
+            for (int s = 0; s < list.Length; s++)
+            {
+                Barricade b = list[s];
+                if (!b.Active || b.Team == team || b.Hp <= 0) continue;
+                double dx = b.Cx + 0.5 - w.X[id], dz = b.Cz + 0.5 - w.Z[id], d2 = dx * dx + dz * dz;
+                if (d2 > r * r) continue;
+                if (d2 <= 1e-12 || (dx * fx + dz * fz) / System.Math.Sqrt(d2) >= cosHalf - 1e-9) return true;
+            }
+            return false;
         }
 
         /// <summary>

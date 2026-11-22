@@ -38,7 +38,10 @@ namespace CriticalMass.Runtime.Camera
     public sealed class CameraFollow
     {
         /// <summary>Lane C fix round: the most the aim lean moves the follow goal (u).</summary>
-        public const double AimLeanMax = 0.35;
+        /// <para>Fix round 2: 0.35 -> 0.3 u. The review measured 30 px against the 26 px the 0.35 u cap gives at the ground:
+        /// the chest the reviewer reads sits about 1 u nearer the lens, which scales the shift ~1.15x. 0.3 u = 22 px at the
+        /// ground, about 26 px at the chest.</para>
+        public const double AimLeanMax = 0.3;
 
         /// <summary>Screen-up direction on the sim ground (HumanInputState basis, yaw 45: (-1, -1) / sqrt 2).</summary>
         private readonly double _upX, _upZ;

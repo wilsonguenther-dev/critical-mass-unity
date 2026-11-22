@@ -20,7 +20,17 @@ namespace CriticalMass.Runtime.Menus
     {
         readonly List<System.Action> _refresh = new List<System.Action>();
         MenuItem _mine, _enemy, _kind, _start, _back;
-        UnityEngine.UI.Text _title, _line;
+        UnityEngine.UI.Text _title, _line, _how;
+
+        /// <summary>Opaque: nothing of a live match shows through the setup.</summary>
+        protected override float WashAlpha => 1f;
+
+        /// <summary>px lane F (pass 2 review): how the mode is won, said plainly on its setup screen.</summary>
+        public static string HowToWin(MatchMode m) => m == MatchMode.Duel
+            ? "HOW TO WIN: most hill time at 3:00. No knock-out limit: a knock-out keeps them off the hill."
+            : "NOTHING SCORES HERE: no hill points, no clock to beat, nothing to lose.";
+
+        public string HowLine => _how != null ? _how.text : null;
         MatchMode _mode = MatchMode.Duel;
 
         public MatchMode Mode => _mode;
@@ -45,6 +55,9 @@ namespace CriticalMass.Runtime.Menus
         {
             _title = MenuUi.Label(space, "Title", CMTokens.Display, UiScale.TypeDisplay, Cream, TextAnchor.MiddleCenter, 460f, 60f, 1000f, 80f, "DUEL", 4f);
             _line = MenuUi.Label(space, "Line", CMTokens.Ui, UiScale.TypeBody, CMTokens.WithAlpha(Cream, 0.9f), TextAnchor.MiddleCenter, 360f, 150f, 1200f, 40f, "", 2f);
+            _how = MenuUi.Label(space, "How To Win", CMTokens.Ui, UiScale.TypeSmall, Brass, TextAnchor.MiddleCenter, 260f, 186f, 1400f, 32f, "", 2f);
+            _how.horizontalOverflow = HorizontalWrapMode.Wrap;
+            _how.verticalOverflow = VerticalWrapMode.Overflow;
             MenuUi.Panel(space, "Panel", 360f, 220f, 1200f, 560f);
             const float sx = 460f, sw = 1000f, sh = 66f, step = 96f, sy = 280f;
             _mine = Stepper(space, "Mine", sx, sy, sw, sh, "YOUR CLASS", () => FlowWords.ClassName(VersusPrefs.Mine(_mode)),
@@ -87,6 +100,7 @@ namespace CriticalMass.Runtime.Menus
             ModeInfo info = PlayModes.Info(_mode);
             HudText.Set(_title, info.Title);
             HudText.Set(_line, info.Line);
+            if (_how != null) HudText.Set(_how, HowToWin(_mode));
             if (_enemy != null && _enemy.Label != null) HudText.Set(_enemy.Label, _mode == MatchMode.Range ? "DUMMY CLASS" : "ENEMY CLASS");
             if (_kind != null && _kind.Label != null) HudText.Set(_kind.Label, _mode == MatchMode.Range ? "DUMMY" : "ENEMY BOT");
             for (int i = 0; i < _refresh.Count; i++) _refresh[i]();

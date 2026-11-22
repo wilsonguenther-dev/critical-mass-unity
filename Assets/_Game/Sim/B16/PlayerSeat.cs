@@ -283,7 +283,8 @@ namespace CriticalMass.Sim.Core
         {
             if (!Dodge.On(w)) return;
             Actor a = w.Actors[i];
-            if (a.AirLen > 0 || a.StandUp > 0 || a.HitStunTicks > 0 || a.KVx != 0 || a.KVz != 0 || a.SwingPending || (CombatFeel.FeintRecovering(w, i)))
+            if (a.AirLen > 0) Refuse(w, i, PlayerReasons.ButtonDodge, PlayerReasons.RefusedInAir);   // px DM: the HUD says IN THE AIR
+            else if (a.StandUp > 0 || a.HitStunTicks > 0 || a.KVx != 0 || a.KVz != 0 || a.SwingPending || (CombatFeel.FeintRecovering(w, i)))
                 Refuse(w, i, PlayerReasons.ButtonDodge, PlayerReasons.RefusedStaggered);
             else if (a.Carry == CarryKind.Corruption) Refuse(w, i, PlayerReasons.ButtonDodge, PlayerReasons.RefusedCarrying);
             else if (w.Tick < w.Dodges.Ready[i]) Refuse(w, i, PlayerReasons.ButtonDodge, PlayerReasons.RefusedCooldown);

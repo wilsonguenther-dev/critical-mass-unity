@@ -16,7 +16,7 @@ namespace CriticalMass.Sim.Tests
     /// Healer healing, stuck episodes per match (the audit's measure: pressing to move and under 0.4 u in 3 s) with the hot
     /// cells, the longest stagger run of any actor (no stun-lock) and the mean sim cost per tick.
     /// Limits (on): win share within 0.15 of control (WinShare.Judge); top-10 damage share at most 0.45; no class above 0.40 of
-    /// all damage; median stuck episodes per match under 10; longest stagger run at most 0.5 s; Healer healing above control.
+    /// all damage; median stuck episodes per match under 10; longest stagger run at most 0.5 s; Healer healing at least 0.6 x control (the wounded rule cuts it on purpose).
     /// </summary>
     [TestFixture]
     [Category("Slow")]
@@ -212,7 +212,9 @@ namespace CriticalMass.Sim.Tests
             if (MedianI(on.Stuck) >= 5) bad.Add("median stuck episodes " + MedianI(on.Stuck) + " >= 5");
             if (hotMax > 5) bad.Add("a stuck cell holds " + hotMax + " episodes (> 5)");
             if (on.MaxLock / 30.0 > 0.5) bad.Add("longest stagger run " + (on.MaxLock / 30.0).ToString("0.00") + " s > 0.5 s");
-            if (!(on.Healing > off.Healing)) bad.Add("Healer healing not above control");
+            // px DM (slow triage S-a): the wounded rule (S1 [4], WoundedHealShare 0.3) is meant to cut healing on bodies in a fight,
+            // so "above control" is the wrong direction now; measured 0.78 x control (10.6k vs 13.3k a match). Kept: at least 0.6 x.
+            if (!(on.Healing >= 0.6 * off.Healing)) bad.Add("Healer healing under 0.6 x control");
             if (!(on.Kills > 0)) bad.Add("no kills");
             Console.WriteLine("{\"item\":\"b15 balance verdict\",\"fails\":" + bad.Count + ",\"detail\":\"" + string.Join("; ", bad) + "\"}");
             Assert.IsEmpty(bad, string.Join("\n", bad));

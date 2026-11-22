@@ -80,6 +80,9 @@ namespace CriticalMass.Runtime.View.Anim
 
         /// <summary>px lane C: true once per swing, 2 rendered frames after it began, with the attack pose weight then (the
         /// SwingCommit ledger value; ActorViews reports it while the model is drawn).</summary>
+        /// <summary>Fix round 2: the attack pose weight drawn this frame when a swing clip is playing (0 otherwise).</summary>
+        public float SwingWeightNow => _kind == 1 && _actClip != null ? _lastActW : 0f;
+
         public bool TakeSwingCommit(out float weight)
         {
             weight = _commitW;

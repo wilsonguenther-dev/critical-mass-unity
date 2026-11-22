@@ -363,6 +363,8 @@ namespace CriticalMass.Sim.Core
             Knock.Dir(w, target, srcX, srcZ, JsMath.Cos(src.SwingFacing), JsMath.Sin(src.SwingFacing), out double dx, out double dz);
             int stun = StaggerFor(w, target, amount, source, out bool armoured, out bool immune);
             if (f.StrikeStaggers != null && (int)src.Cls < f.StrikeStaggers.Length && !f.StrikeStaggers[(int)src.Cls]) stun = 0; // b16: this class's hits do not stagger
+            // px DM (review defect 6): a hit the Warrior's raised shield cuts (frontal) is BLOCKED, not a stagger
+            if (stun > 0 && t.Cls == ClassId.Warrior && t.AbilityActive > 0 && PlayerSeat.On(w) && PlayerSeat.Cfg(w).ShieldStopsStagger && Damage.IsFrontal(w, target, srcX, srcZ)) stun = 0;
             bool locked = InLock(s, target, w.Tick);
             bool clipped = locked && !immune && w.Tick + stun >= s.LockStart[target] + Ticks(w, f.StaggerMaxLockSeconds);
             if (stun > 0)

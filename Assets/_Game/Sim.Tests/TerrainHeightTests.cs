@@ -577,12 +577,19 @@ namespace CriticalMass.Sim.Tests
             var az = new double[w.ActorCount];
             var still = new int[w.ActorCount];
             var level = new int[w.ActorCount];
+            var wasAlive = new bool[w.ActorCount];
+            var px0 = new double[w.ActorCount];
+            var pz0 = new double[w.ActorCount];
             double kx = 0, kz = 0;
             int kStill = 0;
             bool kStalled = false;
             for (int t = 0; t < max && w.Match.Phase != MatchPhase.Ended; t++)
             {
-                for (int i = 0; i < w.ActorCount; i++) level[i] = w.Depth.Height != null ? w.Depth.Height.Level[i] : TerrainHeightState.NoLevel;
+                for (int i = 0; i < w.ActorCount; i++)
+                {
+                    level[i] = w.Depth.Height != null ? w.Depth.Height.Level[i] : TerrainHeightState.NoLevel;
+                    wasAlive[i] = w.Actors[i].Alive; px0[i] = w.X[i]; pz0[i] = w.Z[i];
+                }
                 MatchTick.Advance(w, null, scratch);
                 for (int i = 0; i < w.ActorCount; i++)
                 {
@@ -602,7 +609,15 @@ namespace CriticalMass.Sim.Tests
                         if (NearHeight(w.Map, w.X[i], w.Z[i]) && still[i] > arm.MaxStillNearHeight) arm.MaxStillNearHeight = still[i];
                     }
                     if (a.Alive && w.Depth.Height != null && level[i] != TerrainHeightState.NoLevel && w.Depth.Height.Level[i] != TerrainHeightState.NoLevel
-                        && w.Depth.Height.Level[i] - level[i] >= 3) arm.RiseJumps++;
+                        && w.Depth.Height.Level[i] - level[i] >= 3)
+                    {
+                        arm.RiseJumps++;
+                        // px DM (slow triage R3): say which body rose, how, and from where
+                        TestContext.Progress.WriteLine("[terrain rise] " + tag + " seed " + seed + " tick " + w.Tick + " actor " + i + " " + a.Cls + (a.IsHuman ? " (human)" : "")
+                            + ": level " + level[i] + " -> " + w.Depth.Height.Level[i] + ", alive before " + wasAlive[i] + ", from " + px0[i].ToString("0.00") + "," + pz0[i].ToString("0.00")
+                            + " to " + w.X[i].ToString("0.00") + "," + w.Z[i].ToString("0.00") + ", knock v " + a.KVx.ToString("0.00") + "," + a.KVz.ToString("0.00")
+                            + ", air " + a.AirLen + ", stand-up " + a.StandUp + ", lift there " + TerrainHeight.LiftAt(w.Map, JsMath.FloorToInt(w.X[i]), JsMath.FloorToInt(w.Z[i])));
+                    }
                 }
                 if (t % 30 == 0 && !Terraform.PadsReachHill(w.Map)) arm.HillCut++;
                 Kaiju k = w.Kaiju;
