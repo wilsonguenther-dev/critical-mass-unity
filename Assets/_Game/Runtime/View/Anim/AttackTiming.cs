@@ -157,7 +157,13 @@ namespace CriticalMass.Runtime.View.Anim
         /// Estimated extreme (contact minus StrikeClipSeconds) when a clip cannot be measured; the ease into the extreme
         /// (at most AnticipationSeconds: 4 sim ticks, 2 frames at the default pace 2) and the strike (one sim tick at 30 Hz).
         /// </summary>
-        public const double StrikeClipSeconds = 0.25, AnticipationSeconds = 4.0 / 30.0, StrikeSeconds = 1.0 / 30.0;
+        /// <para>px lane C (2026-11-22): the strike is HitFeelTuning.StrikeFrames (5) frames of 60 fps, at most
+        /// HitFeelTuning.StrikeMaxShare of the wind-up (was ONE sim tick: the "half motion"); the anticipation ease is
+        /// HitFeelTuning.AnticipationSeconds.</para>
+        public const double StrikeClipSeconds = 0.25, AnticipationSeconds = HitFeelTuning.AnticipationSeconds, StrikeSeconds = HitFeelTuning.StrikeSecondsTarget;
+
+        /// <summary>The strike's length (sim s) for a wind-up W: StrikeSeconds, at most StrikeMaxShare of W.</summary>
+        public static double StrikeFor(double windupSeconds) => Math.Min(StrikeSeconds, windupSeconds * HitFeelTuning.StrikeMaxShare);
 
         /// <summary>The estimated wind-up extreme, clip seconds.</summary>
         public static double Extreme(double contact) => Math.Max(0, contact - StrikeClipSeconds);
@@ -170,12 +176,14 @@ namespace CriticalMass.Runtime.View.Anim
         public static double CraftTime(double age, double contact, double windupSeconds, double extreme = -1)
         {
             double e = extreme >= 0 && extreme <= contact ? extreme : Extreme(contact);
-            double strike = Math.Min(StrikeSeconds, windupSeconds * 0.4), holdEnd = windupSeconds - strike;
+            double strike = StrikeFor(windupSeconds), holdEnd = windupSeconds - strike;
             double ease = Math.Min(AnticipationSeconds, holdEnd);
             if (age <= 0) return 0;
-            if (age < ease) { double s = age / ease; return e * s * s * (3 - 2 * s); }
+            // anticipation: ease out into the wind-up extreme (fast first, so the pose commits at once), then hold it
+            if (age < ease) { double s = age / ease; return e * (1 - (1 - s) * (1 - s)); }
             if (age < holdEnd) return e;
-            return e + (contact - e) * Math.Min(1, (age - holdEnd) / strike);
+            // px lane C: the strike over 4-6 frames, ease-in (the weapon is fastest on the contact frame)
+            return e + (contact - e) * HitFeelTuning.StrikeShape(Math.Min(1, (age - holdEnd) / Math.Max(1e-9, strike)));
         }
 
         static readonly System.Collections.Generic.Dictionary<string, double> _extremes = new System.Collections.Generic.Dictionary<string, double>();
@@ -236,18 +244,20 @@ namespace CriticalMass.Runtime.View.Anim
         /// Envelope weight of a one-shot upper clip: fades in over FadeIn (or half the wind-up), out over the last FadeOut
         /// of its clip time. 0 once the clip has finished.
         /// </summary>
-        public static float Envelope(double age, double clipTime, double length, double windupSeconds)
+        public static float Envelope(double age, double clipTime, double length, double windupSeconds) =>
+            Envelope(age, clipTime, length, windupSeconds, false);
+
+        /// <summary>
+        /// px lane C (2026-11-22): with a wind-up the pose COMMITS at once: ease-out to full over HitFeelTuning.CommitRise
+        /// (0.05 s for the local player: 0.89 at 2 frames of 60 fps; 0.075 s for everyone else: 0.89 at 3 frames). The
+        /// smoothstep over the whole wind-up (26% at a third of it) was the "half motion". The clip time eases out of
+        /// frame 0 into the wind-up extreme (CraftTime), so the snap is into the anticipation pose, not the strike.
+        /// </summary>
+        public static float Envelope(double age, double clipTime, double length, double windupSeconds, bool local)
         {
             if (clipTime >= length - 1e-4) return 0f;
             double a;
-            if (windupSeconds > 1e-9)
-            {
-                // Closer (batch 4): with a wind-up the clip fades in over the whole wind-up, smoothstep (slow at both ends).
-                // A 0.05 s linear fade snapped the two-hand grips (Farmer slice, Miner chop: their first frame is far from
-                // the base pose) so fast that the hand peaked on the press tick, 5 ticks before the hit.
-                double s = Math.Min(1, age / windupSeconds);   // fix/hit-feel-3: back to the whole wind-up (a fast fade-in out-ran the strike)
-                a = s * s * (3 - 2 * s);
-            }
+            if (windupSeconds > 1e-9) a = HitFeelTuning.CommitWeight(age, local);
             else a = Math.Min(1, age / 0.02);
             double b = Math.Min(1, (length - clipTime) / FadeOut);
             return (float)Math.Max(0, Math.Min(a, b));

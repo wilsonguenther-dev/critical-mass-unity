@@ -14,6 +14,10 @@ namespace CriticalMass.Runtime.View.WallDamage
         /// <summary>The newest pulse of kind/phase within radius of (x, z) and younger than maxAge (s). Allocation-free.</summary>
         public static bool Latest(ReactKind kind, byte phase, double x, double z, double radius, double now, double maxAge, out ReactPulse best)
         {
+            // px lane C: the sim's StructureHit event first; once it flows, a hit on a barricade, built wall, breakable or
+            // piece never depends on HP polling (the polled pulse stays the fallback for breaks and older builds).
+            if (StructureHits.Latest(kind, phase, x, z, radius, now, maxAge, out best)) return true;
+            if (StructureHits.EventsSeen && phase == 0 && (kind == ReactKind.Barricade || kind == ReactKind.Wall || kind == ReactKind.Piece)) return false;
             best = default;
             WorldReactions rx = WorldReactions.Current;
             if (rx == null) return false;

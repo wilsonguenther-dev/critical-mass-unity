@@ -1,5 +1,7 @@
 using System;
 using CriticalMass.Runtime.Input;
+using CriticalMass.Runtime.View.Anim;
+using CriticalMass.Sim.Core;
 
 namespace CriticalMass.Runtime.Camera
 {
@@ -23,6 +25,54 @@ namespace CriticalMass.Runtime.Camera
         public double LookRight, LookUp;
         /// <summary>The capture tool's override is on: every rule stands down.</summary>
         public bool Override;
+        /// <summary>px lane C: the local player is in a fight (also read from FightState when the caller does not set it).</summary>
+        public bool InFight;
+    }
+
+    /// <summary>
+    /// px lane C (2026-11-22): "am I in a fight" for the camera (third-person fight framing, the hatch pull). In fight while a
+    /// living enemy stands within HitFeelTuning.FightRange inside +-FightConeDeg of my facing, or I dealt or took damage in
+    /// the last FightMemorySeconds (wall). View only; CombatFx marks the hits and evaluates it once per sim tick.
+    /// </summary>
+    public static class FightState
+    {
+        public static bool InFight { get; private set; }
+        static double _lastCombat = double.NegativeInfinity;
+
+        /// <summary>A hit by me or on me landed now (wall clock).</summary>
+        public static void MarkCombat(double now) => _lastCombat = now;
+
+        public static void Reset()
+        {
+            InFight = false;
+            _lastCombat = double.NegativeInfinity;
+        }
+
+        /// <summary>Re-evaluates the flag for the local seat at wall time now.</summary>
+        public static void Evaluate(World w, double now)
+        {
+            int me = LocalSeat.Actor;
+            InFight = w != null && me < w.ActorCount && w.Actors[me].Alive &&
+                      (now - _lastCombat < HitFeelTuning.FightMemorySeconds || EnemyInFront(w, me, HitFeelTuning.FightRange, HitFeelTuning.FightConeDeg));
+        }
+
+        /// <summary>A living enemy within range of actor me, inside +-coneDeg of its facing (pure on the world).</summary>
+        public static bool EnemyInFront(World w, int me, double range, double coneDeg)
+        {
+            if (w == null || me < 0 || me >= w.ActorCount) return false;
+            Actor a = w.Actors[me];
+            double fx = Math.Cos(a.Facing), fz = Math.Sin(a.Facing), cos = Math.Cos(coneDeg * Math.PI / 180), r2 = range * range;
+            for (int j = 0; j < w.ActorCount; j++)
+            {
+                Actor b = w.Actors[j];
+                if (j == me || !b.Alive || b.Team == a.Team) continue;
+                double dx = w.X[j] - w.X[me], dz = w.Z[j] - w.Z[me], d2 = dx * dx + dz * dz;
+                if (d2 > r2) continue;
+                if (d2 < 1e-6) return true;
+                if ((dx * fx + dz * fz) / Math.Sqrt(d2) >= cos) return true;
+            }
+            return false;
+        }
     }
 
     /// <summary>
@@ -121,8 +171,10 @@ namespace CriticalMass.Runtime.Camera
             else _combatHold = Math.Max(0, _combatHold - dt);
             CombatFraming = f.EnemiesNear >= CombatEnemies || _combatHold > 0;
 
-            // Hatch focus, on sim time.
+            // Hatch focus, on sim time. px lane C: the pull toward the egg must not take the camera while I am in a fight
+            // (FightState: an enemy close in front, or damage dealt or taken in the last 2 s): it shrinks to a hint.
             double hw = f.Hatched ? HatchFocusAt(f.SimTime - f.HatchSimTime) : 0;
+            if (hw > 0 && (f.InFight || FightState.InFight)) hw *= HitFeelTuning.HatchShareInFight;
             HatchFocusWeight = hw;
             double ox = 0, oz = 0;
             if (hw > 0)
