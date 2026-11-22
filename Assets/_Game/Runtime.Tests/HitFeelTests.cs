@@ -72,7 +72,11 @@ namespace CriticalMass.Runtime.Tests
         {
             World w = Swinging(ClassId.Warrior, 4, 2, 1.0, 0.3, out int e);
             Assert.AreEqual(e, HitFeel.SwingTarget(w, 0));
-            Assert.AreEqual(Math.Atan2(0.3, 1.0), HitFeel.Facing(w, 0, 0), 1e-9, "faces the target, not just the press direction");
+            // px lane C (2026-11-22): the body faces the sim's LIVE SwingFacing, never a view-chosen target (a turn toward
+            // an enemy the swing then misses was the lie the owner saw).
+            Assert.AreEqual(0, HitFeel.Facing(w, 0, 0), 1e-9, "faces the live swing direction");
+            w.Actors[0].SwingFacing = 0.25;
+            Assert.AreEqual(0.25, HitFeel.Facing(w, 0, 0), 1e-9, "and follows it when the sim tracks the aim");
 
             World behind = Swinging(ClassId.Warrior, 4, 2, -1.0, 0, out _);
             Assert.AreEqual(-1, HitFeel.SwingTarget(behind, 0), "an enemy behind is not the target");
@@ -202,13 +206,13 @@ namespace CriticalMass.Runtime.Tests
         // ---------------------------------------------------------------- hit-stop and camera
 
         [Test]
-        public void HitStopIsFortyToSeventyMillisecondsAndOffUnderReduceMotion()
+        public void HitStopIsSixtyToOneHundredTenMillisecondsAndOffUnderReduceMotion()
         {
             for (byte t = 0; t <= 2; t++)
             {
                 double s = HitFeel.HoldWallSeconds(t, false);
-                Assert.GreaterOrEqual(s, 0.04);
-                Assert.LessOrEqual(s, 0.07);
+                Assert.GreaterOrEqual(s, 0.06);   // px lane C: 60 / 80 / 110 ms by tier
+                Assert.LessOrEqual(s, 0.11);
                 Assert.AreEqual(0, HitFeel.HoldWallSeconds(t, true));
             }
             Assert.Greater(HitFeel.Nudge(true, false), 0f);
@@ -252,7 +256,7 @@ namespace CriticalMass.Runtime.Tests
         /// before the damage tick, so the hand is fastest on that tick (hit-feel-2's 2-frame snap peaked it 4 to 5 ticks early).
         /// </summary>
         [Test]
-        public void TheWindupHoldsItsExtremeThenStrikesInTheLastTick()
+        public void TheWindupHoldsItsExtremeThenStrikesOverFiveFrames()
         {
             const double hz = 30;
             foreach (ClassId cls in All)
@@ -262,20 +266,23 @@ namespace CriticalMass.Runtime.Tests
                         string clip = ArtMapping.ClassClips(cls).Attack ?? ArtMapping.Attack;
                         double c = ClipFacts.Contact(clip, 0.567f), w = windup / hz;
                         double e = measured >= 0 && measured <= c ? measured : AttackTiming.Extreme(c);
-                        Assert.AreEqual(1.0 / hz, AttackTiming.StrikeSeconds, 1e-12, "the strike is one sim tick");
-                        double holdEnd = w - AttackTiming.StrikeSeconds, ease = Math.Min(AttackTiming.AnticipationSeconds, holdEnd);
+                        // px lane C: the strike is 5 frames of 60 fps (at most 0.4 W), not one sim tick (the "half motion")
+                        Assert.AreEqual(5.0 / 60, AttackTiming.StrikeSeconds, 1e-12, "the strike is five frames");
+                        double strike = AttackTiming.StrikeFor(w);
+                        double holdEnd = w - strike, ease = Math.Min(AttackTiming.AnticipationSeconds, holdEnd);
                         Assert.AreEqual(e, AttackTiming.CraftTime(ease, c, w, measured), 1e-9, $"{cls} W={windup}: at the extreme");
                         Assert.AreEqual(e, AttackTiming.CraftTime(holdEnd, c, w, measured), 1e-9, $"{cls}: extreme held until the strike");
                         Assert.AreEqual(c, AttackTiming.ClipTime(w, c, 2, w, measured), 1e-9, $"{cls}: contact on the damage tick");
                         Assert.AreEqual(c + 0.1, AttackTiming.ClipTime(w + 0.1, c, 2, w, measured), 1e-9, $"{cls}: follow-through at normal speed");
                         // per-tick clip advance: the last wind-up tick (the strike) must move at least as much clip as any
                         // earlier tick's share of the ease, so the hand's fastest tick is the damage tick.
-                        double strikeStep = c - AttackTiming.ClipTime(w - 1 / hz, c, 2, w, measured);
-                        Assert.AreEqual(c - e, strikeStep, 1e-9, $"{cls}: the whole strike is the last tick");
+                        double lastTick = c - AttackTiming.ClipTime(w - 1 / hz, c, 2, w, measured);
+                        double firstTick = AttackTiming.ClipTime(holdEnd + 1 / hz, c, 2, w, measured) - e;
+                        Assert.Greater(lastTick, firstTick, $"{cls}: ease-in, the hand fastest on the damage tick");
                         Assert.AreEqual(0f, AttackTiming.Envelope(0, 0, 2, w), 1e-6f, "fades in from nothing");
                         Assert.Greater(AttackTiming.Envelope(holdEnd, e, 2, w), 0.7f, "mostly in for the strike");
                     }
-            Assert.AreEqual(4.0 / 30 - AttackTiming.StrikeSeconds, HitFeel.SmearDelay(4.0 / 30), 1e-9, "the smear starts with the strike");
+            Assert.AreEqual(4.0 / 30 - AttackTiming.StrikeFor(4.0 / 30), HitFeel.SmearDelay(4.0 / 30), 1e-9, "the smear starts with the strike");
             Assert.AreEqual(0, HitFeel.SmearDelay(0.01), 1e-9);
         }
 
