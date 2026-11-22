@@ -122,6 +122,7 @@ namespace CriticalMass.Runtime.View.Effects
         double _lastHitAt, _lastHitDirX, _lastHitDirZ;
         Vector3 _lastHitP, _lastHitTan;
         uint _lastHitSeed;
+        bool _lastHitThird;
 
         /// <summary>
         /// Critical hits (lead's call 12): on top of the hit SpawnHit just drew, a two-stage burst (the cracked impact frame,
@@ -131,8 +132,9 @@ namespace CriticalMass.Runtime.View.Effects
         public float SpawnCritical(int attacker)
         {
             double t = _lastHitAt;
-            AddBurst(t, _lastHitP, Anim.HitFeelTuning.BurstCritStage1, 4, _lastHitSeed + 11, _lastHitTan, S(Anim.HitFeelTuning.BurstCritLife));
-            AddBurst(t + S(Anim.HitFeelTuning.BurstCritStage2Delay), _lastHitP, Anim.HitFeelTuning.BurstCritStage2, 1, _lastHitSeed + 12, _lastHitTan,
+            float k3 = _lastHitThird ? Anim.HitFeelTuning.Burst3PShare : 1f;   // fix round 2: behind and smaller in third person
+            AddBurst(t, _lastHitP, Anim.HitFeelTuning.BurstCritStage1 * k3, 4, _lastHitSeed + 11, _lastHitTan, S(Anim.HitFeelTuning.BurstCritLife));
+            AddBurst(t + S(Anim.HitFeelTuning.BurstCritStage2Delay), _lastHitP, Anim.HitFeelTuning.BurstCritStage2 * k3, 1, _lastHitSeed + 12, _lastHitTan,
                 S(Anim.HitFeelTuning.BurstCritLife));
             int n = Anim.HitFeelTuning.CritRadialLines;
             for (int k = 0; k < n; k++)
@@ -146,7 +148,7 @@ namespace CriticalMass.Runtime.View.Effects
             for (int i = 0; i < MaxTrails; i++)
                 if (_trails[i].Actor == attacker && _trails[i].Kind < TrailWhiff && _trails[i].Born > born) { born = _trails[i].Born; best = i; }
             if (best >= 0) { _trails[best].Team = Anim.HitFeelTuning.CritTrail; _trails[best].Crit = true; }
-            LastBurstSize = Anim.HitFeelTuning.BurstCritStage2;
+            LastBurstSize = Anim.HitFeelTuning.BurstCritStage2 * k3;
             return LastBurstSize;
         }
         private struct Puff { public double Born, Life; public Vector3 P0, V; public float Size; public Color32 Col; public byte Kind; }
@@ -582,6 +584,19 @@ namespace CriticalMass.Runtime.View.Effects
             float dmg01 = Mathf.Clamp01((float)(e.Value / 45.0));
             byte tier = death ? (byte)2 : e.Tier;
             Vector3 tan = SwingTangent(ref e);
+            // fix round 2 (review pass 2, 1a): in third person my own hit burst covered 30-60% of the enemy at impact. There
+            // it is drawn behind him (his far side from the lens, so his body sits in front of it), smaller and shorter; his
+            // flash and recoil stay the main read.
+            bool third = (e.A == LocalSeat.Actor || e.B == LocalSeat.Actor) && CriticalMass.Runtime.Camera.GroundView.PlayActive;
+            if (third)
+            {
+                UnityEngine.Camera lens = UnityEngine.Camera.main;
+                Vector3 vc = W(e.X, h + 0.95, e.Z);
+                Vector3 away = lens != null ? vc - lens.transform.position : Vector3.zero;
+                away.y = 0f;
+                if (away.sqrMagnitude > 1e-4f) contact = vc + away.normalized * (float)(r + 0.2);
+            }
+            _lastHitThird = third;
             _lastHitAt = t; _lastHitP = contact; _lastHitTan = tan; _lastHitSeed = seed; _lastHitDirX = e.DirX; _lastHitDirZ = e.DirZ;
             // Shape language per tier: light = star burst; heavy = star + slash arc along the swing; critical or finishing =
             // the big cracked impact frame. Kaiju melee adds three claw rakes.
@@ -591,6 +606,11 @@ namespace CriticalMass.Runtime.View.Effects
             bool own = e.Local;
             float size = CriticalMass.Runtime.View.Anim.HitFeelTuning.BurstSize(tier, own, e.Value) + (death ? 0.1f : 0f);
             double life = S(CriticalMass.Runtime.View.Anim.HitFeelTuning.BurstLife(tier, own));
+            if (third)
+            {
+                size *= CriticalMass.Runtime.View.Anim.HitFeelTuning.Burst3PShare;
+                life = Math.Min(life, S(CriticalMass.Runtime.View.Anim.HitFeelTuning.Burst3PLife));
+            }
             byte kind = tier >= 2 ? (byte)4 : own || tier == 1 ? (byte)1 : (byte)0;
             AddBurst(t, contact, size, kind, seed, tan, life);
             LastBurstSize = own ? size : 0f;

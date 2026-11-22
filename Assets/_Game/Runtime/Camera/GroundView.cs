@@ -51,7 +51,8 @@ namespace CriticalMass.Runtime.Camera
         /// <summary>px lane C: fight framing weight 0..1 (eased in HitFeelTuning.StepFight) and the pivot lift at full (u).</summary>
         double _fightW;
         // lane C fix round (defect 2): the side-on duel framing (FightFrame): weight, kept side, target, yaw offset now
-        double _duelW, _duelYawOff;
+        double _duelW, _duelYawOff, _duelYaw, _duelEnemyYaw;
+        bool _duelOn, _duelActive;
         int _duelSide, _duelTarget = -1;
         Vector3 _duelChest;
         /// <summary>The duel framing weight 0..1, the target it frames (-1 none) and the yaw it adds this frame (tests, captures).</summary>
@@ -395,22 +396,28 @@ namespace CriticalMass.Runtime.Camera
         {
             bool reduce = CriticalMass.Runtime.View.Effects.FeelGate.ReduceMotion;
             bool steering = _manual && _sinceLook < FollowCamera.RecenterSeconds;
+            // fix round 2: only a LIVE target inside TargetRange engages; a dead or knocked-away one releases at once
+            // (the camera eases back and is never steered by it again).
             int t = rig.FirstPerson || reduce || steering ? -1 : FightState.Target(w, me, FightFrame.TargetRange);
-            if (t >= 0) _duelTarget = t;
-            bool on = t >= 0;
-            _duelW = snap ? (on ? 1 : 0) : FightFrame.Step(_duelW, on, dt);
-            if (_duelW <= 0) { _duelSide = 0; _duelTarget = -1; _duelYawOff = 0; return; }
-            int j = _duelTarget;
-            if (j < 0 || j >= w.ActorCount || !w.Actors[j].Alive) { _duelYawOff *= 0.9; return; }
+            _duelOn = t >= 0;
+            _duelTarget = t;
+            _duelW = snap ? (_duelOn ? 1 : 0) : FightFrame.Step(_duelW, _duelOn, dt);
+            if (_duelOn) _duelActive = true;
+            if (!_duelOn) return;
             double a = Driver.Alpha;
             double mx = w.PrevX[me] + (w.X[me] - w.PrevX[me]) * a, mz = w.PrevZ[me] + (w.Z[me] - w.PrevZ[me]) * a;
-            double ex = w.PrevX[j] + (w.X[j] - w.PrevX[j]) * a, ez = w.PrevZ[j] + (w.Z[j] - w.PrevZ[j]) * a;
-            double enemyYaw = GroundCamera.YawToward(mx, mz, ex, ez, _yawFollow.Yaw);
-            double want = FightFrame.YawOffset(_yawFollow.Yaw, enemyYaw, ref _duelSide) * Smooth01(_duelW);
-            // smoothed so a target strafing round me never jerks the lens (about 0.12 s)
-            double k = dt > 0 ? 1 - Math.Exp(-dt / 0.12) : 1;
-            _duelYawOff += (want - _duelYawOff) * k;
+            double ex = w.PrevX[t] + (w.X[t] - w.PrevX[t]) * a, ez = w.PrevZ[t] + (w.Z[t] - w.PrevZ[t]) * a;
+            _duelEnemyYaw = GroundCamera.YawToward(mx, mz, ex, ez, _yawFollow.Yaw);
             _duelChest = SimSpace.ToWorld(ex, GroundHeight.At(w.Map, ex, ez) + 1.1, ez);
+        }
+
+        /// <summary>Fix round 2: the drawn yaw for this frame (FightFrame.StepYaw), after the follow yaw has stepped.</summary>
+        double DuelYaw(double follow, double dt)
+        {
+            if (!_duelActive) { _duelYaw = follow; _duelYawOff = 0; _duelSide = 0; return follow; }
+            _duelYaw = FightFrame.StepYaw(_duelYaw, follow, _duelOn, _duelEnemyYaw, ref _duelSide, dt, out _duelYawOff);
+            if (!_duelOn && Math.Abs(_duelYawOff) < 1e-6) { _duelActive = false; _duelSide = 0; }
+            return _duelYaw;
         }
 
         void PlayFollow(World w, int id, double facing, double dt, bool snap, double orbitYaw, double orbitPitch, GroundRig rig, ref double tx, ref double tz)
@@ -456,7 +463,7 @@ namespace CriticalMass.Runtime.Camera
                     if (dt > 0) _follow.SetPitch(_follow.Pitch + (defPitch - _follow.Pitch) * (1 - Math.Exp(-dt / 0.4)), rig.MinPitch, rig.MaxPitch);
                 }
             }
-            _follow.SetYaw(GroundCamera.Normalize(_yawFollow.Yaw + _duelYawOff));
+            _follow.SetYaw(DuelYaw(_yawFollow.Yaw, dt));
             bool held = _input != null && _input.State.MoveHeld;
             _inputYaw = snap ? _follow.Yaw : _latch.Step(held, looked, _follow.Yaw);
             if (!rig.FirstPerson)

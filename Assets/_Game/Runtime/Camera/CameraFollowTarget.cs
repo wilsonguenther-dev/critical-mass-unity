@@ -112,7 +112,8 @@ namespace CriticalMass.Runtime.Camera
                 Override = _override,
             };
             f.HumanY = GroundHeight.At(map, f.HumanX, f.HumanZ);
-            if (_input != null && !Driver.HumanAutopilot && _input.State.HasAim)
+            // fix round 2 (gate F33): under REDUCE MOTION the aim lean is off, so nothing about a hit moves the view.
+            if (_input != null && !Driver.HumanAutopilot && _input.State.HasAim && !CriticalMass.Runtime.View.Effects.FeelGate.ReduceMotion)
             {
                 f.HasAim = true;
                 // lane C fix round (review defect 3): lean toward where the PLAYER points (the raw aim), never toward the
