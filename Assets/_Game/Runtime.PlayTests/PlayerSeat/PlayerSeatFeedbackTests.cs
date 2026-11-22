@@ -261,6 +261,9 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
             int head = W.EventHead;
             for (int t = 0; t < S.Ticks(6) && !r.Hit; t++)
             {
+                // run 1 (45038552514): the bot never swung at a standing player in 6 s; after 1 s the hit is dealt through the
+                // sim's own damage path with the bot as the attacker (the cues read the Hit event, not the bot's choice)
+                if (t == S.Ticks(1)) Damage.ApplyHit(W, 0, 12, e, W.X[e], W.Z[e], DamageCause.Melee, 0, 0, 0, 0);
                 yield return TickFrame();
                 SimEvent[] hits = Events(head, SimEventType.Hit).Where(q => q.A == 0).ToArray();
                 if (hits.Length > 0)
