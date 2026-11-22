@@ -40,6 +40,17 @@ namespace CriticalMass.Runtime.View
         /// so the ring is never buried on the hill and still hides behind walls, bodies and the Kaiju.
         /// </summary>
         public const float Lift = 0.075f;
+        /// <summary>Player-experience lane D: the ring of the enemy a press would hit right now (AimAssist.HittableTarget)
+        /// draws this much larger (a gentle 2 Hz breathe between HittablePulseLow and this, steady under REDUCE MOTION), the
+        /// aim-assist lock target LockScale larger. The shader is unchanged: the quad grows, so radius and stroke grow.</summary>
+        public const float HittableScale = 1.32f, HittablePulseLow = 1.2f, LockScale = 1.12f;
+
+        /// <summary>Quad scale of actor i's ring this frame (pure apart from the clock; tests).</summary>
+        public static float RingScale(int i, int hittable, int lockTarget, float time, bool calm)
+        {
+            if (i == hittable) return calm ? HittableScale : Mathf.Lerp(HittablePulseLow, HittableScale, 0.5f + 0.5f * Mathf.Sin(time * Mathf.PI * 4f));
+            return i == lockTarget ? LockScale : 1f;
+        }
         /// <summary>The local player's actor id (World.CreateWorld puts the human first).</summary>
         public const int SelfId = 0;
 
@@ -206,6 +217,9 @@ namespace CriticalMass.Runtime.View
             float tickAngle = up.sqrMagnitude > 1e-8f ? Mathf.Atan2(up.y, up.x) : 0f;
             TeamId selfTeam = w.ActorCount > SelfId ? w.Actors[SelfId].Team : TeamId.Azure;
             int visible = 0;
+            int hittable = CriticalMass.Runtime.Input.AimAssist.HittableTarget, lockT = CriticalMass.Runtime.Input.AimAssist.LockTarget;
+            bool calm = CriticalMass.Runtime.Menu.GameSettings.ReduceMotion;
+            float now = Time.unscaledTime;
             for (int i = 0; i < _styles.Length; i++)
             {
                 int v = i * 4;
@@ -224,10 +238,11 @@ namespace CriticalMass.Runtime.View
                 double gh = map != null ? GroundHeight.At(map, x, z) : 0;
                 Vector3 c = SimSpace.ToWorld(x, gh + Lift, z);
                 _centres[i] = c;
-                _vertices[v] = new Vector3(c.x - QuadHalf, c.y, c.z - QuadHalf);
-                _vertices[v + 1] = new Vector3(c.x - QuadHalf, c.y, c.z + QuadHalf);
-                _vertices[v + 2] = new Vector3(c.x + QuadHalf, c.y, c.z + QuadHalf);
-                _vertices[v + 3] = new Vector3(c.x + QuadHalf, c.y, c.z - QuadHalf);
+                float q = s == Style.Enemy ? QuadHalf * RingScale(i, hittable, lockT, now, calm) : QuadHalf;
+                _vertices[v] = new Vector3(c.x - q, c.y, c.z - q);
+                _vertices[v + 1] = new Vector3(c.x - q, c.y, c.z + q);
+                _vertices[v + 2] = new Vector3(c.x + q, c.y, c.z + q);
+                _vertices[v + 3] = new Vector3(c.x + q, c.y, c.z - q);
                 var info = new Vector4((float)s, a.Team == TeamId.Azure ? 0f : 1f, tickAngle, 0f);
                 _uv1[v] = _uv1[v + 1] = _uv1[v + 2] = _uv1[v + 3] = info;
             }
