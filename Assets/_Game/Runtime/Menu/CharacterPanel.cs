@@ -583,7 +583,8 @@ namespace CriticalMass.Runtime.Menu
             HudText.Set(_record, p.MatchesPlayed.ToString(CultureInfo.InvariantCulture) + " MATCHES   " +
                                  p.Wins.ToString(CultureInfo.InvariantCulture) + " WINS   " +
                                  p.Draws.ToString(CultureInfo.InvariantCulture) + " DRAWS   " +
-                                 p.KnockOuts.ToString(CultureInfo.InvariantCulture) + " KNOCK-OUTS");
+                                 p.KnockOuts.ToString(CultureInfo.InvariantCulture) + " KNOCK-OUTS" +
+                                 (p.PracticeMatches > 0 ? "   " + p.PracticeMatches.ToString(CultureInfo.InvariantCulture) + " PRACTICE" : string.Empty));   // b16
             HudText.Set(_next, NextUnlockText(c, p.Level));
             UpdateHint();
         }

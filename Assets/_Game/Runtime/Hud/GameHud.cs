@@ -766,14 +766,41 @@ namespace CriticalMass.Runtime.Hud
 
         static readonly string[] OnHillA = { "0 ON HILL", "1 ON HILL", "2 ON HILL", "3 ON HILL", "4 ON HILL", "5+ ON HILL" };
 
+        /// <summary>b16: "n/cap ON HILL" words, built once per cap (no per-frame allocation).</summary>
+        static string[] _capWords = new string[0];
+        static int _capWordsFor = -1;
+
+        public static string CapWord(int counted, int cap)
+        {
+            if (cap <= 0) return OnHillA[Math.Min(5, Math.Max(0, counted))];
+            if (_capWordsFor != cap)
+            {
+                _capWords = new string[cap + 1];
+                for (int i = 0; i <= cap; i++) _capWords[i] = i + "/" + cap + " ON HILL";
+                _capWordsFor = cap;
+            }
+            return _capWords[Math.Max(0, Math.Min(cap, counted))];
+        }
+
         void ApplyMatch(HudState s)
         {
             HudText.Set(_clock, NumberCache.Mmss(s.ClockRemaining));
             _clock.color = s.ClockRemaining <= 60 ? CMTokens.ToolBrass.Color : Cream;
             HudText.Set(_scoreA, NumberCache.Int(s.ScoreAzure));
             HudText.Set(_scoreC, NumberCache.Int(s.ScoreCrimson));
-            HudText.Set(_onHillA, OnHillA[Math.Min(5, s.OnHillAzure)]);
-            HudText.Set(_onHillC, OnHillA[Math.Min(5, s.OnHillCrimson)]);
+            if (s.HillCap > 0)
+            {
+                // b16 the hill count: "7/10 ON HILL" (weighted, a Warrior counts 2), brass at the cap so players learn it
+                HudText.Set(_onHillA, CapWord(s.CountedAzure, s.HillCap));
+                HudText.Set(_onHillC, CapWord(s.CountedCrimson, s.HillCap));
+                _onHillA.color = s.CountedAzure >= s.HillCap ? CMTokens.ToolBrass.Color : Cream;
+                _onHillC.color = s.CountedCrimson >= s.HillCap ? CMTokens.ToolBrass.Color : Cream;
+            }
+            else
+            {
+                HudText.Set(_onHillA, OnHillA[Math.Min(5, s.OnHillAzure)]);
+                HudText.Set(_onHillC, OnHillA[Math.Min(5, s.OnHillCrimson)]);
+            }
             for (int i = 0; i < Pips; i++)
             {
                 _pipsA[i].SetFill(i < s.OnHillAzure ? CMTokens.Azure.Color : Empty);

@@ -136,6 +136,7 @@ namespace CriticalMass.Sim.Bots
             {
                 TeamId team = t == 0 ? TeamId.Azure : TeamId.Crimson;
                 EscortJobs(w, st, team, t);
+                HillCapJobs(w, st, team, t);   // b16-hook: bots past the hill cap intercept instead of piling on
                 int staged = 0, teamSize = 0;
                 double oldest = double.PositiveInfinity;
                 bool outnumbered = st.HillBodies[1 - t] - st.HillBodies[t] >= b.RallyOutnumberedBy;
@@ -276,9 +277,11 @@ namespace CriticalMass.Sim.Bots
             BotBrainConfig b = w.Config.Depth.BotBrain;
             Actor t = w.Actors[j];
             double s;
-            if (b.TargetHealersFirst && t.Cls == ClassId.Healer) s = Math.Sqrt(d2) * 0.01;
+            bool tie = MechRules.HealerTieBreak(w);   // b16: Healer focus as a tie-breaker (switch; off = the b15 override)
+            if (b.TargetHealersFirst && t.Cls == ClassId.Healer && !tie) s = Math.Sqrt(d2) * 0.01;
             else if (d2 <= reach * reach) s = 10 + (t.MaxHp > 0 ? t.Hp / t.MaxHp : 1) * 5;
             else s = 20 + Math.Sqrt(d2);
+            if (b.TargetHealersFirst && t.Cls == ClassId.Healer && tie) s -= w.Config.Depth.Mech.HealerTieBonus;
             if (j == st.Target[id]) s -= b.TargetStickScore;
             return s;
         }

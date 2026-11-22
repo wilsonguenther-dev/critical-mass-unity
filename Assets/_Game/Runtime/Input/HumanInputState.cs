@@ -26,7 +26,7 @@ namespace CriticalMass.Runtime.Input
     public sealed class HumanInputState
     {
         /// <summary>The bound game buttons (U-006 Controls table).</summary>
-        public enum HumanButton { Jump, Attack, Ability, Interact, DigPlace, Pause, Scoreboard, /* CM b13 J, appended: */ Dodge }
+        public enum HumanButton { Jump, Attack, Ability, Interact, DigPlace, Pause, Scoreboard, /* CM b13 J, appended: */ Dodge, /* b16, appended: */ Cancel }
 
         // Screen -> world basis for the camera heading on screen (CameraHeading.Active: 135 creator's angle by default, 45
         // classic: up = (-1, -1)/sqrt2, right = (1, -1)/sqrt2). Recomputed only when the heading changes.
@@ -93,6 +93,8 @@ namespace CriticalMass.Runtime.Input
         bool _jumpLatch;
         // CM b13 J: dodge, latched like Jump (one InputFrame.Dodge per press, dropped while paused).
         bool _dodgeLatch;
+        // b16 CANCEL: latched like Dodge (one InputFrame.Cancel per press, dropped while paused).
+        bool _cancelLatch;
         int _classPick = -1;
         double _moveRight;
         double _moveUp;
@@ -131,6 +133,10 @@ namespace CriticalMass.Runtime.Input
         /// MapRight) instead of the screen axes. The controller stick always stays screen-relative.
         /// </summary>
         public bool KeysFollowMap { get; set; }
+
+        /// <summary>b16: Settings, Game, CANCEL BUTTON (GameSettings.CancelButton). Off = this player's cancel presses never reach
+        /// the sim (the rule itself stays in the match config, so every machine agrees).</summary>
+        public bool CancelButton { get; set; } = true;
 
         // feat/ground-camera: camera-relative movement for the experimental ground camera (GroundView). While set, the move
         // keys and the stick go through this basis instead of the fixed screen one; Fill still writes a world-space move.
@@ -213,6 +219,7 @@ namespace CriticalMass.Runtime.Input
             Toolbelt.Reset();
             _jumpLatch = false;
             _dodgeLatch = false;
+            _cancelLatch = false;
             _classPick = -1;
             _moveRight = 0;
             _moveUp = 0;
@@ -244,6 +251,9 @@ namespace CriticalMass.Runtime.Input
                     break;
                 case HumanButton.Dodge:
                     if (!repeat) _dodgeLatch = true; // CM b13 J
+                    break;
+                case HumanButton.Cancel:
+                    if (!repeat) _cancelLatch = true; // b16
                     break;
                 case HumanButton.Attack:
                     if (repeat && _attackHoldOff) break;
@@ -424,6 +434,7 @@ namespace CriticalMass.Runtime.Input
                 _pick = -1;
                 _jumpLatch = false;
                 _dodgeLatch = false;
+                _cancelLatch = false;
                 _classPick = -1;
                 _attackBuffer.Clear();
                 _abilityBuffer.Clear();
@@ -461,6 +472,16 @@ namespace CriticalMass.Runtime.Input
             _attackLatch = false;
             World tw = _world ?? bw;
             int tid = Toolbelt.Actor >= 0 ? Toolbelt.Actor : BufferActor;
+            // b16 CANCEL: on a controller LB is Cancel and Next tool by context (ControlSchemes.ContextPairs): when both
+            // latched this tick, inside your own swing window it cancels, everywhere else it steps the tool.
+            bool cancelNow = _cancelLatch && CancelButton;
+            if (_cancelLatch && _switchLatch)
+            {
+                if (bw != null && CombatFeel.On(bw) && CombatFeel.CancelWindow(bw, BufferActor)) _switchLatch = false;
+                else cancelNow = false;
+            }
+            output.Cancel = cancelNow;
+            _cancelLatch = false;
             if (BuilderToolbelt.Applies(tw, tid))
             {
                 // b14: the Builder's one tool wheel. F (DigPlace) and the class-ability buttons both USE the selected tool;

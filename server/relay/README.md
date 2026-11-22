@@ -50,6 +50,11 @@ room closes after 10 minutes idle, 2 minutes if the host never connects, and 4 h
 On the free plan, going over a daily limit makes requests fail until the next day (UTC); it never bills.
 Matches a day by room size, measured before and after b15's traffic cut: `docs/online/ZERO-COST-ONLINE.md`.
 
+b17 (checked again 2026-11-21, same numbers): chat and lobby voice caps, per-IP and per-room limits, and a daily
+budget guard (chat dropped at 60% of the free day, no new rooms at 90%). Numbers, what an attacker can still do, and
+the deploy step: `docs/online/CHAT-AND-VOICE.md`. The `[[ratelimits]]` blocks in `wrangler.toml` may be deleted if a
+Free-plan deploy refuses them; the code falls back to in-memory limits.
+
 ## Watching the allowance (b15)
 
 - `python3 tools/online/relay-usage.py` asks Cloudflare for the account's Durable Object requests per day (the GraphQL

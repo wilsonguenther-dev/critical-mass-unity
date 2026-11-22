@@ -48,11 +48,13 @@ namespace CriticalMass.Sim.Tests
                 ("exactly the reference mix (a four-way tie)", 100 * r[0], 100 * r[1], 100 * r[2], 100 * r[3], KaijuType.Elder),
                 ("meat and wood tied over the reference", r[0], 2 * r[1], 2 * r[2], 0, KaijuType.Elder),
                 ("nothing delivered", 0, 0, 0, 0, KaijuType.Elder),
-                // b13 r3: a balanced feed (best score under ElderBelowScore 1.03) hatches ELDER; just over it, the type.
-                ("balanced, plant a little over its reference (91.5 / 8.5)", 91.5, 8.5, 0, 0, KaijuType.Elder),
-                ("balanced, meat a little over its reference (89.9 / 10.1)", 89.9, 10.1, 0, 0, KaijuType.Elder),
-                ("plant just past the ELDER line (93.5 / 6.5)", 93.5, 6.5, 0, 0, KaijuType.Grove),
-                ("meat just past the ELDER line (89 / 11)", 89, 11, 0, 0, KaijuType.Brute),
+                // b16: RefShare 0.76 / 0.17 / 0.03 / 0.04 and ElderBelowScore 1.12: a balanced feed (best score under 1.12)
+                // hatches ELDER; just over it, the type.
+                ("balanced, plant a little over its reference (80 / 16 / 2 / 2)", 80, 16, 2, 2, KaijuType.Elder),
+                ("balanced, meat a little over its reference (75 / 18.5 / 3 / 3.5)", 75, 18.5, 3, 3.5, KaijuType.Elder),
+                ("plant just past the ELDER line (86 / 10 / 2 / 2)", 86, 10, 2, 2, KaijuType.Grove),
+                ("meat just past the ELDER line (74 / 20 / 3 / 3)", 74, 20, 3, 3, KaijuType.Brute),
+                ("one wood trip of 3 in 130 no longer makes a TIMBER (105 / 22 / 3 / 0)", 105, 22, 3, 0, KaijuType.Elder),
                 ("bad tallies", double.NaN, -4, double.PositiveInfinity, 0, KaijuType.Elder),
             };
             var wrong = new List<string>();
@@ -405,7 +407,7 @@ namespace CriticalMass.Sim.Tests
             b.Depth.KaijuTypes.RefShare[0] = 0.5;
             b.Depth.KaijuTypes.ShroudTicks[0] = 1;
             Print("clone edit leaves the original RefShare[0] / ShroudTicks[0]", F(a.Depth.KaijuTypes.RefShare[0]) + " / " + a.Depth.KaijuTypes.ShroudTicks[0], "unchanged");
-            Assert.AreEqual(0.90, a.Depth.KaijuTypes.RefShare[0]);
+            Assert.AreEqual(0.76, a.Depth.KaijuTypes.RefShare[0]);
             Assert.AreEqual(120, a.Depth.KaijuTypes.ShroudTicks[0]);
         }
 

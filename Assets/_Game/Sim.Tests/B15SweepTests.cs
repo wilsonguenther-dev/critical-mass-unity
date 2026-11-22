@@ -32,6 +32,7 @@ namespace CriticalMass.Sim.Tests
             k.FeedTrailingPerMille = 0;
             k.KaijuHillPerMille = 1000;
             k.KaijuHillAnywhere = false;
+            k.SmallTeamMaxSize = 0;   // b16: every arm sets its own numbers at every team size (no small-team set)
         }
 
         public static Action<GameConfig> Arm(params Action<ComebackConfig>[] levers) => c =>

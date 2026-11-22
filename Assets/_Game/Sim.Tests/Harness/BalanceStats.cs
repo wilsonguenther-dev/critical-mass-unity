@@ -115,6 +115,8 @@ namespace CriticalMass.Sim.Tests.Harness
         public readonly List<string> NeedsCounter = new List<string>();
         public readonly List<MatchRecord> Matches = new List<MatchRecord>();
         public DuelRunner.Cell[,] Ttk, Duels;
+        /// <summary>b16 scripted chase cells (DuelRunner.Escape), indexed by ClassId; null when not played.</summary>
+        public DuelRunner.Cell[] Escape, EscapeDodge;
 
         public BalanceRow Row(string key)
         {
@@ -181,9 +183,10 @@ namespace CriticalMass.Sim.Tests.Harness
 
         static double Ratio(double a, double b) => b > 0 ? a / b : double.NaN;
 
-        public static BalanceReport Build(List<MatchRecord> ms, DuelRunner.Cell[,] ttk, DuelRunner.Cell[,] duels)
+        public static BalanceReport Build(List<MatchRecord> ms, DuelRunner.Cell[,] ttk, DuelRunner.Cell[,] duels,
+            DuelRunner.Cell[] escape = null, DuelRunner.Cell[] escapeDodge = null)
         {
-            var r = new BalanceReport { Ttk = ttk, Duels = duels };
+            var r = new BalanceReport { Ttk = ttk, Duels = duels, Escape = escape, EscapeDodge = escapeDodge };
             r.Matches.AddRange(ms);
             int n = ms.Count;
             const string O = "Outcome";
@@ -279,6 +282,8 @@ namespace CriticalMass.Sim.Tests.Harness
             Mean(r, "kills.top10", C, "Top-10 share of all kills", Each(ms, m => m.Top10KillShare));
 
             DuelRows(r, ttk, duels);
+            EscapeRows(r, escape, "escape", "Escape from a chasing Warrior (runner flees from 4 u, alive at 20 u within 12 s)");
+            EscapeRows(r, escapeDodge, "escape.dodge", "Escape from a chasing Warrior, runner dodging too");
 
             const string K = "Kaiju";
             int hatched = 0, ownN = 0, ownWon = 0, berserk = 0;
@@ -402,7 +407,33 @@ namespace CriticalMass.Sim.Tests.Harness
                     }
                 }
                 r.Rows.Add(new BalanceRow { Key = "duel.unbeaten", Group = D, Label = "Classes that win every duel (more than half of each matchup)", Kind = "count", Value = unbeaten, N = 6, Note = who, Comparable = false });
+                // b16: the advisor's duel order (DuelRunner.OrderViolations; both seatings of a pair count).
+                int bad = DuelRunner.OrderViolations(duels, out string why);
+                r.Rows.Add(new BalanceRow
+                {
+                    Key = "duel.order", Group = D, Comparable = false, Kind = "count", Value = bad, N = 18,
+                    Label = "Duel order broken (Warrior beats all, all beat the Healer, no unbeaten or winless class among Miner, Builder, Farmer, Demolitions)",
+                    Note = why,
+                });
             }
+        }
+
+        static void EscapeRows(BalanceReport r, DuelRunner.Cell[] cells, string key, string label)
+        {
+            if (cells == null) return;
+            const string D = "Duels (1v1, no bots)";
+            int wins = 0, reps = 0;
+            for (int c = 0; c < 6; c++)
+            {
+                if (c == (int)ClassId.Warrior || cells[c] == null) continue;
+                BalanceStat.Wilson(cells[c].Wins, cells[c].Reps, out double p, out double lo, out double hi);
+                r.Rows.Add(new BalanceRow { Key = key + "." + ClassNames[c], Group = D, Label = label + ": " + ClassNames[c], Kind = "rate", Value = p, Lo = lo, Hi = hi, N = cells[c].Reps,
+                    Note = cells[c].Kills > 0 ? cells[c].Kills + " killed" : "" });
+                wins += cells[c].Wins;
+                reps += cells[c].Reps;
+            }
+            BalanceStat.Wilson(wins, reps, out double pa, out double loa, out double hia);
+            r.Rows.Add(new BalanceRow { Key = key + ".all", Group = D, Label = label + ": all five classes", Kind = "rate", Value = pa, Lo = loa, Hi = hia, N = reps });
         }
 
         static string StuckTable(List<MatchRecord> ms)
@@ -458,17 +489,25 @@ namespace CriticalMass.Sim.Tests.Harness
             return ok ? "met" : "missed";
         }
 
-        public static List<BalanceTarget> FromJson(string json)
+        public static List<BalanceTarget> FromJson(string json) => FromJson(json, 16);
+
+        /// <summary>b16: the targets for one team size: a target's "bySize" entry for that size ("8", "5") replaces its
+        /// min / max / maxExclusive; other sizes use the top-level band.</summary>
+        public static List<BalanceTarget> FromJson(string json, int teamSize)
         {
             var list = new List<BalanceTarget>();
             if (!(MiniJson.Parse(json) is Dictionary<string, object> root) || !(root.TryGetValue("targets", out object t) && t is List<object> items)) return list;
             foreach (object o in items)
             {
                 if (!(o is Dictionary<string, object> d)) continue;
+                Dictionary<string, object> band = d;
+                if (d.TryGetValue("bySize", out object bs) && bs is Dictionary<string, object> sizes
+                    && sizes.TryGetValue(teamSize.ToString(System.Globalization.CultureInfo.InvariantCulture), out object one) && one is Dictionary<string, object> o1)
+                    band = o1;
                 list.Add(new BalanceTarget
                 {
                     Id = MiniJson.Str(d, "id"), Row = MiniJson.Str(d, "row"), Label = MiniJson.Str(d, "label"), Source = MiniJson.Str(d, "source"),
-                    Min = MiniJson.Num(d, "min"), Max = MiniJson.Num(d, "max"), MaxExclusive = MiniJson.Bool(d, "maxExclusive"),
+                    Min = MiniJson.Num(band, "min"), Max = MiniJson.Num(band, "max"), MaxExclusive = MiniJson.Bool(band, "maxExclusive"),
                 });
             }
             return list;
@@ -554,7 +593,7 @@ namespace CriticalMass.Sim.Tests.Harness
                   .Append("no abilities, dodge or hut levels; ").Append(r.Ttk != null && r.Ttk[0, 0] != null ? r.Ttk[0, 0].Reps : 0)
                   .Append(" start angles per cell; 30 s cap. The sim is deterministic, so the angles are the only spread: n counts tries, not independent samples.\n\n");
                 foreach (BalanceRow row in r.Rows)
-                    if (row.Key == "ttk.median" || row.Key == "ttk.inband" || row.Key == "duel.unbeaten")
+                    if (row.Key == "ttk.median" || row.Key == "ttk.inband" || row.Key == "duel.unbeaten" || row.Key == "duel.order" || row.Key == "escape.all" || row.Key == "escape.dodge.all")
                         sb.Append("- ").Append(row.Label).Append(": ").Append(BalanceFormat.Value(row)).Append(row.Kind == "count" ? " of " + row.N : " (95% CI " + BalanceFormat.Ci(row) + ", n " + row.N + ")")
                           .Append(row.Note.Length > 0 ? " (" + row.Note + ")" : "").Append('\n');
                 sb.Append('\n');

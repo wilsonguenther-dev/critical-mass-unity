@@ -472,6 +472,17 @@ namespace CriticalMass.Runtime.View.Affordance
             }
         }
 
+        /// <summary>b16: the refusal words when a Builder aims inside the hill keep-out (no walls on the scoring circle).</summary>
+        public const string HillKeepoutWord = "can't build on the hill";
+
+        /// <summary>b16: the ghost cell is within the hill keep-out plus a piece's half length (its piece reaches into it).</summary>
+        public static bool NearHillKeepout(World w, int cx, int cz)
+        {
+            double r = w.Config.Depth.Build.HillKeepout + 2.5;
+            double dx = cx + 0.5 - w.Map.Hill.X, dz = cz + 0.5 - w.Map.Hill.Z;
+            return dx * dx + dz * dz <= r * r;
+        }
+
         /// <summary>b15: the BLOCK verb on a lift cell: "STACK", "STACK x2", "STACK x3" (the level the block would make).</summary>
         public static string StackVerb(int level) => StackVerbs[Math.Max(0, Math.Min(StackVerbs.Length - 1, level))];
 
@@ -711,7 +722,9 @@ namespace CriticalMass.Runtime.View.Affordance
                     else
                     {
                         int gw = BuilderWalls.GhostWhy(w, id);
-                        Refuse(p, HeightWhy(gw, w.Config) ?? BuilderWalls.Word(gw).ToLowerInvariant());   // b15 words first
+                        // b16: the hill keep-out (7 u) gets its own words, so "too close" never hides why
+                        if (gw == BuilderWalls.RefusedKeepOut && NearHillKeepout(w, gx, gz)) Refuse(p, HillKeepoutWord);
+                        else Refuse(p, HeightWhy(gw, w.Config) ?? BuilderWalls.Word(gw).ToLowerInvariant());   // b15 words first
                     }
                 }
                 else Refuse(p, AffWords.Wait);

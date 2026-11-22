@@ -119,7 +119,11 @@ namespace CriticalMass.Sim.Core
                     FlyTick(w, i, dt);
                     continue;
                 }
-                if (vx != 0 || vz != 0) Collide.MoveActor(w, i, vx * dt, vz * dt, false);
+                // b16 [11]: a press the sim refused for its whole buffer (no clear landing, or past the coyote window) tells the view
+                // once, so a refused jump at the island edge is not silent. Value: 2 = past the coyote window, 1 = no landing.
+                if (wantJump && a.JumpBuffer == 0 && PhysicsFeel.On(w) && PhysicsFeel.Cfg(w).JumpRefusedEvent)
+                    World.PushEvent(w, SimEventType.JumpRefused, i, -1, w.X[i], w.Z[i], a.UnsupportedTicks > Jump.CoyoteTicks(cfg) ? 2 : 1);
+                if (vx != 0 || vz != 0) Collide.MoveActor(w, i, vx * dt, vz * dt, false, true);
                 Knock.Step(w, i, dt); // DG-70: the knock velocity on top, through the same wall-sliding mover
                 a.Moving = moving;
                 if (stunned) continue;

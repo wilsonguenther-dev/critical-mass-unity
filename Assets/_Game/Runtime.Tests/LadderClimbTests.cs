@@ -63,6 +63,9 @@ namespace CriticalMass.Runtime.Tests
             float nearFoot = LadderClimb.Profile(foot - 0.1, half, top);
             Debug.Log($"[ladder fix] lift 0.1 u inside the foot: {nearFoot:F3} u (limit 0.10)");
             Assert.That(nearFoot, Is.LessThanOrEqualTo(0.10f), "no visible float at the ladder foot");
+            // b16 [14] (physics audit item 14: 0.07 u there): the last 0.1 u at the foot is the deck exactly.
+            Debug.Log($"[b16 ladder foot] lift 0.1 u inside the foot: before 0.07 u, after {nearFoot:F3} u (target 0)");
+            Assert.That(nearFoot, Is.LessThanOrEqualTo(0.001f), "the ladder foot sits on the deck");
             float last = top;
             for (double u = 0; u <= foot + 0.2; u += 0.05)
             {

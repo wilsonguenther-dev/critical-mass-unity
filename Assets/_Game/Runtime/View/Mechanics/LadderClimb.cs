@@ -46,6 +46,9 @@ namespace CriticalMass.Runtime.View.Mechanics
             return dx * dx + dz * dz <= HillRockRadius * HillRockRadius ? HillRockTop : WallBoxTop;
         }
 
+        /// <summary>b16 [14]: the run (u) at the foot and at the face of the climb profile held flat (no float at the feet).</summary>
+        public const double FootFlat = 0.1;
+
         /// <summary>Distance from a ladder's centre to its top contact (the face plus the standoff).</summary>
         public static double FaceDist(double halfLen) => halfLen + Standoff;
 
@@ -62,7 +65,12 @@ namespace CriticalMass.Runtime.View.Mechanics
             // b15 Editor review: smoothstep instead of a straight line. The line rose 2.8 u per u from the feet, so a
             // fighter standing 0.1 u inside the foot floated 0.28 u; the curve gives 0.07 u there, keeps top/2 at the
             // midpoint (LadderClimbTests) and never falls walking toward the wall.
-            double s = (foot - u) / Math.Max(1e-6, foot - face);
+            // b16 [14] (physics audit item 14: the foot still floated 0.07 u): the last FootFlat of the run at each end is held
+            // flat (the deck at the feet, the rock top at the face), the smoothstep spans the rest; the midpoint stays top/2.
+            double run = foot - face, flat = run > 4 * FootFlat ? FootFlat : 0;
+            double s = (foot - flat - u) / Math.Max(1e-6, run - 2 * flat);
+            if (s <= 0) return 0f;
+            if (s >= 1) return top;
             return (float)(top * s * s * (3.0 - 2.0 * s));
         }
 

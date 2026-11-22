@@ -25,6 +25,8 @@ Shader "CM/UnitRing"
         _SelfMinPx ("Self minimum stroke (px at 1080p)", Float) = 4.0
         _OutlinePx ("Outline (px at 1080p)", Float) = 1.25
         _Opacity ("Opacity", Range(0, 1)) = 1
+        // b16 [9]: the x-ray copy (View/B16/UnderRings) draws over the Kaiju with Always (8); the ground rings keep LEqual (4).
+        [Enum(UnityEngine.Rendering.CompareFunction)] _ZTest ("Depth test", Float) = 4
     }
     SubShader
     {
@@ -35,7 +37,7 @@ Shader "CM/UnitRing"
             Tags { "LightMode" = "UniversalForward" }
             Blend SrcAlpha OneMinusSrcAlpha
             ZWrite Off
-            ZTest LEqual
+            ZTest [_ZTest]
             Cull Off
             Offset -2, -2
             HLSLPROGRAM
@@ -58,6 +60,7 @@ Shader "CM/UnitRing"
                 float _SelfMinPx;
                 float _OutlinePx;
                 half _Opacity;
+                float _ZTest;
             CBUFFER_END
 
             struct A { float4 positionOS : POSITION; float4 uv0 : TEXCOORD0; float4 uv1 : TEXCOORD1; };
@@ -119,7 +122,9 @@ Shader "CM/UnitRing"
                 half3 team = i.info.y < 0.5 ? _AzureColor.rgb : _CrimsonColor.rgb;
                 half3 body = self ? _SelfColor.rgb : team;
                 half3 rgb = lerp(_OutlineColor.rgb, body, fill / max(cover, 1e-3));
-                return half4(rgb, cover * _Opacity);
+                // b16: uv1.w > 0 is a per-ring alpha (the x-ray copies and the refused-jump highlight); 0 (every ground ring) is 1.
+                half ringAlpha = i.info.w > 0.0 ? (half)i.info.w : (half)1.0;
+                return half4(rgb, cover * _Opacity * ringAlpha);
             }
             ENDHLSL
         }

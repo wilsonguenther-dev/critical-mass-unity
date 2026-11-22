@@ -328,6 +328,8 @@ namespace CriticalMass.Runtime.Audio.Sound
             // ---- integration batch 4: the physics events (#61, DG-69/70/86/99/100)
             R(SimEventType.AttackContact, Pick.Fixed, "swing_light"),
             R(SimEventType.AttackCancel, Pick.Fixed, "block_shield"),
+            // b16 CANCEL: the feint / hit-cancel hook (placeholder: the light swing cue until a feint cue is made)
+            R(SimEventType.Feint, Pick.Fixed, "swing_light"),
             Silent(SimEventType.HitStun, "the Hit that caused it plays the impact and the heavy-hit grunt"),
             Silent(SimEventType.Knock, "the Hit or blast that pushed the body is the sound; launched landings come from the force bus"),
             Silent(SimEventType.BodyShove, "the Kaiju's steps and the low-frequency layer come from the force bus"),
@@ -369,6 +371,7 @@ namespace CriticalMass.Runtime.Audio.Sound
             Silent(SimEventType.CorruptionRoll, "b13 S0: silent until item C adds its cue"),
             Silent(SimEventType.KaijuPower, "b13 S0: silent until item K adds its cue"),
             Silent(SimEventType.CrystalMined, "b13 S0: silent until item C adds its cue"),
+            R(SimEventType.JumpRefused, Pick.Fixed, "refused"),   // b16 [11]: the soft refused cue, the local player's own only (SoundFeed.Fixed)
         };
 
         /// <summary>Every world-force source (draft PR #43): audible cue or silence, and the low-frequency layer.</summary>

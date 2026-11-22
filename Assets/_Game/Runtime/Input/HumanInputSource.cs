@@ -42,8 +42,8 @@ namespace CriticalMass.Runtime.Input
     public sealed class HumanInputSource : MonoBehaviour
     {
         /// <summary>Action names in the Player map bound to game buttons, parallel to Buttons.</summary>
-        private static readonly string[] ButtonActions = { "Jump", "Attack", "Ability", "Interact", "DigPlace", "Pause", "Scoreboard", "Dodge" };
-        private static readonly B[] Buttons = { B.Jump, B.Attack, B.Ability, B.Interact, B.DigPlace, B.Pause, B.Scoreboard, B.Dodge };
+        private static readonly string[] ButtonActions = { "Jump", "Attack", "Ability", "Interact", "DigPlace", "Pause", "Scoreboard", "Dodge", "Cancel" };
+        private static readonly B[] Buttons = { B.Jump, B.Attack, B.Ability, B.Interact, B.DigPlace, B.Pause, B.Scoreboard, B.Dodge, B.Cancel };
 
         /// <summary>The human's input between two sim steps; SimDriverBehaviour calls State.Fill once per tick.</summary>
         public HumanInputState State { get; } = new HumanInputState();
@@ -82,6 +82,7 @@ namespace CriticalMass.Runtime.Input
         {
             var map = InputSystem.actions.FindActionMap("Player", true);
             EnsureDodgeAction(map); // CM b13 J: until Settings/Controls.inputactions carries the Dodge action
+            EnsureCancelAction(map); // b16: an older or rebound asset without the Cancel action gets it in memory
             map.Enable();
             BuilderToolbelt.Local = State.Toolbelt;   // b14: the HUD and the terrain view read the local Builder's wheel
             _map = map;
@@ -153,10 +154,30 @@ namespace CriticalMass.Runtime.Input
             if (was) map.Enable();
         }
 
+        /// <summary>b16 CANCEL defaults, in the Controls tab's slot order: mouse forward side button (mouse column), P (by J K L),
+        /// \ (by Enter and the arrows), LB (controller; shared by context with Next tool, ControlSchemes.ContextPairs). Free in
+        /// every preset: the left-handed one puts Jump on Right Shift and Ping on ; (ControlPresets.LeftHandedRemaps).</summary>
+        public static readonly string[] CancelDefaults = { "<Mouse>/forwardButton", "<Keyboard>/p", "<Keyboard>/backslash", "<Gamepad>/leftShoulder" };
+
+        /// <summary>b16: adds the Cancel action with CancelDefaults when the actions asset lacks it (in memory only).</summary>
+        public static void EnsureCancelAction(InputActionMap map)
+        {
+            if (map == null || map.FindAction("Cancel", false) != null) return;
+            bool was = map.enabled;
+            if (was) map.Disable();
+            InputAction c = map.AddAction("Cancel", InputActionType.Button);
+            c.AddBinding(CancelDefaults[0], groups: "KeyboardMouse");
+            c.AddBinding(CancelDefaults[1], groups: "KeyboardMouse").WithName(ControlBindings.WasdHand);
+            c.AddBinding(CancelDefaults[2], groups: "KeyboardMouse").WithName(ControlBindings.ArrowsHand);
+            c.AddBinding(CancelDefaults[3], groups: "Gamepad");
+            if (was) map.Enable();
+        }
+
         private void ReadSettings()
         {
             State.MovementAssist = GameSettings.MovementAssist;
             State.KeysFollowMap = GameSettings.KeysFollowMap;
+            State.CancelButton = GameSettings.CancelButton;   // b16
         }
 
         private void OnDisable()

@@ -152,6 +152,7 @@ namespace CriticalMass.Sim.Core
             if (!a.Alive || a.AirLen > 0 || a.StandUp > 0) return false;
             if (a.HitStunTicks > 0 || a.KVx != 0 || a.KVz != 0) return false;
             if (a.SwingPending) return false;
+            if (CombatFeel.On(w) && CombatFeel.FeintRecovering(w, id)) return false; // b16: a feint's short recovery holds the dodge too
             if (a.Carry == CarryKind.Corruption) return false;
             return w.Tick >= w.Dodges.Ready[id];
         }

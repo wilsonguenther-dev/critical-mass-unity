@@ -278,6 +278,8 @@ namespace CriticalMass.Runtime.View
         {
             if (driver == null) throw new ArgumentNullException(nameof(driver));
             UnitRings rings = driver.GetComponent<UnitRings>();
+            // b16 [9] / [11]: the x-ray rings under the Kaiju and the refused-jump edge highlight sit next to the ground rings.
+            if (driver.GetComponent<B16.UnderRings>() == null) driver.gameObject.AddComponent<B16.UnderRings>();
             return rings != null ? rings : driver.gameObject.AddComponent<UnitRings>();
         }
     }

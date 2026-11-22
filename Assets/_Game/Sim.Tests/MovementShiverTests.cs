@@ -550,8 +550,10 @@ namespace CriticalMass.Sim.Tests
         // b14-c: the Slow case was 4242; after the hut regrowth and the Kaiju route guard 4242's Kaiju is never owned (0.0 s, run
         // 44159219254; 2024 likewise), so the precondition, not the rule, failed. 99 (164.3 s owned in the same run) replaces it;
         // the six-seed mean tests still play 4242 and print it as left out.
-        [TestCase(1337)]
-        [TestCase(99, Category = "Slow")]
+        // b16 combine: on the combined rules 1337's and 99's Kaiju hatch Berserk (0 s owned, runs 44953083481 / 44953691993),
+        // the precondition again; 7 (180 s owned) and 2024 (180 s owned) replace them; the six-seed mean tests still play both.
+        [TestCase(7)]
+        [TestCase(2024, Category = "Slow")]
         public void InAWholeMatchTheKaijuGetsOntoTheHillAndNeverIdlesOffItWithNoTarget(int seed)
         {
             KaijuHillRun r = MeasureKaijuHill(seed);
@@ -585,10 +587,13 @@ namespace CriticalMass.Sim.Tests
                 used++; near += r.NearShare; on += r.OnShare; onS += r.OnHill; worst = Math.Max(worst, r.WorstStill);
             }
             double mNear = used > 0 ? near / used : 0, mOn = used > 0 ? on / used : 0, mOnS = used > 0 ? onS / used : 0;
-            Console.WriteLine("[KaijuHill] six-seed mean over " + used + " seeds: near share " + mNear.ToString("F3") + " (limit 0.55), on share " +
-                              mOn.ToString("F3") + " (limit 0.20), on hill " + mOnS.ToString("F1") + " s (limit 20 s), worst idle " + worst.ToString("F1") + " s (limit 5 s)");
+            Console.WriteLine("[KaijuHill] six-seed mean over " + used + " seeds: near share " + mNear.ToString("F3") + " (limit 0.50), on share " +
+                              mOn.ToString("F3") + " (limit 0.05), on hill " + mOnS.ToString("F1") + " s (limit 10 s), worst idle " + worst.ToString("F1") + " s (limit 5 s)");
             Assert.GreaterOrEqual(used, 4, "at least four seeds give an owned Kaiju a minute");
-            Assert.GreaterOrEqual(mNear, 0.55, "six-seed mean on-or-near share");
+            // b16 KAIJU WAITS OFF THE CIRCLE: the owned Kaiju now waits on the rim and stops on the rim of a hill its own team
+            // holds (it walks in only to clear an enemy-held hill), so the near floor is 0.50 (r5: 0.548) and the on-disc floors below
+            // are 0.05 and 10 s (r5: 0.109, 25.2 s); before b16 0.55 / 0.20 / 20 s.
+            Assert.GreaterOrEqual(mNear, 0.50, "six-seed mean on-or-near share");
         }
 
         /// <summary>
@@ -609,10 +614,10 @@ namespace CriticalMass.Sim.Tests
                 if (r.WorstStill > worst) { worst = r.WorstStill; worstSeed = seed; }
             }
             double mOn = used > 0 ? on / used : 0, mOnS = used > 0 ? onS / used : 0;
-            Console.WriteLine("[KaijuHill] six-seed mean over " + used + " seeds: on share " + mOn.ToString("F3") + " (limit 0.20), on hill " + mOnS.ToString("F1") +
-                              " s (limit 20 s), worst idle off the hill " + worst.ToString("F1") + " s on seed " + worstSeed + " (limit 5 s)");
-            Assert.GreaterOrEqual(mOn, 0.20, "six-seed mean on-hill share");
-            Assert.Greater(mOnS, 20.0, "six-seed mean time on the hill");
+            Console.WriteLine("[KaijuHill] six-seed mean over " + used + " seeds: on share " + mOn.ToString("F3") + " (limit 0.05), on hill " + mOnS.ToString("F1") +
+                              " s (limit 10 s), worst idle off the hill " + worst.ToString("F1") + " s on seed " + worstSeed + " (limit 5 s)");
+            Assert.GreaterOrEqual(mOn, 0.05, "six-seed mean on-hill share (b16: was 0.20, the Kaiju waits off the circle)");
+            Assert.Greater(mOnS, 10.0, "six-seed mean time on the hill (b16: was 20 s)");
             Assert.LessOrEqual(worst, 5.0, "never idle off the hill with no target over 5 s");
         }
 
@@ -655,7 +660,7 @@ namespace CriticalMass.Sim.Tests
                                       ",\"touching\":" + touching + ",\"siegeStand\":\"" + w.KaijuNav.StandCx + "," + w.KaijuNav.StandCz +
                                       "\",\"onHillS\":" + onHill.ToString("F1") + "}");
                 }
-                bool idleCase = k.TargetId < 0 && isOwned && !inHill && k.MeleeCd <= 0; // clawing is not idle
+                bool idleCase = k.TargetId < 0 && isOwned && !inHill && k.MeleeCd <= 0 && !Kaiju.AtIdlePost(w, k.X, k.Z); // clawing is not idle; b16: nor its rim post
                 if (idleCase && !double.IsNaN(ax) && (k.X - ax) * (k.X - ax) + (k.Z - az) * (k.Z - az) <= 0.3 * 0.3)
                 {
                     still += dt;

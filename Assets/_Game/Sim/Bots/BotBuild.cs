@@ -93,7 +93,8 @@ namespace CriticalMass.Sim.Bots
                     double d = Math.Sqrt(cx * cx + cz * cz);
                     if (d > 1e-6)
                     {
-                        double edge = w.Config.Hill.Radius + b.BotHillEdgeExtra;
+                        // b16: the keep-out is 7 u (was 3), so the 7.5 u edge rounded into it: stand the wall 1.5 u past the keep-out
+                        double edge = Math.Max(w.Config.Hill.Radius + b.BotHillEdgeExtra, w.Config.Depth.Build.HillKeepout + 1.5);
                         double tx = h.X + cx / d * edge;
                         double tz = h.Z + cz / d * edge;
                         double ox = tx - x, oz = tz - z;

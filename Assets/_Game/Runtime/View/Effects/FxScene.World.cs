@@ -209,7 +209,13 @@ namespace CriticalMass.Runtime.View.Effects
                     byte cell = CellAt(x, z);
                     double h = Ground(x, z);
                     if (cell == Cell.Bridge && heavy) PlankDust(t, x, z, h, seed, 1f);
-                    else if (speed > cc.MoveSpeed * SprintFactor) FootPuff(t, x, z, h, seed, dx / d, dz / d);
+                    else
+                    {
+                        // b16 (audit missing list): footstep dust tied to speed (was sprint-only): none at a walk, a small puff at
+                        // a run, the full two-puff kick past top speed (FootDust).
+                        float dust = FootDust(speed, cc.MoveSpeed);
+                        if (dust > 0f) FootPuff(t, x, z, h, seed, dx / d, dz / d, dust);
+                    }
                     if (_foliage != null) Rustle(CellIndex(x, z), t, seed);
                 }
                 if (Blood && a.MaxHp > 0 && a.Hp < a.MaxHp * HurtShare && (w.Tick + i * 5) % DripTicks == 0)
@@ -248,11 +254,22 @@ namespace CriticalMass.Runtime.View.Effects
             KaijuFootfall?.Invoke(fx, fz);
         }
 
-        private void FootPuff(double t, double x, double z, double h, uint seed, double dirX, double dirZ)
+        /// <summary>b16: footstep dust scale at a speed (pure; tests): 0 under 60% of the class's top speed, 0.5 to 1 up to top
+        /// speed, up to 1.3 past it (a dash, a knock); 1 and over is the full two-puff kick.</summary>
+        public static float FootDust(double speed, double moveSpeed)
+        {
+            if (moveSpeed <= 0) return 0f;
+            double s = speed / moveSpeed;
+            if (s < 0.6) return 0f;
+            if (s <= 1.0) return (float)(0.5 + (s - 0.6) * 1.25);
+            return (float)Math.Min(1.3, 1.0 + (s - 1.0) * 0.6);
+        }
+
+        private void FootPuff(double t, double x, double z, double h, uint seed, double dirX, double dirZ, float scale = 1f)
         {
             Vector3 p = W(x - dirX * 0.2, h + 0.08, z - dirZ * 0.2);
-            AddPuff(t, p, seed, 1, 0.22f, DustLight, 2, -dirX, -dirZ);
-            AddPuff(t, p, seed, 2, 0.18f, DustMid, 0);
+            AddPuff(t, p, seed, 1, 0.22f * scale, DustLight, 2, -dirX, -dirZ);
+            if (scale >= 1f) AddPuff(t, p, seed, 2, 0.18f * scale, DustMid, 0);
         }
 
         private void PlankDust(double t, double x, double z, double h, uint seed, float scale)

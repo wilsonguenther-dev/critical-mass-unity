@@ -13,10 +13,12 @@ namespace CriticalMass.Sim
     {
         /// <summary>History: 1 = the browser port through batch 14 (never bumped); 2 = b15-rejoin full-state fingerprint;
         /// 3 = b15 terrain height (MapDef.Lift is sim state; older replays are "from a different game version");
-        /// 4 = batch 15 wave two (combat feel, bot brain, comeback + hut choices: new hashed sim state and rules).</summary>
-        public const int Schema = 5;
+        /// 4 = batch 15 wave two (combat feel, bot brain, comeback + hut choices: new hashed sim state and rules);
+        /// 5 = b15 fix round; 6 = batch 16 combined (physics feel + Kaiju push state, duel order + CANCEL input
+        /// (InputFrame.Cancel and new CombatFeelState arrays are hashed), mechanics fixes: one schema for the combined rules).</summary>
+        public const int Schema = 6;
 
         /// <summary>The reference-match digest this Schema was pinned for (printed by SimVersionTests).</summary>
-        public const ulong RulesDigest = 0x597B21BFA247E913UL;   // b15 fix round (schema 5: Miner bot route steering, Kaiju squeeze ignores ladders): printed by sim run 44880553461 at a7433909; was 0xC3FD3B160874096B (schema 4, sim run 44856207208)
+        public const ulong RulesDigest = 0x821488BB2FBDE4DFUL;   // batch 16 combined (schema 6: physics + duels + mechanics merged, chat outside the sim, plus the combine fixes: bridge-mouth rounding for the steered actor, flat hill cap 10, two extra feeders): printed by sim run 44955919924 at 95b1190b; the merge alone printed 0x05B7303AD27647CA (sim run 44953083481 at 2272ad84). Builders' schema 6 pins (superseded): physics 0x4024C8D689B75551 (sim run 44932803420 at e3d847ea), duels 0x44C1675A017E94E1 (sim run 44925935233 at 80a08aef), mechanics 0x677B2CA156EA17AD (sim run 44937275234); was 0x597B21BFA247E913 (schema 5). b15 fix round (schema 5: Miner bot route steering, Kaiju squeeze ignores ladders): printed by sim run 44880553461 at a7433909; was 0xC3FD3B160874096B (schema 4, sim run 44856207208)
     }
 }

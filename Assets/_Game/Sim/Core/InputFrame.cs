@@ -40,6 +40,12 @@ namespace CriticalMass.Sim.Core
         /// (Sim/B13/Dodge.cs); bots set it through BotReflex. Wire bit 128 (InputCodec), replay button bit 64.
         /// </summary>
         public bool Dodge;   // b13-hook
+        /// <summary>
+        /// b16 CANCEL: cancel this step (a feint during the wind-up, a hit-cancel during the recovery after a landed hit).
+        /// One-shot: edge-latched by the human input layer, read and cleared by Combat (CombatFeel.TakeCancel); bots set it only
+        /// with BotBrain.UsesCancel. Wire bit 128 of the ping byte (InputCodec), replay button bit 128.
+        /// </summary>
+        public bool Cancel;
 
         public void CopyFrom(InputFrame other)
         {
@@ -59,6 +65,7 @@ namespace CriticalMass.Sim.Core
             PingX = other.PingX;
             PingZ = other.PingZ;
             Dodge = other.Dodge;   // b13-hook
+            Cancel = other.Cancel;   // b16 cancel
         }
     }
 }
