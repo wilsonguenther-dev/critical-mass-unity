@@ -151,6 +151,13 @@ namespace CriticalMass.Sim.Core
             return s != null && s.PrevMask != null && id >= 0 && id < s.PrevMask.Length && (s.PrevMask[id] & (1 << PlayerReasons.ButtonCancel)) != 0;
         }
 
+        /// <summary>Lane S3: actor id held button (a PlayerReasons.Button* code) this tick (the press mask; Combat clears the input).</summary>
+        public static bool Pressed(World w, int id, int button)
+        {
+            PlayerSeatState s = S(w);
+            return s != null && s.PrevMask != null && id >= 0 && id < s.PrevMask.Length && (s.PrevMask[id] & (1 << button)) != 0;
+        }
+
         static int FeelCount(World w) => w.Depth.Feel.Feints + w.Depth.Feel.HitCancels;
 
         static bool Staggered(World w, Actor a) => a.StandUp > 0 || (a.HitStunTicks > 0 && Phys.On(w, true));

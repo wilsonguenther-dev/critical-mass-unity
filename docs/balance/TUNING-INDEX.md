@@ -4,7 +4,7 @@ Every tuning field the sim reads from `GameConfig`, found by reflection (`Assets
 
 Regenerate: `tools/balance/balance-report.sh tuning-index (or the balance-report workflow, mode tuning-index)`. `TuningIndexTests` fails when a field has no row here. Paths work as `--set Path=Value` switches for the balance report.
 
-896 fields.
+899 fields.
 
 ## (top level)
 
@@ -726,10 +726,10 @@ Regenerate: `tools/balance/balance-report.sh tuning-index (or the balance-report
 | `Depth.CombatFeel.Classes[1].MaxHp` | 100 | double | `Assets/_Game/Sim/Config/GameConfig.cs` |  |
 | `Depth.CombatFeel.Classes[1].MoveSpeed` | 4.2 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | Units per second. |
 | `Depth.CombatFeel.Classes[1].Radius` | 0.4 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | Collision circle. |
-| `Depth.CombatFeel.Classes[1].AttackDamage` | 23 | double | `Assets/_Game/Sim/Config/GameConfig.cs` |  |
+| `Depth.CombatFeel.Classes[1].AttackDamage` | 22 | double | `Assets/_Game/Sim/Config/GameConfig.cs` |  |
 | `Depth.CombatFeel.Classes[1].AttackRange` | 2.3 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | Melee reach from the actor centre. |
 | `Depth.CombatFeel.Classes[1].AttackArcDeg` | 60 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | Cleave arc, centred on facing. |
-| `Depth.CombatFeel.Classes[1].AttackCooldown` | 0.65 | double | `Assets/_Game/Sim/Config/GameConfig.cs` |  |
+| `Depth.CombatFeel.Classes[1].AttackCooldown` | 0.7 | double | `Assets/_Game/Sim/Config/GameConfig.cs` |  |
 | `Depth.CombatFeel.Classes[1].AbilityCooldown` | 9 | double | `Assets/_Game/Sim/Config/GameConfig.cs` |  |
 | `Depth.CombatFeel.Classes[1].GatherSeconds` | 1 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | Time to pull one unit from a node. |
 | `Depth.CombatFeel.Classes[1].CarryCapacity` | 3 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | Max units carried. |
@@ -737,7 +737,7 @@ Regenerate: `tools/balance/balance-report.sh tuning-index (or the balance-report
 | `Depth.CombatFeel.Classes[1].RecoverySeconds` | 0.22 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | DG-69: real seconds of slowed follow-through after the hit (the view's recovery; movement stays slowed). |
 | `Depth.CombatFeel.Classes[1].Mass` | 0.8 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | DG-70 / OD-3: knock distances are divided by this (Warrior heaviest, Farmer lightest). |
 | `Depth.CombatFeel.Classes[1].Poise` | 20 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | DG-70: a single hit of at least this much damage staggers this class (HeavyStunSeconds). |
-| `Depth.CombatFeel.Classes[2].MaxHp` | 100 | double | `Assets/_Game/Sim/Config/GameConfig.cs` |  |
+| `Depth.CombatFeel.Classes[2].MaxHp` | 115 | double | `Assets/_Game/Sim/Config/GameConfig.cs` |  |
 | `Depth.CombatFeel.Classes[2].MoveSpeed` | 4 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | Units per second. |
 | `Depth.CombatFeel.Classes[2].Radius` | 0.45 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | Collision circle. |
 | `Depth.CombatFeel.Classes[2].AttackDamage` | 19 | double | `Assets/_Game/Sim/Config/GameConfig.cs` |  |
@@ -754,10 +754,10 @@ Regenerate: `tools/balance/balance-report.sh tuning-index (or the balance-report
 | `Depth.CombatFeel.Classes[3].MaxHp` | 120 | double | `Assets/_Game/Sim/Config/GameConfig.cs` |  |
 | `Depth.CombatFeel.Classes[3].MoveSpeed` | 4 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | Units per second. |
 | `Depth.CombatFeel.Classes[3].Radius` | 0.45 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | Collision circle. |
-| `Depth.CombatFeel.Classes[3].AttackDamage` | 15 | double | `Assets/_Game/Sim/Config/GameConfig.cs` |  |
+| `Depth.CombatFeel.Classes[3].AttackDamage` | 18 | double | `Assets/_Game/Sim/Config/GameConfig.cs` |  |
 | `Depth.CombatFeel.Classes[3].AttackRange` | 1.4 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | Melee reach from the actor centre. |
 | `Depth.CombatFeel.Classes[3].AttackArcDeg` | 90 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | Cleave arc, centred on facing. |
-| `Depth.CombatFeel.Classes[3].AttackCooldown` | 0.7 | double | `Assets/_Game/Sim/Config/GameConfig.cs` |  |
+| `Depth.CombatFeel.Classes[3].AttackCooldown` | 0.65 | double | `Assets/_Game/Sim/Config/GameConfig.cs` |  |
 | `Depth.CombatFeel.Classes[3].AbilityCooldown` | 12 | double | `Assets/_Game/Sim/Config/GameConfig.cs` |  |
 | `Depth.CombatFeel.Classes[3].GatherSeconds` | 2 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | Time to pull one unit from a node. |
 | `Depth.CombatFeel.Classes[3].CarryCapacity` | 1 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | Max units carried. |
@@ -775,14 +775,14 @@ Regenerate: `tools/balance/balance-report.sh tuning-index (or the balance-report
 | `Depth.CombatFeel.Classes[4].AbilityCooldown` | 12 | double | `Assets/_Game/Sim/Config/GameConfig.cs` |  |
 | `Depth.CombatFeel.Classes[4].GatherSeconds` | 2 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | Time to pull one unit from a node. |
 | `Depth.CombatFeel.Classes[4].CarryCapacity` | 1 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | Max units carried. |
-| `Depth.CombatFeel.Classes[4].AttackWindupSeconds` | 0.33 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | DG-69 / OD-2: real seconds from the attack press to the hit (0 = the browser's press-tick hit). |
+| `Depth.CombatFeel.Classes[4].AttackWindupSeconds` | 0.35 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | DG-69 / OD-2: real seconds from the attack press to the hit (0 = the browser's press-tick hit). |
 | `Depth.CombatFeel.Classes[4].RecoverySeconds` | 0.3 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | DG-69: real seconds of slowed follow-through after the hit (the view's recovery; movement stays slowed). |
 | `Depth.CombatFeel.Classes[4].Mass` | 1.3 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | DG-70 / OD-3: knock distances are divided by this (Warrior heaviest, Farmer lightest). |
 | `Depth.CombatFeel.Classes[4].Poise` | 26 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | DG-70: a single hit of at least this much damage staggers this class (HeavyStunSeconds). |
 | `Depth.CombatFeel.Classes[5].MaxHp` | 110 | double | `Assets/_Game/Sim/Config/GameConfig.cs` |  |
 | `Depth.CombatFeel.Classes[5].MoveSpeed` | 4.1 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | Units per second. |
 | `Depth.CombatFeel.Classes[5].Radius` | 0.42 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | Collision circle. |
-| `Depth.CombatFeel.Classes[5].AttackDamage` | 15 | double | `Assets/_Game/Sim/Config/GameConfig.cs` |  |
+| `Depth.CombatFeel.Classes[5].AttackDamage` | 14 | double | `Assets/_Game/Sim/Config/GameConfig.cs` |  |
 | `Depth.CombatFeel.Classes[5].AttackRange` | 1.5 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | Melee reach from the actor centre. |
 | `Depth.CombatFeel.Classes[5].AttackArcDeg` | 90 | double | `Assets/_Game/Sim/Config/GameConfig.cs` | Cleave arc, centred on facing. |
 | `Depth.CombatFeel.Classes[5].AttackCooldown` | 0.8 | double | `Assets/_Game/Sim/Config/GameConfig.cs` |  |
@@ -874,8 +874,9 @@ Regenerate: `tools/balance/balance-report.sh tuning-index (or the balance-report
 | `Depth.CombatFeel.CritDamageMul` | 1.25 | double | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` | [9] Damage of a critical hit, applied after every other multiplier (kinds do not stack). Start value of the ask. |
 | `Depth.CombatFeel.CritBackArcDeg` | 120 | double | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` | [9] The rear arc (degrees, centred on the back) a back hit comes from: 120 = more than 120 deg off his facing. |
 | `Depth.CombatFeel.BotHumanLimits` | true | bool | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` | [2] Bots fight by human limits (BotAim): aim delay, aim error and a class-arc press cone. False = b16 bots. |
-| `Depth.CombatFeel.BotMeleeAimDelayTicks` | [5, 8, 2] | int[] | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` | [2] Melee aim delay (ticks at 30 Hz) by BotDifficulty (Normal, Easy, Hard): the bot aims at where its target was this long ago (a 0.2 s human = 6). |
-| `Depth.CombatFeel.BotMeleeAimErrorDeg` | [20, 35, 5] | double[] | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` | [2] Melee aim error (degrees, uniform +-) by BotDifficulty, redrawn every 1/3 s. |
+| `Depth.CombatFeel.BotMeleeAimDelayTicks` | [5, 12, 2] | int[] | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` | [2] Melee aim delay (ticks at 30 Hz) by BotDifficulty (Normal, Easy, Hard): the bot aims at where its target was this long ago (a 0.2 s human = 6). |
+| `Depth.CombatFeel.BotMeleeAimErrorDeg` | [20, 45, 5] | double[] | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` | [2] Melee aim error (degrees, uniform +-) by BotDifficulty, redrawn every 1/3 s. |
+| `Depth.CombatFeel.BotSwingHesitation` | [0.3, 0.85, 0] | double[] | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` | px S3: share of 1/3-s windows in which a bot holds a ready swing, by BotDifficulty (Normal, Easy, Hard); the larger of this and the BotSkillConfig.SwingHesitation profile wins. Full rules only. |
 | `Depth.CombatFeel.BotSwingTrackScale` | [0.1, 0, 0.5] | double[] | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` | [2] A bot's swing tracks at this share of SwingTrackDegPerSecond, by BotDifficulty (Normal, Easy, Hard). Measured: with full tracking a Normal bot landed 95% on an evasive circle-strafing human (target 40-75%). |
 | `Depth.CombatFeel.BotMeleeDodgeChance` | [0.05, 0.1, 0.6] | double[] | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` | [3] Melee dodge chance of a bot (Easy, Normal, Hard: DodgeConfig order) while BotHumanLimits is on; null = DodgeConfig.DodgeChance (0.15 / 0.35 / 0.60). |
 | `Depth.CombatFeel.BotPressConeIsClassArc` | true | bool | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` | [2] The bot presses only with the target inside its own class arc (b16: a flat 60 degrees each side for all). |
@@ -976,6 +977,8 @@ Regenerate: `tools/balance/balance-report.sh tuning-index (or the balance-report
 | `Depth.Seat.MinerDigsAwayFromVein` | true | bool | `Assets/_Game/Sim/Config/PlayerSeatConfig.cs` | A human Miner's F away from an ore vein digs the cell ahead with the Builder's dig rule (no carry, no place). Bots never dig. |
 | `Depth.Seat.IdleAimUnits` | 0.5 | double | `Assets/_Game/Sim/Config/PlayerSeatConfig.cs` | Idle rule: an aim (relative to the body) that moved this far since input last counted is input. |
 | `Depth.Seat.IdleAimDegrees` | 2 | double | `Assets/_Game/Sim/Config/PlayerSeatConfig.cs` | Idle rule: an aim direction that turned this many degrees since input last counted is input. |
+| `Depth.Seat.MinerTapMinesToFull` | true | bool | `Assets/_Game/Sim/Config/PlayerSeatConfig.cs` | Lane S3 (lead's call): one tap of F at an ore vein keeps a human Miner mining until the cargo is full or the vein is out; moving, attacking, Cancel, a hit or a get-up stops it. False = one unit per tap. Bots unchanged. |
+| `Depth.Seat.MinerTapStopMoveShare` | 0.25 | double | `Assets/_Game/Sim/Config/PlayerSeatConfig.cs` | Lane S3: move input share above which a tapped mining channel stops (under it is stick drift). |
 | `Depth.Mech.FeedExtrasShare` | false | bool | `Assets/_Game/Sim/Config/MechRulesConfig.cs` | The director's two extra Kaiju feeders (ahead, or 10 s behind) become a share of the team: ceil(FeedExtraShare x team size) = 2 at 16, 1 at 8, 1 at 5 (before: 2 at every size, 3 of 5 bots off the hill at 5v5). |
 | `Depth.Mech.FeedExtraShare` | 0.12 | double | `Assets/_Game/Sim/Config/MechRulesConfig.cs` |  |
 | `Depth.Mech.HutBotsWaitForHumans` | true | bool | `Assets/_Game/Sim/Config/MechRulesConfig.cs` | On a team with at least one human at the controls, bots hold their votes until HutBotLastSeconds are left in the window or every such human has voted, whichever is first, and then follow the humans' majority; when the... |

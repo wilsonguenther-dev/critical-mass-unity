@@ -240,7 +240,12 @@ namespace CriticalMass.Sim.Core
             if (!f.CritEnabled || source < 0 || target < 0 || source == target) return 0;
             Actor t = w.Actors[target];
             if (!t.Alive) return 0;
-            if (t.SwingPending) return 1;
+            // px S3: a critical strike is a hit on an enemy (melee never lands on an ally); also keeps the back-arc bearing
+            // off the per-tick cost probe's ally pairs.
+            if (w.Actors[source].Team == t.Team) return 0;
+            // px S3: a victim whose own swing reaches contact THIS tick is trading blows, not caught winding up: no COUNTER
+            // (the queue is read in actor-id order, so the lower id used to crit every same-tick trade: S35 16-0 mirrors).
+            if (t.SwingPending && t.SwingTick + t.SwingWindup > w.Tick) return 1;
             if (w.Tick <= w.Depth.Feel.WhiffRecoverUntil[target]) return 2;
             if (f.CritBackArcDeg > 0)
             {
@@ -248,9 +253,12 @@ namespace CriticalMass.Sim.Core
                 double l = Math.Sqrt(dx * dx + dz * dz);
                 if (l > 1e-9)
                 {
-                    double cos = (dx * JsMath.Cos(t.Facing) + dz * JsMath.Sin(t.Facing)) / l;
-                    // the rear arc of CritBackArcDeg: the angle between his facing and the way to the attacker > 180 - arc/2
-                    if (cos < -JsMath.Cos(f.CritBackArcDeg * 0.5 * Math.PI / 180) - 1e-12) return 3;
+                    // the rear arc of CritBackArcDeg: the angle between his facing and the way to the attacker > 180 - arc/2.
+                    // px S3: one fdlibm call (the bearing), not three (cos and sin of his facing, cos of the half-arc): the
+                    // rule's own per-tick cost went 2.5 -> 25 us with crits on (CombatFeelTests.TickCost, limit 0.05 of a tick).
+                    double off = JsMath.Atan2(dz, dx) - t.Facing;
+                    off -= 2 * Math.PI * Math.Floor((off + Math.PI) / (2 * Math.PI));
+                    if (Math.Abs(off) > Math.PI - f.CritBackArcDeg * 0.5 * Math.PI / 180 + 1e-12) return 3;
                 }
             }
             return 0;

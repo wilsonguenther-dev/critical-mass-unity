@@ -180,6 +180,13 @@ namespace CriticalMass.Sim.Core
                 else World.PushEvent(w, SimEventType.Death, targetId, credit, tx, tz, dmg, null, cause);
                 return dmg;
             }
+            // px S3: TNT and mine blasts (DamageCause.Explosion) open the "wounded" window too, as a landed melee hit does in
+            // CombatFeel.ApplyStrike (heal and fountain cut, low-HP slow); WoundedSeconds 0 = off. Full rules only.
+            if (cause == DamageCause.Explosion && dmg > 0 && fromActor && w.Actors[sourceId].Team != t.Team && CombatFeel.On(w))
+            {
+                double ws = CombatFeel.Cfg(w).WoundedSeconds;
+                if (ws > 0) w.Depth.Feel.WoundedUntil[targetId] = w.Tick + CombatFeel.Ticks(w, ws);
+            }
             if (physics && (eff > 0 || stunTicks > 0)) Knock.Push(w, targetId, sourceId, dirX, dirZ, eff, stunTicks, tier, cause);
             return dmg;
         }

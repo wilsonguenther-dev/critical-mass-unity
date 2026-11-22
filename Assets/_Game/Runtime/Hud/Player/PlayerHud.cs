@@ -218,6 +218,14 @@ namespace CriticalMass.Runtime.Hud.Player
                 case SimEventType.Heal:
                     if (e.A == me) Numbers.AddHeal(me, (float)e.Value);
                     break;
+                case SimEventType.CriticalHit:
+                    ShowCritical(e.A, e.B, (int)e.Value, (float)e.Radius);
+                    break;
+                case SimEventType.AutopilotChanged:
+                    // lane S3: the sim's idle autopilot took the local fighter (Value 1) or handed it back (0); the plate in
+                    // B16MechHud holds while it drives, this tag marks both edges over the fighter.
+                    if (e.A == me) Tags.OnAutopilot(w, me, e.Value >= 0.5);
+                    break;
             }
         }
 

@@ -50,8 +50,10 @@ namespace CriticalMass.Sim.Config
             // close (FarmerCloseShare inside FarmerCloseRange). 23 every 0.65 s (pass 4b: 20 -> 23, tune search BEST).
             new ClassConfig
             {
-                MaxHp = 100, MoveSpeed = 4.2, Radius = 0.4, AttackDamage = 23, AttackRange = 2.3, AttackArcDeg = 60,
-                AttackCooldown = 0.65, AbilityCooldown = 9, GatherSeconds = 1, CarryCapacity = 3,
+                // px S3: cooldown 0.65 -> 0.70 (a lag-6 human Farmer beat the middle three 0.75 with the bots at human limits;
+                // data/s3-tune/sweep/t10-t13).
+                MaxHp = 100, MoveSpeed = 4.2, Radius = 0.4, AttackDamage = 22, AttackRange = 2.3, AttackArcDeg = 60,   // px S3: 23 -> 22 (middle three 0.79 -> 0.75)
+                AttackCooldown = 0.70, AbilityCooldown = 9, GatherSeconds = 1, CarryCapacity = 3,
                 AttackWindupSeconds = 0.31, RecoverySeconds = 0.22, Mass = 0.8, Poise = 20,   // b16: 0.27 -> 0.31 wind-up (no middle-class king)
             },
             // MINER: fast pick (0.20 s wind-up, 0.65 s cycle), light body (110 HP). Armour break: his hits leave SUNDER (+15% for
@@ -62,7 +64,9 @@ namespace CriticalMass.Sim.Config
             {
                 // px S1 [3]: 17 -> 19 (19, not 20: 20 reaches the Poise 20 of the Farmer and Healer, a heavy stagger; human-seat probe: a lag-6 human Miner won 10 of 48 duels vs Normal bots and a human Healer beat
                 // a Miner bot 4 of 4; at 20: 20 of 24 and 2 of 4, non-mirror share 0.52 -> 0.58; data/s1-combat/sweep/t1_*).
-                MaxHp = 100, MoveSpeed = 4.0, Radius = 0.45, AttackDamage = 19, AttackRange = 1.5, AttackArcDeg = 90,
+                // px S3: 100 -> 115 HP (a human Healer beat the Miner bot 5 of 8; at 115 her 14 lantern needs 9 hits, not 7;
+                // middle-three share 0.25 -> 0.63; data/s3-tune/sweep/t1, t13).
+                MaxHp = 115, MoveSpeed = 4.0, Radius = 0.45, AttackDamage = 19, AttackRange = 1.5, AttackArcDeg = 90,
                 AttackCooldown = 0.65, AbilityCooldown = 12, GatherSeconds = 2, CarryCapacity = 1,
                 AttackWindupSeconds = 0.35, RecoverySeconds = 0.18, Mass = 1.1, Poise = 24,   // b16: 0.20 -> 0.35 wind-up (the swing only; mining is GatherSeconds and the terraform rules)
             },
@@ -70,8 +74,10 @@ namespace CriticalMass.Sim.Config
             // TntCooldownTicks instead of 150; her own blast hurts her (TntSelfShare): self-risk.
             new ClassConfig
             {
-                MaxHp = 120, MoveSpeed = 4.0, Radius = 0.45, AttackDamage = 15, AttackRange = 1.4, AttackArcDeg = 90,   // b16: 12 -> 15
-                AttackCooldown = 0.70, AbilityCooldown = 12, GatherSeconds = 2, CarryCapacity = 1,
+                // px S3: pry bar 15 -> 18 and cooldown 0.70 -> 0.65 (a lag-6 human Demolitionist won 0.21 of her duels vs Normal
+                // bots, 3 of 8 vs the Healer bot, middle three 0.25; at 18 she needs 7 hits on the Builder, Healer and Miner, not 8).
+                MaxHp = 120, MoveSpeed = 4.0, Radius = 0.45, AttackDamage = 18, AttackRange = 1.4, AttackArcDeg = 90,   // b16: 12 -> 15; px S3: 18
+                AttackCooldown = 0.65, AbilityCooldown = 12, GatherSeconds = 2, CarryCapacity = 1,
                 AttackWindupSeconds = 0.23, RecoverySeconds = 0.25, Mass = 1.0, Poise = 22,
             },
             // BUILDER: hammer (26 every 0.9 s, 0.33 s wind-up; 23 measured 6.1 s on the Warrior and 2.4% of all damage in 16v16) with the biggest knockback; x1.5 within BuilderHomeRadius of his
@@ -80,14 +86,16 @@ namespace CriticalMass.Sim.Config
             {
                 MaxHp = 120, MoveSpeed = 4.0, Radius = 0.45, AttackDamage = 26, AttackRange = 1.6, AttackArcDeg = 100,
                 AttackCooldown = 0.90, AbilityCooldown = 12, GatherSeconds = 2, CarryCapacity = 1,
-                AttackWindupSeconds = 0.33, RecoverySeconds = 0.30, Mass = 1.3, Poise = 26,
+                // px S3: wind-up 0.33 -> 0.35 (a human Builder won 0.83 of the middle three; 0.38 swung it the other way, 0.50)
+                AttackWindupSeconds = 0.35, RecoverySeconds = 0.30, Mass = 1.3, Poise = 26,
             },
             // HEALER: her row now says what her strike does (the audit: config 4.5 u / 0 damage, real strike 1.6 u / 8). Her
             // attack press MENDS the hurt ally in MendRange first (a visible beam, MendHeal, on her AttackCooldown); with nobody
             // to mend it swings her lantern: 15 at 1.5 u. Bots keep HealerBotStandOff from the enemy.
             new ClassConfig
             {
-                MaxHp = 110, MoveSpeed = 4.1, Radius = 0.42, AttackDamage = 15, AttackRange = 1.5, AttackArcDeg = 90,
+                // px S3: lantern 15 -> 14 (the Healer loses every 1v1: with the Miner at 115 HP she needs 9 hits, not 8)
+                MaxHp = 110, MoveSpeed = 4.1, Radius = 0.42, AttackDamage = 14, AttackRange = 1.5, AttackArcDeg = 90,
                 AttackCooldown = 0.80, AbilityCooldown = 9, GatherSeconds = 1.5, CarryCapacity = 2,
                 AttackWindupSeconds = 0.23, RecoverySeconds = 0.22, Mass = 0.9, Poise = 20,
             },
@@ -267,19 +275,27 @@ namespace CriticalMass.Sim.Config
         /// its own wind-up (counter), in the recovery of its whiff (punish) or from its rear arc (back hit). Measured in
         /// data/s1-combat/crit/. OFF by default: the ask's bar "the strong model gains >= 5 points" is not shown yet. Measured on
         /// (288 duels each): lag-6 0.50 -> 0.50, 50%-player 0.28 -> 0.30, first-match floor 0.27 -> 0.27, a 0.13 s human 0.53 ->
-        /// 0.54 (+1; the probe has no feint / back-circling model yet). Turn on once that model shows the gain.</summary>
-        public bool CritEnabled = false;
+        /// 0.54 (+1; the probe has no feint / back-circling model yet). Turn on once that model shows the gain.
+        /// px S3: ON. The gate's strong model (feints, dodges, hit-cancels) gains 0.68 -> 0.73 vs Normal (S48b passes) and
+        /// 0.51 -> 0.53 vs Hard; the first-match floor holds (0.30 -> 0.30); Warrior wins all (39/40), Healer loses all (3/40);
+        /// S43, S44, S35 stay green; the only band move is the Demolitions middle-three share 0.50 -> 0.75 (5 points over).
+        /// Same-tick trades are not COUNTERs (CritKindOf). Data: data/s3-tune/sweep/crit1.25.txt, crit1.15.txt.</summary>
+        public bool CritEnabled = true;
         /// <summary>[9] Damage of a critical hit, applied after every other multiplier (kinds do not stack). Start value of the ask.</summary>
         public double CritDamageMul = 1.25;
         /// <summary>[9] The rear arc (degrees, centred on the back) a back hit comes from: 120 = more than 120 deg off his facing.</summary>
         public double CritBackArcDeg = 120;   // pass 2: 0.85 -> 0.75 (lag-6 Warrior catch within 4 s 17/48 -> 22/48)
         /// <summary>[2] Bots fight by human limits (BotAim): aim delay, aim error and a class-arc press cone. False = b16 bots.</summary>
         public bool BotHumanLimits = true;
+        /// <summary>px S3: share of 1/3-s windows in which a bot holds a ready swing, by BotDifficulty (Normal, Easy, Hard); the
+        /// larger of this and the BotSkillConfig.SwingHesitation profile wins (Easy's profile is 0.4). Full rules only (BotAim.On).
+        /// null = off (S1). Measured in data/s3-tune/.</summary>
+        public double[] BotSwingHesitation = { 0.3, 0.85, 0 };   // px S3: S48 floor vs Easy 0.36 -> 0.77, vs Normal 0.25 -> 0.29; ceiling 0.63 -> 0.68-0.72
         /// <summary>[2] Melee aim delay (ticks at 30 Hz) by BotDifficulty (Normal, Easy, Hard): the bot aims at where its target
         /// was this long ago (a 0.2 s human = 6). Baseline: Normal bots landed 94% on a circle-strafing human (target 40-75%).</summary>
-        public int[] BotMeleeAimDelayTicks = { 5, 8, 2 };
+        public int[] BotMeleeAimDelayTicks = { 5, 12, 2 };   // px S3: Easy 8 -> 12 (S48 floor vs Easy, data/s3-tune)
         /// <summary>[2] Melee aim error (degrees, uniform +-) by BotDifficulty, redrawn every 1/3 s.</summary>
-        public double[] BotMeleeAimErrorDeg = { 20, 35, 5 };
+        public double[] BotMeleeAimErrorDeg = { 20, 45, 5 };   // px S3: Easy 35 -> 45 (S48 floor vs Easy, data/s3-tune)
         /// <summary>[2] A bot's swing tracks at this share of SwingTrackDegPerSecond, by BotDifficulty (Normal, Easy, Hard).
         /// Measured: with full tracking a Normal bot landed 95% on an evasive circle-strafing human (target 40-75%).</summary>
         public double[] BotSwingTrackScale = { 0.1, 0, 0.5 };   // Normal 0.1 -> 0.62-0.76 measured (sweep in FINDINGS)
@@ -305,6 +321,7 @@ namespace CriticalMass.Sim.Config
             if (BotMeleeDodgeChance != null) c.BotMeleeDodgeChance = (double[])BotMeleeDodgeChance.Clone();
             if (BotSwingTrackScale != null) c.BotSwingTrackScale = (double[])BotSwingTrackScale.Clone();
             if (BotMeleeAimErrorDeg != null) c.BotMeleeAimErrorDeg = (double[])BotMeleeAimErrorDeg.Clone();
+            if (BotSwingHesitation != null) c.BotSwingHesitation = (double[])BotSwingHesitation.Clone();
             if (SwingTrackDegPerSecondByClass != null) c.SwingTrackDegPerSecondByClass = (double[])SwingTrackDegPerSecondByClass.Clone();
             return c;
         }

@@ -26,6 +26,9 @@ namespace CriticalMass.Runtime.View.Effects
         /// <summary>px lane C: SimEventType.StructureHit: A = attacker, B = PlayerReasons.Structure* kind, (X, Z) = the cell
         /// centre, Value = damage (0 with StructureSolid: cannot break), Extra = share of health left (0 = it broke).</summary>
         StructureHit,
+        /// <summary>px lane S3: SimEventType.CriticalHit (lead's call 12): A = victim, B = attacker, Value = kind (1 counter,
+        /// 2 punish, 3 back hit), Extra = the bonus damage. Raised right after the critical Hit of the same tick.</summary>
+        Critical,
     }
 
     /// <summary>One decoded effect event. Tick is the sim tick the sim raised it in (exact: decoded once per tick).</summary>
@@ -395,6 +398,11 @@ namespace CriticalMass.Runtime.View.Effects
                     }
                     return true;
                 }
+                case SimEventType.CriticalHit:
+                    if (ev.A < 0 || ev.A >= w.ActorCount) return false;
+                    Begin(FxKind.Critical, w, ev.A, ev.B, w.X[ev.A], w.Z[ev.A], ev.Value);
+                    _e.Extra = ev.Radius;
+                    return true;
                 case SimEventType.KaijuDamaged:
                     // (X, Z) = the contact point on the Kaiju toward the attacker (A), Value = damage dealt.
                     Begin(FxKind.KaijuHit, w, -1, -1, ev.X, ev.Z, ev.Value);

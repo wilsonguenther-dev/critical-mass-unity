@@ -168,9 +168,13 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
                 _hz[h] = w.Z[t];
                 _seen++;
                 double tx = w.X[t], tz = w.Z[t];
-                if (LagTicks > 0 && _seen > LagTicks)
+                if (LagTicks > 0)
                 {
-                    int hl = (w.Tick - LagTicks) & 63;
+                    // lane S3: before LagTicks samples exist the model sees its OLDEST sample (it has not reacted yet), not the
+                    // live position: a slower model used to see perfectly for its first LagTicks ticks and so pressed first
+                    // (S35: seat B at lag 7 out-swung seat A at lag 6 in every Miner and Healer mirror).
+                    int back = Math.Min(LagTicks, _seen - 1);
+                    int hl = (w.Tick - back) & 63;
                     tx = _hx[hl];
                     tz = _hz[hl];
                 }
