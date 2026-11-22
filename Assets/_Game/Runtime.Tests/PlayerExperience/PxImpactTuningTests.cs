@@ -223,6 +223,61 @@ namespace CriticalMass.Runtime.Tests
             }
         }
 
+        /// <summary>Round 3 (review pass 3: no HitFlash / HitStop in the ledger): a hit by the local player, frame by frame as
+        /// ActorViews draws it (flash on 8 frames, hold 5 frames, knock check once, a skipped frame in the middle), reports
+        /// HitFlash, HitStop and KnockVisual each exactly once, with a non-null source; a second hit reports again.</summary>
+        [Test]
+        public void AHitByMeReportsFlashHitStopAndKnockExactlyOnceWithASource()
+        {
+            var go = new UnityEngine.GameObject("px-cue-source");
+            try
+            {
+                var src = go.AddComponent<UnityEngine.MeshRenderer>();
+                CriticalMass.Runtime.Game.PlayerFeedback.Clear();
+                int cursor = CriticalMass.Runtime.Game.PlayerFeedback.Head;
+                var seen = ImpactCueLedger.Make(4);
+                const int victim = 2;
+                double flashStart = 10.0;
+                for (int f = 0; f < 12; f++)
+                {
+                    if (f == 4) continue;   // a frame the victim was not drawn (never loses the cue)
+                    ImpactCueLedger.Frame(ref seen[victim], victim, src,
+                        f < 8, true, flashStart, HitFeelTuning.FlashStrength(true, true),
+                        f < 5, true, 300, 80f,
+                        f == 6, true, 0.5f);
+                }
+                foreach (var ch in new[] { CriticalMass.Runtime.Game.FeedbackChannel.HitFlash, CriticalMass.Runtime.Game.FeedbackChannel.HitStop,
+                                           CriticalMass.Runtime.Game.FeedbackChannel.KnockVisual })
+                {
+                    Assert.AreEqual(1, CriticalMass.Runtime.Game.PlayerFeedback.Count(ch, cursor, victim), ch + " exactly once");
+                    Assert.IsTrue(CriticalMass.Runtime.Game.PlayerFeedback.TryFind(ch, cursor, victim, out var entry));
+                    Assert.IsNotNull(entry.Source, ch + " has a source");
+                }
+                // the next hit (new flash start, new hold tick) reports again
+                ImpactCueLedger.Frame(ref seen[victim], victim, src, true, true, 10.5, 0.85f, true, true, 315, 80f, false, true, 0f);
+                Assert.AreEqual(2, CriticalMass.Runtime.Game.PlayerFeedback.Count(CriticalMass.Runtime.Game.FeedbackChannel.HitFlash, cursor, victim));
+                Assert.AreEqual(2, CriticalMass.Runtime.Game.PlayerFeedback.Count(CriticalMass.Runtime.Game.FeedbackChannel.HitStop, cursor, victim));
+                // someone else's hit (not own) reports nothing
+                ImpactCueLedger.Frame(ref seen[1], 1, src, true, false, 11.0, 0.62f, true, false, 330, 60f, true, false, 0.3f);
+                Assert.AreEqual(0, CriticalMass.Runtime.Game.PlayerFeedback.Count(CriticalMass.Runtime.Game.FeedbackChannel.HitFlash, cursor, 1));
+            }
+            finally { UnityEngine.Object.DestroyImmediate(go); }
+        }
+
+        /// <summary>Round 3: the third-person own flash spans the impact frame and the hold, stays short, and the starts stay
+        /// under 3 a second; the near-side contact spark is a small part of the victim.</summary>
+        [Test]
+        public void TheThirdPersonOwnFlashCoversTheHoldAndTheNearSparkIsSmall()
+        {
+            Assert.GreaterOrEqual(HitFeelTuning.FlashSeconds(true, true), 0.15);
+            Assert.LessOrEqual(HitFeelTuning.FlashSeconds(true, true), HitFeelTuning.FlashMinGapSeconds * 0.6);
+            Assert.AreEqual(HitFeelTuning.FlashSeconds(true), HitFeelTuning.FlashSeconds(true, false));
+            Assert.AreEqual(HitFeelTuning.FlashSeconds(false), HitFeelTuning.FlashSeconds(false, true));
+            Assert.LessOrEqual(HitFeelTuning.NearSpark3PSize, 0.35f);
+            Assert.LessOrEqual(HitFeelTuning.NearSpark3PLife, 0.1);
+            Assert.That(HitFeelTuning.NearSpark3PLines, Is.InRange(3, 4));
+        }
+
         [Test]
         public void TheTopDownAimLeanIsCappedAndUsesTheRawAim()
         {

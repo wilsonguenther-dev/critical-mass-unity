@@ -135,7 +135,11 @@ namespace CriticalMass.Runtime.View.Effects
         public double FlashSeconds => FlashSecondsFor(false);
 
         /// <summary>px lane C: flash length (sim s) for an own-hit or other flash (HitFeelTuning: 120 / 100 ms wall).</summary>
-        public double FlashSecondsFor(bool own) => _scene != null ? _scene.S(HitFeelTuning.FlashSeconds(own)) : HitFeelTuning.FlashSeconds(own) * 2;
+        public double FlashSecondsFor(bool own)
+        {
+            double wall = HitFeelTuning.FlashSeconds(own, CriticalMass.Runtime.Camera.GroundView.PlayActive);
+            return _scene != null ? _scene.S(wall) : wall * 2;
+        }
 
         private void Awake()
         {
@@ -768,6 +772,24 @@ namespace CriticalMass.Runtime.View.Effects
                 any = true;
             }
             return any;
+        }
+
+        /// <summary>Round 3 (ledger): the sim time actor i's current flash started (NegativeInfinity none) and whether it is
+        /// an own-hit flash; the tick of its current hold, its wall ms and whether it is own (ActorViews reports each once,
+        /// keyed on these, instead of on the one-frame FlashNew / HoldNew latches).</summary>
+        public double FlashStartOf(int i) => _flashStart != null && i >= 0 && i < _flashStart.Length ? _flashStart[i] : double.NegativeInfinity;
+
+        public bool HoldOf(int i, out int tick, out float ms, out bool own)
+        {
+            tick = int.MinValue; ms = 0f; own = false;
+            if (_feed == null || i < 0 || i >= _feed.HoldTick.Length) return false;
+            tick = _feed.HoldTick[i];
+            bool crit = _feed.CritHoldTick[i] == tick;
+            double wall = crit ? HitFeelTuning.HoldCritWallSeconds(FeelGate.ReduceMotion) : Anim.HitFeel.HoldWallSeconds(_feed.HoldTier[i], FeelGate.ReduceMotion);
+            ms = (float)(wall * 1000);
+            int me = LocalSeat.Actor;
+            own = OwnVictimAt(i, tick) || (_feed.LastHitBy[i] == me && _feed.LastHitTick[i] == tick);
+            return ms > 0f;
         }
 
         /// <summary>px lane C: the hold of `attacker` at tick hk is an own hit: it is the local player, or it hit the local player then.</summary>
