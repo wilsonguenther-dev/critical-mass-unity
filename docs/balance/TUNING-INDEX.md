@@ -4,7 +4,7 @@ Every tuning field the sim reads from `GameConfig`, found by reflection (`Assets
 
 Regenerate: `tools/balance/balance-report.sh tuning-index (or the balance-report workflow, mode tuning-index)`. `TuningIndexTests` fails when a field has no row here. Paths work as `--set Path=Value` switches for the balance report.
 
-898 fields.
+899 fields.
 
 ## (top level)
 
@@ -874,8 +874,9 @@ Regenerate: `tools/balance/balance-report.sh tuning-index (or the balance-report
 | `Depth.CombatFeel.CritDamageMul` | 1.25 | double | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` | [9] Damage of a critical hit, applied after every other multiplier (kinds do not stack). Start value of the ask. |
 | `Depth.CombatFeel.CritBackArcDeg` | 120 | double | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` | [9] The rear arc (degrees, centred on the back) a back hit comes from: 120 = more than 120 deg off his facing. |
 | `Depth.CombatFeel.BotHumanLimits` | true | bool | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` | [2] Bots fight by human limits (BotAim): aim delay, aim error and a class-arc press cone. False = b16 bots. |
-| `Depth.CombatFeel.BotMeleeAimDelayTicks` | [5, 8, 2] | int[] | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` | [2] Melee aim delay (ticks at 30 Hz) by BotDifficulty (Normal, Easy, Hard): the bot aims at where its target was this long ago (a 0.2 s human = 6). |
-| `Depth.CombatFeel.BotMeleeAimErrorDeg` | [20, 35, 5] | double[] | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` | [2] Melee aim error (degrees, uniform +-) by BotDifficulty, redrawn every 1/3 s. |
+| `Depth.CombatFeel.BotMeleeAimDelayTicks` | [5, 12, 2] | int[] | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` | [2] Melee aim delay (ticks at 30 Hz) by BotDifficulty (Normal, Easy, Hard): the bot aims at where its target was this long ago (a 0.2 s human = 6). |
+| `Depth.CombatFeel.BotMeleeAimErrorDeg` | [20, 45, 5] | double[] | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` | [2] Melee aim error (degrees, uniform +-) by BotDifficulty, redrawn every 1/3 s. |
+| `Depth.CombatFeel.BotSwingHesitation` | [0.3, 0.85, 0] | double[] | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` | px S3: share of 1/3-s windows in which a bot holds a ready swing, by BotDifficulty (Normal, Easy, Hard); the larger of this and the BotSkillConfig.SwingHesitation profile wins. Full rules only. |
 | `Depth.CombatFeel.BotSwingTrackScale` | [0.1, 0, 0.5] | double[] | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` | [2] A bot's swing tracks at this share of SwingTrackDegPerSecond, by BotDifficulty (Normal, Easy, Hard). Measured: with full tracking a Normal bot landed 95% on an evasive circle-strafing human (target 40-75%). |
 | `Depth.CombatFeel.BotMeleeDodgeChance` | [0.05, 0.1, 0.6] | double[] | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` | [3] Melee dodge chance of a bot (Easy, Normal, Hard: DodgeConfig order) while BotHumanLimits is on; null = DodgeConfig.DodgeChance (0.15 / 0.35 / 0.60). |
 | `Depth.CombatFeel.BotPressConeIsClassArc` | true | bool | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` | [2] The bot presses only with the target inside its own class arc (b16: a flat 60 degrees each side for all). |
