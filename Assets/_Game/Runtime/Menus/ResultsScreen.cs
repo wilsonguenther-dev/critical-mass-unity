@@ -157,7 +157,7 @@ namespace CriticalMass.Runtime.Menus
             Rect mr = ResultsLayout.MainMenuButton, cr = ResultsLayout.ChangeClassButton, pr = ResultsLayout.PlayAgainButton;
             // Home lobby (feat/lobby): one press back to HOME, where this match's rewards land on the player card.
             _menu = Button(space, "Main Menu", mr.x, mr.y, mr.width, mr.height, "HOME", () => Director.ToMainMenu(), UiScale.TypeButton);
-            _change = Button(space, "Change Class", cr.x, cr.y, cr.width, cr.height, "CHANGE CLASS", () => Director.ShowSetup(true), UiScale.TypeButton);
+            _change = Button(space, "Change Class", cr.x, cr.y, cr.width, cr.height, "CHANGE CLASS", PressChange, UiScale.TypeButton);
             _again = Button(space, "Play Again", pr.x, pr.y, pr.width, pr.height, "PLAY AGAIN", () => Director.PlayAgain(), UiScale.TypeHeading);
             _again.Body.RimPx = 4f;
             _again.Body.SetRim(Brass);
@@ -563,7 +563,25 @@ namespace CriticalMass.Runtime.Menus
             return true;
         }
 
-        protected override void OnShow() => HideStrayOverlays();
+        protected override void OnShow()
+        {
+            HideStrayOverlays();
+            // px lane F: after a duel the way out is REMATCH (same classes, a new seed) and SWAP CLASSES (yours and theirs trade).
+            bool duel = GameFlow.LastSetup.Mode == MatchMode.Duel;
+            if (_again != null && _again.Label != null) HudText.Set(_again.Label, duel ? "REMATCH" : "PLAY AGAIN");
+            if (_change != null && _change.Label != null) HudText.Set(_change.Label, duel ? "SWAP CLASSES" : "CHANGE CLASS");
+        }
+
+        /// <summary>px lane F: CHANGE CLASS opens match setup; after a duel it is SWAP CLASSES (straight into the swapped duel).</summary>
+        void PressChange()
+        {
+            if (GameFlow.LastSetup.Mode == MatchMode.Duel)
+            {
+                GameFlow.BeginMatch(PlayModes.Swapped(GameFlow.LastSetup), true);
+                return;
+            }
+            Director.ShowSetup(true);
+        }
 
         static float Top => ResultsLayout.CardsTop;
 

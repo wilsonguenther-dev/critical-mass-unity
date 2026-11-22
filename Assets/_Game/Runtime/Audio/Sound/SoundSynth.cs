@@ -401,6 +401,73 @@ namespace CriticalMass.Runtime.Audio.Sound
             R("amb_bird", 0.36f, 0f, L(Si, 0, 0.08f, 2800, 3600, 0.005f, 0.03f, 0.5f, 0, 0, 0, 0.05f, 30f), L(Si, 0.12f, 0.08f, 3000, 4000, 0.005f, 0.03f, 0.5f, 0, 0, 0, 0.05f, 30f),
                 L(Si, 0.22f, 0.1f, 2600, 3400, 0.005f, 0.03f, 0.45f, 0, 0, 0, 0.05f, 30f)),
             R("amb_bird_trill", 0.42f, 0f, L(Si, 0, 0.4f, 3400, 3300, 0.02f, 0.15f, 0.45f, 0, 0, 0, 0.08f, 25f)),
+
+            // ---- player-experience wave (lane F, 2026-11-22): the local player's own tier. Numbers for every recipe (peak,
+            // RMS, length, dominant band) are in cm-incidents/player-experience-rebuild-2026-11-22/data/f-modes-audio/cues.md.
+            // The Warrior's cleave: a low, wide air push (no blade), so a two-handed swing is not a knife slice.
+            R("px_whoosh_cleave", 0.42f, 0f, L(Br, 0, 0.4f, 1, 1, 0.14f, 0.1f, 1.2f, 250, 1300, 60), L(Nz, 0, 0.38f, 1, 1, 0.13f, 0.08f, 0.45f, 400, 1800, 200),
+                L(Si, 0, 0.36f, 120, 55, 0.12f, 0.12f, 0.25f)),
+            // A contact with nobody in it: a thin, light air swish (no slice, no body).
+            R("px_air_swish", 0.2f, 0f, L(Nz, 0, 0.18f, 1, 1, 0.05f, 0.04f, 1f, 1800, 4200, 900)),
+            // The hit-confirm tick (the shooter convention): 75 ms, two partials at 2.8 and 3.7 kHz, the same for every class.
+            R("px_confirm", 0.075f, 0f, L(Si, 0, 0.07f, 2900, 2700, 0.001f, 0.018f, 1f), L(Si, 0, 0.06f, 3800, 3600, 0.001f, 0.012f, 0.45f),
+                L(Nz, 0, 0.01f, 1, 1, 0.0005f, 0.003f, 0.3f, 0, 0, 2500)),
+            // The kill confirm: the tick, then a higher second note.
+            R("px_confirm_kill", 0.18f, 0f, L(Si, 0, 0.07f, 2700, 2700, 0.001f, 0.02f, 1f), L(Si, 0.08f, 0.09f, 3600, 3600, 0.001f, 0.03f, 1f),
+                L(Si, 0.08f, 0.08f, 4800, 4800, 0.001f, 0.015f, 0.25f)),
+            // Weapon bodies under the recorded punches: heavy thud (cleave, hammer), sharp crack (staff, pick), clank (pry
+            // bar), dull bell (lantern; G, in the score's F minor).
+            R("px_thud", 0.3f, 1.4f, L(Si, 0, 0.28f, 110, 42, 0.001f, 0.08f, 1f), L(Br, 0, 0.2f, 1, 1, 0.001f, 0.05f, 0.8f, 900, 250),
+                L(Nz, 0, 0.03f, 1, 1, 0.0005f, 0.008f, 0.35f, 4000, 1500, 400)),
+            R("px_crack", 0.22f, 1.2f, L(Nz, 0, 0.05f, 1, 1, 0.0005f, 0.012f, 1f, 9000, 3000, 1200), L(Cr, 0, 0.15f, 700, 0, 0.0005f, 0.03f, 0.5f, 8000, 0, 1500),
+                L(Si, 0, 0.12f, 240, 140, 0.001f, 0.035f, 0.6f)),
+            R("px_clank", 0.35f, 0f, L(Sq, 0, 0.3f, 620, 600, 0.0005f, 0.06f, 0.5f, 5000, 2000), L(Si, 0, 0.3f, 1480, 1460, 0.0005f, 0.08f, 0.45f),
+                L(Si, 0, 0.3f, 2210, 2200, 0.0005f, 0.05f, 0.3f), L(Nz, 0, 0.02f, 1, 1, 0.0005f, 0.006f, 0.5f, 6000, 0, 800)),
+            R("px_bell", 0.6f, 0f, L(Si, 0, 0.6f, 392, 392, 0.002f, 0.22f, 1f), L(Si, 0, 0.5f, 1050, 1050, 0.002f, 0.12f, 0.45f),
+                L(Si, 0, 0.4f, 1630, 1630, 0.002f, 0.07f, 0.25f), L(Br, 0, 0.08f, 1, 1, 0.001f, 0.02f, 0.4f, 1200)),
+            // The receiving end: a low body thump (I was hit), a sharper ring when my shield took it.
+            R("px_hurt_thump", 0.26f, 1.6f, L(Si, 0, 0.24f, 85, 38, 0.001f, 0.07f, 1f), L(Br, 0, 0.15f, 1, 1, 0.001f, 0.04f, 0.7f, 600, 200),
+                L(Tr, 0, 0.1f, 170, 90, 0.001f, 0.03f, 0.6f)),
+            R("px_hurt_blocked", 0.3f, 0f, L(Si, 0, 0.28f, 1320, 1300, 0.0005f, 0.06f, 0.7f), L(Sq, 0, 0.2f, 660, 650, 0.0005f, 0.04f, 0.35f, 4000, 1500),
+                L(Nz, 0, 0.03f, 1, 1, 0.0005f, 0.008f, 0.6f, 7000, 0, 1000), L(Si, 0, 0.15f, 90, 50, 0.001f, 0.04f, 0.6f)),
+            // Low health: one lub-dub (the director repeats it at 1.2 to 1.8 Hz). A 124 Hz overtone so laptop speakers carry it.
+            R("px_heartbeat", 0.42f, 0f, L(Si, 0, 0.12f, 62, 45, 0.004f, 0.035f, 1f), L(Si, 0.17f, 0.12f, 55, 40, 0.004f, 0.03f, 0.75f),
+                L(Tr, 0, 0.1f, 124, 90, 0.004f, 0.03f, 0.75f), L(Tr, 0.17f, 0.1f, 110, 80, 0.004f, 0.03f, 0.6f),
+                L(Br, 0, 0.08f, 1, 1, 0.004f, 0.02f, 0.25f, 300), L(Br, 0.17f, 0.08f, 1, 1, 0.004f, 0.02f, 0.2f, 300)),
+            R("px_my_death", 0.7f, 1.1f, L(Si, 0, 0.65f, 220, 55, 0.005f, 0.25f, 0.8f), L(Tr, 0, 0.6f, 330, 82, 0.005f, 0.2f, 0.35f, 2000, 400),
+                L(Br, 0, 0.4f, 1, 1, 0.002f, 0.12f, 0.6f, 800, 150)),
+            R("px_my_respawn", 0.5f, 0f, L(Tr, 0, 0.45f, 349, 698, 0.02f, 0.18f, 0.6f), L(Si, 0.05f, 0.4f, 523, 1047, 0.02f, 0.15f, 0.45f),
+                L(Nz, 0, 0.4f, 1, 1, 0.15f, 0.1f, 0.15f, 6000, 9000, 3000)),
+            // Kills: a short proud F to C (the score's key), under half a second; the assist is one softer note.
+            R("px_kill_sting", 0.45f, 0.8f, L(Sw, 0, 0.14f, 349, 349, 0.004f, 0.08f, 0.7f, 2400, 1600), L(Sw, 0.11f, 0.3f, 523, 523, 0.004f, 0.14f, 0.8f, 3000, 1500),
+                L(Si, 0.11f, 0.3f, 1047, 1047, 0.002f, 0.1f, 0.3f), L(Si, 0, 0.12f, 87, 60, 0.002f, 0.05f, 0.5f)),
+            R("px_assist_sting", 0.32f, 0f, L(Tr, 0, 0.3f, 523, 523, 0.004f, 0.12f, 0.7f), L(Si, 0.05f, 0.25f, 784, 784, 0.004f, 0.1f, 0.35f)),
+            // The world answers: the soft neutral "denied" tick (Blizzard's error-sound convention), a shield clang, a dodge
+            // "phew", a wall thud, the dull clonk of something that cannot break, a dig scrape, a gather rustle.
+            R("px_denied", 0.09f, 0f, L(Si, 0, 0.08f, 330, 290, 0.001f, 0.03f, 1f), L(Tr, 0, 0.06f, 660, 580, 0.001f, 0.02f, 0.3f)),
+            R("px_shield_clang", 0.45f, 0f, L(Si, 0, 0.42f, 980, 975, 0.0005f, 0.12f, 0.6f), L(Si, 0, 0.4f, 2460, 2450, 0.0005f, 0.08f, 0.4f),
+                L(Sq, 0, 0.2f, 490, 488, 0.0005f, 0.05f, 0.3f, 3500, 1200), L(Nz, 0, 0.02f, 1, 1, 0.0005f, 0.006f, 0.6f, 8000, 0, 1000)),
+            R("px_phew", 0.28f, 0f, L(Nz, 0, 0.26f, 1, 1, 0.03f, 0.08f, 1f, 3200, 800, 400), L(Si, 0, 0.22f, 700, 420, 0.02f, 0.07f, 0.15f)),
+            R("px_wall_thud", 0.22f, 0f, L(Si, 0, 0.2f, 140, 80, 0.001f, 0.05f, 1f), L(Nz, 0, 0.1f, 1, 1, 0.001f, 0.03f, 0.6f, 1400, 400, 150)),
+            R("px_clonk", 0.2f, 0f, L(Si, 0, 0.18f, 200, 160, 0.0008f, 0.04f, 1f), L(Tr, 0, 0.12f, 470, 430, 0.0008f, 0.025f, 0.4f),
+                L(Nz, 0, 0.04f, 1, 1, 0.0005f, 0.01f, 0.4f, 1500, 600, 200)),
+            R("px_dig_scrape", 0.32f, 0f, L(Nz, 0, 0.3f, 1, 1, 0.01f, 0.12f, 1f, 2200, 900, 300, 0, 0, 0.6f, 22f), L(Cr, 0, 0.3f, 180, 0, 0.005f, 0.1f, 0.4f, 4000)),
+            R("px_gather_start", 0.2f, 0f, L(Nz, 0, 0.18f, 1, 1, 0.02f, 0.06f, 1f, 2500, 1500, 500, 0, 0, 0.5f, 30f)),
+            // The feint flick: a quick bright air flick over the blade (the swing it cancels is the lower whoosh).
+            R("px_feint_flick", 0.14f, 0f, L(Nz, 0, 0.12f, 1, 1, 0.02f, 0.03f, 0.8f, 3000, 7000, 1500), L(Si, 0, 0.1f, 900, 1400, 0.01f, 0.03f, 0.2f)),
+            // b13 events that were silent: the corruption roll, a Kaiju power, a crystal mined.
+            R("px_corruption_roll", 0.6f, 0f, L(Cr, 0, 0.5f, 40, 0, 0.01f, 0.2f, 0.7f, 3000, 0, 300), L(Sw, 0, 0.55f, 92, 69, 0.03f, 0.25f, 0.5f, 900, 400),
+                L(Si, 0, 0.5f, 46, 40, 0.05f, 0.25f, 0.5f)),
+            R("px_kaiju_power", 0.9f, 1.2f, L(Sw, 0, 0.85f, 55, 110, 0.15f, 0.35f, 0.6f, 600, 1400), L(Si, 0, 0.8f, 41, 55, 0.1f, 0.4f, 0.7f),
+                L(Nz, 0, 0.6f, 1, 1, 0.2f, 0.2f, 0.25f, 1500, 3000, 200)),
+            R("px_crystal", 0.5f, 0f, L(Si, 0, 0.45f, 1568, 1568, 0.001f, 0.15f, 0.6f), L(Si, 0, 0.4f, 2349, 2349, 0.001f, 0.1f, 0.45f),
+                L(Si, 0, 0.35f, 3729, 3729, 0.001f, 0.06f, 0.25f)),
+            // Combine hooks (AutopilotChanged, CriticalHit): autopilot on falls C to F, off (you have control) rises F to C;
+            // the critical is a hard crack with a high ring.
+            R("px_autopilot_on", 0.36f, 0f, L(Tr, 0, 0.16f, 523, 523, 0.004f, 0.08f, 0.6f), L(Tr, 0.15f, 0.2f, 349, 349, 0.004f, 0.1f, 0.6f)),
+            R("px_autopilot_off", 0.36f, 0f, L(Tr, 0, 0.16f, 349, 349, 0.004f, 0.08f, 0.6f), L(Tr, 0.15f, 0.2f, 523, 523, 0.004f, 0.1f, 0.6f)),
+            R("px_critical", 0.3f, 1.3f, L(Nz, 0, 0.06f, 1, 1, 0.0005f, 0.015f, 1f, 10000, 3500, 1500), L(Si, 0, 0.25f, 1760, 1700, 0.001f, 0.06f, 0.5f),
+                L(Si, 0, 0.2f, 130, 60, 0.001f, 0.05f, 0.7f)),
         };
 
         private static Dictionary<string, SynthRecipe> _byId;

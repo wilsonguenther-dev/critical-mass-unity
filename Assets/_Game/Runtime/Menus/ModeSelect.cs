@@ -25,11 +25,14 @@ namespace CriticalMass.Runtime.Menus
         readonly Dictionary<MatchMode, Text> _sizeValues = new Dictionary<MatchMode, Text>();
         readonly Dictionary<MatchMode, Text> _lengthValues = new Dictionary<MatchMode, Text>();
         readonly List<System.Action> _refresh = new List<System.Action>();
-        MenuItem _back, _size;
+        MenuItem _back, _size, _duel, _range;
 
         public MenuItem Card(MatchMode m) => _cards.TryGetValue(m, out MenuItem it) ? it : null;
         public MenuItem BackItem => _back;
         public MenuItem SizeItem => _size;
+        /// <summary>px lane F: DUEL (1 V 1) and PRACTICE RANGE, next to the quick match size (two presses from the PLAY menu).</summary>
+        public MenuItem DuelItem => _duel;
+        public MenuItem RangeItem => _range;
         public IReadOnlyDictionary<MatchMode, MenuItem> Cards => _cards;
 
         protected override string HintKeys => "ENTER CHOOSE   ·   ARROWS MOVE   ·   ESC HOME";
@@ -50,6 +53,8 @@ namespace CriticalMass.Runtime.Menus
             _back = Button(space, "Back", 152f, 870f, 300f, 84f, "BACK", Back, UiScale.TypeHeading);
             _size = Stepper(space, "Skirmish Size", 476f, 870f, 640f, 84f, "QUICK MATCH SIZE",
                 () => PlayModes.SizeLabel(PlayModes.ValidQuickSize(PlayFlow.QuickSize)), StepSize, _refresh);
+            _duel = Button(space, "Duel", 1140f, 870f, 300f, 84f, "DUEL 1 V 1", () => PlayFlow.Choose(MatchMode.Duel), UiScale.TypeHeading);
+            _range = Button(space, "Practice Range", 1464f, 870f, 304f, 84f, "PRACTICE RANGE", () => PlayFlow.Choose(MatchMode.Range), UiScale.TypeButton);
             Wire();
             DefaultFocus = Card(MatchMode.Quick);
         }
@@ -140,8 +145,9 @@ namespace CriticalMass.Runtime.Menus
                 MenuItem it = _cards[o[i]];
                 MenuItem left = _cards[o[row * 3 + (col + 2) % 3]];
                 MenuItem right = _cards[o[row * 3 + (col + 1) % 3]];
-                MenuItem up = row == 0 ? (col == 0 ? _back : _size) : _cards[o[col]];
-                MenuItem down = row == 0 ? _cards[o[3 + col]] : (col == 0 ? _back : _size);
+                MenuItem bar = col == 0 ? _back : col == 1 ? _size : _duel;
+                MenuItem up = row == 0 ? bar : _cards[o[col]];
+                MenuItem down = row == 0 ? _cards[o[3 + col]] : bar;
                 it.navigation = new Navigation
                 {
                     mode = Navigation.Mode.Explicit, selectOnLeft = left, selectOnRight = right, selectOnUp = up, selectOnDown = down,
@@ -149,7 +155,15 @@ namespace CriticalMass.Runtime.Menus
             }
             _back.navigation = new Navigation
             {
-                mode = Navigation.Mode.Explicit, selectOnUp = _cards[o[3]], selectOnDown = _cards[o[0]], selectOnRight = _size, selectOnLeft = _size,
+                mode = Navigation.Mode.Explicit, selectOnUp = _cards[o[3]], selectOnDown = _cards[o[0]], selectOnRight = _size, selectOnLeft = _range,
+            };
+            _duel.navigation = new Navigation
+            {
+                mode = Navigation.Mode.Explicit, selectOnUp = _cards[o[5]], selectOnDown = _cards[o[2]], selectOnRight = _range, selectOnLeft = _size,
+            };
+            _range.navigation = new Navigation
+            {
+                mode = Navigation.Mode.Explicit, selectOnUp = _cards[o[5]], selectOnDown = _cards[o[2]], selectOnRight = _back, selectOnLeft = _duel,
             };
             // The size line keeps left/right for itself (a stepper); up goes back to the cards.
             _size.navigation = new Navigation

@@ -67,6 +67,10 @@ namespace CriticalMass.Runtime.Flow
         public ModeSelect Modes => GetScreen<ModeSelect>();
         /// <summary>Home lobby: the "match ready" rosters and countdown (Setup state).</summary>
         public ReadyScreen Ready => GetScreen<ReadyScreen>();
+        /// <summary>px lane F: the DUEL / PRACTICE RANGE setup (Setup state).</summary>
+        public VersusSetup Versus => GetScreen<VersusSetup>();
+        /// <summary>px lane F: the first PLAY NOW's class pick (Setup state).</summary>
+        public StarterPick Starter => GetScreen<StarterPick>();
 
         T GetScreen<T>() where T : FlowScreen
         {
@@ -238,6 +242,29 @@ namespace CriticalMass.Runtime.Flow
             PlayFlow.InModeFlow = true;
             Modes.Show();
             Modes.FocusMode(focus);
+        }
+
+        /// <summary>px lane F: the DUEL or PRACTICE RANGE setup for m.</summary>
+        public void ShowVersus(MatchMode m)
+        {
+            HideScreens();
+            GameFlow.Enter(FlowState.Setup);
+            SetHud(false);
+            PlayFlow.InModeFlow = true;
+            Versus.Bind(m);
+            Versus.Show();
+        }
+
+        /// <summary>px lane F: the first PLAY NOW's class pick. false: not now (a load is under way).</summary>
+        public bool ShowStarterPick()
+        {
+            if (Loading) return false;
+            HideScreens();
+            GameFlow.Enter(FlowState.Setup);
+            SetHud(false);
+            PlayFlow.InModeFlow = false;
+            Starter.Show();
+            return true;
         }
 
         /// <summary>Home lobby: the ready screen for a launch (rosters, map, objective, a skippable 3 s countdown).</summary>

@@ -140,6 +140,16 @@ namespace CriticalMass.Runtime.Flow
         {
             OfferThenPlay = false;
             if (!GameFlow.Enabled) return false;
+            // px lane F: the first PLAY NOW of a profile picks a class first (three recommended starters); its card calls GoNow.
+            if (StarterPick.ShouldShow && FlowDirector.Current.ShowStarterPick()) return true;
+            return GoNow();
+        }
+
+        /// <summary>px lane F: Play Now without the first-run class pick (the pick's own card calls this).</summary>
+        public static bool GoNow()
+        {
+            OfferThenPlay = false;
+            if (!GameFlow.Enabled) return false;
             MatchSetupChoice c = Prepare();
             GameFlow.BeginMatch(c, true);
             return true;

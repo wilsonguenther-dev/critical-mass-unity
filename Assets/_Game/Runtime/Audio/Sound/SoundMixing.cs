@@ -120,7 +120,7 @@ namespace CriticalMass.Runtime.Audio.Sound
     }
 
     /// <summary>Why the planner turned a request down (tests, the budget report).</summary>
-    public enum VoiceRefusal : byte { None, Cooldown, CueCap, FrameCap, Outranked, Inaudible, Muted }
+    public enum VoiceRefusal : byte { None, Cooldown, CueCap, FrameCap, Outranked, Inaudible, Muted, Reserved }
 
     /// <summary>
     /// The voice limiter (pure; tests): a fixed number of voices, per-cue voice caps and cooldowns, a cap on new voices
@@ -132,7 +132,16 @@ namespace CriticalMass.Runtime.Audio.Sound
         public const double OwnRepeatGuard = 0.03;
         public const int StartsPerFrame = 8;
 
-        private struct Slot { public int Cue; public float Priority; public double Started, Ends; }
+        private struct Slot { public int Cue; public float Priority; public double Started, Ends; public bool Own; }
+
+        /// <summary>
+        /// px lane F (2026-11-22): voices kept free for the local player's own sounds. The crowd may only take a free voice
+        /// while more than this many are free; an own sound always gets one (a free voice, else the weakest crowd voice
+        /// whatever its priority, else the oldest own voice). So at 32 fighters MY impact, hurt and confirm are never dropped.
+        /// 0 for a bare planner (the old rules); FromTable sets DefaultOwnReserve.
+        /// </summary>
+        public int OwnReserve { get; set; }
+        public const int DefaultOwnReserve = 4;
 
         private readonly Slot[] _slots;
         private readonly double[] _lastPlay;
@@ -163,7 +172,7 @@ namespace CriticalMass.Runtime.Audio.Sound
             var max = new int[n];
             var cd = new float[n];
             for (int i = 0; i < n; i++) { max[i] = Math.Max(1, SoundTable.Cues[i].MaxVoices); cd[i] = SoundTable.Cues[i].Cooldown; }
-            return new VoicePlanner(voices, max, cd);
+            return new VoicePlanner(voices, max, cd) { OwnReserve = Math.Min(DefaultOwnReserve, Math.Max(0, voices / 4)) };
         }
 
         public bool Busy(int slot, double now) => slot >= 0 && slot < _slots.Length && _slots[slot].Ends > now;
@@ -204,16 +213,19 @@ namespace CriticalMass.Runtime.Audio.Sound
             if (own ? since < OwnRepeatGuard : since < _cooldown[cue]) return Refuse(VoiceRefusal.Cooldown);
             if (!own && _startsThisFrame >= StartsPerFrame) return Refuse(VoiceRefusal.FrameCap);
 
-            int same = 0, oldestSame = -1, free = -1, weakest = -1;
-            double oldestStart = double.MaxValue;
-            float weakestP = float.MaxValue;
+            int same = 0, oldestSame = -1, free = -1, weakest = -1, freeCount = 0, weakestCrowd = -1, oldestOwn = -1;
+            double oldestStart = double.MaxValue, oldestOwnStart = double.MaxValue;
+            float weakestP = float.MaxValue, weakestCrowdP = float.MaxValue;
             for (int i = 0; i < _slots.Length; i++)
             {
                 if (_slots[i].Ends <= now)
                 {
                     if (free < 0) free = i;
+                    freeCount++;
                     continue;
                 }
+                if (_slots[i].Own) { if (_slots[i].Started < oldestOwnStart) { oldestOwnStart = _slots[i].Started; oldestOwn = i; } }
+                else if (_slots[i].Priority < weakestCrowdP) { weakestCrowdP = _slots[i].Priority; weakestCrowd = i; }
                 if (_slots[i].Cue == cue)
                 {
                     same++;
@@ -229,15 +241,21 @@ namespace CriticalMass.Runtime.Audio.Sound
                 slot = oldestSame; // the player's own sound replaces its oldest copy
                 Stolen++;
             }
-            else if (free >= 0) slot = free;
+            else if (free >= 0 && (own || freeCount > OwnReserve)) slot = free;
             else if (weakest >= 0 && weakestP < priority)
             {
                 slot = weakest;
                 Stolen++;
             }
-            else return Refuse(VoiceRefusal.Outranked);
+            else if (own && OwnReserve > 0 && (weakestCrowd >= 0 || oldestOwn >= 0))
+            {
+                slot = weakestCrowd >= 0 ? weakestCrowd : oldestOwn;   // px lane F: my own sound is never dropped
+                Stolen++;
+            }
+            else return Refuse(free >= 0 ? VoiceRefusal.Reserved : VoiceRefusal.Outranked);
 
             _slots[slot].Cue = cue;
+            _slots[slot].Own = own;
             _slots[slot].Priority = priority;
             _slots[slot].Started = now;
             _slots[slot].Ends = now + Math.Max(0.01, length);
@@ -253,6 +271,7 @@ namespace CriticalMass.Runtime.Audio.Sound
             if (slot < 0 || slot >= _slots.Length) return;
             _slots[slot].Ends = double.NegativeInfinity;
             _slots[slot].Cue = -1;
+            _slots[slot].Own = false;
         }
 
         public void ReleaseAll()
