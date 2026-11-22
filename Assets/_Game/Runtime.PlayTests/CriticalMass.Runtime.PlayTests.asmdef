@@ -7,7 +7,9 @@
         "CriticalMass.Runtime",
         "Unity.InputSystem",
         "UnityEngine.TestRunner",
-        "UnityEngine.UI"
+        "UnityEngine.UI",
+        "UnityEditor.TestRunner",
+        "Unity.InputSystem.TestFramework"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],
