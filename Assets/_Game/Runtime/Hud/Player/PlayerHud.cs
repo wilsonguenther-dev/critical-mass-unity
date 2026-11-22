@@ -22,6 +22,7 @@ namespace CriticalMass.Runtime.Hud.Player
         public readonly HurtEdge Hurt;
         public readonly KillConfirm Kills;
         public readonly ActionTags Tags;
+        public readonly DamageNumbers Numbers;
         public readonly AssistTracker Assists = new AssistTracker();
 
         World _world;
@@ -40,6 +41,7 @@ namespace CriticalMass.Runtime.Hud.Player
             Hurt = new HurtEdge(root, playerCard);
             Kills = new KillConfirm(root);
             Tags = new ActionTags(world);
+            Numbers = new DamageNumbers(world);
             Current = this;
         }
 
@@ -60,12 +62,14 @@ namespace CriticalMass.Runtime.Hud.Player
                 Hurt.Clear();
                 Kills.Clear();
                 Tags.Clear();
+                Numbers.Clear();
                 Assists.Clear();
             }
             if (_cursor < 0 || _cursor > w.EventHead) _cursor = w.EventHead;
             if (w.EventHead - _cursor > World.EventCapacity)
             {
                 Dropped += w.EventHead - World.EventCapacity - _cursor;
+                RuntimeCounters.HudEventsDropped += w.EventHead - World.EventCapacity - _cursor;   // DG-60 (was GameHud's loop)
                 _cursor = w.EventHead - World.EventCapacity;
             }
             ScanBlasts(w);
@@ -75,6 +79,7 @@ namespace CriticalMass.Runtime.Hud.Player
             Direction.Tick(w, me, alpha, cam, scale, dt);
             Kills.Tick(dt);
             Tags.Tick(w, alpha, cam, scale, dt);
+            Numbers.Tick(w, alpha, cam, scale, dt);
             Hurt.Tick(me, s != null && s.HasPlayer ? s.Hp01 : 1f, s != null && s.HasPlayer && s.Alive, dt);
         }
 
@@ -88,6 +93,8 @@ namespace CriticalMass.Runtime.Hud.Player
                     {
                         Bars.OnMyHit(e.A, w.Match.Time);
                         Marker.OnMyHit(w, e.A, e.Tier, _alpha);
+                        Numbers.Add(e.A, PxProject.Actor(w, e.A, _alpha, DamageNumbers.NumberLift), (float)e.Value,
+                            e.Tier >= 2 ? DamageNumbers.Kind.Crit : e.Tier == 1 ? DamageNumbers.Kind.Heavy : DamageNumbers.Kind.Hit);
                     }
                     else if (e.A == me && e.B != me && me >= 0 && me < w.ActorCount) OnHurt(w, e, me);
                     break;
@@ -135,6 +142,7 @@ namespace CriticalMass.Runtime.Hud.Player
                     {
                         Bars.OnStructureHit(w, e.X, e.Z, (float)e.Radius, e.B);
                         Marker.OnMyHitAt(PxProject.Point(w, e.X, e.Z, 1.2f), 0);
+                        Numbers.Add(-1, PxProject.Point(w, e.X, e.Z, 1.9f), (float)e.Value, DamageNumbers.Kind.Structure);
                     }
                     break;
                 case SimEventType.KaijuDamaged:
@@ -142,7 +150,15 @@ namespace CriticalMass.Runtime.Hud.Player
                     {
                         Bars.OnMyKaijuHit(w.Match.Time);
                         Marker.OnMyHitAt(PxProject.Point(w, e.X, e.Z, 1.6f), e.Value >= 20 ? 1 : 0);
+                        Numbers.Add(-1, PxProject.Point(w, e.X, e.Z, 2.6f), (float)e.Value, DamageNumbers.Kind.Kaiju);
                     }
+                    break;
+                case SimEventType.HealLanded:
+                    if (e.B == me && e.A != me) Numbers.AddHeal(e.A, (float)e.Value);
+                    if (e.A == me) Numbers.AddHeal(me, (float)e.Value);
+                    break;
+                case SimEventType.Heal:
+                    if (e.A == me) Numbers.AddHeal(me, (float)e.Value);
                     break;
             }
         }

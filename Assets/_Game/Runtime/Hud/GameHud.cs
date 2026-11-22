@@ -576,20 +576,13 @@ namespace CriticalMass.Runtime.Hud
 
         // ---------------------------------------------------------------- world layer
 
-        const int DamageNumbers = 12;
         const int Pointers = 2;
         RectTransform _world;
         VectorShape _hillMarker;
         Text _hillMarkerWord;
-        readonly Text[] _dmg = new Text[DamageNumbers];
-        readonly float[] _dmgAge = new float[DamageNumbers];
-        readonly Vector3[] _dmgPos = new Vector3[DamageNumbers];
-        int _dmgNext;
         readonly RectTransform[] _ptr = new RectTransform[Pointers];
         readonly RectTransform[] _ptrArrow = new RectTransform[Pointers];
         readonly Text[] _ptrDist = new Text[Pointers];
-        double[] _lastHit = new double[64];
-        int _eventCursor = -1;
 
         void BuildWorldLayer()
         {
@@ -608,17 +601,6 @@ namespace CriticalMass.Runtime.Hud
             _hillMarkerWord = Label(marker, "Word", CMTokens.Ui, UiScale.TypeMin, Cream, TextAnchor.MiddleCenter, 0f, 46f, 120f, 22f, "NEUTRAL", 2.5f);
 
             // player-experience lane D: the overhead hearts became always-on health bars (Hud/Player/HealthBars.cs)
-            for (int i = 0; i < DamageNumbers; i++)
-            {
-                Text t = HudText.Make(_world, "Damage " + i, CMTokens.Mono, UiScale.TypeHeading, Cream, TextAnchor.MiddleCenter, 3f);
-                Center(t.rectTransform, 80f, 32f);
-                t.gameObject.SetActive(false);
-                _dmg[i] = t;
-                // M5: fade through the group alpha (no text mesh or 12-direction outline rebuild per frame).
-                _dmgFade[i] = t.gameObject.AddComponent<CanvasGroup>();
-                _dmgFade[i].interactable = false;
-                _dmgFade[i].blocksRaycasts = false;
-            }
             for (int i = 0; i < Pointers; i++)
             {
                 RectTransform p = Rt(_world, "Pointer " + i);
@@ -645,7 +627,6 @@ namespace CriticalMass.Runtime.Hud
         /// <summary>The nested canvases of the M5 split (tests read them).</summary>
         public Canvas WorldCanvas { get; private set; }
         public Canvas MinimapCanvas { get; private set; }
-        readonly CanvasGroup[] _dmgFade = new CanvasGroup[DamageNumbers];
 
         /// <summary>A nested canvas on rt: inherits the root's camera, sorting and scale; no raycaster (nothing to click).</summary>
         static Canvas NestedCanvas(RectTransform rt)
@@ -1170,41 +1151,8 @@ namespace CriticalMass.Runtime.Hud
             bool kOn = Project(cam, kWorld, out _);
             Pointer(1, cam, kWorld, kOn, s, w.Kaiju.X, w.Kaiju.Z, scale, sw, sh);
 
-            // events: damage numbers (local player's hits only) and the last-hit time for overhead hearts
-            if (_lastHit.Length < w.ActorCount) _lastHit = new double[w.ActorCount];
-            if (_eventCursor < 0 || _eventCursor > w.EventHead) _eventCursor = w.EventHead;
-            if (w.EventHead - _eventCursor > World.EventCapacity)
-            {
-                CriticalMass.Runtime.Game.RuntimeCounters.HudEventsDropped += w.EventHead - World.EventCapacity - _eventCursor;   // DG-60
-                _eventCursor = w.EventHead - World.EventCapacity;
-            }
-            for (; _eventCursor < w.EventHead; _eventCursor++)
-            {
-                SimEvent e = w.Events[_eventCursor % World.EventCapacity];
-                if (e.Type != SimEventType.Hit) continue;
-                if (e.A >= 0 && e.A < _lastHit.Length) _lastHit[e.A] = w.Match.Time;
-                if (e.B == HudBinder.LocalActor && e.A != HudBinder.LocalActor)
-                {
-                    int k = _dmgNext;
-                    _dmgNext = (_dmgNext + 1) % DamageNumbers;
-                    _dmgAge[k] = 0f;
-                    _dmgPos[k] = SimSpace.ToWorld(e.X, GroundHeight.At(w.Map, e.X, e.Z) + 2.2, e.Z);
-                    HudText.Set(_dmg[k], NumberCache.Int(Mathf.RoundToInt((float)e.Value)));
-                    SetAlpha(_dmgFade[k], 1f);
-                    _dmg[k].gameObject.SetActive(true);
-                }
-            }
-            for (int k = 0; k < DamageNumbers; k++)
-            {
-                if (!_dmg[k].gameObject.activeSelf) continue;
-                _dmgAge[k] += dt;
-                if (_dmgAge[k] >= 0.7f && !SnapAnimations) { _dmg[k].gameObject.SetActive(false); continue; }
-                float t = SnapAnimations ? 0.25f : _dmgAge[k] / 0.7f;
-                if (!Project(cam, _dmgPos[k] + Vector3.up * (0.6f * t), out Vector2 dp)) { _dmg[k].gameObject.SetActive(false); continue; }
-                _dmg[k].rectTransform.anchoredPosition = dp / scale;
-                SetAlpha(_dmgFade[k], 1f - t * t);
-            }
-
+            // player-experience lane D: damage numbers moved to Hud/Player/DamageNumbers.cs (setting honoured, stacked,
+            // sized per camera, heal / Kaiju / wall numbers)
             // player-experience lane D: health bars over every unit in view, hit marker, damage direction, kill confirm,
             // tags and pops (Hud/Player); replaces the 3-second overhead hearts
             PlayerHud?.Tick(w, s, Driver != null ? Driver.Alpha : 1.0, cam, scale, dt);
