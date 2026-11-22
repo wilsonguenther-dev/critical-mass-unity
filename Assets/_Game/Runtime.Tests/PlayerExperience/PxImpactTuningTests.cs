@@ -320,6 +320,26 @@ namespace CriticalMass.Runtime.Tests
             Assert.IsFalse(HitFeelTuning.PredictedSwing(HitFeelTuning.PredictTimeout + 0.01, windup, out _, out _), "a refused press fades");
         }
 
+        /// <summary>Fix round 5 (item 9): a missing or empty input-actions asset is named (so OnEnable logs one error and
+        /// hands the seat to the autopilot) instead of throwing; a complete Player map passes.</summary>
+        [Test]
+        public void AMissingOrEmptyInputActionsAssetIsNamedNotThrown()
+        {
+            Assert.IsNotNull(CriticalMass.Runtime.Input.HumanInputSource.ActionsProblem(null));
+            var asset = ScriptableObject.CreateInstance<UnityEngine.InputSystem.InputActionAsset>();
+            try
+            {
+                StringAssert.Contains("no Player map", CriticalMass.Runtime.Input.HumanInputSource.ActionsProblem(asset));
+                var map = asset.AddActionMap("Player");
+                map.AddAction("Move");
+                StringAssert.Contains("'Point'", CriticalMass.Runtime.Input.HumanInputSource.ActionsProblem(asset));
+                foreach (string a in CriticalMass.Runtime.Input.HumanInputSource.RequiredActions)
+                    if (map.FindAction(a, false) == null) map.AddAction(a);
+                Assert.IsNull(CriticalMass.Runtime.Input.HumanInputSource.ActionsProblem(asset));
+            }
+            finally { UnityEngine.Object.DestroyImmediate(asset); }
+        }
+
         [Test]
         public void TheTopDownAimLeanIsCappedAndUsesTheRawAim()
         {
