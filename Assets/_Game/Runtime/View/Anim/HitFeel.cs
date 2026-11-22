@@ -230,7 +230,9 @@ namespace CriticalMass.Runtime.View.Anim
             double d = sf - a.Facing;
             d = Math.Atan2(Math.Sin(d), Math.Cos(d));
             double cone = FaceConeDeg * Math.PI / 180;
-            return Math.Abs(d) <= cone ? sf : a.Facing + Math.Sign(d) * cone;
+            if (Math.Abs(d) <= cone) return sf;
+            // swinging back over the shoulder while backing off: the movement facing rules (never turned around)
+            return Math.Abs(d) >= Math.PI * 0.5 ? a.Facing : a.Facing + Math.Sign(d) * cone;
         }
 
         /// <summary>
