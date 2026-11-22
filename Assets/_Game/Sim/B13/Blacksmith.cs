@@ -244,6 +244,9 @@ namespace CriticalMass.Sim.Core
             }
             h.ChannelVein[id] = vein;
             h.ChannelTicks[id] = 0;
+            // lane S2: the MINE channel starts now and says so (the ore itself is OreMined when the channel completes)
+            if (PlayerSeat.On(w))
+                World.PushEvent(w, SimEventType.WorldAction, id, PlayerReasons.WorldMineOre, w.Depth.Sources[vein].X, w.Depth.Sources[vein].Z, 0, null, DamageCause.None, Durations.T30(w.Config, w.Config.Depth.Hut.MineTicks) / w.Config.SimHz);
             return true;
         }
 

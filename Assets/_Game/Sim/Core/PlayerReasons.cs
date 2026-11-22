@@ -58,5 +58,8 @@ namespace CriticalMass.Sim.Core
         public const int WorldCorrupt = 7;
         public const int WorldPurify = 8;
         public const int WorldRepair = 9;
+        public const int WorldGather = 10;          // lane S2: a gather channel started at a node / grove / spring (Value 0 =
+                                                    // started, Radius = seconds to the first unit, 0 when unknown); the unit
+                                                    // itself is the Gather / SourceGather event as before
     }
 }

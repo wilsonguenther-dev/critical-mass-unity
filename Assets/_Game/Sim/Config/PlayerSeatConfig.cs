@@ -14,9 +14,9 @@ namespace CriticalMass.Sim.Config
         // ---- NO SILENT PRESS (ActionRefused)
         /// <summary>A held or mashed button raises at most one ActionRefused per this many seconds, per actor and button.</summary>
         public double RefuseRepeatSeconds = 1.0;
-        /// <summary>Interact: slack (u) added to every interact reach when deciding "nothing in reach" (never refuse a press a
-        /// system might still take).</summary>
-        public double InteractSlack = 0.3;
+        /// <summary>Interact: slack (u) added to the interact reaches when deciding "nothing in reach" (0 = the systems' exact
+        /// reaches; a positive slack trades a missed refusal for never refusing a press a system might still take).</summary>
+        public double InteractSlack = 0;
 
         // ---- DEMOLITIONS POINT-BLANK
         /// <summary>With TNT ready, an Attack press with an enemy within this centre-to-centre distance inside her pry-bar arc

@@ -196,7 +196,13 @@ namespace CriticalMass.Sim.Core
                 if (d2 > 1e-12)
                 {
                     double dot = (dx * fx + dz * fz) / Math.Sqrt(d2);
-                    if (dot < (body ? WidenedCos(halfRad, cfg.Class(t.Cls).Radius, Math.Sqrt(d2)) : cosHalf) - 1e-9) continue;
+                    if (dot < (body ? WidenedCos(halfRad, cfg.Class(t.Cls).Radius, Math.Sqrt(d2)) : cosHalf) - 1e-9)
+                    {
+                        // lane S2: a target inside the reach whose dodge carried it out of the arc (it dashed past or through):
+                        // DODGED, not a silent miss. The outcome is the same skip.
+                        if (report && Dodge.Immune(w, j, DamageCause.Melee)) World.PushEvent(w, SimEventType.HitBlocked, j, i, w.X[j], w.Z[j], PlayerReasons.BlockedDodge);
+                        continue;
+                    }
                 }
                 if (passive)
                 {

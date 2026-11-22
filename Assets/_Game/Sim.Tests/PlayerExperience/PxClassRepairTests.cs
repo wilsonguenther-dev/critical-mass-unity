@@ -88,7 +88,7 @@ namespace CriticalMass.Sim.Tests
         public void EverySwingContactOnAnEnemyInReachYieldsHitOrHitBlocked()
         {
             int bad = 0;
-            void Case(string name, Action<Rig, int> setup, int wantWhy)
+            void Case(string name, Action<Rig, int> setup, int wantWhy, Action<Rig, int> atContact = null)
             {
                 var r = new Rig(ClassId.Warrior);
                 int foe = r.Foe();
@@ -96,7 +96,20 @@ namespace CriticalMass.Sim.Tests
                 setup(r, foe);
                 r.Head = r.W.EventHead;
                 r.Aim(r.W.X[foe], r.W.Z[foe]);
-                r.Tap(Attack, 14);
+                r.Me.Attack = true;
+                r.Step(1);
+                r.Me.Attack = false;
+                Actor me = r.W.Actors[0];
+                bool fired = false;
+                for (int t = 0; t < 14; t++)
+                {
+                    if (atContact != null && !fired && me.SwingPending && me.SwingTick + me.SwingWindup - r.W.Tick <= 1)
+                    {
+                        atContact(r, foe);
+                        fired = true;
+                    }
+                    r.Step(1);
+                }
                 int hits = r.Count(SimEventType.Hit, e => e.A == foe && e.B == 0);
                 int blocked = r.Count(SimEventType.HitBlocked, e => e.A == foe && e.B == 0 && (int)e.Value == wantWhy);
                 bool ok = wantWhy == PlayerReasons.BlockedShield ? hits == 1 && blocked == 1 : wantWhy == 0 ? hits == 1 : hits == 0 && blocked == 1;
@@ -104,17 +117,23 @@ namespace CriticalMass.Sim.Tests
                 if (!ok) bad++;
             }
             Case("open", (r, f) => { }, 0);
-            Case("spawn protected", (r, f) => r.W.Actors[f].SpawnProtect = 3, PlayerReasons.BlockedSpawnProtect);
-            Case("wall between", (r, f) => MapGrid.SetCell(r.W, 57, 40, Cell.Wall), PlayerReasons.BlockedWall);
-            Case("dodging (i-frames at contact)", (r, f) =>
+            Case("spawn protected (on its pad)", (r, f) =>
             {
-                // the dodge starts so the contact tick (press + 12) is its dash tick 1; its path stands still
+                PadDef pad = r.W.Map.Pads[(int)TeamId.Crimson];
+                DepthKit.Put(r.W, 0, pad.X - 1.5, pad.Z);
+                DepthKit.Put(r.W, f, pad.X, pad.Z);
+                r.W.Actors[f].SpawnProtect = 3;
+            }, PlayerReasons.BlockedSpawnProtect);
+            Case("wall between", (r, f) => MapGrid.SetCell(r.W, 57, 40, Cell.Wall), PlayerReasons.BlockedWall);
+            Case("dodging (i-frames at contact)", (r, f) => { }, PlayerReasons.BlockedDodge, (r, f) =>
+            {
+                // on the contact tick the target is on its dash tick 1 (an i-frame); its path stands still
                 DodgeState s = r.W.Dodges;
                 int b = f * s.Stride;
                 for (int k = 0; k < s.Stride; k++) { s.PathX[b + k] = r.W.X[f]; s.PathZ[b + k] = r.W.Z[f]; }
-                s.Start[f] = r.W.Tick + 11;
+                s.Start[f] = r.W.Tick - 2; // dash tick 2 or 3 at contact, inside the i-frames either way
                 s.Len[f] = 6;
-            }, PlayerReasons.BlockedDodge);
+            });
             Case("Warrior shield up (the hit lands cut)", (r, f) =>
             {
                 r.Place(f, ClassId.Warrior, 58.0, 40.5);
@@ -308,8 +327,25 @@ namespace CriticalMass.Sim.Tests
         [Test]
         public void AHumanMinerDigsAwayFromAVeinWithTheBuildersRuleAndABotMinerNeverDoes()
         {
-            var r = new Rig(ClassId.Miner);
-            r.Aim(58.0, 40.5);
+            // a diggable floor cell off the hill (the field's default spot is the hill centre, a keep-out)
+            var probe = new Rig(ClassId.Miner);
+            double px = 0, pz = 0;
+            bool found = false;
+            for (int k = 0; k < 64 && !found; k++)
+            {
+                double a = k * Math.PI / 32;
+                double x = probe.W.Map.Hill.X + 10 * Math.Cos(a), z = probe.W.Map.Hill.Z + 10 * Math.Sin(a);
+                int cx = (int)Math.Floor(x + 1.5), cz = (int)Math.Floor(z);
+                if (!MapGrid.IsWalkable(probe.W.Map, (int)Math.Floor(x), cz) || probe.W.Map.Cells[cz * probe.W.Map.Width + cx] != Cell.Floor) continue;
+                DepthKit.Put(probe.W, 0, Math.Floor(x) + 0.5, cz + 0.5);
+                if (Terraform.DigRefusal(probe.W, cx, cz) != 0 || Blacksmith.VeinInReach(probe.W, 0) >= 0) continue;
+                px = Math.Floor(x) + 0.5;
+                pz = cz + 0.5;
+                found = true;
+            }
+            Assert.IsTrue(found, "a diggable test cell");
+            var r = new Rig(ClassId.Miner, px, pz);
+            r.Aim(px + 1.5, pz);
             r.Tap((f, on) => f.Terraform = on, 2);
             List<SimEvent> tf = r.Ev(SimEventType.Terraform);
             int dug = 0;
@@ -318,9 +354,9 @@ namespace CriticalMass.Sim.Tests
             Assert.AreEqual(1, dug);
             Assert.AreEqual(0, r.W.Terraform.Carried[0], "the Miner carries no spoil (no PLACE)");
 
-            var b = new Rig(ClassId.Miner);
+            var b = new Rig(ClassId.Miner, px, pz);
             b.W.Actors[0].IsHuman = false;
-            b.Aim(58.0, 40.5);
+            b.Aim(px + 1.5, pz);
             b.Tap((f, on) => f.Terraform = on, 2);
             int botDug = b.Ev(SimEventType.Terraform).Count;
             int refused = b.Count(SimEventType.OreMined, e => e.A == 0 && (int)e.Value == Blacksmith.RefusedNoVein);

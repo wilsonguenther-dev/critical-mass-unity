@@ -213,6 +213,25 @@ namespace CriticalMass.Sim.Core
             }
             double slack = Cfg(w).InteractSlack;
             double x = w.X[i], z = w.Z[i];
+            // a gather the next systems will start (SimResources: a plant node; Sources: a grove or spring) is answered NOW
+            // with a channel-start WorldAction (Value 0 = started, Radius = seconds to the first unit), unless the shrine takes
+            // the load first (delivery comes before gathering)
+            bool atShrine = Near(x, z, w.Map.Shrine.X, w.Map.Shrine.Z, w.Config.KaijuFeed.ShrineInteractRange + slack);
+            if (!(atShrine && (a.CarryAmount > 0 || a.CarryMeat > 0)))
+            {
+                int gn = SimResources.GatherNode(w, i);
+                if (gn >= 0)
+                {
+                    World.PushEvent(w, SimEventType.WorldAction, i, PlayerReasons.WorldGather, w.Nodes[gn].X, w.Nodes[gn].Z, 0, null, DamageCause.None, w.Config.Class(a.Cls).GatherSeconds);
+                    return;
+                }
+                int sn = Sources.On(w) ? Sources.SourceInReach(w, i) : -1;
+                if (sn >= 0)
+                {
+                    World.PushEvent(w, SimEventType.WorldAction, i, PlayerReasons.WorldGather, w.Depth.Sources[sn].X, w.Depth.Sources[sn].Z, 0, null, DamageCause.None, 0);
+                    return;
+                }
+            }
             double nodeReach = w.Config.Resources.NodeInteractRange + Collide.ActorRadius(w, i) + slack;
             bool nodeNear = false;
             ResourceNode[] nodes = w.Nodes;
@@ -223,7 +242,7 @@ namespace CriticalMass.Sim.Core
             if (src != null)
                 for (int k = 0; k < src.Length && !nodeNear; k++)
                     nodeNear = Near(x, z, src[k].X, src[k].Z, nodeReach);
-            bool other = Near(x, z, w.Map.Shrine.X, w.Map.Shrine.Z, w.Config.KaijuFeed.ShrineInteractRange + slack)
+            bool other = atShrine
                 || Stations.InStation(w, i)
                 || BuiltPieces.PieceInReach(w, i) >= 0
                 || (w.Builder != null && w.Builder.CarryPiece != null && i < w.Builder.CarryPiece.Length && w.Builder.CarryPiece[i] >= 0)
@@ -234,8 +253,9 @@ namespace CriticalMass.Sim.Core
                     other = j != i && w.Actors[j].Alive && w.Actors[j].Team == a.Team && Near(x, z, w.X[j], w.Z[j], 2.5);
             }
             if (other) return;
-            if (!nodeNear) Refuse(w, i, PlayerReasons.ButtonInteract, PlayerReasons.RefusedNoTarget);
-            else if (a.CarryAmount >= w.Config.Class(a.Cls).CarryCapacity) Refuse(w, i, PlayerReasons.ButtonInteract, PlayerReasons.RefusedCarryFull);
+            // a node in reach that takes nothing from you: your hands are full, or it is empty / not yours to gather
+            if (nodeNear && a.CarryAmount >= w.Config.Class(a.Cls).CarryCapacity) Refuse(w, i, PlayerReasons.ButtonInteract, PlayerReasons.RefusedCarryFull);
+            else Refuse(w, i, PlayerReasons.ButtonInteract, PlayerReasons.RefusedNoTarget);
         }
 
         static bool Near(double x, double z, double px, double pz, double r)
