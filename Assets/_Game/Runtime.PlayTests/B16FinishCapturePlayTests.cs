@@ -65,7 +65,7 @@ namespace CriticalMass.Runtime.PlayTests
         static IEnumerator Capture(string name)
         {
             Mute();
-            Camera cam = Camera.main;
+            UnityEngine.Camera cam = UnityEngine.Camera.main;
             Assert.IsNotNull(cam, "no main camera to capture " + name);
             var rt = new RenderTexture(1920, 1080, 24, RenderTextureFormat.ARGB32);
             var moved = new List<Canvas>();
