@@ -43,6 +43,9 @@ namespace CriticalMass.Runtime.Hud.Mechanics
         CombatLog _log;
         float _openedAt, _lastPlay = -9f;
         bool _bound, _wasPressed;
+        float _pressAt = -1f;
+        /// <summary>b16 finish: a controller holds L3 this long to open the wheel (a double tap is CAMERA VIEW).</summary>
+        public const float PadHoldSeconds = 0.3f;
         int _logSearch;
         Vector2 _mouseAtOpen;
 
@@ -128,7 +131,15 @@ namespace CriticalMass.Runtime.Hud.Mechanics
                 Bubble(w);
                 return;
             }
-            if (pressed && !_wasPressed) Open(now);
+            // b16 finish: double-tap L3 is the controller's camera view, so on a controller the wheel opens once L3 is HELD
+            // PadHoldSeconds (the quick-chat wheel's rule); a tap or a double tap never flashes it. Keyboard T opens at once.
+            if (pressed && !_wasPressed)
+            {
+                if (CriticalMass.Runtime.Input.ControlBindings.ActiveDevice == CriticalMass.Runtime.Input.ControlDevice.Gamepad) _pressAt = now;
+                else Open(now);
+            }
+            if (!pressed) _pressAt = -1f;
+            else if (_pressAt >= 0f && !IsOpen && now - _pressAt >= PadHoldSeconds) { _pressAt = -1f; Open(now); }
             if (IsOpen) Steer();
             if (!pressed && _wasPressed && IsOpen) Release(now);
             _wasPressed = pressed;

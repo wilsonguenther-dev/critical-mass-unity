@@ -476,7 +476,9 @@ namespace CriticalMass.Sim.Tests
             for (int arm = 0; arm < 2; arm++)
             {
                 bool on = arm == 0;
-                GameConfig c = Full(g => g.Depth.Build.On = on);
+                // b16: this staging needs the seed's Builder to build inside the window; the physics fixes (blast shoves) change that
+                // match, so they are off here. The step's allocation with them on is PhysicsFeelTests' crowd match (0 B).
+                GameConfig c = Full(g => { g.Depth.Build.On = on; g.Depth.PhysicsFeel.Enabled = false; });
                 World w = World.CreateWorld(new WorldOptions { Seed = 4242, TeamSize = 16, HumanTeam = TeamId.Azure, HumanClass = ClassId.Warrior, Config = c });
                 InputFrame scratch = SimInput.EmptyInput();
                 for (int t = 0; t < 600; t++) MatchTick.Advance(w, null, scratch);

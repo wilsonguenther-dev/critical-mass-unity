@@ -186,8 +186,9 @@ namespace CriticalMass.Sim.Bots
                 if (shortHanded) kaijuQuota = (int)ShortHandedDuty;
                 else
                 {
-                    if (ahead) kaijuQuota += (int)AdvantageExtra;
-                    if (m.HillSeconds[otherT] - m.HillSeconds[team] >= GambitDeficitSeconds) kaijuQuota += (int)GambitExtra;
+                    // b16 (mechanics audit #6): the extras are a share of the team with the rule on (2 at 16, 1 at 8 and 5)
+                    if (ahead) kaijuQuota += MechRules.FeedExtra(world, (int)AdvantageExtra);
+                    if (m.HillSeconds[otherT] - m.HillSeconds[team] >= GambitDeficitSeconds) kaijuQuota += MechRules.FeedExtra(world, (int)GambitExtra);
                 }
                 if (kaijuQuota > count - hillQuota) kaijuQuota = Math.Max(0, count - hillQuota);
                 // CM-64: a Kaiju-duty bot that died keeps its duty while it respawns.

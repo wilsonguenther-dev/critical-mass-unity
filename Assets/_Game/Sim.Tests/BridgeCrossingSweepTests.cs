@@ -307,7 +307,10 @@ namespace CriticalMass.Sim.Tests
                     along.Add((w.X[0] - ox) * ux + (w.Z[0] - oz) * uz);
                     if (t >= 6 && along[t] - along[t - 3] < 0.01) stall = t;
                 }
-                Assert.AreEqual(Math.Abs(deg) == 30 ? 41 : 49, stall, deg + " deg: the stall tick CI printed");
+                // b16: the Warrior walks 3.61 u/s (was 3.8): the CI-printed stall ticks 41 / 49 at 3.8 scale by 3.8 / speed
+                // (30 deg: 43 measured, sim run 44925935233), one tick either way for rounding.
+                double slow = 3.8 / w.Config.Class(ClassId.Warrior).MoveSpeed;
+                Assert.AreEqual(Math.Round((Math.Abs(deg) == 30 ? 41 : 49) * slow), stall, 1.0, deg + " deg: the stall tick CI printed, scaled by the Warrior's speed");
                 Assert.AreEqual(4.0, along[along.Count - 1], 0.15, deg + " deg: stopped at the collapsed gap (the middle third starts at Len / 3 = 4.48 u)");
             }
             frame.MoveX = 0;
@@ -345,6 +348,63 @@ namespace CriticalMass.Sim.Tests
                 Offsets = new[] { -0.8, -0.4, 0, 0.4, 0.8 }, StickStep = 5, Mags = new[] { 1.0, 0.5, -1.0 },
             }, out int runs, out int excused);
             NoneBad(bad, runs, excused);
+        }
+
+        /// <summary>
+        /// b16 combine: the PlayMode CreatorAcceptance Need4 crossing in the Sim (its "assist OFF" diagnosis is the raw stick):
+        /// the Warrior on the deck axis (offset 0), started at the first fitting spot from one cell before the chasm, the stick
+        /// held at +-60 degrees, the same budget and stall rule, with no "points off the deck" excuse. The physics branch's gate
+        /// run 44940001460 had B7 back and B8 forward stall at tick 17 there (assist off too). Lever arms (each printed) find
+        /// which b16 [4]/[12] rule does it; the default must not stall.
+        /// </summary>
+        [Test]
+        public void TheAcceptanceCrossingAt60DegreesFromTheMouthNeverStallsWithTheB16PhysicsFeel()
+        {
+            var arms = new List<(string name, Action<GameConfig> set)>
+            {
+                ("default", c => { }),
+                ("no wall slide (fade 45)", c => { c.Depth.PhysicsFeel.WallSlideFadeDeg = 45; c.Depth.PhysicsFeel.WallSlideKeep = 0; }),
+                ("corner nudge 0.1", c => c.Depth.PhysicsFeel.CornerNudgeMax = 0.1),
+                ("physics feel off", c => c.Depth.PhysicsFeel.Enabled = false),
+            };
+            string defaultBad = null;
+            foreach (var arm in arms)
+            {
+                GameConfig cfg = GameConfig.CreateDefault();
+                arm.set(cfg);
+                World w = Lone(cfg, ClassId.Warrior);
+                double r = cfg.Class(ClassId.Warrior).Radius, speed = cfg.Class(ClassId.Warrior).MoveSpeed;
+                var bad = new List<string>();
+                int runs = 0;
+                for (int s = 0; s < BridgeSpans.All.Count; s++)
+                {
+                    BridgeSpan sp = BridgeSpans.All[s];
+                    if (!Chasm(w.Map, sp, out double enter, out double exit)) continue;
+                    for (int dir = 1; dir >= -1; dir -= 2)
+                    {
+                        double ux = sp.Ux * dir, uz = sp.Uz * dir;
+                        double ox = dir > 0 ? sp.X0 : sp.X1, oz = dir > 0 ? sp.Z0 : sp.Z1;
+                        double en = dir > 0 ? enter : sp.Len - exit, ex = dir > 0 ? exit : sp.Len - enter;
+                        double sa = -1;
+                        for (double a = Math.Max(0, en - 1); a <= en + 1; a += 0.25)
+                            if (Collide.ActorFits(w, ox + ux * a, oz + uz * a, r)) { sa = a; break; }
+                        if (sa < 0) continue;
+                        double goal = Math.Min(sp.Len, ex + 1), axis = Math.Atan2(uz, ux);
+                        foreach (int deg in new[] { 45, -45, 60, -60 })
+                        {
+                            double th = axis + deg * Math.PI / 180;
+                            int budget = (int)Math.Ceiling(1.25 * (goal - sa) / (speed * Math.Cos(deg * Math.PI / 180)) * cfg.SimHz) + (int)cfg.SimHz;
+                            Run run = Cross(w, ox + ux * sa, oz + uz * sa, Math.Cos(th), Math.Sin(th), false, ox, oz, ux, uz, sp, en, ex, goal, budget);
+                            runs++;
+                            if (!run.Arrived || run.Stall >= 0)
+                                bad.Add($"{BridgeSpans.Name(s)} [span {s}] {(dir > 0 ? "fwd" : "back")} stick {deg}: arrived {run.Arrived}, stall {run.Stall} at {run.X:F2},{run.Z:F2}");
+                        }
+                    }
+                }
+                Console.WriteLine($"{{\"item\":\"b16 combine bridge mouth 60 deg\",\"arm\":\"{arm.name}\",\"runs\":{runs},\"bad\":{bad.Count}}} " + string.Join(" | ", bad));
+                if (arm.name == "default") defaultBad = bad.Count == 0 ? null : string.Join("\n", bad);
+            }
+            Assert.IsNull(defaultBad, "the Need4 crossing stalls in the Sim with the default rules:\n" + defaultBad);
         }
     }
 }

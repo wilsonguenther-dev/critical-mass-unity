@@ -121,6 +121,10 @@ namespace CriticalMass.Runtime.Input
             new ControlRow("Jump", new[] { new RebindSlot("Jump", K, 0, column: SlotColumn.Wasd), new RebindSlot("Jump", K, 1, column: SlotColumn.Arrows) }, new[] { new RebindSlot("Jump", G) }),
             // CM b13 J: dodge for every class. b14: Left Shift / Right Ctrl / right bumper (HumanInputSource.DodgeDefaults)
             new ControlRow("Dodge", new[] { new RebindSlot("Dodge", K, 0, column: SlotColumn.Wasd), new RebindSlot("Dodge", K, 1, column: SlotColumn.Arrows) }, new[] { new RebindSlot("Dodge", G) }),
+            // b16 CANCEL (test feature): mouse forward side button / P by J K L / \ by Enter and the arrows; LB on a controller,
+            // shared by context with Next tool (HumanInputState: inside your own swing window LB cancels, else it switches).
+            new ControlRow("Cancel attack (feint)", new[] { new RebindSlot("Cancel", K, 0, column: SlotColumn.Mouse), new RebindSlot("Cancel", K, 1, column: SlotColumn.Wasd), new RebindSlot("Cancel", K, 2, column: SlotColumn.Arrows) },
+                new[] { new RebindSlot("Cancel", G) }),
             new ControlRow("Interact / carry", new[] { new RebindSlot("Interact", K, 0, column: SlotColumn.Mouse), new RebindSlot("Interact", K, 2, column: SlotColumn.Wasd), new RebindSlot("Interact", K, 1, column: SlotColumn.Arrows) }, new[] { new RebindSlot("Interact", G) }),
             new ControlRow("Build / mine", new[] { new RebindSlot("DigPlace", K, 0, column: SlotColumn.Mouse), new RebindSlot("DigPlace", K, 1, column: SlotColumn.Wasd) }, new[] { new RebindSlot("DigPlace", G) }),
             // b14: the Builder's tool wheel steps forward on R / I, the wheel (up forward, down back) and the left bumper; 1-7 pick.

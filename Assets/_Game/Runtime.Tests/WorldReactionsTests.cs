@@ -216,6 +216,9 @@ namespace CriticalMass.Runtime.Tests
                 // b15 safe defaults: the feedback card reads the local player's own Hit and Deliver events once, for the
                 // time-to-first-fun markers (no WorldForce, nothing drawn)
                 "Menus/FeedbackCard.cs",
+                // b16 physics item 11: the refused-jump cue decodes only its own JumpRefused event (no WorldForce: nothing
+                // is pushed), once per tick, for the stumble and the edge highlight
+                "View/B16/JumpRefusedView.cs",
             };
             var readers = Directory.GetFiles(root, "*.cs", SearchOption.AllDirectories)
                 .Where(f => Regex.IsMatch(File.ReadAllText(f), @"\.EventHead\b"))

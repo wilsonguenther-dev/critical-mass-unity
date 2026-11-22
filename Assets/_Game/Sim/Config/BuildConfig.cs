@@ -20,8 +20,10 @@ namespace CriticalMass.Sim.Config
         public double WallCellsTier2 = 5;
         /// <summary>Tier by the team's hut level 0..5 (Blacksmith.Level): 0 = short pieces only, 1 = tall pieces, 2 = 5-cell tall walls at TallHp2.</summary>
         public int[] TierAtHutLevel = { 0, 0, 1, 1, 2, 2 };
-        /// <summary>No piece cell within this distance of the hill centre (the hill's inner circle).</summary>
-        public double HillKeepout = 3.0;
+        /// <summary>No piece cell within this distance of the hill centre. b16: 7 u (was 3 u, inside a 6 u scoring disc, so a
+        /// Builder could wall its outer half). Mechanics audit 5c, keep-out 7 u alone: Kaiju owner wins 0.883 -> 0.729, bot walls
+        /// 3.4 -> 0.85 a match, nothing else moved.</summary>
+        public double HillKeepout = 7.0;
         /// <summary>No piece cell where a living actor or the hatched Kaiju is within this distance + its radius of the cell centre (MinerBarricade.MinDistanceFromActor).</summary>
         public double ActorClearance = 0.9;
 

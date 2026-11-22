@@ -346,6 +346,13 @@ namespace CriticalMass.Sim.Bots
                 double side = (id & 1) == 0 ? 1 : -1;
                 double want = reach * 0.7;
                 double pull = (d - want) / reach;
+                if (PhysicsFeel.On(w))
+                {
+                    // b16 [3]: no keep-distance pull within BotPullDeadband of the wanted distance. Pressed sideways into a wall or a
+                    // body the strafe part stops and the pull alone was left, flipping in, out, in as the gap jittered round `want`.
+                    double off = d - want, db = PhysicsFeel.Cfg(w).BotPullDeadband;
+                    pull = off > db ? (off - db) / reach : off < -db ? (off + db) / reach : 0;
+                }
                 Mv.X = (-dz / d) * side * 0.6 + (dx / d) * pull;
                 Mv.Z = (dx / d) * side * 0.6 + (dz / d) * pull;
             }
@@ -587,7 +594,7 @@ namespace CriticalMass.Sim.Bots
                     Toward(w, id, st.UnstickX[id], st.UnstickZ[id], 0.2);
                     break;
                 case AiState.HoldHill:
-                    if (TeamBrain.On(w) && st.Job[id] == TeamBrain.JobEscort)
+                    if (TeamBrain.On(w) && TeamBrain.OffHillJob(st.Job[id]))   // b16: escort or intercept
                     {
                         Escort(w, st, id, a);   // b15 bot brain: KAIJU HOLDS NOTHING, walk our Kaiju off the disc
                         break;
@@ -857,7 +864,7 @@ namespace CriticalMass.Sim.Bots
                         aimZ = map.Hill.Z;
                         break;
                     }
-                    if (TeamBrain.On(w) && st.Job[id] == TeamBrain.JobEscort)
+                    if (TeamBrain.On(w) && TeamBrain.OffHillJob(st.Job[id]))   // b16: escort or intercept
                     {
                         Escort(w, st, id, a);
                         break;
@@ -1066,6 +1073,26 @@ namespace CriticalMass.Sim.Bots
                         oz = hx * sn + hz * turnCos;
                     }
                 }
+                else if (PhysicsFeel.On(w) && PhysicsFeel.Cfg(w).BotNoSnapReversal && vs >= 0.05 * cc.MoveSpeed)
+                {
+                    // b16 [3]: no snap reversal. A fighter (or a bot walking straight at a point) whose wish flips to more than 120
+                    // degrees off the way it is moving turns through the side at TurnStep a step instead of stepping straight back:
+                    // the approach / retreat band flipping in, out, in read as Reversals in the fast gate's match. Dodges, the cloud
+                    // and the unjam step are decided after this and are not limited. From 5% of top speed: a fighter slowed by its
+                    // own swing (CombatFeel.SpeedScale) moves under the field rule's quarter and snapped back there.
+                    // b16 combine: tried fighters only from TurnLimitFraction (sim run 44954702167): the two-minute shiver match went
+                    // from 0 to 1 hard flag (5 flags vs 0) and the seed 7 lone walker stalled at 79.1:53.9, so the 5% rule stays.
+                    double hx = vx / vs;
+                    double hz = vz / vs;
+                    if (hx * ox + hz * oz < -0.5)
+                    {
+                        double turnCos = TurnCos(cfg);
+                        double turnSin = TurnSin(cfg);
+                        double sn = hx * oz - hz * ox >= 0 ? turnSin : -turnSin;
+                        ox = hx * turnCos - hz * sn;
+                        oz = hx * sn + hz * turnCos;
+                    }
+                }
                 output.MoveX = ox;
                 output.MoveZ = oz;
                 st.WantMove[id] = 1;
@@ -1116,7 +1143,34 @@ namespace CriticalMass.Sim.Bots
         private static void Escort(World w, BotsState st, int id, Actor a)
         {
             int field = a.Team == TeamId.Azure ? BotFields.FieldPadCrimson : BotFields.FieldPadAzure;
+            if (st.Job[id] == TeamBrain.JobIntercept && Intercept(w, st, id, field)) return;   // b16-hook
             if (!Follow(w, st, id, field)) Toward(w, id, w.Kaiju.X, w.Kaiju.Z, 3);
+        }
+
+        /// <summary>Intercept band (u of path): inside it the bot stands; past its far edge it walks back toward the hill.</summary>
+        const double InterceptBand = 3;
+        /// <summary>b16: the intercept stand-off tiers (path units apart, how many).</summary>
+        const double InterceptTierStep = 4;
+        const int InterceptTiers = 3;
+
+        /// <summary>
+        /// b16 the hill cap (TeamBrain.HillCapJobs): stand on the enemy's approach, InterceptAlong u of path from the hill toward
+        /// the enemy pad (the enemy pad's flow field: the route its reinforcements walk), and fight whoever comes (the FSM plays
+        /// it cocky). A 3 u band of path holds still, so it never shivers on an edge. False when the field gives no distance.
+        /// </summary>
+        private static bool Intercept(World w, BotsState st, int id, int field)
+        {
+            double dHill = BotFields.FieldDistAt(st.Fields, field, w.Map.Hill.X, w.Map.Hill.Z);
+            double d = BotFields.FieldDistAt(st.Fields, field, w.X[id], w.Z[id]);
+            if (!(dHill < 1e5) || !(d < 1e5)) return false;
+            // three stand-off tiers by id (12, 16, 20 u of path at the defaults): the surplus spreads along the approach instead of
+            // packing one band of the corridor (r3 tick cost: one band made a dense crowd, 80 us a tick vs 54 us)
+            double target = Math.Max(1, dHill - w.Config.Depth.Mech.InterceptAlong - InterceptTierStep * (id % InterceptTiers));
+            if (d > target) return Follow(w, st, id, field);
+            if (d < target - InterceptBand) return Follow(w, st, id, BotFields.FieldHill);
+            Mv.X = 0;
+            Mv.Z = 0;
+            return true;
         }
     }
 }

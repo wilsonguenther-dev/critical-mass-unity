@@ -32,6 +32,14 @@ namespace CriticalMass.Sim.Core
         /// <summary>Ticks in a row this actor has been staggered (HitStunTicks above 0) and the longest such run this match.</summary>
         public int[] LockRun;
         public int MaxLockRun;
+        /// <summary>b16 outnumbered: last tick of the armour break (a second enemy hit an armoured body within OutnumberedSeconds).</summary>
+        public int[] ArmourBreakUntil;
+        /// <summary>b16 CANCEL: first tick a new feint is allowed (FeintLockoutSeconds after the last one).</summary>
+        public int[] FeintLockUntil;
+        /// <summary>b16 CANCEL: the SwingTick of the swing that already used its cancel (one per attack).</summary>
+        public int[] CancelUsed;
+        /// <summary>b16 CANCEL: the SwingTick of the last swing that landed (a hit-cancel needs it; a whiff never sets it).</summary>
+        public int[] LandedSwing;
         /// <summary>1 on every cell of a built ladder lane (a Bridge cell laid over a Wall), rebuilt once per tick.</summary>
         public byte[] Ladder;
         public int[] LadderCells;
@@ -40,6 +48,8 @@ namespace CriticalMass.Sim.Core
 
         /// <summary>Counters the tests and the balance print read.</summary>
         public int Swings, Whiffs, Staggers, StaggerDiminished, StaggerImmune, StaggerArmoured, Buffered, LadderFalls, TntSelfHits;
+        /// <summary>b16: feints, hit-cancels, outnumbered armour breaks.</summary>
+        public int Feints, HitCancels, ArmourBreaks;
         public double TntSelfDamage;
 
         public static CombatFeelState Create(GameConfig cfg, MapDef map)
@@ -59,6 +69,10 @@ namespace CriticalMass.Sim.Core
                 LockStart = new int[cap],
                 LockUntil = new int[cap],
                 LockRun = new int[cap],
+                ArmourBreakUntil = new int[cap],
+                FeintLockUntil = new int[cap],
+                CancelUsed = new int[cap],
+                LandedSwing = new int[cap],
                 Ladder = new byte[cells],
                 LadderCells = new int[cells],
             };
@@ -82,12 +96,17 @@ namespace CriticalMass.Sim.Core
                 LockStart[i] = CombatFeel.NoTick;
                 LockUntil[i] = CombatFeel.NoTick;
                 LockRun[i] = 0;
+                ArmourBreakUntil[i] = CombatFeel.NoTick;
+                FeintLockUntil[i] = CombatFeel.NoTick;
+                CancelUsed[i] = CombatFeel.NoTick;
+                LandedSwing[i] = CombatFeel.NoTick;
             }
             for (int k = 0; k < LadderCount; k++) Ladder[LadderCells[k]] = 0;
             LadderCount = 0;
             LadderTick = CombatFeel.NoTick;
             MaxLockRun = 0;
             Swings = Whiffs = Staggers = StaggerDiminished = StaggerImmune = StaggerArmoured = Buffered = LadderFalls = TntSelfHits = 0;
+            Feints = HitCancels = ArmourBreaks = 0;
             TntSelfDamage = 0;
         }
     }
@@ -156,13 +175,24 @@ namespace CriticalMass.Sim.Core
             Actor s = w.Actors[source];
             double m = 1;
             if (w.Tick <= w.Depth.Feel.SunderUntil[target]) m *= 1 + f.SunderDamageTaken;
+            // b16 solo guard: one on one (no other enemy struck the target within OutnumberedSeconds) it shrugs off a share.
+            if (f.SoloGuard != null)
+            {
+                int tc = (int)w.Actors[target].Cls;
+                if (tc < f.SoloGuard.Length && f.SoloGuard[tc] > 0)
+                {
+                    int by = w.Depth.Feel.StruckBy[target];
+                    if (by < 0 || by == source || w.Tick - w.Depth.Feel.StruckTick[target] > Ticks(w, f.OutnumberedSeconds)) m *= 1 - f.SoloGuard[tc];
+                }
+            }
             switch (s.Cls)
             {
                 case ClassId.Farmer:
                     if (d < f.FarmerCloseRange) m *= f.FarmerCloseShare;
                     break;
                 case ClassId.Miner:
-                    if (w.Config.Class(w.Actors[target].Cls).Mass >= f.MinerHeavyMass) m *= f.MinerHeavyPierce;
+                    // b16: MinerPierceWarrior false = the pierce spares the Warrior (the fighter wins his duels).
+                    if (w.Config.Class(w.Actors[target].Cls).Mass >= f.MinerHeavyMass && (f.MinerPierceWarrior || w.Actors[target].Cls != ClassId.Warrior)) m *= f.MinerHeavyPierce;
                     break;
                 case ClassId.Builder:
                     if (NearHome(w, source)) m *= f.BuilderHomeMultiplier;
@@ -209,7 +239,10 @@ namespace CriticalMass.Sim.Core
             if (immune) return 0;
             bool heavy = amount >= w.Config.Class(t.Cls).Poise;
             // Armour break: a SUNDERED body (a Miner hit it in the last SunderSeconds) loses its armoured wind-up.
-            if (!heavy && t.SwingPending && f.Strikes[(int)t.Cls].ArmouredWindup && w.Tick > s.SunderUntil[target])
+            // b16: SunderBreaksArmour false = the armour holds through SUNDER; outnumbered (a second enemy inside
+            // OutnumberedSeconds, OutnumberedBreaksArmour) breaks it instead.
+            if (!heavy && t.SwingPending && f.Strikes[(int)t.Cls].ArmouredWindup && (w.Tick > s.SunderUntil[target] || !f.SunderBreaksArmour)
+                && w.Tick > s.ArmourBreakUntil[target])
             {
                 armoured = true;
                 return 0;
@@ -246,10 +279,18 @@ namespace CriticalMass.Sim.Core
             CombatFeelState s = w.Depth.Feel;
             Actor src = w.Actors[source];
             Actor t = w.Actors[target];
+            // b16 outnumbered: a second enemy's hit inside OutnumberedSeconds of another's breaks an armoured body's armour.
+            if (f.OutnumberedBreaksArmour && f.Strikes[(int)t.Cls].ArmouredWindup && s.StruckBy[target] >= 0 && s.StruckBy[target] != source
+                && w.Tick - s.StruckTick[target] <= Ticks(w, f.OutnumberedSeconds))
+            {
+                if (w.Tick > s.ArmourBreakUntil[target]) s.ArmourBreaks++;
+                s.ArmourBreakUntil[target] = w.Tick + Ticks(w, f.OutnumberedSeconds);
+            }
             s.StruckTick[target] = w.Tick;
             s.StruckBy[target] = source;
             Knock.Dir(w, target, srcX, srcZ, JsMath.Cos(src.SwingFacing), JsMath.Sin(src.SwingFacing), out double dx, out double dz);
             int stun = StaggerFor(w, target, amount, out bool armoured, out bool immune);
+            if (f.StrikeStaggers != null && (int)src.Cls < f.StrikeStaggers.Length && !f.StrikeStaggers[(int)src.Cls]) stun = 0; // b16: this class's hits do not stagger
             bool locked = InLock(s, target, w.Tick);
             bool clipped = locked && !immune && w.Tick + stun >= s.LockStart[target] + Ticks(w, f.StaggerMaxLockSeconds);
             if (stun > 0)
@@ -308,10 +349,91 @@ namespace CriticalMass.Sim.Core
             if (hits <= 0)
             {
                 s.Whiffs++;
-                a.SwingRecovery += Ticks(w, Cfg(w).WhiffRecoverySeconds);
+                double extra = Cfg(w).WhiffExtraSeconds != null && (int)a.Cls < Cfg(w).WhiffExtraSeconds.Length ? Cfg(w).WhiffExtraSeconds[(int)a.Cls] : 0;
+                a.SwingRecovery += Ticks(w, Cfg(w).WhiffRecoverySeconds + extra);
             }
+            else s.LandedSwing[i] = a.SwingTick; // b16 CANCEL: this swing landed (a hit-cancel may cut its recovery)
             double left = a.SwingRecovery / w.Config.SimHz;
             if (a.AttackCd < left) a.AttackCd = left;
+        }
+
+        // ------------------------------------------------------------------------------------------------ b16 CANCEL
+
+        /// <summary>
+        /// Combat, first thing per actor each tick: the CANCEL press (one-shot, read and cleared here). During the wind-up
+        /// (strictly before the contact tick) it is a FEINT: the swing is dropped with no hit, the attacker cannot swing for
+        /// FeintRecoverySeconds, FeintRefund of the cooldown left comes back, and no second feint for FeintLockoutSeconds.
+        /// During the recovery after a swing that LANDED (after the contact tick; never on a whiff) it is a HIT-CANCEL: the
+        /// recovery left is cut by HitCancelShare and the cooldown by the same time. One cancel per attack. Feint and
+        /// hit-cancel push SimEventType.Feint (Value 1 = feint, 2 = hit-cancel); the wind-up cue goes with SwingPending.
+        /// Returns 1 for a feint, 2 for a hit-cancel, 0 when the press did nothing.
+        /// </summary>
+        public static int TakeCancel(World w, int i)
+        {
+            InputFrame inp = w.Inputs[i];
+            if (!inp.Cancel) return 0;
+            inp.Cancel = false; // read and cleared: a stored true never cancels twice
+            CombatFeelConfig f = Cfg(w);
+            if (!f.CancelEnabled) return 0;
+            Actor a = w.Actors[i];
+            if (!a.Alive || a.StandUp > 0) return 0;
+            CombatFeelState s = w.Depth.Feel;
+            if (s.CancelUsed[i] == a.SwingTick) return 0;
+            int contact = a.SwingTick + a.SwingWindup;
+            double hz = w.Config.SimHz;
+            if (a.SwingPending && w.Tick < contact)
+            {
+                if (w.Tick < s.FeintLockUntil[i]) return 0;
+                int rec = Ticks(w, f.FeintRecoverySeconds);
+                a.SwingPending = false;
+                a.SwingWindup = w.Tick - a.SwingTick;
+                a.SwingRecovery = rec;
+                double left = a.AttackCd * (1 - f.FeintRefund);
+                a.AttackCd = left > rec / hz ? left : rec / hz;
+                s.CancelUsed[i] = a.SwingTick;
+                s.FeintLockUntil[i] = w.Tick + Ticks(w, f.FeintLockoutSeconds);
+                s.BufferTick[i] = NoTick;
+                s.Feints++;
+                World.PushEvent(w, SimEventType.Feint, i, -1, w.X[i], w.Z[i], 1);
+                return 1;
+            }
+            if (!a.SwingPending && s.LandedSwing[i] == a.SwingTick && w.Tick > contact)
+            {
+                int remaining = contact + a.SwingRecovery - w.Tick;
+                if (remaining <= 0) return 0;
+                int cut = (int)Math.Floor(remaining * f.HitCancelShare + 0.5);
+                if (cut <= 0) return 0;
+                a.SwingRecovery -= cut;
+                double cd = a.AttackCd - cut / hz;
+                a.AttackCd = cd > Combat.TimerEps ? cd : 0;
+                s.CancelUsed[i] = a.SwingTick;
+                s.HitCancels++;
+                World.PushEvent(w, SimEventType.Feint, i, -1, w.X[i], w.Z[i], 2);
+                return 2;
+            }
+            return 0;
+        }
+
+        /// <summary>b16 CANCEL (read by the view's input layer between ticks): would a cancel press do something for actor id
+        /// now (a feint during its wind-up, or a hit-cancel in the recovery after a landed hit, its one use not spent)?</summary>
+        public static bool CancelWindow(World w, int id)
+        {
+            if (w == null || id < 0 || id >= w.ActorCount || !On(w) || !Cfg(w).CancelEnabled) return false;
+            Actor a = w.Actors[id];
+            CombatFeelState s = w.Depth.Feel;
+            if (!a.Alive || a.StandUp > 0 || s.CancelUsed[id] == a.SwingTick) return false;
+            int contact = a.SwingTick + a.SwingWindup;
+            if (a.SwingPending) return w.Tick < contact && w.Tick >= s.FeintLockUntil[id];
+            return s.LandedSwing[id] == a.SwingTick && w.Tick > contact && w.Tick < contact + a.SwingRecovery;
+        }
+
+        /// <summary>b16 CANCEL: true while actor id is in the short fixed recovery after a feint (no swing, no dodge).</summary>
+        public static bool FeintRecovering(World w, int id)
+        {
+            CombatFeelState s = w.Depth.Feel;
+            Actor a = w.Actors[id];
+            return s.CancelUsed[id] == a.SwingTick && !a.SwingPending && s.LandedSwing[id] != a.SwingTick
+                && w.Tick < a.SwingTick + a.SwingWindup + a.SwingRecovery;
         }
 
         // ------------------------------------------------------------------------------------------------ movement

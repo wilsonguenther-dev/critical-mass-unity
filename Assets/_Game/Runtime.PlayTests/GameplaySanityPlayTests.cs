@@ -140,7 +140,13 @@ namespace CriticalMass.Runtime.PlayTests
                     // strike (AttackTiming.ClipTime, fix/hit-feel-3) the hips tilt and the axis-aligned box grows taller than the
                     // body. Actor 19 at 19 s in run 44239149225 read 3.17 u that way, mid-swing (the rule's 0.40 s heavy wind-up
                     // makes a frame inside a swing far more likely). The scale check reads fighters outside a swing only.
-                    bool swinging = a.SwingPending || (a.SwingTick > 0 && w.Tick - a.SwingTick <= a.SwingWindup + 15);
+                    // b16 combine: the same 3.17 u read came back (actor 20 at 18 s, sim 58.8:42.2, run 44944697639) once the b16
+                    // duel rules made wind-ups longer (Miner 0.35 s, Farmer 0.31 s), added the whiff recovery (+0.25 s) and the
+                    // stagger-cancel refund: the attack clip now plays past SwingWindup + 15 ticks. The guard covers the whole attack
+                    // (its cooldown, and 1.2 s of any action clip); an idle or walking fighter (no cooldown, no recent action) is
+                    // still read every time.
+                    bool swinging = a.SwingPending || (a.SwingTick > 0 && w.Tick - a.SwingTick <= a.SwingWindup + 15)
+                                    || a.AttackCd > 0 || a.AnimAction < 1.2;
                     if (spec != null && body != null && spec.Height > 0 && !swinging)
                     {
                         float ratio = body.bounds.size.y / spec.Height;
@@ -390,6 +396,10 @@ namespace CriticalMass.Runtime.PlayTests
             Assert.IsNotNull(cam, "no main camera");
             World w = _w.W;
             int cooldown = _w.Ticks(_w.Cfg.Class(w.Actors[0].Cls).AttackCooldown) + 2;
+            // b16: a whiffed swing (these clicks hit nobody) recovers longer, by the class's extra miss time (the Warrior's
+            // trade for his duels), so the next click waits for that too
+            double[] whiffExtra = _w.Cfg.Depth.CombatFeel.WhiffExtraSeconds;
+            if (whiffExtra != null && (int)w.Actors[0].Cls < whiffExtra.Length) cooldown += _w.Ticks(whiffExtra[(int)w.Actors[0].Cls]) + 1;
             for (int k = 0; k < 8; k += 2)
             {
                 double ang = k * Math.PI / 4;

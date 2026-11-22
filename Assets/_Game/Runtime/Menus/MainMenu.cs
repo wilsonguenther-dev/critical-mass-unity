@@ -395,7 +395,8 @@ namespace CriticalMass.Runtime.Menus
             bool coinsOn = CriticalMass.Runtime.Hud.DeadSystemViews.CoinsShown();   // b15 item 4: coins have no sink
             if (_coins.gameObject.activeSelf != coinsOn) _coins.gameObject.SetActive(coinsOn);
             if (_coinIcon != null && _coinIcon.gameObject.activeSelf != coinsOn) _coinIcon.gameObject.SetActive(coinsOn);
-            HudText.Set(_record, NumberCache.Int(p.MatchesPlayed) + " PLAYED   ·   " + NumberCache.Int(p.Wins) + " WON");
+            HudText.Set(_record, NumberCache.Int(p.MatchesPlayed) + " PLAYED   ·   " + NumberCache.Int(p.Wins) + " WON" +
+                (p.PracticeMatches > 0 ? "   ·   " + NumberCache.Int(p.PracticeMatches) + " PRACTICE" : string.Empty));   // b16: practice apart
         }
 
         protected override void OnScale(float scale)

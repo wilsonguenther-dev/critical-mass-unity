@@ -85,6 +85,8 @@ namespace CriticalMass.Sim.Core
                 if (t.SwingPending)
                 {
                     t.SwingPending = false;
+                    // b16: StaggerCancelRefund gives back that share of the cancelled swing's cooldown (0 = b15: all of it is spent).
+                    if (CombatFeel.On(w) && w.Config.Depth.CombatFeel.StaggerCancelRefund > 0) t.AttackCd *= 1 - w.Config.Depth.CombatFeel.StaggerCancelRefund;
                     World.PushEvent(w, SimEventType.AttackCancel, target, source, w.X[target], w.Z[target], 0);
                 }
             }

@@ -169,6 +169,8 @@ namespace CriticalMass.Runtime.Online
         // Footer children.
         public static readonly Rect Leave = new Rect(140f, 908f, 320f, 72f);
         public static readonly Rect Back = Leave;
+        /// <summary>b17-chat: the room page's CHAT SETTINGS button, at the footer's right end.</summary>
+        public static readonly Rect ChatSettings = new Rect(1460f, 908f, 320f, 72f);
 
         // Home and join pages (their own children inside List and Controls).
         public static readonly Rect NameLabel = new Rect(140f, 216f, 620f, 30f);

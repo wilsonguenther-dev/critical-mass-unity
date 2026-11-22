@@ -104,7 +104,15 @@ namespace CriticalMass.Runtime.Camera
             MinPitch = FirstMinPitch, MaxPitch = FirstMaxPitch,
         };
 
-        public static CameraView Next(CameraView v) => (CameraView)(((int)v + 1) % 3);
+        /// <summary>b16 owner decision (demo): the first-person view is hidden behind this switch, OFF. Off, F5 and the CAMERA line
+        /// go TOP-DOWN and THIRD PERSON only, and a stored first-person choice plays as third person (the stored key is kept, so
+        /// turning the switch back on restores it). All first-person code stays; automation (FollowCameraShots) still reaches it
+        /// through GroundView.ViewOverride.</summary>
+        public static bool FirstPersonEnabled = false;
+
+        public static CameraView Next(CameraView v) => FirstPersonEnabled
+            ? (CameraView)(((int)v + 1) % 3)
+            : v == CameraView.TopDown ? CameraView.ThirdPerson : CameraView.TopDown;
 
         public static string Label(CameraView v) =>
             v == CameraView.ThirdPerson ? "THIRD PERSON" : v == CameraView.FirstPerson ? "FIRST PERSON" : "TOP-DOWN";

@@ -406,7 +406,7 @@ namespace CriticalMass.Runtime.View
                 float d = (float)(2 * cfg.Class(actor.Cls).Radius);
                 if (i == 0) d *= HumanScale;
                 slot.Capsule.localScale = new Vector3(d, (float)(charHeight / 2), d);
-                slot.Capsule.localPosition += JumpLift.Offset(w, map, i, a, x, z); // DG-02 jump arc
+                slot.Capsule.localPosition += JumpLift.Offset(w, map, i, a, x, z) + B16.JumpRefusedView.Offset(w, i, a); // DG-02 jump arc; b16 [11] stumble
                 SetMaterial(slot.CapsuleRenderer, ToonMaterials.Character(actor.Team == TeamId.Azure ? Palette.Azure : Palette.Crimson));
                 return false;
             }
@@ -449,7 +449,8 @@ namespace CriticalMass.Runtime.View
             Vector3 basePos = SimSpace.ToWorld(x, h, z);
             // feat/hit-feel-1 step-in plus the reaction shift, horizontally capped (fix/hit-feel-3: HitFeel.MaxViewOffset).
             m.Transform.localPosition = basePos + Anim.HitFeel.ClampOffset((hasFx ? fx.Nudge : Vector3.zero) + Anim.HitFeel.Lunge(w, i, a))
-                + JumpLift.Offset(w, map, i, a, x, z); // DG-02 jump arc
+                + JumpLift.Offset(w, map, i, a, x, z) // DG-02 jump arc
+                + B16.JumpRefusedView.Offset(w, i, a); // b16 [11]: the refused-jump stumble
             Material teamMat = CriticalMass.Runtime.Progression.TrimMaterials.ForActor(ArtMaterials.ForTeam(m.Spec, actor.Team), i);   // b15 profile: colour trim (fixed colours only; cached, no allocation)
             m.SetMaterial(hasFx && fx.Flash ? _fx.FlashMaterial(teamMat) : teamMat);
             // Animation pass: clips, timing, facing spring, squash and the level of detail live in Anim.ActorAnimator.

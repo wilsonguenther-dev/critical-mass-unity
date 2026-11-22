@@ -17,6 +17,8 @@ namespace CriticalMass.Net
 
         private const int BAttack = 1, BAbility = 2, BInteract = 4, BTerraform = 8, BJump = 16, BSwitch = 32, BHasAim = 64,
             BDodge = 128;   // b13-hook: CM b13 dodge, same byte as BJump (Size stays 14)
+        /// <summary>b16 CANCEL rides the top bit of the ping byte (PingKind is 0..4), so Size stays 14.</summary>
+        private const int PCancel = 128;
 
         public static void Encode(InputFrame f, byte[] buf, int off)
         {
@@ -38,7 +40,7 @@ namespace CriticalMass.Net
             buf[off + 7] = (byte)(sbyte)(f.ClassPick >= 0 && f.ClassPick < ClassIds.All.Count ? f.ClassPick : -1);
             buf[off + 8] = (byte)(f.StationBuy >= 1 && f.StationBuy <= ClassIds.All.Count ? f.StationBuy : 0);
             bool ping = f.PingKind >= 1 && f.PingKind <= 4 && double.IsFinite(f.PingX) && double.IsFinite(f.PingZ);
-            buf[off + 9] = (byte)(ping ? f.PingKind : 0);
+            buf[off + 9] = (byte)((ping ? f.PingKind : 0) | (f.Cancel ? PCancel : 0));   // b16 cancel
             Put16(buf, off + 10, ping ? QCoord(f.PingX) : 0);
             Put16(buf, off + 12, ping ? QCoord(f.PingZ) : 0);
         }
@@ -71,7 +73,8 @@ namespace CriticalMass.Net
             f.ClassPick = cp >= 0 && cp < ClassIds.All.Count ? cp : -1;
             int sb = buf[off + 8];
             f.StationBuy = sb >= 1 && sb <= ClassIds.All.Count ? sb : 0;
-            int pk = buf[off + 9];
+            int pk = buf[off + 9] & 0x7F;
+            f.Cancel = (buf[off + 9] & PCancel) != 0;   // b16 cancel
             f.PingKind = pk >= 1 && pk <= 4 ? pk : 0;
             f.PingX = f.PingKind != 0 ? Coord(Get16(buf, off + 10)) : 0;
             f.PingZ = f.PingKind != 0 ? Coord(Get16(buf, off + 12)) : 0;

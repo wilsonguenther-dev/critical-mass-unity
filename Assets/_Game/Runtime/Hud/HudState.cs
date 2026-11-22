@@ -18,6 +18,10 @@ namespace CriticalMass.Runtime.Hud
         /// <summary>Score = seconds of hill held (Match.DecideWinner compares HillSeconds).</summary>
         public int ScoreAzure, ScoreCrimson;
         public int OnHillAzure, OnHillCrimson;
+        /// <summary>b16 the hill count: the weighted bodies that count after the cap per team, the cap (0 = no cap), and whether
+        /// the local player is on the idle autopilot ("A bot is playing for you").</summary>
+        public int CountedAzure, CountedCrimson, HillCap;
+        public bool Autopiloted;
         public HillState Hill;
         /// <summary>Azure's share of held hill time, 0.5 when nobody has held it yet.</summary>
         public float HillShareAzure;
@@ -63,6 +67,7 @@ namespace CriticalMass.Runtime.Hud
         {
             ClockRemaining = o.ClockRemaining; Ended = o.Ended; Winner = o.Winner;
             ScoreAzure = o.ScoreAzure; ScoreCrimson = o.ScoreCrimson; OnHillAzure = o.OnHillAzure; OnHillCrimson = o.OnHillCrimson;
+            CountedAzure = o.CountedAzure; CountedCrimson = o.CountedCrimson; HillCap = o.HillCap; Autopiloted = o.Autopiloted;
             Hill = o.Hill; HillShareAzure = o.HillShareAzure; KaijuBlocksHill = o.KaijuBlocksHill;
             Kaiju = o.Kaiju; Hatched = o.Hatched; UntilHatch = o.UntilHatch; KaijuMeter01 = o.KaijuMeter01;
             Instability01 = o.Instability01; BerserkLocked = o.BerserkLocked; AllegianceAzure = o.AllegianceAzure; AllegianceCrimson = o.AllegianceCrimson;
@@ -93,6 +98,11 @@ namespace CriticalMass.Runtime.Hud
             s.ScoreCrimson = (int)Math.Floor(m.HillSeconds.Crimson);
             s.OnHillAzure = (int)m.HillCount.Azure;
             s.OnHillCrimson = (int)m.HillCount.Crimson;
+            int cap = MechRules.HillCap(w);   // b16 the hill count
+            s.HillCap = cap == int.MaxValue ? 0 : cap;
+            s.CountedAzure = w.Mech != null ? w.Mech.HillCounted[0] : s.OnHillAzure;
+            s.CountedCrimson = w.Mech != null ? w.Mech.HillCounted[1] : s.OnHillCrimson;
+            s.Autopiloted = MechRules.Autopiloted(w, localId);
             s.Hill = m.HillState;
             double held = m.HillSeconds.Azure + m.HillSeconds.Crimson;
             s.HillShareAzure = held > 1e-6 ? (float)(m.HillSeconds.Azure / held) : 0.5f;

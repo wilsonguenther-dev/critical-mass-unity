@@ -47,11 +47,30 @@ namespace CriticalMass.Sim.Core
         /// <summary>The rule is on (Full profile and ComebackConfig.Enabled).</summary>
         public static bool On(World w) => DepthRules.On(w, w.Config.Depth.Comeback.Enabled);
 
-        /// <summary>The RALLY cap in thousandths of a tick.</summary>
+        /// <summary>The RALLY cap in thousandths of a tick (the big-team set; a world reads <see cref="CapMilli(World)"/>).</summary>
         public static int CapMilli(GameConfig c) => (int)Math.Floor(c.Depth.Comeback.BonusCapSeconds * c.SimHz + 0.5) * 1000;
 
-        /// <summary>The hill multiplier while RALLY runs (1.25).</summary>
+        /// <summary>The hill multiplier while RALLY runs (the big-team set; a world reads <see cref="Multiplier(World)"/>).</summary>
         public static double Multiplier(GameConfig c) => 1 + c.Depth.Comeback.RallyPerMille / 1000.0;
+
+        /// <summary>b16: this world plays the small-team numbers (at most SmallTeamMaxSize a side).</summary>
+        public static bool Small(World w) => w.Opts.TeamSize <= w.Config.Depth.Comeback.SmallTeamMaxSize;
+
+        /// <summary>b16: RALLY per mille for this world's team size.</summary>
+        public static int RallyPerMille(World w) => Small(w) ? w.Config.Depth.Comeback.SmallRallyPerMille : w.Config.Depth.Comeback.RallyPerMille;
+
+        /// <summary>b16: the RALLY cap in thousandths of a tick for this world's team size.</summary>
+        public static int CapMilli(World w)
+        {
+            double cap = Small(w) ? w.Config.Depth.Comeback.SmallBonusCapSeconds : w.Config.Depth.Comeback.BonusCapSeconds;
+            return (int)Math.Floor(cap * w.Config.SimHz + 0.5) * 1000;
+        }
+
+        /// <summary>b16: the hill multiplier while RALLY runs, for this world's team size (HUD).</summary>
+        public static double Multiplier(World w) => 1 + RallyPerMille(w) / 1000.0;
+
+        /// <summary>b16: FORWARD RETURN also when the hill is lost, for this world's team size.</summary>
+        public static bool ForwardWhenLost(World w) => Small(w) ? w.Config.Depth.Comeback.SmallForwardWhenHillLost : w.Config.Depth.Comeback.ForwardWhenHillLost;
 
         /// <summary>The other team's hill seconds minus this team's (positive = behind).</summary>
         public static double Deficit(World w, TeamId team)
@@ -62,12 +81,12 @@ namespace CriticalMass.Sim.Core
 
         /// <summary>The team trails by more than the threshold and still has cap left (RALLY would count if it held the hill).</summary>
         public static bool Trailing(World w, TeamId team) =>
-            On(w) && w.Config.Depth.Comeback.RallyOn && Deficit(w, team) > w.Config.Depth.Comeback.TrailThresholdSeconds && w.Rally.BonusMilli[(int)team] < CapMilli(w.Config);
+            On(w) && w.Config.Depth.Comeback.RallyOn && Deficit(w, team) > w.Config.Depth.Comeback.TrailThresholdSeconds && w.Rally.BonusMilli[(int)team] < CapMilli(w);
 
         /// <summary>FORWARD RETURN is on for the team right now (it trails by more than the threshold).</summary>
         public static bool ForwardActive(World w, TeamId team) =>
             On(w) && w.Config.Depth.Comeback.ForwardReturnOn && (Deficit(w, team) > w.Config.Depth.Comeback.TrailThresholdSeconds
-                || (w.Config.Depth.Comeback.ForwardWhenHillLost && w.Match.HillState == (team == TeamId.Azure ? HillState.Crimson : HillState.Azure)));
+                || (ForwardWhenLost(w) && w.Match.HillState == (team == TeamId.Azure ? HillState.Crimson : HillState.Azure)));
 
         /// <summary>The team earned RALLY credit on the last tick.</summary>
         public static bool Earning(World w, TeamId team) => On(w) && w.Rally.Earning[(int)team] != 0;
@@ -77,7 +96,7 @@ namespace CriticalMass.Sim.Core
 
         /// <summary>Extra hill seconds RALLY can still give the team.</summary>
         public static double CapLeftSeconds(World w, TeamId team) =>
-            On(w) ? Math.Max(0, CapMilli(w.Config) - w.Rally.BonusMilli[(int)team]) / 1000.0 / w.Config.SimHz : 0;
+            On(w) ? Math.Max(0, CapMilli(w) - w.Rally.BonusMilli[(int)team]) / 1000.0 / w.Config.SimHz : 0;
 
         /// <summary>
         /// Hill.HillSystem, once the owner of this tick is known and BEFORE its seconds are added: the extra seconds RALLY gives
@@ -96,8 +115,8 @@ namespace CriticalMass.Sim.Core
             else return 0;
             if (!(Deficit(w, team) > w.Config.Depth.Comeback.TrailThresholdSeconds)) return 0;
             int t = (int)team;
-            int left = CapMilli(w.Config) - s.BonusMilli[t];
-            int add = Math.Min(left, Math.Max(0, w.Config.Depth.Comeback.RallyPerMille));
+            int left = CapMilli(w) - s.BonusMilli[t];
+            int add = Math.Min(left, Math.Max(0, RallyPerMille(w)));
             if (add <= 0) return 0;
             s.BonusMilli[t] += add;
             s.Earning[t] = 1;
@@ -126,7 +145,8 @@ namespace CriticalMass.Sim.Core
             if (curve)
             {
                 ComebackConfig k = c.Depth.Comeback;
-                long a = Ticks(k.RespawnStartSeconds, hz), b = Ticks(k.RespawnEndSeconds, hz);
+                bool small = Small(w);   // b16: small teams keep the b15 curve
+                long a = Ticks(small ? k.SmallRespawnStartSeconds : k.RespawnStartSeconds, hz), b = Ticks(small ? k.SmallRespawnEndSeconds : k.RespawnEndSeconds, hz);
                 long total = Math.Max(1L, Ticks(c.MatchSeconds, hz));
                 long now = Math.Min(total, Math.Max(0L, (long)w.Tick));
                 long num = now, den = total;

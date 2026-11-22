@@ -61,7 +61,10 @@ namespace CriticalMass.Runtime.Input
         /// opens the base station inside your own station ring (StationPanel) and, everywhere else, holding it shows all
         /// usable terrain (TerrainAffordanceView ignores the hold while the station panel is open).
         /// </summary>
-        static readonly string[][] ContextPairs = { new[] { "OpenStation", "ShowTerrain" } };
+        static readonly string[][] ContextPairs = { new[] { "OpenStation", "ShowTerrain" },
+            // b16: on a controller LB cancels inside your own swing window (the wind-up, or the recovery after a landed hit) and
+            // steps the Builder / Miner tool everywhere else (HumanInputState.Fill picks one per press).
+            new[] { "Cancel", "SwitchDigPlace" } };
 
         /// <summary>True when the two actions share a button by context (ContextPairs).</summary>
         public static bool ContextShared(string a, string b)
@@ -132,7 +135,7 @@ namespace CriticalMass.Runtime.Input
         }
 
         /// <summary>feat/ground-camera: a double-tap binding (MultiTap) is its own gesture, so it may share a button with a
-        /// press or hold (Camera view: double-tap View; Scoreboard: hold View).</summary>
+        /// press or hold (b16 finish: Camera view is a double tap of L3; the emote wheel opens on an L3 hold).</summary>
         public const string DoubleTapSuffix = " (double tap)";
 
         public static bool IsDoubleTap(InputBinding b) =>

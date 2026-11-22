@@ -93,6 +93,7 @@ namespace CriticalMass.Net
             H_MapDef(ref h, o.Map);
             H_MatchState(ref h, o.Match);
             A(ref h, o.MeatDropped);
+            H_MechState(ref h, o.Mech);
             {
                 var a3 = o.Nodes;
                 if (a3 == null) M(ref h, -1);
@@ -653,6 +654,7 @@ namespace CriticalMass.Net
             D(ref h, o.AimX);
             D(ref h, o.AimZ);
             M(ref h, o.Attack ? 1 : 2);
+            M(ref h, o.Cancel ? 1 : 2);
             M(ref h, o.ClassPick);
             M(ref h, o.Dodge ? 1 : 2);
             M(ref h, o.Interact ? 1 : 2);
@@ -683,6 +685,8 @@ namespace CriticalMass.Net
             M(ref h, o.MeleeWindupLen);
             D(ref h, o.PrevX);
             D(ref h, o.PrevZ);
+            D(ref h, o.PushVx);
+            D(ref h, o.PushVz);
             D(ref h, o.SlamCd);
             M(ref h, (long)o.State);
             M(ref h, o.TargetId);
@@ -838,6 +842,20 @@ namespace CriticalMass.Net
             M(ref h, (long)o.Phase);
             D(ref h, o.Time);
             M(ref h, (long)o.Winner);
+        }
+
+        private static void H_MechState(ref ulong h, global::CriticalMass.Sim.Core.MechState o)
+        {
+            if (o == null) { M(ref h, 0x4E554C4CL); return; }
+            A(ref h, o.Auto);
+            M(ref h, o.Handbacks);
+            A(ref h, o.HillCounted);
+            A(ref h, o.HillWeighted);
+            A(ref h, o.IdleTicks);
+            M(ref h, o.Intercepts);
+            A(ref h, o.Surplus);
+            A(ref h, o.SurplusLock);
+            M(ref h, o.Takeovers);
         }
 
         private static void H_ResourceNode(ref ulong h, global::CriticalMass.Sim.Core.ResourceNode o)
@@ -1066,14 +1084,21 @@ namespace CriticalMass.Net
         private static void H_CombatFeelState(ref ulong h, global::CriticalMass.Sim.Core.CombatFeelState o)
         {
             if (o == null) { M(ref h, 0x4E554C4CL); return; }
+            A(ref h, o.ArmourBreakUntil);
+            M(ref h, o.ArmourBreaks);
             A(ref h, o.BufferTick);
             M(ref h, o.Buffered);
+            A(ref h, o.CancelUsed);
+            A(ref h, o.FeintLockUntil);
+            M(ref h, o.Feints);
+            M(ref h, o.HitCancels);
             A(ref h, o.ImmuneUntil);
             A(ref h, o.Ladder);
             A(ref h, o.LadderCells);
             M(ref h, o.LadderCount);
             M(ref h, o.LadderFalls);
             M(ref h, o.LadderTick);
+            A(ref h, o.LandedSwing);
             A(ref h, o.LockRun);
             A(ref h, o.LockStart);
             A(ref h, o.LockUntil);

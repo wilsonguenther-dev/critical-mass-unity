@@ -54,9 +54,12 @@ namespace CriticalMass.Sim.Tests
                             double ax = kx + Math.Cos(ang) * fr[f] * body, az = kz + Math.Sin(ang) * fr[f] * body;
                             if (!Terraform.WalkableAt(w.Map, ax, az)) continue;
                             DepthKit.Put(w, 0, ax, az);
+                            // b16 [1]: a pinned fighter may hold the Kaiju back (it gives way): each case starts from the spot, and
+                            // the distance is measured to where the Kaiju ends.
+                            k.X = kx; k.Z = kz; k.PrevX = kx; k.PrevZ = kz;
                             cases++;
                             Collide.KaijuDepenetrate(w);
-                            double dx = w.X[0] - kx, dz = w.Z[0] - kz, d = Math.Sqrt(dx * dx + dz * dz);
+                            double dx = w.X[0] - k.X, dz = w.Z[0] - k.Z, d = Math.Sqrt(dx * dx + dz * dz);
                             if (d > rr + 0.01) viaRing++;
                             bool bad = false;
                             if (d < body) { inside++; bad = true; }
