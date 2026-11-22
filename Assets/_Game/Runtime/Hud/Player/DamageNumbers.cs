@@ -23,13 +23,14 @@ namespace CriticalMass.Runtime.Hud.Player
         public const int BaseTop = 30, BaseThird = 34, MinSize = 28;
         public const float HeavyScale = 1.35f, CritScale = 1.6f, HealScale = 0.94f, Life = 0.7f, HeavyLife = 0.85f, Rise = 0.6f, StackWindow = 0.45f;
         public const float HealWindow = 0.35f, NumberLift = 2.2f;
-        public enum Kind { Hit, Heavy, Crit, Heal, Structure, Kaiju }
+        public enum Kind { Hit, Heavy, Crit, Heal, Structure, Kaiju, Critical }
+        public const float CriticalScale = 1.9f, Punch = 0.16f, PunchScale = 1.45f, PairWindow = 0.12f;
 
         /// <summary>Font size of a number of kind k in the given view (pure; tests).</summary>
         public static int SizeFor(Kind k, bool thirdPerson)
         {
             float b = thirdPerson ? BaseThird : BaseTop;
-            float s = k == Kind.Heavy ? b * HeavyScale : k == Kind.Crit ? b * CritScale : k == Kind.Heal || k == Kind.Structure ? b * HealScale : b;
+            float s = k == Kind.Heavy ? b * HeavyScale : k == Kind.Crit ? b * CritScale : k == Kind.Critical ? b * CriticalScale : k == Kind.Heal || k == Kind.Structure ? b * HealScale : b;
             return Mathf.Max(MinSize, Mathf.RoundToInt(s));
         }
 
@@ -39,6 +40,7 @@ namespace CriticalMass.Runtime.Hud.Player
             {
                 case Kind.Heavy: return PxPalette.StrikeInk;
                 case Kind.Crit: return PxPalette.Strike;
+                case Kind.Critical: return PxPalette.CritSkill;
                 case Kind.Heal: return PxPalette.Heal;
                 case Kind.Structure: return PxPalette.Structure;
                 default: return PxPalette.Cream;
@@ -49,7 +51,8 @@ namespace CriticalMass.Runtime.Hud.Player
         {
             public Text Text;
             public CanvasGroup Group;
-            public float Age, Life;
+            public float Age, Life, Punch;
+            public Kind Kind;
             public int Actor;
             public Vector3 Point;
             public Vector2 Offset;
@@ -60,6 +63,43 @@ namespace CriticalMass.Runtime.Hud.Player
         int _next;
         readonly float[] _healAcc = new float[HealthBars.MaxBars];
         readonly float[] _healAge = new float[HealthBars.MaxBars];
+        readonly float[] _critAt = new float[HealthBars.MaxBars];
+        public int CriticalsShown { get; private set; }
+
+        /// <summary>
+        /// Lane S1's CriticalHit for my hit on victim (the same tick as its Hit, either order): the newest number on victim
+        /// becomes the critical style (1.9 x, the hot pink, a 0.16 s scale punch); if its Hit has not been read yet the
+        /// next number on victim inside PairWindow is. Returns true when a number was upgraded now.
+        /// </summary>
+        public bool Critical(int victim, float bonus)
+        {
+            if (!CriticalMass.Runtime.Menu.GameSettings.DamageNumbers) return false;
+            Num best = null;
+            for (int i = 0; i < Pool; i++)
+            {
+                Num o = _nums[i];
+                if (o.Active && o.Actor == victim && o.Kind != Kind.Heal && o.Age <= PairWindow && (best == null || o.Age < best.Age)) best = o;
+            }
+            if (best == null)
+            {
+                if (victim >= 0 && victim < _critAt.Length) _critAt[victim] = Mathf.Max(1e-4f, Time.unscaledTime);
+                return false;
+            }
+            MakeCritical(best);
+            return true;
+        }
+
+        void MakeCritical(Num n)
+        {
+            n.Kind = Kind.Critical;
+            int size = SizeFor(Kind.Critical, PxProject.ThirdPerson);
+            if (n.Text.fontSize != size) { n.Text.fontSize = size; ContainedText.Of(n.Text)?.Configure(size, MinSize, 1); }
+            n.Text.color = ColourFor(Kind.Critical);
+            n.Life = HeavyLife + 0.15f;
+            n.Punch = Punch;
+            CriticalsShown++;
+            PlayerFeedback.Report(FeedbackChannel.DamageNumber, n.Actor, 1f, n.Text, 99);
+        }
 
         public int ActiveCount
         {
@@ -106,6 +146,9 @@ namespace CriticalMass.Runtime.Hud.Player
             n.Life = kind == Kind.Heavy || kind == Kind.Crit ? HeavyLife : Life;
             n.Actor = actor;
             n.Point = point;
+            n.Kind = kind;
+            n.Punch = 0f;
+            n.Text.rectTransform.localScale = Vector3.one;
             float side = (stack & 1) == 0 ? 1f : -1f;
             n.Offset = stack == 0 ? Vector2.zero : new Vector2(side * (12f + 6f * stack), size * 0.8f * stack);
             if (n.Text.fontSize != size) { n.Text.fontSize = size; ContainedText.Of(n.Text)?.Configure(size, MinSize, 1); }
@@ -114,6 +157,11 @@ namespace CriticalMass.Runtime.Hud.Player
             n.Group.alpha = 1f;
             if (!n.Text.gameObject.activeSelf) n.Text.gameObject.SetActive(true);
             PlayerFeedback.Report(kind == Kind.Heal ? FeedbackChannel.HealNumber : FeedbackChannel.DamageNumber, actor, v, n.Text);
+            if (kind != Kind.Heal && actor >= 0 && actor < _critAt.Length && _critAt[actor] > 0f)
+            {
+                if (Time.unscaledTime - _critAt[actor] <= PairWindow) MakeCritical(n);
+                _critAt[actor] = 0f;
+            }
             return true;
         }
 
@@ -135,7 +183,7 @@ namespace CriticalMass.Runtime.Hud.Player
         public void Clear()
         {
             for (int i = 0; i < Pool; i++) { _nums[i].Active = false; PxUi.Show(_nums[i].Text, false); }
-            for (int i = 0; i < _healAcc.Length; i++) { _healAcc[i] = 0f; _healAge[i] = -1f; }
+            for (int i = 0; i < _healAcc.Length; i++) { _healAcc[i] = 0f; _healAge[i] = -1f; _critAt[i] = 0f; }
         }
 
         public void Tick(World w, double alpha, UnityEngine.Camera cam, float scale, float dt)
@@ -161,6 +209,12 @@ namespace CriticalMass.Runtime.Hud.Player
                 Vector3 at = n.Actor >= 0 && n.Actor < w.ActorCount && w.Actors[n.Actor].Alive ? PxProject.Actor(w, n.Actor, alpha, NumberLift + up) : n.Point + Vector3.up * up;
                 if (!PxProject.Screen(cam, at, 0f, out Vector2 p)) { PxUi.Alpha(n.Group, 0f); continue; }
                 n.Text.rectTransform.anchoredPosition = p / scale + n.Offset;
+                if (n.Punch > 0f)
+                {
+                    n.Punch = calm ? 0f : Mathf.Max(0f, n.Punch - dt);
+                    float ps = 1f + (PunchScale - 1f) * (n.Punch / Punch);
+                    n.Text.rectTransform.localScale = new Vector3(ps, ps, 1f);
+                }
                 PxUi.Alpha(n.Group, t < 0.55f ? 1f : 1f - (t - 0.55f) / 0.45f);
             }
         }

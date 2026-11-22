@@ -20,6 +20,9 @@ namespace CriticalMass.Runtime.Hud.Player
         /// <summary>Hurt (hits on ME): direction arcs, hurt vignette, low-health pulse, own bar when low. #E8288A (h 330).</summary>
         public static readonly Color Hurt = CMTokens.ParseHex("#E8288A");
         /// <summary>Healing (numbers, the bar's rise glow). #5CE38A (h 141): clear of Azure, Biomass and the hurt family.</summary>
+        /// <summary>Lane S1's skill critical (COUNTER / PUNISH / BACK HIT) number: the hot light pink of the damage family
+        /// (h 318), lighter and larger than the tier-2 magenta.</summary>
+        public static readonly Color CritSkill = CMTokens.ParseHex("#FF6FD2");
         public static readonly Color Heal = CMTokens.ParseHex("#5CE38A");
         /// <summary>The "chunk just lost" segment of every bar.</summary>
         public static readonly Color Chunk = Color.white;

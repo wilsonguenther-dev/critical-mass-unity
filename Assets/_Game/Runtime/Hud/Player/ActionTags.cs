@@ -23,6 +23,21 @@ namespace CriticalMass.Runtime.Hud.Player
         /// time from PlayerReasons when it lands (lane S2); until then this value. See FINDINGS "Needs from other lanes".</summary>
         public static readonly int BlockedGlancing = ReasonCode("BlockedGlancing", 8);
         // Lane S2's other new codes, keyed by NUMBER so the words exist before and after the combine (S2 67b56400).
+        /// <summary>Lane S1's CriticalHit kinds (Value of the view-only event; lead's call 12).</summary>
+        public const int CritCounter = 1, CritPunish = 2, CritBackHit = 3;
+
+        /// <summary>The critical word: mine = I dealt it (on the target), else I took it (on me). Unknown kinds fall back.</summary>
+        public static string CriticalWords(int kind, bool mine)
+        {
+            switch (kind)
+            {
+                case CritCounter: return mine ? "COUNTER!" : "COUNTERED";
+                case CritPunish: return mine ? "PUNISH!" : "PUNISHED";
+                case CritBackHit: return mine ? "BACK HIT!" : "HIT FROM BEHIND";
+                default: return mine ? "CRITICAL!" : "CRITICAL HIT";
+            }
+        }
+
         public const int ButtonStationBuy = 8, RefusedCarrying = 11, RefusedInAir = 12, RefusedRuleOff = 13, WorldGather = 10;
 
         /// <summary>A PlayerReasons constant by name (fallback when the lane that adds it has not merged yet).</summary>
@@ -187,6 +202,25 @@ namespace CriticalMass.Runtime.Hud.Player
             Text t = _words.Show(Interrupted, 2000, me, Vector3.zero, SelfLift, PxPalette.Cream, PxPalette.Hurt, true, Seconds);
             if (t != null) PlayerFeedback.Report(FeedbackChannel.InterruptedTag, me, 1f, t);
         }
+
+        /// <summary>A critical I dealt: the word above the number on the target (damage ink on a magenta rim).</summary>
+        public Text OnCriticalDealt(World w, int victim, int kind, float bonus)
+        {
+            Text t = _words.Show(CriticalWords(kind, true), 2100 + kind * 64 + (victim & 63), victim >= 0 && victim < w.ActorCount ? victim : -1,
+                victim >= 0 && victim < w.ActorCount ? PxProject.Actor(w, victim, 1.0, CritLift) : Vector3.zero, CritLift, PxPalette.StrikeInk, PxPalette.Strike, true, 0.9f);
+            if (t != null) PlayerFeedback.Report(FeedbackChannel.DamageNumber, victim, bonus, t, 100 + kind);
+            return t;
+        }
+
+        /// <summary>A critical I took: the reason over my fighter, cream on a hurt rim.</summary>
+        public Text OnCriticalTaken(World w, int me, int attacker, int kind, float bonus)
+        {
+            Text t = _words.Show(CriticalWords(kind, false), 2200 + kind, me, Vector3.zero, SelfLift + 0.25f, PxPalette.Cream, PxPalette.Hurt, true, 1.3f);
+            if (t != null) PlayerFeedback.Report(FeedbackChannel.OwnHurtVignette, attacker, bonus, t, 100 + kind);
+            return t;
+        }
+
+        public const float CritLift = 3.0f;
 
         public void OnFeint(World w, int me) => _words.Show(Feint, 2001, me, Vector3.zero, SelfLift, PxPalette.Cream, PxPalette.Brass, false, 0.8f);
 

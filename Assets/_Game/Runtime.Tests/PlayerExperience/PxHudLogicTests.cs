@@ -114,7 +114,7 @@ namespace CriticalMass.Runtime.Tests.PlayerExperience
         public void HurtAndDamageColoursSitOutsideBothTeamHues()
         {
             float[] teams = { Hue("#16C7D9"), Hue("#FF5A5F"), Hue("#3D9BFF"), Hue("#FFB000") };
-            foreach (Color c in new[] { PxPalette.Strike, PxPalette.Hurt })
+            foreach (Color c in new[] { PxPalette.Strike, PxPalette.Hurt, PxPalette.CritSkill })
             {
                 Color.RGBToHSV(c, out float h, out _, out _);
                 foreach (float t in teams) Assert.Greater(HueGap(h * 360f, t), 25f, "damage hue " + h * 360f + " vs team hue " + t);

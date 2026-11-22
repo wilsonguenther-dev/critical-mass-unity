@@ -80,6 +80,16 @@ namespace CriticalMass.Runtime.Hud.Player
             PlayerFeedback.Report(FeedbackChannel.HitMarker, victim, tier, _ticks);
         }
 
+        public const float CritLife = 0.24f, CritScale = 1.6f;
+
+        /// <summary>Lane S1's CriticalHit by me: the strongest non-kill variant (1.6 x, 0.24 s) on the same victim.</summary>
+        public void OnMyCritical(World w, int victim, double alpha)
+        {
+            OnMyHit(w, victim, 2, alpha);
+            _life = CritLife;
+            _base = CritScale;
+        }
+
         /// <summary>A hit by me on a structure or the Kaiju (no victim actor): the marker at the contact point.</summary>
         public void OnMyHitAt(Vector3 world, int tier)
         {

@@ -12,19 +12,23 @@ namespace CriticalMass.Runtime.Hud.Player
     /// plate: knock-outs, assists, damage dealt, healing done and hill seconds ("KO 3  AST 1  DMG 412  HEAL 0  HILL 34s").
     /// KO and hill seconds are the sim's own counters (Actor.Kills, Actor.HillSeconds: the scoreboard's numbers), damage and
     /// healing MatchStats (the results screen's numbers), assists the HUD's AssistTracker. The line is rebuilt only when a
-    /// number changes. Size, px at 1080p: Mono 16 (shrinks to 12 to fit), box 252 x 18 at card x 124, y 113 (under the
-    /// health plate, clear of the portrait and the ability keys).
+    /// number changes. Size, px at 1080p: Mono 16 (shrinks to 12 to fit), box 500 x 20 at card x 124, y -28 (just above
+    /// the card and the LOW HEALTH row; a 38-46 character line does not fit any free row inside the card).
     /// </summary>
     public sealed class PlayerTally
     {
-        public const float X = 124f, Y = 113f, W = 252f, H = 18f;
+        public const float X = 124f, Y = -28f, W = 500f, H = 20f;   // above the card (the card has no 38-character row free)
 
         /// <summary>The tally line (pure; tests).</summary>
-        public static string Compose(int ko, int assists, int damage, int healing, int hillSeconds) =>
-            "KO " + ko + "  AST " + assists + "  DMG " + damage + "  HEAL " + healing + "  HILL " + hillSeconds + "s";
+        public static string Compose(int ko, int assists, int damage, int healing, int hillSeconds) => Compose(ko, assists, 0, damage, healing, hillSeconds);
+
+        /// <summary>The tally line with criticals (CRIT n shows once there is one; pure; tests).</summary>
+        public static string Compose(int ko, int assists, int crits, int damage, int healing, int hillSeconds) =>
+            "KO " + ko + "  AST " + assists + (crits > 0 ? "  CRIT " + crits : "") + "  DMG " + damage + "  HEAL " + healing + "  HILL " + hillSeconds + "s";
 
         readonly Text _line;
-        int _ko = -1, _ast = -1, _dmg = -1, _heal = -1, _hill = -1;
+        int _ko = -1, _ast = -1, _dmg = -1, _heal = -1, _hill = -1, _crit = -1;
+        public int Crits => _crit;
 
         public Text Line => _line;
         public int Kills => _ko;
@@ -39,9 +43,11 @@ namespace CriticalMass.Runtime.Hud.Player
             CriticalMass.Runtime.Menu.MenuUi.Fit(_line, 12);
         }
 
-        public void Clear() => _ko = _ast = _dmg = _heal = _hill = -1;
+        public void Clear() => _ko = _ast = _dmg = _heal = _hill = _crit = -1;
 
-        public void Tick(World w, int me, AssistTracker assists)
+        public void Tick(World w, int me, AssistTracker assists) => Tick(w, me, assists, 0);
+
+        public void Tick(World w, int me, AssistTracker assists, int crits)
         {
             if (me < 0 || me >= w.ActorCount) { PxUi.Show(_line, false); return; }
             PxUi.Show(_line, true);
@@ -51,10 +57,11 @@ namespace CriticalMass.Runtime.Hud.Player
             int ko = a.Kills, ast = assists.Assists(me);
             int dmg = st != null ? Mathf.RoundToInt((float)st.Damage) : 0, heal = st != null ? Mathf.RoundToInt((float)st.HealingDone) : 0;
             int hill = (int)System.Math.Floor(a.HillSeconds);
-            if (ko == _ko && ast == _ast && dmg == _dmg && heal == _heal && hill == _hill) return;
-            bool koChanged = ko != _ko || ast != _ast;
+            if (ko == _ko && ast == _ast && dmg == _dmg && heal == _heal && hill == _hill && crits == _crit) return;
+            bool koChanged = ko != _ko || ast != _ast || crits != _crit;
+            _crit = crits;
             _ko = ko; _ast = ast; _dmg = dmg; _heal = heal; _hill = hill;
-            HudText.Set(_line, Compose(ko, ast, dmg, heal, hill));
+            HudText.Set(_line, Compose(ko, ast, crits, dmg, heal, hill));
             if (koChanged) PlayerFeedback.Report(FeedbackChannel.PersonalTally, me, ko, _line);
         }
     }

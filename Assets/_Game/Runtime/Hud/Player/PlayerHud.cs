@@ -26,6 +26,38 @@ namespace CriticalMass.Runtime.Hud.Player
         public readonly WorldPops Pops;
         public readonly PlayerTally Tally;
         public readonly ChannelBar Channel;
+        /// <summary>Criticals I dealt this match (the tally's CRIT n).</summary>
+        public int Criticals { get; private set; }
+        World _critWorld;
+        int _critMe = -1;
+        double _critAlpha = 1.0;
+
+        /// <summary>
+        /// Lane S1's CriticalHit (lead's call 12), the ONE entry point. The lead wires the event at the combine in
+        /// PlayerHud.OnEvent with: case SimEventType.CriticalHit: ShowCritical(e.A, e.B, (int)e.Value, (float)e.Radius); break;
+        /// Mine (attacker = me): the number turns critical (1.9 x, hot pink, punch), COUNTER! / PUNISH! / BACK HIT! above it,
+        /// the hit marker's strongest non-kill variant, CRIT n in the tally. On me (victim = me): the arc from the attacker
+        /// goes thick and full and COUNTERED / PUNISHED / HIT FROM BEHIND shows over my fighter.
+        /// </summary>
+        public void ShowCritical(int victim, int attacker, int kind, float bonus)
+        {
+            World w = _critWorld;
+            int me = _critMe;
+            if (w == null || me < 0) return;
+            if (attacker == me && victim != me)
+            {
+                Criticals++;
+                Numbers.Critical(victim, bonus);
+                Tags.OnCriticalDealt(w, victim, kind, bonus);
+                if (victim >= 0 && victim < w.ActorCount) Marker.OnMyCritical(w, victim, _critAlpha);
+            }
+            else if (victim == me)
+            {
+                Vector3 from = attacker >= 0 && attacker < w.ActorCount ? PxProject.Actor(w, attacker, _critAlpha, 1f) : PxProject.Actor(w, me, _critAlpha, 1f);
+                Direction.OnCritical(attacker >= 0 ? attacker : DamageDirection.SourcePoint, from);
+                Tags.OnCriticalTaken(w, me, attacker, kind, bonus);
+            }
+        }
         public readonly AssistTracker Assists = new AssistTracker();
 
         World _world;
@@ -57,6 +89,9 @@ namespace CriticalMass.Runtime.Hud.Player
             if (w == null || cam == null) return;
             int me = HudBinder.LocalActor;
             _alpha = alpha;
+            _critWorld = w;
+            _critMe = me;
+            _critAlpha = alpha;
             if (!ReferenceEquals(w, _world) || w.Epoch != _epoch)
             {
                 _world = w;
@@ -73,6 +108,7 @@ namespace CriticalMass.Runtime.Hud.Player
                 Channel.Clear();
                 Tally?.Clear();
                 Assists.Clear();
+                Criticals = 0;
             }
             if (_cursor < 0 || _cursor > w.EventHead) _cursor = w.EventHead;
             if (w.EventHead - _cursor > World.EventCapacity)
@@ -91,7 +127,7 @@ namespace CriticalMass.Runtime.Hud.Player
             Tags.Tick(w, alpha, cam, scale, dt);
             Numbers.Tick(w, alpha, cam, scale, dt);
             Pops.Tick(w, me, alpha, cam, scale, dt);
-            Tally?.Tick(w, me, Assists);
+            Tally?.Tick(w, me, Assists, Criticals);
             Channel.Tick(w, me, alpha, cam, scale, dt);
             Hurt.Tick(me, s != null && s.HasPlayer ? s.Hp01 : 1f, s != null && s.HasPlayer && s.Alive, dt);
         }

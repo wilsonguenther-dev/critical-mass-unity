@@ -16,7 +16,7 @@ namespace CriticalMass.Runtime.Hud.Player
     public sealed class DamageDirection
     {
         public const int Arcs = 6;
-        public const float Life = 0.8f, RadiusThird = 170f, RadiusTop = 120f, SpanDeg = 50f, MinThick = 9f, MaxThick = 16f;
+        public const float CritThick = 24f, Life = 0.8f, RadiusThird = 170f, RadiusTop = 120f, SpanDeg = 50f, MinThick = 9f, MaxThick = 16f;
         /// <summary>Source codes beyond actor ids.</summary>
         public const int SourceKaiju = -2, SourcePoint = -10;
 
@@ -30,7 +30,7 @@ namespace CriticalMass.Runtime.Hud.Player
             public int Source = int.MinValue;
             public Vector3 Point;
             public float Age = Life, Strength;
-            public bool Reported;
+            public bool Reported, Crit;
         }
 
         readonly Arc[] _arcs = new Arc[Arcs];
@@ -70,15 +70,29 @@ namespace CriticalMass.Runtime.Hud.Player
                 for (int i = 0; i < Arcs; i++) if (_arcs[i].Age > oldest) { oldest = _arcs[i].Age; slot = _arcs[i]; }
             }
             float st = StrengthFor(share);
+            if (!(slot.Age < Life && slot.Source == source)) slot.Crit = false;
             if (slot.Age < Life && slot.Source == source) st = Mathf.Max(st, slot.Strength * (1f - slot.Age / Life));
             slot.Source = source;
             slot.Point = point;
             slot.Age = 0f;
             slot.Strength = st;
             slot.Reported = false;
-            float thick = Mathf.Lerp(MinThick, MaxThick, (st - 0.45f) / 0.55f);
+            float thick = slot.Crit ? CritThick : Mathf.Lerp(MinThick, MaxThick, (st - 0.45f) / 0.55f);
             if (Mathf.Abs(slot.G.ThicknessPx - thick) > 0.5f) { slot.G.ThicknessPx = thick; slot.G.SetVerticesDirty(); }
             if (!slot.G.gameObject.activeSelf) slot.G.gameObject.SetActive(true);
+        }
+
+        /// <summary>Lane S1's CriticalHit on me: the arc for that source (made if its Hit has not been read yet) goes thick and full.</summary>
+        public void OnCritical(int source, Vector3 point)
+        {
+            Arc slot = null;
+            for (int i = 0; i < Arcs && slot == null; i++) if (_arcs[i].Age < Life && _arcs[i].Source == source) slot = _arcs[i];
+            if (slot == null) { OnHurt(source, point, 1f); for (int i = 0; i < Arcs && slot == null; i++) if (_arcs[i].Age < Life && _arcs[i].Source == source) slot = _arcs[i]; }
+            if (slot == null) return;
+            slot.Crit = true;
+            slot.Strength = 1f;
+            slot.Age = 0f;
+            if (Mathf.Abs(slot.G.ThicknessPx - CritThick) > 0.5f) { slot.G.ThicknessPx = CritThick; slot.G.SetVerticesDirty(); }
         }
 
         public void Clear()

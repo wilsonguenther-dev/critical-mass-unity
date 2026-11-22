@@ -87,6 +87,28 @@ namespace CriticalMass.Runtime.Tests.PlayerExperience
         }
 
         [Test]
+        public void CriticalWordsForBothSidesAndTheBiggestNumber()
+        {
+            Assert.AreEqual("COUNTER!", ActionTags.CriticalWords(ActionTags.CritCounter, true));
+            Assert.AreEqual("PUNISH!", ActionTags.CriticalWords(ActionTags.CritPunish, true));
+            Assert.AreEqual("BACK HIT!", ActionTags.CriticalWords(ActionTags.CritBackHit, true));
+            Assert.AreEqual("COUNTERED", ActionTags.CriticalWords(ActionTags.CritCounter, false));
+            Assert.AreEqual("PUNISHED", ActionTags.CriticalWords(ActionTags.CritPunish, false));
+            Assert.AreEqual("HIT FROM BEHIND", ActionTags.CriticalWords(ActionTags.CritBackHit, false));
+            Assert.IsNotEmpty(ActionTags.CriticalWords(0, true), "an unknown kind still has words");
+            Assert.IsNotEmpty(ActionTags.CriticalWords(77, false));
+            foreach (DamageNumbers.Kind k in System.Enum.GetValues(typeof(DamageNumbers.Kind)))
+                if (k != DamageNumbers.Kind.Critical)
+                {
+                    Assert.Greater(DamageNumbers.SizeFor(DamageNumbers.Kind.Critical, true), DamageNumbers.SizeFor(k, true), "critical is the biggest number, vs " + k);
+                    Assert.AreNotEqual(DamageNumbers.ColourFor(DamageNumbers.Kind.Critical), DamageNumbers.ColourFor(k), "critical has its own colour, vs " + k);
+                }
+            Assert.Greater(DamageDirection.CritThick, DamageDirection.MaxThick, "a critical on me draws the thickest arc");
+            Assert.Greater(HitMarker.CritScale, HitMarker.HeavyScale, "my critical uses the strongest non-kill marker");
+            Assert.AreEqual("KO 1  AST 0  CRIT 2  DMG 90  HEAL 0  HILL 0s", PlayerTally.Compose(1, 0, 2, 90, 0, 0));
+        }
+
+        [Test]
         public void TheOlderRefusalEventsAreWordedAndCarryALedgerReason()
         {
             var refused = new HashSet<int>();
