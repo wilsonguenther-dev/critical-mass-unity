@@ -127,14 +127,21 @@ namespace CriticalMass.Runtime.Tests
             GameConfig cfg = GameConfig.CreateDefault();
             double decay = Knock.DecayPerTick(cfg), hz = cfg.SimHz;
             double t = HitFeelTuning.KnockCheckSeconds;
-            // the interpolated sim body alone, one tick behind at worst
-            foreach (double k in new[] { 0.19, 0.3, 0.44, 0.56, 0.75 })
+            // the interpolated sim body alone, one tick behind at worst (2 of the 3 ticks in 100 ms), for the knocks up to a
+            // Warrior-on-Warrior swing (0.56 u); bigger knocks are below (the 0.35 u placement check limits the lead)
+            foreach (double k in new[] { 0.19, 0.3, 0.44, 0.56 })
             {
                 double sim = k * HitFeelTuning.SimKnockShare(t * hz - 1, decay);
                 double drawn = sim + HitFeelTuning.KnockLead(t, k, sim);
                 TestContext.Progress.WriteLine($"[px knock] {k:0.00} u: sim alone {sim:0.000} u, drawn {drawn:0.000} u ({drawn / k:0.00}x) at {t * 1000:0} ms");
                 Assert.GreaterOrEqual(drawn, HitFeelTuning.KnockShare * k - 1e-9, $"knock {k} u: at least 0.8x drawn by 100 ms");
                 Assert.LessOrEqual(HitFeelTuning.KnockLead(t, k, sim), HitFeelTuning.MaxKnockLead + 1e-9, "the lead is capped");
+            }
+            // bigger knocks at the typical 3 ticks in: 0.8x up to about 0.95 u; past that the placement cap rules (FINDINGS: S1)
+            foreach (double k in new[] { 0.75, 0.9 })
+            {
+                double sim = k * HitFeelTuning.SimKnockShare(t * hz, decay);
+                Assert.GreaterOrEqual(sim + HitFeelTuning.KnockLead(t, k, sim), HitFeelTuning.KnockShare * k - 1e-9, $"knock {k} u at 3 ticks");
             }
             // tiny knocks still recoil visibly
             double tiny = 0.19, tinySim = tiny * HitFeelTuning.SimKnockShare(0.07 * hz, decay);
