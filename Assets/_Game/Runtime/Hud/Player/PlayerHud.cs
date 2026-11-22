@@ -21,6 +21,7 @@ namespace CriticalMass.Runtime.Hud.Player
         public readonly DamageDirection Direction;
         public readonly HurtEdge Hurt;
         public readonly KillConfirm Kills;
+        public readonly ActionTags Tags;
         public readonly AssistTracker Assists = new AssistTracker();
 
         World _world;
@@ -38,6 +39,7 @@ namespace CriticalMass.Runtime.Hud.Player
             Direction = new DamageDirection(world);
             Hurt = new HurtEdge(root, playerCard);
             Kills = new KillConfirm(root);
+            Tags = new ActionTags(world);
             Current = this;
         }
 
@@ -57,6 +59,7 @@ namespace CriticalMass.Runtime.Hud.Player
                 Direction.Clear();
                 Hurt.Clear();
                 Kills.Clear();
+                Tags.Clear();
                 Assists.Clear();
             }
             if (_cursor < 0 || _cursor > w.EventHead) _cursor = w.EventHead;
@@ -71,6 +74,7 @@ namespace CriticalMass.Runtime.Hud.Player
             Marker.Tick(w, me, alpha, cam, scale, dt);
             Direction.Tick(w, me, alpha, cam, scale, dt);
             Kills.Tick(dt);
+            Tags.Tick(w, alpha, cam, scale, dt);
             Hurt.Tick(me, s != null && s.HasPlayer ? s.Hp01 : 1f, s != null && s.HasPlayer && s.Alive, dt);
         }
 
@@ -98,7 +102,35 @@ namespace CriticalMass.Runtime.Hud.Player
                     else if (assist && e.A != me) Kills.OnMyAssist(w, e.A);
                     break;
                 }
+                case SimEventType.HitBlocked:
+                    if (e.B == me && e.A != me) Tags.OnBlocked(w, e.A, (int)e.Value, e.X, e.Z, e.Radius);
+                    break;
+                case SimEventType.AttackCancel:
+                    if (e.A == me) Tags.OnInterrupted(w, me);
+                    break;
+                case SimEventType.Feint:
+                    if (e.A == me && e.Value < 1.5) Tags.OnFeint(w, me);
+                    break;
+                case SimEventType.ActionRefused:
+                    if (e.A == me) Tags.OnActionRefused(w, me, e.B, (int)e.Value);
+                    break;
+                case SimEventType.OreMined:
+                    if (e.A == me && e.Value < 0) { int code = (int)e.Value; Tags.OnRefused(w, me, ActionTags.OreRefusal(code, out int why), why, 900 - code); }
+                    break;
+                case SimEventType.WallBuilt:
+                    if (e.A == me && e.Value < 0) { int code = (int)e.Value; Tags.OnRefused(w, me, ActionTags.WallRefusal(code, out int why), why, 920 - code); }
+                    break;
+                case SimEventType.DeliverRefused:
+                    if (e.A == me) Tags.OnRefused(w, me, ActionTags.DeliverRefusal(e.B), PlayerReasons.RefusedNotYourClass, 940 + e.B);
+                    break;
+                case SimEventType.JumpRefused:
+                    if (e.A == me) Tags.OnRefused(w, me, ActionTags.JumpRefusal((int)e.Value), PlayerReasons.RefusedBlockedPlace, 950 + (int)e.Value);
+                    break;
+                case SimEventType.BridgeRepaired:
+                    if (e.A == me && e.Value <= -1.5) Tags.OnRefused(w, me, ActionTags.NeedWoodRepair, PlayerReasons.RefusedNoResource, 960);
+                    break;
                 case SimEventType.StructureHit:
+                    if (e.A == me && e.B == PlayerReasons.StructureSolid && e.Value <= 0) Tags.OnCantBreak(w, e.X, e.Z, e.B);
                     if (e.A == me && e.Value > 0)
                     {
                         Bars.OnStructureHit(w, e.X, e.Z, (float)e.Radius, e.B);
