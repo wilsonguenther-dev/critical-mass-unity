@@ -60,6 +60,9 @@ namespace CriticalMass.Runtime.Audio.Sound
         BuildWall,
         /// <summary>b15: a deposit at a pad: ore into the hut sounds; other deposits stay with the depth HUD.</summary>
         Bank,
+        /// <summary>px lane F: Respawn (crowd blip / my own respawn), AttackContact (whiff swish only), Feint, HitBlocked,
+        /// StructureHit, ActionRefused (local only), WorldAction (channel start or the verb).</summary>
+        Respawn, Contact, Feint, Blocked, Structure, Refused, WorldAct,
     }
 
     /// <summary>One sim event type's sound: a pick rule over a cue set, or an explicit silence with its reason.</summary>
@@ -119,7 +122,8 @@ namespace CriticalMass.Runtime.Audio.Sound
             C("kaiju_step", null, S("kaiju_step"), 0.85f, 1f, 0.05f, 2, 0.12f, 60, Far),
 
             // ---- swings, per class weight
-            C("swing_warrior", F("knifeSlice", "knifeSlice2"), null, 0.32f, 1.1f, 0.1f, 4, 0.05f, 25, Near, layer: "swing_heavy", layerGain: 0.5f),
+            // px lane F: the Warrior's cleave is a low, wide air push (px_whoosh_cleave), not a knife slice; the knife slices moved to the feint.
+            C("swing_warrior", null, S("px_whoosh_cleave"), 0.42f, 1f, 0.06f, 4, 0.05f, 25, Near, layer: "swing_heavy", layerGain: 0.35f),
             C("swing_heavy", null, S("whoosh_heavy"), 0.4f, 1f, 0.08f, 4, 0.05f, 22, Near),
             C("swing_mid", null, S("whoosh_mid"), 0.35f, 1f, 0.08f, 4, 0.05f, 22, Near),
             C("swing_light", null, S("whoosh_light"), 0.3f, 1f, 0.08f, 4, 0.05f, 20, Near),
@@ -275,14 +279,59 @@ namespace CriticalMass.Runtime.Audio.Sound
             C("sb_bridge_place", F("sb_bridge_place"), null, 0.55f, 1f, 0.03f, 2, 0.15f, 40, Mid),
             C("sb_pit_dig", F("sb_pit_dig"), null, 0.45f, 1f, 0.08f, 3, 0.08f, 30, Mid),
             C("sb_behind_tick", F("sb_behind_tick"), null, 0.35f, 1f, 0f, 1, 1.5f, 85, Ui, SoundBus.Ui, caption: "Danger behind you"),
+
+            // ---- player-experience wave (lane F, 2026-11-22): the local player's own tier (threat hierarchy: other people's
+            // events keep their old cues and levels). Measured numbers: data/f-modes-audio/cues.md.
+            // MY landed hit: a meaty impact by my weapon (gain >= 0.7) + the hit-confirm tick (the same for every class).
+            C("own_impact_thud", F("impactPunch_heavy_000", "impactPunch_heavy_001"), null, 0.85f, 0.92f, 0.05f, 3, 0f, 82, Mid, layer: "own_thud_body", layerGain: 0.85f),
+            C("own_thud_body", null, S("px_thud"), 0.8f, 1f, 0.05f, 3, 0f, 80, Mid),
+            C("own_impact_crack", F("impactPunch_medium_000", "impactPunch_medium_001"), null, 0.8f, 1.05f, 0.05f, 3, 0f, 82, Mid, layer: "own_crack_body", layerGain: 0.8f),
+            C("own_crack_body", null, S("px_crack"), 0.75f, 1f, 0.05f, 3, 0f, 80, Mid),
+            C("own_impact_clank", F("impactPlate_medium_000", "impactPlate_medium_001"), null, 0.8f, 1f, 0.05f, 3, 0f, 82, Mid, layer: "own_clank_body", layerGain: 0.7f),
+            C("own_clank_body", null, S("px_clank"), 0.7f, 1f, 0.04f, 3, 0f, 80, Mid),
+            C("own_impact_bell", F("impactSoft_heavy_000", "impactSoft_heavy_001"), null, 0.75f, 1.1f, 0.04f, 3, 0f, 82, Mid, layer: "own_bell_body", layerGain: 0.8f),
+            C("own_bell_body", null, S("px_bell"), 0.7f, 1f, 0.03f, 3, 0f, 80, Mid),
+            C("hit_confirm", null, S("px_confirm"), 0.5f, 1f, 0f, 2, 0f, 96, Ui, SoundBus.Ui, variants: 1),
+            C("kill_confirm", null, S("px_confirm_kill"), 0.55f, 1f, 0f, 2, 0f, 97, Ui, SoundBus.Ui, variants: 1),
+            // MY contact with nobody in it: a light air swish only.
+            C("whiff_swish", null, S("px_air_swish"), 0.32f, 1f, 0.08f, 3, 0.05f, 18, Near),
+            // The receiving end: my own hurt thump (scaled by the damage share), the ring when my shield took it, my death,
+            // my respawn, and the low-health heartbeat (one lub-dub; SoundDirector repeats it at Heartbeat.Rate).
+            C("own_hurt", null, S("px_hurt_thump"), 0.72f, 1f, 0.05f, 2, 0f, 86, Ui),
+            C("own_hurt_block", null, S("px_hurt_blocked"), 0.6f, 1f, 0.04f, 2, 0f, 86, Ui),
+            C("heartbeat", null, S("px_heartbeat"), 0.55f, 1f, 0f, 1, 0.25f, 90, Ui, SoundBus.Ui, caption: "Heartbeat: low health", variants: 1),
+            C("my_death", null, S("px_my_death"), 0.7f, 1f, 0f, 1, 0.5f, 100, Ui, SoundBus.Stinger, variants: 1),
+            C("my_respawn", null, S("px_my_respawn"), 0.5f, 1f, 0f, 1, 0.5f, 90, Ui, SoundBus.Ui, variants: 1),
+            // Kills credited to me: a short proud sting on the Stinger bus (never queued behind the announcer); assists softer.
+            C("kill_sting", null, S("px_kill_sting"), 0.7f, 1f, 0f, 2, 0.05f, 100, Ui, SoundBus.Stinger, variants: 1),
+            C("assist_sting", null, S("px_assist_sting"), 0.45f, 1f, 0f, 1, 0.1f, 95, Ui, SoundBus.Stinger, variants: 1),
+            // The world answers.
+            C("denied", null, S("px_denied"), 0.35f, 1f, 0f, 1, 0.25f, 70, Ui, SoundBus.Ui, variants: 1),
+            C("shield_clang", null, S("px_shield_clang"), 0.55f, 1f, 0.04f, 2, 0.06f, 45, Mid),
+            C("dodge_phew", null, S("px_phew"), 0.45f, 1f, 0.06f, 2, 0.06f, 40, Near),
+            C("block_wall", null, S("px_wall_thud"), 0.5f, 1f, 0.06f, 2, 0.06f, 35, Mid),
+            C("structure_solid", null, S("px_clonk"), 0.55f, 1f, 0.05f, 2, 0.08f, 40, Mid),
+            C("dig_start", null, S("px_dig_scrape"), 0.45f, 1f, 0.08f, 2, 0.1f, 32, Mid),
+            C("gather_start", null, S("px_gather_start"), 0.3f, 1f, 0.08f, 2, 0.1f, 25, Near),
+            C("feint", F("knifeSlice", "knifeSlice2"), null, 0.26f, 1.35f, 0.06f, 2, 0.05f, 28, Near, layer: "feint_flick", layerGain: 0.6f),
+            C("feint_flick", null, S("px_feint_flick"), 0.4f, 1f, 0.06f, 2, 0.05f, 26, Near),
+            C("corruption_roll", null, S("px_corruption_roll"), 0.5f, 1f, 0.03f, 1, 0.5f, 50, Far, caption: "Corruption rolls"),
+            C("kaiju_power", null, S("px_kaiju_power"), 0.6f, 1f, 0.03f, 1, 0.5f, 60, Huge, caption: "Kaiju power"),
+            C("crystal_mined", null, S("px_crystal"), 0.45f, 1f, 0.03f, 2, 0.1f, 30, Mid),
+            // Combine hooks (not routed from the event ring on this branch): SoundDirector.PlayAutopilot / PlayCritical.
+            C("autopilot_on", null, S("px_autopilot_on"), 0.5f, 1f, 0f, 1, 0.3f, 90, Ui, SoundBus.Ui, caption: "Autopilot on", variants: 1),
+            C("autopilot_off", null, S("px_autopilot_off"), 0.5f, 1f, 0f, 1, 0.3f, 90, Ui, SoundBus.Ui, caption: "You have control", variants: 1),
+            C("critical_hit", null, S("px_critical"), 0.7f, 1f, 0.04f, 2, 0.05f, 75, Mid),
         };
 
         /// <summary>Every sim event type. Silence rows say what covers them.</summary>
         public static readonly SimRoute[] Sim =
         {
-            R(SimEventType.Hit, Pick.Hit, "hit_flesh_light", "hit_flesh_heavy", "hit_flesh_crit", "hit_armor", "block_shield", "block_heavy", "kaiju_melee", "grunt", "pain"),
-            R(SimEventType.Death, Pick.Death, "death", "hit_flesh_crit", "kaiju_melee"),
-            R(SimEventType.Respawn, Pick.Fixed, "respawn"),
+            // cues 9..15 (px lane F): my weapon impacts thud / crack / clank / bell, the hit-confirm tick, my hurt thump, my shield ring
+            R(SimEventType.Hit, Pick.Hit, "hit_flesh_light", "hit_flesh_heavy", "hit_flesh_crit", "hit_armor", "block_shield", "block_heavy", "kaiju_melee", "grunt", "pain",
+                "own_impact_thud", "own_impact_crack", "own_impact_clank", "own_impact_bell", "hit_confirm", "own_hurt", "own_hurt_block"),
+            R(SimEventType.Death, Pick.Death, "death", "hit_flesh_crit", "kaiju_melee", "my_death", "kill_sting", "kill_confirm", "assist_sting"),
+            R(SimEventType.Respawn, Pick.Respawn, "respawn", "my_respawn"),
             R(SimEventType.Gather, Pick.Fixed, "gather_done"),
             R(SimEventType.DeliverBiomass, Pick.Bio, "egg_feed", "egg_feed_meat"),
             R(SimEventType.DeliverCorruption, Pick.Fixed, "corrupt"),
@@ -326,10 +375,10 @@ namespace CriticalMass.Runtime.Audio.Sound
             R(SimEventType.Heal, Pick.Fixed, "heal_tick"),
             Silent(SimEventType.MatchEnd, "the music director plays the victory, defeat or draw sting"),
             // ---- integration batch 4: the physics events (#61, DG-69/70/86/99/100)
-            R(SimEventType.AttackContact, Pick.Fixed, "swing_light"),
+            R(SimEventType.AttackContact, Pick.Contact, "whiff_swish"),   // px lane F: a whiff only (a contact with hits is the impact's)
             R(SimEventType.AttackCancel, Pick.Fixed, "block_shield"),
-            // b16 CANCEL: the feint / hit-cancel hook (placeholder: the light swing cue until a feint cue is made)
-            R(SimEventType.Feint, Pick.Fixed, "swing_light"),
+            // b16 CANCEL: the feint / hit-cancel hook. px lane F: its own cue (a bright flick over the knife slice)
+            R(SimEventType.Feint, Pick.Feint, "feint"),
             Silent(SimEventType.HitStun, "the Hit that caused it plays the impact and the heavy-hit grunt"),
             Silent(SimEventType.Knock, "the Hit or blast that pushed the body is the sound; launched landings come from the force bus"),
             Silent(SimEventType.BodyShove, "the Kaiju's steps and the low-frequency layer come from the force bus"),
@@ -368,10 +417,21 @@ namespace CriticalMass.Runtime.Audio.Sound
             R(SimEventType.WallBuilt, Pick.BuildWall, "sb_wall_place", "sb_block_place", "refused"),
             R(SimEventType.WallBroken, Pick.Fixed, "sb_wall_break"),
             R(SimEventType.Dodge, Pick.Fixed, "sb_dodge"),
-            Silent(SimEventType.CorruptionRoll, "b13 S0: silent until item C adds its cue"),
-            Silent(SimEventType.KaijuPower, "b13 S0: silent until item K adds its cue"),
-            Silent(SimEventType.CrystalMined, "b13 S0: silent until item C adds its cue"),
+            R(SimEventType.CorruptionRoll, Pick.Fixed, "corruption_roll"),   // px lane F
+            R(SimEventType.KaijuPower, Pick.Fixed, "kaiju_power"),
+            R(SimEventType.CrystalMined, Pick.Fixed, "crystal_mined"),
             R(SimEventType.JumpRefused, Pick.Fixed, "refused"),   // b16 [11]: the soft refused cue, the local player's own only (SoundFeed.Fixed)
+            // ---- player-experience wave reporting events (lane F routes; SoundFeed.Blocked / Structure / Refused / WorldAct)
+            // HitBlocked by Value: spawn protect, passive, immune = clang; dodge = phew; wall = thud; ward = WardAbsorb's
+            // block_heavy; shield = the Hit's own block cue.
+            R(SimEventType.HitBlocked, Pick.Blocked, "shield_clang", "dodge_phew", "block_wall"),
+            // StructureHit by kind: barricade wood knock, built wall chip, breakable crack, piece wood, solid clonk.
+            R(SimEventType.StructureHit, Pick.Structure, "barricade_hit", "sb_wall_hit", "wall_crack", "hit_wood", "structure_solid"),
+            // ActionRefused: the local player's own only, one soft neutral tick (the event is already rate limited).
+            R(SimEventType.ActionRefused, Pick.Refused, "denied"),
+            // WorldAction: Value 0 = a channel started (dig scrape, pick strike, gather rustle); else the verb's own cue.
+            R(SimEventType.WorldAction, Pick.WorldAct, "dig_start", "sb_ore_hit", "gather_start", "sb_pit_dig", "place_block", "sb_wall_place", "sb_ore_bank",
+                "egg_feed", "corrupt", "purify", "build_bridge", "gather_done"),
         };
 
         /// <summary>Every world-force source (draft PR #43): audible cue or silence, and the low-frequency layer.</summary>

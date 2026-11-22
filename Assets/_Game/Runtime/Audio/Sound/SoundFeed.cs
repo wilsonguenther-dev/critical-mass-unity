@@ -18,6 +18,9 @@ namespace CriticalMass.Runtime.Audio.Sound
         public int Tick;
         /// <summary>The actor it belongs to, or -1.</summary>
         public int Actor;
+        /// <summary>px lane F: the player-feedback channel to report when this cue really starts (FeedbackChannel + 1; 0 = none),
+        /// the actor the entry is about, and its reason code (PlayerReasons.*).</summary>
+        public int Feedback, FeedbackActor, Reason;
     }
 
     /// <summary>Where SoundFeed sends what it decodes (the director, or a recorder in tests).</summary>
@@ -45,6 +48,15 @@ namespace CriticalMass.Runtime.Audio.Sound
 
         private readonly int _capacity;
         private readonly int[] _airLen;
+        // px lane F: the tick each actor last landed a hit (for MY assists: index = victim, value = my last hit tick on them),
+        // and the tick each attacker's swing was already answered (HitBlocked / StructureHit / a Kaiju hit): no whiff swish.
+        private readonly int[] _myHitOn, _answered;
+        /// <summary>px lane F: an assist is a kill by someone else on an enemy I hit within this many seconds.</summary>
+        public const double AssistSeconds = 5.0;
+        /// <summary>px lane F: the low-health heartbeat state of the local player (updated every tick).</summary>
+        public readonly Heartbeat Heart = new Heartbeat();
+        /// <summary>px lane F: the last tick a StructureHit event was decoded (SoundDirector.PlayStructureHit skips its polled knock then).</summary>
+        public int LastStructureTick { get; private set; } = int.MinValue;
         private int _head;
         private int _meat = -1;
         private int _hill;
@@ -59,6 +71,16 @@ namespace CriticalMass.Runtime.Audio.Sound
         {
             _capacity = Math.Max(1, actorCapacity);
             _airLen = new int[_capacity];
+            _myHitOn = new int[_capacity];
+            _answered = new int[_capacity];
+            ResetTicks();
+        }
+
+        private void ResetTicks()
+        {
+            for (int i = 0; i < _capacity; i++) { _myHitOn[i] = int.MinValue; _answered[i] = int.MinValue; }
+            LastStructureTick = int.MinValue;
+            Heart.Reset();
         }
 
         public void Reset()
@@ -68,6 +90,7 @@ namespace CriticalMass.Runtime.Audio.Sound
             _hill = 0;
             _berserk = false;
             Array.Clear(_airLen, 0, _airLen.Length);
+            ResetTicks();
         }
 
         /// <summary>Call after every sim tick (SimDriverBehaviour.Ticked).</summary>
@@ -105,6 +128,10 @@ namespace CriticalMass.Runtime.Audio.Sound
             }
             if (w.ActorCount > 0)
             {
+                // px lane F: the heartbeat under 30% health (hysteresis to 35%), off while dead or after the whistle.
+                Actor me = w.Actors[LocalSeat.Actor];
+                float share = me.MaxHp > 0 ? (float)(me.Hp / me.MaxHp) : 1f;
+                Heart.Update(share, me.Alive && w.Match.Phase != MatchPhase.Ended);
                 int meat = w.Actors[LocalSeat.Actor].Alive ? w.Actors[LocalSeat.Actor].CarryMeat : 0;
                 if (_meat >= 0 && meat > _meat) Emit(sink, SoundTable.EdgeCue(SoundEdge.MeatPickup), w, w.X[LocalSeat.Actor], w.Z[LocalSeat.Actor], true, false, 1f, 1f, 0);
                 _meat = meat;
@@ -237,6 +264,31 @@ namespace CriticalMass.Runtime.Audio.Sound
                     if (ev.Bio == BiomassType.Ore) Emit(sink, cues[0], w, ev.X, ev.Z, ownA, false, 1f, 1f, ev.A);
                     else Silenced++;
                     return;
+                // ---- px lane F
+                case Pick.Respawn:
+                    if (ownA && cues.Length > 1) Emit(sink, cues[1], w, ev.X, ev.Z, true, false, 1f, 1f, ev.A);
+                    else Emit(sink, cues[0], w, ev.X, ev.Z, ownA, false, ownA ? 1f : 0.6f, 1f, ev.A);
+                    return;
+                case Pick.Contact:
+                    Contact(ev, w, sink, cues[0]);
+                    return;
+                case Pick.Feint:
+                    // Value 1 = a feint (the wind-up dropped), 2 = a hit-cancel (lower, softer)
+                    Emit(sink, cues[0], w, ev.X, ev.Z, ownA, false, (ownA ? 1f : 0.6f) * (ev.Value >= 2 ? 0.8f : 1f), ev.Value >= 2 ? 0.85f : 1f, ev.A);
+                    return;
+                case Pick.Blocked:
+                    Blocked(ev, w, sink, cues);
+                    return;
+                case Pick.Structure:
+                    Structure(ev, w, sink, cues);
+                    return;
+                case Pick.Refused:
+                    if (ownA) Emit(sink, cues[0], w, ev.X, ev.Z, true, false, 1f, 1f, ev.A, 0, ev.A, (int)ev.Value);
+                    else Silenced++;   // other people's dead presses are their own business
+                    return;
+                case Pick.WorldAct:
+                    WorldAct(ev, w, sink, cues);
+                    return;
                 default:
                     Silenced++;
                     return;
@@ -263,6 +315,7 @@ namespace CriticalMass.Runtime.Audio.Sound
                     Emit(sink, cue, w, ev.X, ev.Z, false, false, 1f, 1f, -1);
                     return;
                 case SimEventType.KaijuDamaged:
+                    if (ev.A >= 0 && ev.A < _capacity) _answered[ev.A] = w.Tick;   // px lane F: a Kaiju hit is not a whiff
                     Emit(sink, cue, w, ev.X, ev.Z, ownA, false, 1f, (float)(1.05 - Math.Min(0.15, ev.Value / 300.0)), ev.A);
                     return;
                 case SimEventType.MineArmed:
@@ -290,7 +343,6 @@ namespace CriticalMass.Runtime.Audio.Sound
                     Emit(sink, cue, w, ev.X, ev.Z, ownA, false, 1f, 1f, ev.A);
                     return;
                 case SimEventType.Gather:
-                case SimEventType.Respawn:
                 case SimEventType.MineRemoved:
                 case SimEventType.PiecePickedUp:
                     // Small personal sounds: yours, or quietly from the crowd.
@@ -311,38 +363,185 @@ namespace CriticalMass.Runtime.Audio.Sound
         {
             int t = ev.A;
             if (t < 0 || t >= w.ActorCount) return;
-            bool own = t == LocalSeat.Actor || ev.B == LocalSeat.Actor;
-            bool threat = t == 0;
+            int me = LocalSeat.Actor;
+            bool own = t == me || ev.B == me;
+            bool threat = t == me;
+            // px lane F: MY hit on someone else, or a hit ON me (the local player's own tier; the crowd keeps its old cues).
+            bool mine = ev.B == me && t != me;
+            bool onMe = t == me && ev.B != me;
             byte tier = CombatFeed.TierOf(ev.Value, death);
             if (death)
             {
-                // cues: death, finishing hit, Kaiju blow.
+                // cues: death, finishing hit, Kaiju blow; px: my death, kill sting, kill confirm, assist sting.
                 Emit(sink, cues[0], w, ev.X, ev.Z, own, threat, 1f, 1f, t);
                 if (ev.Cause == DamageCause.KaijuMelee || ev.B == Damage.KaijuSource) Emit(sink, cues[2], w, ev.X, ev.Z, own, threat, 0.9f, 1f, t);
                 else if (ev.Cause == DamageCause.Melee) Emit(sink, cues[1], w, ev.X, ev.Z, own, threat, 0.85f, 1f, t);
+                if (cues.Length > 6)
+                {
+                    if (t == me) Emit(sink, cues[3], w, ev.X, ev.Z, true, true, 1f, 1f, t);
+                    else if (ev.B == me)
+                    {
+                        // every kill credited to me: the sting (Stinger bus: never queued behind the announcer) + the two-note confirm
+                        Emit(sink, cues[4], w, ev.X, ev.Z, true, false, 1f, 1f, t, Fb(FeedbackChannelKill), t);
+                        Emit(sink, cues[5], w, ev.X, ev.Z, true, false, 1f, 1f, t);
+                    }
+                    else if (IsAssist(w, t)) Emit(sink, cues[6], w, ev.X, ev.Z, true, false, 1f, 1f, t);
+                }
+                if (t < _capacity) _myHitOn[t] = int.MinValue;
                 return;
             }
-            // cues: flesh light, heavy, crit, armour, shield block, heavy block, Kaiju blow, knockback grunt.
+            if (mine && t < _capacity) _myHitOn[t] = w.Tick;
+            bool px = cues.Length > 15;
+            // cues: flesh light, heavy, crit, armour, shield block, heavy block, Kaiju blow, knockback grunt, pain.
             // Blasts, slams and falls already have their own big sound: their hits only grunt.
             bool melee = ev.Cause == DamageCause.Melee || ev.Cause == DamageCause.KaijuMelee || ev.Cause == DamageCause.None;
             Source(w, ev.B, ev.X, ev.Z, out double sx, out double sz);
             bool blocked = w.Actors[t].Cls == ClassId.Warrior && w.Actors[t].AbilityActive > 0 && Damage.IsFrontal(w, t, sx, sz);
             if (blocked)
             {
-                Emit(sink, cues[ev.Value >= HeavyBlock ? 5 : 4], w, ev.X, ev.Z, own, false, 1f, 1f, t);
+                if (onMe && px) Emit(sink, cues[15], w, ev.X, ev.Z, true, true, 1f, 1f, t, Fb(FeedbackChannelHurt), t);
+                else Emit(sink, cues[ev.Value >= HeavyBlock ? 5 : 4], w, ev.X, ev.Z, own, false, 1f, 1f, t);
+                if (mine && px && ev.Value > 0) Emit(sink, cues[13], w, ev.X, ev.Z, true, false, 0.8f, 1f, t);
                 return;
             }
             if (melee)
             {
-                int cue;
-                if (ev.B == Damage.KaijuSource || ev.Cause == DamageCause.KaijuMelee) cue = cues[6];
-                else if (w.Actors[t].Cls == ClassId.Warrior) cue = tier >= 2 ? cues[2] : cues[3];
-                else cue = cues[tier >= 2 ? 2 : tier == 1 ? 1 : 0];
-                Emit(sink, cue, w, ev.X, ev.Z, own, threat, 1f, 1f, t);
+                if (mine && px && ev.B >= 0 && ev.B < w.ActorCount)
+                {
+                    // MY landed hit: always the meaty weapon impact at own priority, plus the hit-confirm tick.
+                    Emit(sink, cues[9 + WeaponImpact(w.Actors[ev.B].Cls)], w, ev.X, ev.Z, true, false, tier >= 2 ? 1.15f : 1f, 1f, t, Fb(FeedbackChannelImpact), t);
+                    if (SoundPrefs.HitConfirm) Emit(sink, cues[13], w, ev.X, ev.Z, true, false, 1f, tier >= 2 ? 1.06f : 1f, t);
+                }
+                else
+                {
+                    int cue;
+                    if (ev.B == Damage.KaijuSource || ev.Cause == DamageCause.KaijuMelee) cue = cues[6];
+                    else if (w.Actors[t].Cls == ClassId.Warrior) cue = tier >= 2 ? cues[2] : cues[3];
+                    else cue = cues[tier >= 2 ? 2 : tier == 1 ? 1 : 0];
+                    Emit(sink, cue, w, ev.X, ev.Z, own, threat, 1f, 1f, t);
+                }
                 // feat/hit-feel-1: the victim's pain voice, pitched by body (Weight) with the cue's own jitter.
                 if (cues.Length > 8) Emit(sink, cues[8], w, ev.X, ev.Z, own, threat, 1f, SoundFeed.Weight(w.Actors[t].Cls), t);
             }
-            if (tier >= 1) Emit(sink, cues[7], w, ev.X, ev.Z, t == 0, false, 0.85f, SoundFeed.Weight(w.Actors[t].Cls), t);
+            else if (mine && px && ev.Value > 0 && SoundPrefs.HitConfirm) Emit(sink, cues[13], w, ev.X, ev.Z, true, false, 1f, 1f, t);   // my blast landed on them
+            // px lane F: MY hurt thump, scaled by the share of my health the hit took (a scratch is quiet, a big blow is full).
+            if (onMe && px)
+            {
+                Actor a = w.Actors[t];
+                double share = a.MaxHp > 0 ? ev.Value / a.MaxHp : 0;
+                Emit(sink, cues[14], w, ev.X, ev.Z, true, true, HurtGain(share), 1f, t, Fb(FeedbackChannelHurt), t);
+            }
+            if (tier >= 1) Emit(sink, cues[7], w, ev.X, ev.Z, t == me, false, 0.85f, SoundFeed.Weight(w.Actors[t].Cls), t);
+        }
+
+        // px lane F: CriticalMass.Runtime.Game.FeedbackChannel members this feed reports (+1 in SoundRequest.Feedback).
+        private const int FeedbackChannelImpact = (int)CriticalMass.Runtime.Game.FeedbackChannel.ImpactSound;
+        private const int FeedbackChannelWhiff = (int)CriticalMass.Runtime.Game.FeedbackChannel.WhiffCue;
+        private const int FeedbackChannelHurt = (int)CriticalMass.Runtime.Game.FeedbackChannel.OwnHurtSound;
+        private const int FeedbackChannelKill = (int)CriticalMass.Runtime.Game.FeedbackChannel.KillSound;
+        private static int Fb(int channel) => channel + 1;
+
+        /// <summary>px lane F (pure; tests): my hurt thump's gain for a hit that took share of my max health: 0.55 for a
+        /// scratch, full at a quarter or more.</summary>
+        public static float HurtGain(double share) => (float)Math.Max(0.55, Math.Min(1.0, 0.55 + 0.45 * share / 0.25));
+
+        /// <summary>px lane F (pure; tests): my weapon's impact (0 thud: Warrior cleave, Builder hammer; 1 crack: Farmer staff,
+        /// Miner pick; 2 clank: Demolitions pry bar; 3 dull bell: Healer lantern).</summary>
+        public static int WeaponImpact(ClassId attacker)
+        {
+            switch (attacker)
+            {
+                case ClassId.Farmer:
+                case ClassId.Miner: return 1;
+                case ClassId.Demolitions: return 2;
+                case ClassId.Healer: return 3;
+                default: return 0;
+            }
+        }
+
+        /// <summary>px lane F: a kill by someone else on an enemy I hit within AssistSeconds.</summary>
+        private bool IsAssist(World w, int victim)
+        {
+            if (victim < 0 || victim >= _capacity || _myHitOn[victim] == int.MinValue || w.ActorCount == 0) return false;
+            if (w.Actors[victim].Team == w.Actors[LocalSeat.Actor].Team) return false;
+            return w.Tick - _myHitOn[victim] <= AssistSeconds * w.Config.SimHz;
+        }
+
+        /// <summary>px lane F: the contact tick. A contact with nobody in it is a light air swish only; one with hits is the
+        /// impact's (Hit), and one already answered this tick (HitBlocked, StructureHit, a Kaiju hit) is that answer's.</summary>
+        private void Contact(SimEvent ev, World w, ISoundSink sink, int cue)
+        {
+            int a = ev.A;
+            if (a < 0 || a >= w.ActorCount || ev.Value > 0 || (a < _capacity && _answered[a] == w.Tick)) { Silenced++; return; }
+            bool ownA = a == LocalSeat.Actor;
+            Emit(sink, cue, w, ev.X, ev.Z, ownA, false, ownA ? 1f : 0.6f, Weight(w.Actors[a].Cls), a, ownA ? Fb(FeedbackChannelWhiff) : 0, a);
+        }
+
+        /// <summary>px lane F: a swing or blast that reached an enemy and dealt nothing (A target, B attacker, Value Blocked*).
+        /// cues: clang, phew, wall thud.</summary>
+        private void Blocked(SimEvent ev, World w, ISoundSink sink, int[] cues)
+        {
+            int me = LocalSeat.Actor;
+            if (ev.B >= 0 && ev.B < _capacity) _answered[ev.B] = w.Tick;
+            int code = (int)ev.Value;
+            int cue;
+            float g = 1f;
+            switch (code)
+            {
+                case PlayerReasons.BlockedSpawnProtect:
+                case PlayerReasons.BlockedImmune: cue = cues[0]; break;
+                case PlayerReasons.BlockedPassive: cue = cues[0]; g = 0.6f; break;
+                case PlayerReasons.BlockedDodge: cue = cues[1]; break;
+                case PlayerReasons.BlockedWall: cue = cues[2]; break;
+                default: Silenced++; return;   // Ward: WardAbsorb plays block_heavy; Shield: the Hit plays the block; newer codes: their own event
+            }
+            bool own = ev.A == me || ev.B == me;
+            if (!own) g *= 0.7f;
+            Emit(sink, cue, w, ev.X, ev.Z, own, ev.A == me, g, 1f, ev.A, ev.B == me ? Fb(FeedbackChannelWhiff) : 0, ev.A, code);
+        }
+
+        /// <summary>px lane F: a structure took a hit (A attacker, B Structure* kind). cues: barricade, built wall, breakable,
+        /// piece, solid.</summary>
+        private void Structure(SimEvent ev, World w, ISoundSink sink, int[] cues)
+        {
+            if (ev.A >= 0 && ev.A < _capacity) _answered[ev.A] = w.Tick;
+            LastStructureTick = w.Tick;
+            int k = ev.B - 1;
+            if (k < 0 || k >= cues.Length) { Silenced++; return; }
+            bool ownA = ev.A == LocalSeat.Actor;
+            if (ev.B == PlayerReasons.StructureSolid && !ownA) { Silenced++; return; }   // only ever raised for a human swing
+            Emit(sink, cues[k], w, ev.X, ev.Z, ownA, false, ownA ? 1f : 0.7f, 1f, ev.A);
+        }
+
+        /// <summary>px lane F: a world action. Value 0 = a channel started (dig scrape, pick strike, gather rustle); else the
+        /// verb's own cue. cues: dig start, ore hit, gather start, dig, place, wall, bank, feed, corrupt, purify, repair, gather.</summary>
+        private void WorldAct(SimEvent ev, World w, ISoundSink sink, int[] cues)
+        {
+            bool ownA = ev.A == LocalSeat.Actor;
+            int i = WorldActCue(ev.B, ev.Value <= 0);
+            if (i < 0 || i >= cues.Length) { Silenced++; return; }
+            Emit(sink, cues[i], w, ev.X, ev.Z, ownA, false, ownA ? 1f : 0.5f, 1f, ev.A);
+        }
+
+        /// <summary>px lane F (pure; tests): which WorldAction cue a kind plays (start = a channel started), -1 = silent.</summary>
+        public static int WorldActCue(int kind, bool start)
+        {
+            const int Gather = 10;   // PlayerReasons.WorldGather (feat/px-s2-class; not on this branch's PlayerReasons yet)
+            if (start) return kind == PlayerReasons.WorldMineOre ? 1 : kind == Gather ? 2 : 0;
+            switch (kind)
+            {
+                case PlayerReasons.WorldDig: return 3;
+                case PlayerReasons.WorldPlace: return 4;
+                case PlayerReasons.WorldBuild: return 5;
+                case PlayerReasons.WorldMineOre: return 1;
+                case PlayerReasons.WorldBank: return 6;
+                case PlayerReasons.WorldFeed: return 7;
+                case PlayerReasons.WorldCorrupt: return 8;
+                case PlayerReasons.WorldPurify: return 9;
+                case PlayerReasons.WorldRepair: return 10;
+                case Gather: return 11;
+                default: return -1;
+            }
         }
 
         private void Hill(SimEvent ev, World w, ISoundSink sink, int[] cues)
@@ -360,10 +559,15 @@ namespace CriticalMass.Runtime.Audio.Sound
             Emit(sink, cue, w, ev.X, ev.Z, true, false, 1f, 1f, -1);
         }
 
-        private void Emit(ISoundSink sink, int cue, World w, double x, double z, bool own, bool threat, float gain, float rate, int actor)
+        private void Emit(ISoundSink sink, int cue, World w, double x, double z, bool own, bool threat, float gain, float rate, int actor,
+            int feedback = 0, int feedbackActor = -1, int reason = 0)
         {
             if (cue < 0) { Silenced++; return; }
-            var r = new SoundRequest { Cue = cue, X = x, Z = z, Own = own, Threat = threat, Gain = gain, Rate = rate, Tick = w.Tick, Actor = actor };
+            var r = new SoundRequest
+            {
+                Cue = cue, X = x, Z = z, Own = own, Threat = threat, Gain = gain, Rate = rate, Tick = w.Tick, Actor = actor,
+                Feedback = feedback, FeedbackActor = feedbackActor, Reason = reason,
+            };
             Requested++;
             sink.Play(in r);
         }
