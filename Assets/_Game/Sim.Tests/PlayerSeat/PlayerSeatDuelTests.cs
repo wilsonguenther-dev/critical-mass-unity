@@ -394,7 +394,7 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
                             s.Human.KeepRange = x == ClassId.Farmer;
                             models.Add(s.Human);
                         })
-                        : Cell(x, them, TargetMode.RealBot, T.Angles, T.FloorLagTicks, half: true, bots: bots);
+                        : Cell(x, them, TargetMode.RealBot, T.Angles, T.FloorLagTicks, half: true, bots: bots, setup: (s, k) => s.Human.AimHelp = T.FloorAimHelp);
                     All6(row, c);
                 }
                 All6(all, row);
@@ -412,7 +412,7 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
         {
             var n = Sweep(false, BotDifficulty.Normal);
             var e = Sweep(false, BotDifficulty.Easy);
-            bool a = PxLog.Line("S48a Floor_FirstMatchPlayer", "0.3 s reactions, every other swing off, no dodge/feint vs Normal (30 pairs x 8)", "land " + PxLog.F(n.all.Land) + ", won " + n.all.Wins + "/" + n.all.Reps + " = " + PxLog.F(n.all.Share) + " [" + string.Join("; ", n.rows) + "]", "land >= " + PxLog.F(T.FloorLandMin) + ", win >= " + PxLog.F(T.FloorWinVsNormalMin), n.all.Land >= T.FloorLandMin && n.all.Share >= T.FloorWinVsNormalMin);
+            bool a = PxLog.Line("S48a Floor_FirstMatchPlayer", "0.3 s reactions, every other swing off, no dodge/feint, aim help " + (T.FloorAimHelp >= 2 ? "High" : T.FloorAimHelp == 1 ? "Low" : "Off") + " vs Normal (30 pairs x 8)", "land " + PxLog.F(n.all.Land) + ", won " + n.all.Wins + "/" + n.all.Reps + " = " + PxLog.F(n.all.Share) + " [" + string.Join("; ", n.rows) + "]", "land >= " + PxLog.F(T.FloorLandMin) + ", win >= " + PxLog.F(T.FloorWinVsNormalMin), n.all.Land >= T.FloorLandMin && n.all.Share >= T.FloorWinVsNormalMin);
             bool b = PxLog.Line("S48a Floor_FirstMatchPlayer", "the same model vs Easy bots", "won " + e.all.Wins + "/" + e.all.Reps + " = " + PxLog.F(e.all.Share) + " [" + string.Join("; ", e.rows) + "]", ">= " + PxLog.F(T.FloorWinVsEasyMin), e.all.Share >= T.FloorWinVsEasyMin);
             Assert.IsTrue(a && b);
         }

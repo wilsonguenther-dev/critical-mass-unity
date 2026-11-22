@@ -110,6 +110,13 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
         public const double SoakKillSeats = 1.5;
 
         // ---- S48: floor and ceiling (PLAN THE STANDARD rows 4, 5; start values)
+        /// <summary>px S4: the first-match model's aim help (0 Off, 1 Low, 2 High). PLAN THE STANDARD row 4 says "aim help at its
+        /// default"; the shipped default is High for keys and controller, Low for the mouse (Runtime/Input/AimAssistMath.cs,
+        /// AimAssistTunables.DefaultFor). Low: the floor must hold for the device whose default helps least (the mouse). Lane I's
+        /// measured help for that player (data/i-input/assist-s1-final.txt, duel rows): camyaw Off land 0.300 -> High 0.792,
+        /// stick Off 0.667 -> High 0.797 (mouse Off 0.724 -> Low 0.749). S4 measured this floor at Low: land 0.59, win 0.48 vs
+        /// Normal, gap 0.25; at High: land 0.70, win 0.60, gap 0.14 (data/s4-rig/tierS-s48-low.txt, tierS-s48-try1.txt).</summary>
+        public const int FloorAimHelp = 1;
         /// <summary>First-match player: 0.3 s reactions (9 ticks), every other swing aimed off, never dodges or feints.</summary>
         public const int FloorLagTicks = 9;
         public const double FloorLandMin = 0.50, FloorWinVsNormalMin = 0.35, FloorWinVsEasyMin = 0.60;

@@ -129,6 +129,16 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
         public int SpacingReadTicks = -1;
         public bool SpacingStepOut = true;
         public int SpaceOutCount;
+        /// <summary>px S4 (S48a floor): the shipped aim help on this model's attack aim, 0 Off, 1 Low, 2 High. A copy of lane I's
+        /// AimAssistBrain attack bend for one enemy (Runtime/Input/AimAssistMath.cs, AimAssistTunables): while attacking and
+        /// StickySeconds 0.4 after, the aim goes onto the target's live position + velocity x 0.13 s (the body when the led point
+        /// leaves the cone) when the target is within the cone (High 50 deg, Low 25 deg; x 1.4 once locked) around the move
+        /// direction (keys / stick intent) or else the raw aim, and within reach + body + 2.5 (High) / 1.5 (Low) (+ 0.75 locked);
+        /// High also picks an enemy inside reach + body + 0.25 at any angle ("in your face"). Off by default.</summary>
+        public int AimHelp;
+        public int AimHelpBends;
+        private double _helpSticky;
+        private bool _helpLock;
         private int _evHead = -1, _mySwing = -100000, _theirDodge = -100000, _theirSwing = -100000, _landed = -100000, _cancelAt = -100000;
         /// <summary>One-tick buttons for the next frame (the test sets them; the model clears them after one tick).</summary>
         public bool PressAttack, PressAbility, PressDigPlace, PressDodge, PressCancel, PressJump, PressSwitch, HoldInteract;
@@ -148,6 +158,40 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
         {
             Me = me;
             Target = target;
+        }
+
+        private void HelpAim(World w, int t, ClassConfig cc, double mx, double mz, bool want, ref double ax, ref double az)
+        {
+            bool attacking = want || w.Actors[Me].SwingPending;
+            if (attacking) _helpSticky = 0.4;
+            else if (_helpSticky > 0) _helpSticky -= 1.0 / w.Config.SimHz;
+            if (!attacking && !(_helpSticky > 0)) { _helpLock = false; return; }
+            double px = w.X[Me], pz = w.Z[Me];
+            double ux = mx, uz = mz, ul = Math.Sqrt(ux * ux + uz * uz);
+            if (ul < 1e-9) { ux = ax - px; uz = az - pz; ul = Math.Sqrt(ux * ux + uz * uz); }
+            if (ul < 1e-9) { ux = JsMath.Cos(w.Actors[Me].Facing); uz = JsMath.Sin(w.Actors[Me].Facing); ul = 1; }
+            ux /= ul; uz /= ul;
+            double cone = AimHelp >= 2 ? 50 : 25, extra = AimHelp >= 2 ? 2.5 : 1.5;
+            if (_helpLock) { cone *= 1.4; extra += 0.75; }
+            double body = w.Config.Class(w.Actors[t].Cls).Radius;
+            double ex = w.X[t] - px, ez = w.Z[t] - pz, ed = Math.Sqrt(ex * ex + ez * ez);
+            double pickCone = cone;
+            bool pick = ed <= cc.AttackRange + body + extra && ConeDeg(ex, ez, ux, uz) <= cone + 1e-9;
+            if (!pick && AimHelp >= 2 && ed <= cc.AttackRange + body + 0.25) { pick = true; pickCone = 180; }
+            _helpLock = pick;
+            if (!pick) return;
+            double tx = w.X[t] + w.Vx[t] * 0.13, tz = w.Z[t] + w.Vz[t] * 0.13;
+            if (ConeDeg(tx - px, tz - pz, ux, uz) > pickCone + 1e-9) { tx = w.X[t]; tz = w.Z[t]; }
+            if ((tx - ax) * (tx - ax) + (tz - az) * (tz - az) > 1e-12) AimHelpBends++;
+            ax = tx;
+            az = tz;
+        }
+
+        private static double ConeDeg(double dx, double dz, double ux, double uz)
+        {
+            double d = Math.Sqrt(dx * dx + dz * dz);
+            if (d < 1e-9) return 0;
+            return Math.Acos(Math.Max(-1, Math.Min(1, (dx * ux + dz * uz) / d))) * 180 / Math.PI;
         }
 
         /// <summary>Writes this tick's frame (call once per tick, before MatchTick.AdvanceHumans).</summary>
@@ -218,6 +262,7 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
                     az = w.Z[Me] + dx;
                 }
                 if (want && !_prevWant) Presses++;
+                if (AimHelp > 0) HelpAim(w, t, cc, mx, mz, want, ref ax, ref az);
                 if (KeepRange && d < 0.7 * cc.AttackRange && d > 1e-6) { mx = -dx / d; mz = -dz / d; }
                 if (skilled)
                 {
