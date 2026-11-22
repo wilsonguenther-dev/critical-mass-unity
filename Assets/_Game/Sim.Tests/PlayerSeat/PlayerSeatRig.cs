@@ -110,6 +110,16 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
         public bool Fight = true;
         /// <summary>The model holds its first swing this many ticks (two human seats never press on the very same tick).</summary>
         public int HoldFireTicks;
+        /// <summary>S48 strong player (all off by default; the older tests never set them). Feints: cancels its own wind-up when
+        /// the target starts a dodge or has left the swing's arc, then swings again. HitCancels: presses Cancel the tick after a
+        /// landed hit. Dodges: reads the target's AttackStart no sooner than ReadTicks after it (a human's eye) and dodges away
+        /// when in the target's reach. KeepRange: backs off inside 0.7 x its own range (the Farmer's spacing).</summary>
+        public bool Feints, HitCancels, Dodges, KeepRange;
+        public int ReadTicks = 6;
+        /// <summary>Out-of-arc angle for a feint (degrees from the locked swing facing).</summary>
+        public double FeintArcDegrees = 55;
+        public int FeintCount, DodgeCount;
+        private int _evHead = -1, _mySwing = -100000, _theirDodge = -100000, _theirSwing = -100000, _landed = -100000, _cancelAt = -100000;
         /// <summary>One-tick buttons for the next frame (the test sets them; the model clears them after one tick).</summary>
         public bool PressAttack, PressAbility, PressDigPlace, PressDodge, PressCancel, PressJump, PressSwitch, HoldInteract;
         /// <summary>Optional move override for the next frame (NaN = the model's own move).</summary>
@@ -137,6 +147,20 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
             double mx = 0, mz = 0, ax = w.X[Me] + JsMath.Cos(w.Actors[Me].Facing), az = w.Z[Me] + JsMath.Sin(w.Actors[Me].Facing);
             bool want = false;
             int t = Target;
+            bool skilled = Feints || HitCancels || Dodges;
+            if (skilled)
+            {
+                if (_evHead < 0) _evHead = w.EventHead;
+                for (int i = Math.Max(_evHead, w.EventHead - World.EventCapacity); i < w.EventHead; i++)
+                {
+                    SimEvent e = w.Events[i % World.EventCapacity];
+                    if (e.Type == SimEventType.AttackStart && e.A == Me) _mySwing = w.Tick - 1;
+                    else if (e.Type == SimEventType.AttackStart && e.A == t) _theirSwing = w.Tick - 1;
+                    else if (e.Type == SimEventType.Dodge && e.A == t) _theirDodge = w.Tick - 1;
+                    else if (e.Type == SimEventType.Hit && e.A == t && e.B == Me) _landed = w.Tick - 1;
+                }
+                _evHead = w.EventHead;
+            }
             if (t >= 0 && t < w.ActorCount && w.Actors[t].Alive && w.Actors[Me].Alive)
             {
                 int h = w.Tick & 63;
@@ -179,6 +203,28 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
                     az = w.Z[Me] + dx;
                 }
                 if (want && !_prevWant) Presses++;
+                if (KeepRange && d < 0.7 * cc.AttackRange && d > 1e-6) { mx = -dx / d; mz = -dz / d; }
+                if (skilled)
+                {
+                    double rx = w.X[t] - w.X[Me], rz = w.Z[t] - w.Z[Me], rd = Math.Sqrt(rx * rx + rz * rz);
+                    int wu = w.Dur.AttackWindup[(int)w.Actors[Me].Cls];
+                    bool inWind = w.Tick - _mySwing < wu && w.Tick - _mySwing >= 1;
+                    if (Feints && inWind && _cancelAt < _mySwing)
+                    {
+                        double gap = Math.Abs(Math.IEEERemainder(Math.Atan2(rz, rx) - w.Actors[Me].SwingFacing, 2 * Math.PI)) * 180 / Math.PI;
+                        bool outOfArc = gap > FeintArcDegrees || rd > reach + 0.3;
+                        if (w.Tick - _theirDodge <= 3 || outOfArc) { PressCancel = true; _cancelAt = w.Tick; FeintCount++; want = false; }
+                    }
+                    if (HitCancels && w.Tick - _landed == 1) PressCancel = true;
+                    double theirReach = w.Config.Class(w.Actors[t].Cls).AttackRange + cc.Radius;
+                    if (Dodges && w.Tick - _theirSwing == ReadTicks && rd <= theirReach + 0.5 && rd > 1e-6)
+                    {
+                        PressDodge = true;
+                        DodgeCount++;
+                        mx = -rx / rd;
+                        mz = -rz / rd;
+                    }
+                }
             }
             _prevWant = want;
             f.MoveX = double.IsNaN(MoveOverrideX) ? mx : MoveOverrideX;

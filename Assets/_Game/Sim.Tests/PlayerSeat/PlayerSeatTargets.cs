@@ -107,6 +107,22 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
         /// <summary>Seat 0's share of its team's kills: at least 1.5 seats' worth.</summary>
         public const double SoakKillSeats = 1.5;
 
+        // ---- S48: floor and ceiling (PLAN THE STANDARD rows 4, 5; start values)
+        /// <summary>First-match player: 0.3 s reactions (9 ticks), every other swing aimed off, never dodges or feints.</summary>
+        public const int FloorLagTicks = 9;
+        public const double FloorLandMin = 0.50, FloorWinVsNormalMin = 0.35, FloorWinVsEasyMin = 0.60;
+        /// <summary>Strong player: 0.15 s reactions (4-5 ticks), feints, hit-cancels, dodges telegraphs read 6 ticks late, the Farmer keeps range.</summary>
+        public const int CeilingLagTicks = 4;
+        public const double CeilingWinVsNormalMin = 0.70, CeilingWinVsHardMin = 0.50;
+        /// <summary>Strong minus first-match win share vs Normal bots.</summary>
+        public const double SkillGapMin = 0.25;
+
+        // ---- S49: never bored (PLAN THE STANDARD row 3; start values)
+        public const int EngagementSeeds = 12;
+        /// <summary>Meaningful = alive and an enemy within this, or on the hill, or busy with a verb, or near the egg / Kaiju.</summary>
+        public const double EngageEnemyRadius = 8, EngageEggRadius = 6;
+        public const double LongestIdleMedianMax = 20, LongestIdleWorstMax = 30, DeadOrWalkingShareMax = 0.25, RespawnToHitMedianMax = 10;
+
         /// <summary>The six classes in roster order (TestCase arguments use the enum directly).</summary>
         public static readonly ClassId[] Classes = { ClassId.Warrior, ClassId.Farmer, ClassId.Miner, ClassId.Demolitions, ClassId.Builder, ClassId.Healer };
     }

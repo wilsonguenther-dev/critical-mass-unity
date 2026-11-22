@@ -38,7 +38,7 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
             public override string ToString() => Wins + "/" + Reps + " won (" + Losses + " lost, " + Draws + " drawn), land " + PxLog.F(Land) + " of " + Swings + ", median ttk " + (Ttk.Count > 0 ? PxLog.F(PlayerSeatRig.Median(Ttk), "0.0") + " s" : "none");
         }
 
-        static Tally Cell(ClassId me, ClassId them, TargetMode mode, int angles, int lag, bool half = false, bool strafe = false, BotDifficulty bots = BotDifficulty.Normal)
+        static Tally Cell(ClassId me, ClassId them, TargetMode mode, int angles, int lag, bool half = false, bool strafe = false, BotDifficulty bots = BotDifficulty.Normal, Action<Seat, int> setup = null)
         {
             var t = new Tally();
             for (int k = 0; k < angles; k++)
@@ -51,6 +51,7 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
                     s.Human2.LagTicks = lag + (k % 3) - 1;
                     s.Human2.HoldFireTicks = k % 4;
                 }
+                setup?.Invoke(s, k);
                 t.Add(PlayerSeatRig.Play(s));
             }
             return t;
@@ -338,6 +339,72 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
         {
             a.Reps += b.Reps; a.Wins += b.Wins; a.Losses += b.Losses; a.Draws += b.Draws; a.Swings += b.Swings; a.Landed += b.Landed;
             a.TheirSwings += b.TheirSwings; a.TheirLanded += b.TheirLanded; a.Ttk.AddRange(b.Ttk);
+        }
+
+        // ------------------------------------------------------------------ S48: floor and ceiling (PLAN THE STANDARD rows 4, 5)
+
+        static readonly Dictionary<string, (Tally all, List<string> rows)> Sweeps = new Dictionary<string, (Tally, List<string>)>();
+
+        /// <summary>The 30 non-mirror match-ups x 8 angles for one human model against bots of one difficulty (cached per run).</summary>
+        static (Tally all, List<string> rows) Sweep(bool strong, BotDifficulty bots)
+        {
+            string key = (strong ? "ceiling" : "floor") + "/" + bots;
+            if (Sweeps.TryGetValue(key, out var hit)) return hit;
+            var all = new Tally();
+            var rows = new List<string>();
+            var models = new List<HumanModel>();
+            foreach (ClassId x in All)
+            {
+                var row = new Tally();
+                foreach (ClassId them in All)
+                {
+                    if (them == x) continue;
+                    Tally c = strong
+                        ? Cell(x, them, TargetMode.RealBot, T.Angles, T.CeilingLagTicks, bots: bots, setup: (s, k) =>
+                        {
+                            s.Human.LagTicks = T.CeilingLagTicks + (k % 2);
+                            s.Human.Feints = s.Human.HitCancels = s.Human.Dodges = true;
+                            s.Human.KeepRange = x == ClassId.Farmer;
+                            models.Add(s.Human);
+                        })
+                        : Cell(x, them, TargetMode.RealBot, T.Angles, T.FloorLagTicks, half: true, bots: bots);
+                    All6(row, c);
+                }
+                All6(all, row);
+                rows.Add(x + " won " + row.Wins + "/" + row.Reps + " (" + PxLog.F(row.Share) + "), land " + PxLog.F(row.Land) + ", bot land " + PxLog.F(row.TheirLand));
+                PxLog.Csv("s48-" + key.Replace('/', '-') + ".csv", "model,bots,class,wins,reps,share,land,bot_land", (strong ? "ceiling" : "floor") + "," + bots + "," + x + "," + row.Wins + "," + row.Reps + "," + PxLog.F(row.Share) + "," + PxLog.F(row.Land) + "," + PxLog.F(row.TheirLand));
+            }
+            if (strong) rows.Add("feints " + models.Sum(m => m.FeintCount) + ", dodges " + models.Sum(m => m.DodgeCount) + " over " + models.Count + " duels");
+            var r = (all, rows);
+            Sweeps[key] = r;
+            return r;
+        }
+
+        [Test]
+        public void S48a_Floor_FirstMatchPlayer()
+        {
+            var n = Sweep(false, BotDifficulty.Normal);
+            var e = Sweep(false, BotDifficulty.Easy);
+            bool a = PxLog.Line("S48a Floor_FirstMatchPlayer", "0.3 s reactions, every other swing off, no dodge/feint vs Normal (30 pairs x 8)", "land " + PxLog.F(n.all.Land) + ", won " + n.all.Wins + "/" + n.all.Reps + " = " + PxLog.F(n.all.Share) + " [" + string.Join("; ", n.rows) + "]", "land >= " + PxLog.F(T.FloorLandMin) + ", win >= " + PxLog.F(T.FloorWinVsNormalMin), n.all.Land >= T.FloorLandMin && n.all.Share >= T.FloorWinVsNormalMin);
+            bool b = PxLog.Line("S48a Floor_FirstMatchPlayer", "the same model vs Easy bots", "won " + e.all.Wins + "/" + e.all.Reps + " = " + PxLog.F(e.all.Share) + " [" + string.Join("; ", e.rows) + "]", ">= " + PxLog.F(T.FloorWinVsEasyMin), e.all.Share >= T.FloorWinVsEasyMin);
+            Assert.IsTrue(a && b);
+        }
+
+        [Test]
+        public void S48b_Ceiling_StrongPlayer()
+        {
+            var n = Sweep(true, BotDifficulty.Normal);
+            var h = Sweep(true, BotDifficulty.Hard);
+            bool a = PxLog.Line("S48b Ceiling_StrongPlayer", "0.15 s reactions, feints, hit-cancels, dodges read 6 ticks late, Farmer keeps range vs Normal", "won " + n.all.Wins + "/" + n.all.Reps + " = " + PxLog.F(n.all.Share) + ", land " + PxLog.F(n.all.Land) + " [" + string.Join("; ", n.rows) + "]", ">= " + PxLog.F(T.CeilingWinVsNormalMin), n.all.Share >= T.CeilingWinVsNormalMin);
+            bool b = PxLog.Line("S48b Ceiling_StrongPlayer", "the same model vs Hard bots", "won " + h.all.Wins + "/" + h.all.Reps + " = " + PxLog.F(h.all.Share) + " [" + string.Join("; ", h.rows) + "]", ">= " + PxLog.F(T.CeilingWinVsHardMin), h.all.Share >= T.CeilingWinVsHardMin);
+            Assert.IsTrue(a && b);
+        }
+
+        [Test]
+        public void S48c_SkillGap_Pays()
+        {
+            double gap = Sweep(true, BotDifficulty.Normal).all.Share - Sweep(false, BotDifficulty.Normal).all.Share;
+            Assert.IsTrue(PxLog.Line("S48c SkillGap_Pays", "strong minus first-match win share vs Normal", PxLog.F(gap), ">= +" + PxLog.F(T.SkillGapMin), gap >= T.SkillGapMin));
         }
     }
 }
