@@ -384,6 +384,12 @@ namespace CriticalMass.Runtime.View
             double x = hasFx && fx.Corpse ? fx.CorpseX : Lerp(w.PrevX[i], w.X[i], a);
             double z = hasFx && fx.Corpse ? fx.CorpseZ : Lerp(w.PrevZ[i], w.Z[i], a);
             if (_stressHill) StressPlace(map.Hill, i, ref x, ref z);
+            // fix round 5 (item 7): a fresh knock is drawn at the current tick, not up to a tick behind it (HitFeelTuning.KnockAlphaLead)
+            if (!(hasFx && fx.Corpse) && _fx != null && _fx.Knock(i, out double kAge, out _, out _, out _, out _, out _))
+            {
+                double share = Anim.HitFeelTuning.KnockAlphaLead(kAge);
+                if (share > 0) { x += (w.X[i] - x) * share; z += (w.Z[i] - z) * share; }
+            }
             double h = CriticalMass.Runtime.GroundHeight.Body(map, x, z);   // b15: on the pit floor / on top of a stack (+ b14 bridge deck)
             // b12-jz / b14 ladder fix: up the near ladder, along the rock top, down the far ladder; on the rungs the fighter
             // faces the ladder (the wall), going up and coming down

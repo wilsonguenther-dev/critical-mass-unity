@@ -390,11 +390,12 @@ namespace CriticalMass.Runtime.Tests
             GameConfig cfg = GameConfig.CreateDefault();
             double decay = Knock.DecayPerTick(cfg), hz = cfg.SimHz;
             double t = HitFeelTuning.KnockCheckSeconds;
-            // the interpolated sim body alone, one tick behind at worst (2 of the 3 ticks in 100 ms), for the knocks up to a
-            // Warrior-on-Warrior swing (0.56 u); bigger knocks are below (the 0.35 u placement check limits the lead)
+            // fix round 5 (item 7): a fresh knock is drawn at the CURRENT tick (KnockAlphaLead 1), no longer up to a tick
+            // behind it, so the sim body's share at 100 ms is the full 3 ticks
+            Assert.AreEqual(1.0, HitFeelTuning.KnockAlphaLead(t), 1e-9, "no interpolation lag at 100 ms");
             foreach (double k in new[] { 0.19, 0.3, 0.44, 0.56 })
             {
-                double sim = k * HitFeelTuning.SimKnockShare(t * hz - 1, decay);
+                double sim = k * HitFeelTuning.SimKnockShare(t * hz, decay);
                 double drawn = sim + HitFeelTuning.KnockLead(t, k, sim);
                 TestContext.Progress.WriteLine($"[px knock] {k:0.00} u: sim alone {sim:0.000} u, drawn {drawn:0.000} u ({drawn / k:0.00}x) at {t * 1000:0} ms");
                 Assert.GreaterOrEqual(drawn, HitFeelTuning.KnockShare * k - 1e-9, $"knock {k} u: at least 0.8x drawn by 100 ms");
@@ -415,6 +416,31 @@ namespace CriticalMass.Runtime.Tests
             Assert.AreEqual(0, HitFeelTuning.KnockLead(HitFeelTuning.KnockLeadFadeTo, 1.0, 0.0), "the lead is gone by 0.6 s even against a wall");
             Assert.AreEqual(0, HitFeelTuning.KnockLead(0.05, 0.5, 0.6), "no lead once the body is past the want");
             Assert.LessOrEqual(HitFeelTuning.MaxDrawnOffset, 0.35f, "inside the play-mode placement check (0.35 u)");
+        }
+
+        /// <summary>Fix round 5 (item 7): big knocks (up to 1.6 u) draw at least the sim body's own travel at 100 ms (the old
+        /// one-tick interpolation lag drew 0.53-0.72 of it), and the lag returns smoothly once the slide is over.</summary>
+        [Test]
+        public void BigKnocksDrawAtLeastTheSimBodyTravelAtAHundredMilliseconds()
+        {
+            GameConfig cfg = GameConfig.CreateDefault();
+            double decay = Knock.DecayPerTick(cfg), hz = cfg.SimHz, t = HitFeelTuning.KnockCheckSeconds;
+            foreach (double k in new[] { 0.9, 1.2, 1.6 })
+            {
+                double sim = k * HitFeelTuning.SimKnockShare(t * hz, decay);          // the sim body at 100 ms
+                double lagged = k * HitFeelTuning.SimKnockShare(t * hz - 1, decay);   // the old draw: one tick behind
+                double drawn = lagged + (sim - lagged) * HitFeelTuning.KnockAlphaLead(t) + HitFeelTuning.KnockLead(t, k, sim);
+                TestContext.Progress.WriteLine($"[px big knock] {k:0.00} u: sim body {sim:0.000}, old draw {lagged / sim:0.00}x of it, now {drawn / sim:0.00}x");
+                Assert.GreaterOrEqual(drawn, sim - 1e-9, $"knock {k} u drawn at least the sim body's travel");
+            }
+            Assert.AreEqual(0.0, HitFeelTuning.KnockAlphaLead(HitFeelTuning.KnockAlphaFade), 1e-9, "plain interpolation after the slide");
+            double prev = 1;
+            for (double a = HitFeelTuning.KnockAlphaHold; a <= HitFeelTuning.KnockAlphaFade; a += 1 / 60.0)
+            {
+                double v = HitFeelTuning.KnockAlphaLead(a);
+                Assert.LessOrEqual(prev - v, 0.12 + 1e-9, "fades over several frames, no step");
+                prev = v;
+            }
         }
 
         // ---------------------------------------------------------------- 1d. burst

@@ -72,6 +72,23 @@ namespace CriticalMass.Runtime.View.Anim
         /// check allows 0.35 u; GameplaySanityPlayTests).</summary>
         public const float MaxKnockLead = 0.34f, MaxDrawnOffset = 0.34f;
 
+        /// <summary>
+        /// Fix round 5 (item 7: big knocks drew at 0.53-0.72 of the sim body's travel at 100 ms). The clamp was the
+        /// interpolation itself: a fighter is drawn Lerp(PrevX, X, alpha), up to one whole tick BEHIND the sim, and in a
+        /// knock's first ticks one tick is 0.3-0.5 u of travel, more than the 0.34 u lead cap could make up. While a knock
+        /// is fresh the victim is drawn at the CURRENT tick's position (share 1 of the gap from the interpolated spot to X),
+        /// fading back to plain interpolation between KnockAlphaHold and KnockAlphaFade s, when the slide has all but stopped
+        /// (no visible step). Pure; ActorViews applies it before the knock lead.
+        /// </summary>
+        public const double KnockAlphaHold = 0.3, KnockAlphaFade = 0.45;
+
+        public static double KnockAlphaLead(double age)
+        {
+            if (!(age >= 0) || age >= KnockAlphaFade) return 0;
+            if (age <= KnockAlphaHold) return 1;
+            return 1 - (age - KnockAlphaHold) / (KnockAlphaFade - KnockAlphaHold);
+        }
+
         static double Smooth(double x) => x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3 - 2 * x);
         static double EaseOut(double x) => x <= 0 ? 0 : x >= 1 ? 1 : 1 - (1 - x) * (1 - x);
 
