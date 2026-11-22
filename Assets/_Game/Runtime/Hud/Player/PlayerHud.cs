@@ -20,6 +20,8 @@ namespace CriticalMass.Runtime.Hud.Player
         public readonly HitMarker Marker;
         public readonly DamageDirection Direction;
         public readonly HurtEdge Hurt;
+        public readonly KillConfirm Kills;
+        public readonly AssistTracker Assists = new AssistTracker();
 
         World _world;
         int _epoch = -1;
@@ -35,6 +37,7 @@ namespace CriticalMass.Runtime.Hud.Player
             Marker = new HitMarker(world);
             Direction = new DamageDirection(world);
             Hurt = new HurtEdge(root, playerCard);
+            Kills = new KillConfirm(root);
             Current = this;
         }
 
@@ -53,6 +56,8 @@ namespace CriticalMass.Runtime.Hud.Player
                 Marker.Clear();
                 Direction.Clear();
                 Hurt.Clear();
+                Kills.Clear();
+                Assists.Clear();
             }
             if (_cursor < 0 || _cursor > w.EventHead) _cursor = w.EventHead;
             if (w.EventHead - _cursor > World.EventCapacity)
@@ -65,6 +70,7 @@ namespace CriticalMass.Runtime.Hud.Player
             Bars.Tick(w, me, alpha, cam, scale, dt);
             Marker.Tick(w, me, alpha, cam, scale, dt);
             Direction.Tick(w, me, alpha, cam, scale, dt);
+            Kills.Tick(dt);
             Hurt.Tick(me, s != null && s.HasPlayer ? s.Hp01 : 1f, s != null && s.HasPlayer && s.Alive, dt);
         }
 
@@ -73,6 +79,7 @@ namespace CriticalMass.Runtime.Hud.Player
             switch (e.Type)
             {
                 case SimEventType.Hit:
+                    if (e.A >= 0 && e.B >= 0) Assists.OnHit(e.A, e.B, w.Match.Time);
                     if (e.B == me && e.A != me && e.A >= 0)
                     {
                         Bars.OnMyHit(e.A, w.Match.Time);
@@ -81,8 +88,16 @@ namespace CriticalMass.Runtime.Hud.Player
                     else if (e.A == me && e.B != me && me >= 0 && me < w.ActorCount) OnHurt(w, e, me);
                     break;
                 case SimEventType.Death:
-                    if (e.B == me && e.A != me && e.A >= 0) Marker.OnMyKill(w, e.A, e.X, e.Z);
+                {
+                    bool assist = Assists.OnDeath(e.A, e.B, w.Match.Time, me, me);
+                    if (e.B == me && e.A != me && e.A >= 0)
+                    {
+                        Marker.OnMyKill(w, e.A, e.X, e.Z);
+                        Kills.OnMyKill(w, e.A);
+                    }
+                    else if (assist && e.A != me) Kills.OnMyAssist(w, e.A);
                     break;
+                }
                 case SimEventType.StructureHit:
                     if (e.A == me && e.Value > 0)
                     {
