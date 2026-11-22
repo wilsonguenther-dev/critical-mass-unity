@@ -392,9 +392,9 @@ namespace CriticalMass.Runtime.View.Effects
                 {
                     bool onMe = e.A == me, byMe = e.B == me && e.A != me;
                     if (!onMe && !byMe) return;
-                    // lead's call 12: the top tier that is not a kill is the critical look until lane S1's CriticalHit
-                    // event is wired (at the combine: call OnCritical(victim, attacker, kind) from that event instead).
-                    if (e.Kind == FxKind.Hit && e.Tier >= 2) { OnCritical(e.A, e.B, 0); return; }
+                    // lead's call 12: when the sim's crit rule is on, the CriticalHit event (FxKind.Critical below) drives the
+                    // critical look; only with the rule off does the top tier that is not a kill stand in for it.
+                    if (e.Kind == FxKind.Hit && e.Tier >= 2 && !CritRuleOn(w)) { OnCritical(e.A, e.B, 0); return; }
                     CriticalMass.Runtime.Camera.FightState.MarkCombat(Time.unscaledTimeAsDouble);
                     HitFeelTuning.KickKind k = e.Kind == FxKind.Death ? (onMe ? HitFeelTuning.KickKind.MyDeath : HitFeelTuning.KickKind.MyKill)
                         : onMe ? HitFeelTuning.KickKind.OnMe : HitFeelTuning.KickKind.ByMe;
@@ -403,6 +403,9 @@ namespace CriticalMass.Runtime.View.Effects
                     if (_scene != null && _scene.LastBurstSize > 0f) PlayerFeedback.Report(FeedbackChannel.ImpactBurst, e.A, _scene.LastBurstSize, FxSource);
                     return;
                 }
+                case FxKind.Critical:
+                    if (e.A == me || (e.B == me && e.A != me)) OnCritical(e.A, e.B, (int)e.Value);
+                    return;
                 case FxKind.Contact:
                     if (e.A == me && e.Value <= 0) PlayerFeedback.Report(FeedbackChannel.WhiffCue, me, 1f, FxSource);
                     return;
@@ -422,6 +425,9 @@ namespace CriticalMass.Runtime.View.Effects
         /// ImpactBurst (stage-2 size), CameraKick (in CameraShake.Kick), HitStop (ActorViews, 140 ms). Call it the tick of
         /// the Hit (after FxScene spawned it).
         /// </summary>
+        /// <summary>True when the sim's earned-crit rule is live (Full combat feel and CritEnabled): the CriticalHit event exists.</summary>
+        private static bool CritRuleOn(World w) => w != null && CombatFeel.On(w) && CombatFeel.Cfg(w).CritEnabled;
+
         public void OnCritical(int victim, int attacker, int kind)
         {
             World w = _driver != null ? _driver.World : null;

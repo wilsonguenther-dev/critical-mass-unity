@@ -151,6 +151,8 @@ namespace CriticalMass.Runtime.Hud.Player
 
         public static string DeliverRefusal(int code) => code == 2 ? "YOUR CLASS CAN'T CORRUPT" : "YOUR CLASS CAN'T FEED THE EGG";
         public static string JumpRefusal(int code) => code == 2 ? "TOO LATE TO JUMP" : "NO ROOM TO LAND";
+        /// <summary>lane S3: the words of SimEventType.AutopilotChanged for the local player (Value 1 took over, 0 handed back).</summary>
+        public const string AutopilotOn = "Autopilot on: press any key", AutopilotOff = "You have control";
         public const string Interrupted = "INTERRUPTED", Feint = "FEINT", CantBreak = "CAN'T BREAK", NeedWoodRepair = "NEED WOOD TO REPAIR";
 
         static readonly string[] CooldownWords = BuildCooldown();
@@ -239,6 +241,13 @@ namespace CriticalMass.Runtime.Hud.Player
             if (why == PlayerReasons.RefusedCooldown)
                 cd = Mathf.CeilToInt((float)(button == PlayerReasons.ButtonAttack ? a.AttackCd : button == PlayerReasons.ButtonAbility ? a.AbilityCd : 0.0));
             OnRefused(w, me, RefusalWords(button, why, a.Cls, cd), why, button * 32 + why);
+        }
+
+        /// <summary>lane S3: the idle autopilot took my fighter (on) or handed it back (off): a short tag over my fighter.</summary>
+        public void OnAutopilot(World w, int me, bool on)
+        {
+            Text t = _words.Show(on ? AutopilotOn : AutopilotOff, on ? 2300 : 2301, me, Vector3.zero, SelfLift, PxPalette.Cream, PxPalette.Brass, false, on ? 2.0f : 1.2f);
+            if (t != null) PlayerFeedback.Report(FeedbackChannel.RefusalTag, me, on ? 1f : 0f, t, 0);
         }
 
         /// <summary>A structure that cannot be broken (StructureSolid, Value 0) answered my swing.</summary>
