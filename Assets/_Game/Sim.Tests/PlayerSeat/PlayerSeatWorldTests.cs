@@ -85,9 +85,11 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
                 StepsAiming(s, w.Dur.AttackWindup[(int)ClassId.Warrior] + 2, facing ? w.X[s.Them] : away, w.Z[0]);
                 return s.Spy.Hits(s.Them, 0, mark).Sum(e => e.Value);
             }
-            double open = Hit(false, true), front = Hit(true, true), rear = Hit(true, false);
+            // lane S3: the rear case is compared with an UNSHIELDED hit from the same rear side: with critical strikes on, a hit
+            // from the victim's rear arc is a BACK HIT (x CritDamageMul) whether or not he holds a shield.
+            double open = Hit(false, true), front = Hit(true, true), rear = Hit(true, false), openRear = Hit(false, false);
             double share = front / Math.Max(1e-9, open);
-            bool ok = PxLog.Line("S09 Warrior_Shield_CutsFrontalDamage", "Warrior hit on a Warrior", "unshielded " + PxLog.F(open, "0.0") + ", shield front " + PxLog.F(front, "0.0") + " (x" + PxLog.F(share) + "), shield rear " + PxLog.F(rear, "0.0"), "front x0.40, rear x1.00", open > 0 && Math.Abs(share - 0.4) <= 0.02 && Math.Abs(rear - open) <= 0.01 * open);
+            bool ok = PxLog.Line("S09 Warrior_Shield_CutsFrontalDamage", "Warrior hit on a Warrior", "unshielded " + PxLog.F(open, "0.0") + ", shield front " + PxLog.F(front, "0.0") + " (x" + PxLog.F(share) + "), shield rear " + PxLog.F(rear, "0.0") + " (unshielded rear " + PxLog.F(openRear, "0.0") + ")", "front x0.40, rear x1.00 of an unshielded rear hit", open > 0 && Math.Abs(share - 0.4) <= 0.02 && Math.Abs(rear - openRear) <= 0.01 * openRear);
             Assert.IsTrue(ok);
         }
 
