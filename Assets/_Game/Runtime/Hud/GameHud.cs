@@ -780,8 +780,9 @@ namespace CriticalMass.Runtime.Hud
         {
             HudText.Set(_clock, NumberCache.Mmss(s.ClockRemaining));
             _clock.color = s.ClockRemaining <= 60 ? CMTokens.ToolBrass.Color : Cream;
-            HudText.Set(_scoreA, NumberCache.Int(s.ScoreAzure));
-            HudText.Set(_scoreC, NumberCache.Int(s.ScoreCrimson));
+            // review fix round 3 (pass-3: "0 59:31 0" in the range): no score digits where nothing can score (no hill)
+            HudText.Set(_scoreA, s.NoHill ? string.Empty : NumberCache.Int(s.ScoreAzure));
+            HudText.Set(_scoreC, s.NoHill ? string.Empty : NumberCache.Int(s.ScoreCrimson));
             if (s.HillCap > 0)
             {
                 // b16 the hill count: "7/10 ON HILL" (weighted, a Warrior counts 2), brass at the cap so players learn it
@@ -803,7 +804,10 @@ namespace CriticalMass.Runtime.Hud
             _hillBar.SetFill(anyHeld ? CMTokens.Azure.Color : CMTokens.Stone.Color);
             _hillBar.SetEmpty(anyHeld ? CMTokens.Crimson.Color : CMTokens.Stone.Color);
             _hillBar.Fill01 = s.HillShareAzure;
-            _medallionHalf.gameObject.SetActive(s.Hill == HillState.Contested);
+            _medallionHalf.gameObject.SetActive(s.Hill == HillState.Contested && !s.NoHill);
+            // review fix round 3: the hill meter and its medallion (the painted hill ring of the top band) only where a hill is
+            if (_hillBar.gameObject.activeSelf == s.NoHill) _hillBar.gameObject.SetActive(!s.NoHill);
+            if (_medallion.gameObject.activeSelf == s.NoHill) _medallion.gameObject.SetActive(!s.NoHill);
             _medallion.SetFill(HillColour(s.Hill));
             // b15 D0: the owner's own Kaiju stands on the hill, so the owner scores nothing; the word says so from each side's
             // point of view (words, not colour alone: brass ink is a second cue)

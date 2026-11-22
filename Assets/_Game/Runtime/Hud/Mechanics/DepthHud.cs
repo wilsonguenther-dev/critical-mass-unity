@@ -754,7 +754,7 @@ namespace CriticalMass.Runtime.Hud.Mechanics
         void TickB13(World w, int me)
         {
             TeamId team = w.Actors[me].Team;
-            bool hut = Blacksmith.On(w);
+            bool hut = Blacksmith.On(w) && !HudState.NoHillIn(w.Config);   // review fix round 3: no "HUT 0 ore 0/6" in the range
             if (_hut.gameObject.activeSelf != hut) _hut.gameObject.SetActive(hut);
             if (hut)
             {

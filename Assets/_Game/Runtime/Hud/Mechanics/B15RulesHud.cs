@@ -253,7 +253,9 @@ namespace CriticalMass.Runtime.Hud.Mechanics
             TeamId enemy = team == TeamId.Azure ? TeamId.Crimson : TeamId.Azure;
             bool ownTrails = Comeback.Trailing(w, team), enemyTrails = Comeback.Trailing(w, enemy);
             // review fix round 2 (pass-2 N4): no RALLY in Duel or the Practice Range (no Kaiju: lane F's small modes)
-            bool show = (ownTrails || enemyTrails) && !HudState.NoKaijuIn(w.Config);
+            // review fix round 3 (pass-3 defect 3: the tag sat on the RALLY banner's reason line): the tag steps back while a
+            // banner holds the centre lane and returns after it (one message at a time)
+            bool show = (ownTrails || enemyTrails) && !HudState.NoKaijuIn(w.Config) && !Banner.IsOpen;
             if (show && !_rally.gameObject.activeSelf) _rally.gameObject.SetActive(true);   // hidden by TickLevers
             // a one-time banner per team, the first tick that team earns RALLY credit (the announcer line, both teams see it)
             for (int t = 0; t < 2; t++)
@@ -288,6 +290,13 @@ namespace CriticalMass.Runtime.Hud.Mechanics
         /// RALLY POINT (FORWARD RETURN); a turned Kaiju gets a banner for both teams.</summary>
         void TickLevers(World w, TeamId team, TeamId enemy)
         {
+            if (Banner.IsOpen)
+            {
+                // review fix round 3: the tag's lane is under the banner's reason line; it waits for the banner
+                if (_rally.gameObject.activeSelf) _rally.gameObject.SetActive(false);
+                _rallyKey = int.MinValue;
+                return;
+            }
             KaijuState ks = w.Kaiju.State;
             if ((ks == KaijuState.Azure || ks == KaijuState.Crimson) && w.Rally.Turns != _turnsShown)
             {

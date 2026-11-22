@@ -138,6 +138,7 @@ namespace CriticalMass.Runtime.Hud.Player
                     if (builder || dig) return "NEED WOOD";
                     if (cls == ClassId.Demolitions) return "NO TNT READY";
                     return "NOTHING TO SPEND";
+                case PlayerReasons.RefusedBlockedPlace when button == PlayerReasons.ButtonDodge: return "NO ROOM TO DODGE";   // lane DM: a dodge into a wall
                 case PlayerReasons.RefusedBlockedPlace: return builder || button == PlayerReasons.ButtonAbility ? "CAN'T BUILD HERE" : dig ? "CAN'T DIG HERE" : "NOT HERE";
                 case PlayerReasons.RefusedStaggered: return "STAGGERED";
                 case PlayerReasons.RefusedCarryFull: return "CARRY FULL";
@@ -145,7 +146,7 @@ namespace CriticalMass.Runtime.Hud.Player
                 case PlayerReasons.RefusedNothingToCancel: return "NOTHING TO CANCEL";
                 case PlayerReasons.RefusedTeamLimit: return "TEAM LIMIT REACHED";
                 case RefusedCarrying: return button == PlayerReasons.ButtonDodge ? "CAN'T DODGE WHILE CARRYING" : "PUT YOUR LOAD DOWN FIRST";
-                case RefusedInAir: return "ALREADY IN THE AIR";
+                case RefusedInAir: return button == PlayerReasons.ButtonDodge ? "CAN'T DODGE IN THE AIR" : "ALREADY IN THE AIR";
                 case RefusedRuleOff: return button == ButtonStationBuy ? "STATION UPGRADES ARE OFF: THE HUT LEVELS THE TEAM" : "OFF IN THIS MATCH";
                 default: return "CAN'T DO THAT NOW";
             }
@@ -238,19 +239,32 @@ namespace CriticalMass.Runtime.Hud.Player
 
         /// <summary>Review fix (defect 6): MY defence worked (HitBlocked with me as the target: a dodge, a shield, a parry
         /// appended later): DODGED / BLOCKED in my word row, cream on a brass rim (a success, not a hurt).</summary>
-        public void OnDefended(World w, int me, int attacker, int code, double lost)
+        public const string PerfectWord = "PERFECT";
+        const int GlanceOnMeKey = 2450;
+        float _defendedWordAt = -10f;
+
+        public void OnDefended(World w, int me, int attacker, int code, double lost) => OnDefended(w, me, attacker, code, lost, 0);
+
+        /// <summary>tier 1 on a dodge = a perfect dodge (lane DM, HitBlocked Tier 1): PERFECT, a little larger, instead of DODGED.</summary>
+        public void OnDefended(World w, int me, int attacker, int code, double lost, int tier)
         {
             if (code == BlockedGlancing)
             {
+                // review fix round 3 (pass-3 defect 4): a glance on my raised shield is BLOCKED only, one pill
+                if (Time.unscaledTime - _defendedWordAt < 0.6f) return;
                 // review fix round 2 (pass-2 defect 6): a glancing hit ON me says it too, small and rate-limited (one word per
                 // GlanceRepeat seconds), the same soft stone pill my glancing hit on him shows
-                Text g = _words.Show(BlockedWords(code, 0), 2450, me, Vector3.zero, SelfLift, PxPalette.Cream,
+                Text g = _words.Show(BlockedWords(code, 0), GlanceOnMeKey, me, Vector3.zero, SelfLift, PxPalette.Cream,
                     CriticalMass.Runtime.Hud.Style.CMTokens.Stone.Color, false, 0.8f, GlanceRepeat);
                 if (g != null) PlayerFeedback.Report(FeedbackChannel.BlockedTag, me, Mathf.RoundToInt((float)lost), g, code);
                 return;
             }
             if (!IsDefence(code)) return;
-            Text t = _words.Show(BlockedWords(code, 0), 2400 + code, me, Vector3.zero, SelfLift, PxPalette.Cream, PxPalette.Brass, true, Seconds);
+            _words.Hide(GlanceOnMeKey);
+            _defendedWordAt = Time.unscaledTime;
+            bool perfect = tier >= 1 && code == PlayerReasons.BlockedDodge;
+            if (perfect) _words.NextSize = Mathf.RoundToInt(WorldWords.StrongSize * 1.25f);
+            Text t = _words.Show(perfect ? PerfectWord : BlockedWords(code, 0), 2400 + code, me, Vector3.zero, SelfLift, PxPalette.Cream, PxPalette.Brass, true, Seconds);
             if (t != null) PlayerFeedback.Report(FeedbackChannel.BlockedTag, me, Mathf.RoundToInt((float)lost), t, code);
         }
 
