@@ -40,9 +40,50 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
         static readonly string[] SavedKeys = { GameSettings.GroundCameraKey, GameSettings.CameraViewKey, SettingsExtras.CleanHudKey, GameSettings.ReduceMotionKey };
         readonly Dictionary<string, int?> _saved = new Dictionary<string, int?>();
 
+        // The project-wide actions asset (InputSystem.actions) as the FIRST test found it. InputTestFixture's Reset
+        // (InputTestStateManager.Reset -> InputSystem.TestHook_DisableActions) sets s_Manager.actions = null on the very
+        // InputManager object it pushed as "saved", so Restore() brings that manager back with actions still null and
+        // every later play test that boots the game throws at HumanInputSource.OnEnable. Saved once, put back after
+        // every test (passed, failed or errored) and once more at fixture end.
+        static InputActionAsset s_FoundActions;
+        static bool s_FoundEnabled;
+
+        static void CaptureActions()
+        {
+            InputActionAsset a = InputSystem.actions;
+            if (a == null || s_FoundActions != null) return;
+            s_FoundActions = a;
+            s_FoundEnabled = a.enabled;
+        }
+
+        /// <summary>Puts the asset found back on the live InputManager (the public setter refuses in play mode, so the
+        /// manager's own setter is used, which re-applies it), enabled as it was.</summary>
+        internal static void RestoreActions()
+        {
+            if (s_FoundActions == null) return;
+            try
+            {
+                if (!ReferenceEquals(InputSystem.actions, s_FoundActions))
+                {
+                    object mgr = typeof(InputSystem).GetField("s_Manager", BindingFlags.NonPublic | BindingFlags.Static)?.GetValue(null);
+                    PropertyInfo prop = mgr?.GetType().GetProperty("actions", BindingFlags.Public | BindingFlags.Instance);
+                    if (prop == null) Debug.LogError("[px-f] cannot restore InputSystem.actions: InputManager.actions not found");
+                    else prop.SetValue(mgr, s_FoundActions);
+                }
+                if (s_FoundEnabled && !s_FoundActions.enabled) s_FoundActions.Enable();
+                if (!ReferenceEquals(InputSystem.actions, s_FoundActions)) Debug.LogError("[px-f] InputSystem.actions still not restored after the test");
+            }
+            catch (Exception ex) { Debug.LogError("[px-f] restoring InputSystem.actions failed: " + ex); }
+        }
+
+        [OneTimeTearDown]
+        public void RestoreActionsAtFixtureEnd() => RestoreActions();
+
         public override void Setup()
         {
-            base.Setup();
+            CaptureActions();
+            try { base.Setup(); }
+            catch { RestoreActions(); throw; }
             foreach (string k in SavedKeys) _saved[k] = PlayerPrefs.HasKey(k) ? PlayerPrefs.GetInt(k) : (int?)null;
             InputSettings s = InputSystem.settings;
             s.backgroundBehavior = InputSettings.BackgroundBehavior.IgnoreFocus;
@@ -61,8 +102,12 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
                 else PlayerPrefs.DeleteKey(kv.Key);
             }
             PlayerPrefs.Save();
-            SanityWorld.Reset();
-            base.TearDown();
+            try
+            {
+                SanityWorld.Reset();
+                base.TearDown();
+            }
+            finally { RestoreActions(); }
         }
 
         /// <summary>Loads Boot with actor 0 as cls in the given view, the real input reader ON, the sim clock stopped.</summary>
