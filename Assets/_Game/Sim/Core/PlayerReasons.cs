@@ -15,6 +15,8 @@ namespace CriticalMass.Sim.Core
         public const int BlockedPassive = 5;        // the passive window (a bot's swing on the human slot)
         public const int BlockedImmune = 6;         // any other immunity (B13Hooks.Immune)
         public const int BlockedShield = 7;         // a raised shield cut the hit (the hit still landed; informational)
+        public const int BlockedGlancing = 8;       // lane S2: the hit landed reduced (the Farmer's staff inside her close range,
+                                                    // "TOO CLOSE"); Radius = the damage lost; informational like BlockedShield
 
         // ---- StructureHit.B
         public const int StructureBarricade = 1;
@@ -43,6 +45,8 @@ namespace CriticalMass.Sim.Core
         public const int RefusedOutOfRange = 8;
         public const int RefusedNothingToCancel = 9;
         public const int RefusedTeamLimit = 10;     // a team-wide cap or rate limit
+        public const int RefusedCarrying = 11;      // lane S2: the load you carry forbids it (a corruption carrier cannot dodge)
+        public const int RefusedInAir = 12;         // lane S2: already in the air (a jump pressed mid-flight that will not land in time)
 
         // ---- WorldAction.B
         public const int WorldDig = 1;

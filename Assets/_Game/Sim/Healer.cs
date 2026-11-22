@@ -124,6 +124,9 @@ namespace CriticalMass.Sim.Core
             // b15 combat feel: a bot Healer mends the MOST HURT ally in range (lowest HP share, lowest id on a tie); a player
             // keeps the aim rule (the ally nearest her aim), so she chooses.
             bool mostHurt = !a.IsHuman && CombatFeel.On(w);
+            // lane S2: a human Healer mends the hurt ally nearest her aim when the aim is within HealerAimPickRadius of that
+            // ally, else the MOST hurt ally in range (the bots' rule), so not aiming at anyone still heals the right one.
+            if (a.IsHuman && PlayerSeat.On(w)) return HumanMendTarget(w, id, aimX, aimZ, range);
             double hx = w.X[id];
             double hz = w.Z[id];
             double px = double.IsFinite(aimX) ? aimX : hx;
@@ -148,6 +151,64 @@ namespace CriticalMass.Sim.Core
                 }
             }
             return best;
+        }
+
+        /// <summary>Lane S2: the human rule of MendTarget (see there). Lowest id breaks ties, as the bots' rule.</summary>
+        static int HumanMendTarget(World w, int id, double aimX, double aimZ, double range)
+        {
+            Actor a = w.Actors[id];
+            double hx = w.X[id], hz = w.Z[id];
+            bool aimed = double.IsFinite(aimX) && double.IsFinite(aimZ);
+            double pick = PlayerSeat.Cfg(w).HealerAimPickRadius;
+            int near = -1, hurt = -1;
+            double nearD = double.PositiveInfinity, hurtS = double.PositiveInfinity;
+            for (int j = 0; j < w.ActorCount; j++)
+            {
+                if (j == id) continue;
+                Actor t = w.Actors[j];
+                if (!t.Alive || t.Team != a.Team || !(t.Hp < t.MaxHp)) continue;
+                double dx = w.X[j] - hx, dz = w.Z[j] - hz;
+                if (dx * dx + dz * dz > range * range) continue;
+                double share = t.Hp / Math.Max(1, t.MaxHp);
+                if (share < hurtS)
+                {
+                    hurtS = share;
+                    hurt = j;
+                }
+                if (!aimed) continue;
+                double ax = w.X[j] - aimX, az = w.Z[j] - aimZ, d2 = ax * ax + az * az;
+                if (d2 <= pick * pick && d2 < nearD)
+                {
+                    nearD = d2;
+                    near = j;
+                }
+            }
+            return near >= 0 ? near : hurt;
+        }
+
+        /// <summary>
+        /// Lane S2: a HUMAN Healer's attack press swings the lantern instead of mending when her aim point is within
+        /// HealerFightAimRadius of a living enemy who stands inside her lantern reach (class AttackRange + its radius). Bots
+        /// keep their rule (they never take this path).
+        /// </summary>
+        public static bool AimsAtEnemy(World w, int id)
+        {
+            Actor a = w.Actors[id];
+            if (a.Cls != ClassId.Healer || !PlayerSeat.Human(w, id) || w.HasAim[id] != 1) return false;
+            double r = PlayerSeat.Cfg(w).HealerFightAimRadius;
+            if (!(r > 0)) return false;
+            double px = w.Inputs[id].AimX, pz = w.Inputs[id].AimZ;
+            double reach = w.Config.Class(ClassId.Healer).AttackRange;
+            for (int j = 0; j < w.ActorCount; j++)
+            {
+                Actor t = w.Actors[j];
+                if (!t.Alive || t.Team == a.Team) continue;
+                double ex = w.X[j] - px, ez = w.Z[j] - pz;
+                if (ex * ex + ez * ez > r * r) continue;
+                double dx = w.X[j] - w.X[id], dz = w.Z[j] - w.Z[id], lr = reach + w.Config.Class(t.Cls).Radius;
+                if (dx * dx + dz * dz <= lr * lr) return true;
+            }
+            return false;
         }
 
         /// <summary>The attack press of a living, standing Healer whose attack cooldown ran out (Combat.CombatSystem). True when a mend landed.</summary>

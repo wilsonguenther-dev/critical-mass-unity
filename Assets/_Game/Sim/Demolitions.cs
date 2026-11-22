@@ -325,6 +325,7 @@ namespace CriticalMass.Sim.Core
             PhysicsConfig p = w.Config.Physics;
             bool ownerIsBot = owner >= 0 && owner < w.ActorCount && !w.Actors[owner].IsHuman;
             bool walls = Phys.On(w, p.WallsBlockHits);
+            bool report = PlayerSeat.On(w);   // lane S2
             bool feelBlast = PhysicsFeel.BlastOn(w);   // b16 [2]: blasts shove under their own switch (Knockback is off by default)
             bool knock = Phys.On(w, p.Knockback) || feelBlast;
             int hit = 0;
@@ -332,13 +333,24 @@ namespace CriticalMass.Sim.Core
             {
                 Actor t = w.Actors[j];
                 if (!t.Alive || t.Team == team) continue;
-                if (ownerIsBot && t.IsHuman && w.Match.Time < w.Config.Bots.PassiveSeconds) continue;
+                bool passive = ownerIsBot && t.IsHuman && w.Match.Time < w.Config.Bots.PassiveSeconds;
+                if (passive && !report) continue;
                 double r = radius + w.Config.Class(t.Cls).Radius;
                 double dx = w.X[j] - x;
                 double dz = w.Z[j] - z;
                 double d2 = dx * dx + dz * dz;
                 if (d2 > r * r) continue;
-                if (walls && !SegmentClear.Clear(w.Map, x, z, w.X[j], w.Z[j])) continue;
+                // lane S2: a blast that reaches an enemy body and deals nothing says why (HitBlocked)
+                if (passive)
+                {
+                    World.PushEvent(w, SimEventType.HitBlocked, j, owner, w.X[j], w.Z[j], PlayerReasons.BlockedPassive);
+                    continue;
+                }
+                if (walls && !SegmentClear.Clear(w.Map, x, z, w.X[j], w.Z[j]))
+                {
+                    if (report && owner >= 0) World.PushEvent(w, SimEventType.HitBlocked, j, owner, w.X[j], w.Z[j], PlayerReasons.BlockedWall);
+                    continue;
+                }
                 double d = Math.Sqrt(d2);
                 double u = Math.Min(1, d / radius);
                 double ux = d > 1e-6 ? dx / d : JsMath.Cos(j * 2.39996);
@@ -506,7 +518,7 @@ namespace CriticalMass.Sim.Core
             }
             bool walls = BuilderWalls.On(w);
             Barricades.DamageBarricadesInArc(w, b.Owner, bx, bz, 1, 0, cfg.BlastRadius, -1, cfg.Damage, walls);
-            if (walls) BuilderWalls.BlastWalls(w, b.Team, bx, bz, cfg.BlastRadius); // CM b13 B: 60 per wall cell in the radius
+            if (walls) BuilderWalls.BlastWalls(w, b.Team, bx, bz, cfg.BlastRadius, b.Owner); // CM b13 B: 60 per wall cell in the radius
 
             // Breakable walls in the radius: destroyed outright (they only ever ADD walkable ground, so no route check).
             double R = cfg.BlastRadius;
@@ -524,10 +536,13 @@ namespace CriticalMass.Sim.Core
                     double dx = cx + 0.5 - bx;
                     double dz = cz + 0.5 - bz;
                     if (dx * dx + dz * dz > R * R) continue;
+                    double had = map.WallHp[i] > 0 ? map.WallHp[i] : (t == Cell.BreakableIntact ? 2 : 1) * w.Config.Abilities.MinerWallBreak.HitsPerState;
                     map.WallHp[i] = 0;
                     MapGrid.SetCell(w, cx, cz, Cell.BreakableDestroyed);
                     s.Stats.WallsBroken++;
                     World.PushEvent(w, SimEventType.WallBreak, b.Owner, i, cx + 0.5, cz + 0.5, Cell.BreakableDestroyed);
+                    // lane S2: the uniform structure answer (Value = the hits it had left, Radius 0 = broke)
+                    if (PlayerSeat.On(w)) World.PushEvent(w, SimEventType.StructureHit, b.Owner, PlayerReasons.StructureBreakable, cx + 0.5, cz + 0.5, had, null, DamageCause.Explosion, 0);
                 }
             }
 
@@ -635,7 +650,22 @@ namespace CriticalMass.Sim.Core
             if (!w.Inputs[id].Attack || w.Tick < w.Demolitions.TntReadyTick[id]) return false;
             if (a.AttackCd > 0 || a.SwingPending) return false;
             if (a.HitStunTicks > 0 && Phys.On(w, true)) return false;
+            if (PointBlank(w, id)) return false;   // lane S2: the pry bar swings at an enemy in her face; the TNT stays ready
             return true;
+        }
+
+        /// <summary>
+        /// Lane S2 (Full rules): a living enemy within PlayerSeatConfig.PointBlankRange (centre to centre) inside her pry-bar arc
+        /// (the class row arc, widened by the body as Combat does) along her aim. Then an attack press swings instead of
+        /// throwing. Every actor (bots too). The DigPlace key always throws.
+        /// </summary>
+        public static bool PointBlank(World w, int id)
+        {
+            if (!PlayerSeat.On(w)) return false;
+            double r = PlayerSeat.Cfg(w).PointBlankRange;
+            if (!(r > 0)) return false;
+            PlayerSeat.AimDir(w, id, out double fx, out double fz);
+            return PlayerSeat.EnemyInArc(w, id, r, fx, fz) >= 0;
         }
 
         /// <summary>
