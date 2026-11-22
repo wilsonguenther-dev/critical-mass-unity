@@ -427,12 +427,12 @@ namespace CriticalMass.Runtime.Audio.Sound
                 L(Si, 0, 0.4f, 1630, 1630, 0.002f, 0.07f, 0.25f), L(Br, 0, 0.08f, 1, 1, 0.001f, 0.02f, 0.4f, 1200)),
             // The receiving end: a low body thump (I was hit), a sharper ring when my shield took it.
             R("px_hurt_thump", 0.26f, 1.6f, L(Si, 0, 0.24f, 85, 38, 0.001f, 0.07f, 1f), L(Br, 0, 0.15f, 1, 1, 0.001f, 0.04f, 0.7f, 600, 200),
-                L(Tr, 0, 0.1f, 170, 90, 0.001f, 0.03f, 0.3f)),
+                L(Tr, 0, 0.1f, 170, 90, 0.001f, 0.03f, 0.6f)),
             R("px_hurt_blocked", 0.3f, 0f, L(Si, 0, 0.28f, 1320, 1300, 0.0005f, 0.06f, 0.7f), L(Sq, 0, 0.2f, 660, 650, 0.0005f, 0.04f, 0.35f, 4000, 1500),
                 L(Nz, 0, 0.03f, 1, 1, 0.0005f, 0.008f, 0.6f, 7000, 0, 1000), L(Si, 0, 0.15f, 90, 50, 0.001f, 0.04f, 0.6f)),
             // Low health: one lub-dub (the director repeats it at 1.2 to 1.8 Hz). A 124 Hz overtone so laptop speakers carry it.
             R("px_heartbeat", 0.42f, 0f, L(Si, 0, 0.12f, 62, 45, 0.004f, 0.035f, 1f), L(Si, 0.17f, 0.12f, 55, 40, 0.004f, 0.03f, 0.75f),
-                L(Tr, 0, 0.1f, 124, 90, 0.004f, 0.03f, 0.35f), L(Tr, 0.17f, 0.1f, 110, 80, 0.004f, 0.03f, 0.28f),
+                L(Tr, 0, 0.1f, 124, 90, 0.004f, 0.03f, 0.75f), L(Tr, 0.17f, 0.1f, 110, 80, 0.004f, 0.03f, 0.6f),
                 L(Br, 0, 0.08f, 1, 1, 0.004f, 0.02f, 0.25f, 300), L(Br, 0.17f, 0.08f, 1, 1, 0.004f, 0.02f, 0.2f, 300)),
             R("px_my_death", 0.7f, 1.1f, L(Si, 0, 0.65f, 220, 55, 0.005f, 0.25f, 0.8f), L(Tr, 0, 0.6f, 330, 82, 0.005f, 0.2f, 0.35f, 2000, 400),
                 L(Br, 0, 0.4f, 1, 1, 0.002f, 0.12f, 0.6f, 800, 150)),

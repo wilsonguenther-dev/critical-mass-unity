@@ -406,20 +406,19 @@ namespace CriticalMass.Runtime.Audio.Sound
             }
             if (melee)
             {
+                int cue;
+                if (ev.B == Damage.KaijuSource || ev.Cause == DamageCause.KaijuMelee) cue = cues[6];
+                else if (w.Actors[t].Cls == ClassId.Warrior) cue = tier >= 2 ? cues[2] : cues[3];
+                else cue = cues[tier >= 2 ? 2 : tier == 1 ? 1 : 0];
                 if (mine && px && ev.B >= 0 && ev.B < w.ActorCount)
                 {
-                    // MY landed hit: always the meaty weapon impact at own priority, plus the hit-confirm tick.
+                    // MY landed hit: always the meaty weapon impact at own priority, plus the hit-confirm tick; what I hit
+                    // (flesh or armour) stays under it at 0.6 so the victim's material still reads.
                     Emit(sink, cues[9 + WeaponImpact(w.Actors[ev.B].Cls)], w, ev.X, ev.Z, true, false, tier >= 2 ? 1.15f : 1f, 1f, t, Fb(FeedbackChannelImpact), t);
+                    Emit(sink, cue, w, ev.X, ev.Z, true, false, 0.6f, 1f, t);
                     if (SoundPrefs.HitConfirm) Emit(sink, cues[13], w, ev.X, ev.Z, true, false, 1f, tier >= 2 ? 1.06f : 1f, t);
                 }
-                else
-                {
-                    int cue;
-                    if (ev.B == Damage.KaijuSource || ev.Cause == DamageCause.KaijuMelee) cue = cues[6];
-                    else if (w.Actors[t].Cls == ClassId.Warrior) cue = tier >= 2 ? cues[2] : cues[3];
-                    else cue = cues[tier >= 2 ? 2 : tier == 1 ? 1 : 0];
-                    Emit(sink, cue, w, ev.X, ev.Z, own, threat, 1f, 1f, t);
-                }
+                else Emit(sink, cue, w, ev.X, ev.Z, own, threat, 1f, 1f, t);
                 // feat/hit-feel-1: the victim's pain voice, pitched by body (Weight) with the cue's own jitter.
                 if (cues.Length > 8) Emit(sink, cues[8], w, ev.X, ev.Z, own, threat, 1f, SoundFeed.Weight(w.Actors[t].Cls), t);
             }
