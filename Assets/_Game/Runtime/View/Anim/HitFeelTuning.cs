@@ -160,10 +160,27 @@ namespace CriticalMass.Runtime.View.Anim
         /// <summary>Fix round 5 (item 4): the local press is shown before the sim's tick takes it (presentation only): the
         /// wind-up pose starts on the press frame and holds at most PredictHoldShare of the wind-up until the sim's swing
         /// starts; if the sim has not started it within PredictTimeout (s, wall) the pose fades out like a feint.</summary>
-        public const double PredictTimeout = 0.12, PredictHoldShare = 0.35;
+        public const double PredictTimeout = 0.06, PredictHoldShare = 0.35;   // round 6: 0.06 + the 0.06 re-trigger fade = gone by 0.12 s
 
         /// <summary>Fix round 5 (pure; tests): the predicted swing's age (s into the wind-up) and weight, `wall` s after the
         /// press. Null age past the timeout (the caller aborts).</summary>
+        /// <summary>Fix round 6: what a predicted wind-up does this frame.</summary>
+        public enum PredictStep { Continue, HandOver, Abort }
+
+        /// <summary>
+        /// Fix round 6 (pure; tests; review pass 6: a Demolitions press with TNT ready threw the TNT and the predicted wind-up
+        /// stayed raised at 0.56 for 566 ms+). Every frame, before the pose: the sim's melee swing started (its SwingTick
+        /// moved) -> HandOver (the swing continues the same clip); any OTHER action started instead (AnimAction reset: TNT,
+        /// an ability, a throw, a skill cue, a verb) or PredictTimeout passed with no swing -> Abort (the predicted pose fades
+        /// out over the re-trigger fade, 0.06 s, and the other action's own pose takes over); else Continue.
+        /// </summary>
+        public static PredictStep StepPrediction(bool simSwingStarted, bool otherActionStarted, double wall)
+        {
+            if (simSwingStarted) return PredictStep.HandOver;
+            if (otherActionStarted || !(wall >= 0) || wall > PredictTimeout) return PredictStep.Abort;
+            return PredictStep.Continue;
+        }
+
         public static bool PredictedSwing(double wall, double windupSeconds, out double age, out float weight)
         {
             age = 0; weight = 0f;

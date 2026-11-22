@@ -90,6 +90,27 @@ namespace CriticalMass.Runtime.View.Anim
         float _predFloor;
         double _predFloorT;
         public bool Predicting => _predicting;
+        /// <summary>Fix round 6: predicted wind-ups aborted (tests / logs).</summary>
+        public int PredictAborts { get; private set; }
+
+        /// <summary>Fix round 6 (item 1): the predicted clip becomes the fading previous clip (0.06 s re-trigger fade) and
+        /// leaves the action slot free for whatever the sim started (its own pose) or for nothing.</summary>
+        void AbortPrediction(double simTime)
+        {
+            _predicting = false;
+            _predFloor = 0f;
+            PredictAborts++;
+            if (_kind == 1 && _actClip != null)
+            {
+                if (_lastActW > 0f)
+                {
+                    _prevClip = _actClip; _prevTime = _lastActTime; _prevW = _lastActW; _prevLoop = false; _prevAt = simTime; _slot = 1 - _slot;
+                }
+                _actClip = null;
+                _lastActW = 0f;
+                _commitPending = _commitReady = false;
+            }
+        }
 
         /// <summary>Fix round 5 (item 4): the local player pressed attack this frame and the sim would accept it next step:
         /// start the attack clip's wind-up now (the sim's AttackStart continues it without a crossfade).</summary>
@@ -282,6 +303,13 @@ namespace CriticalMass.Runtime.View.Anim
             // feat/skill-effects-1: TNT and Purify reset AnimAction without the cooldowns above, so they played no clip; the
             // skill lane's cue (Throw, Cast, set on the skill's event tick) starts one. Root Seeds' cue swaps Cast for Throw.
             string cue = CriticalMass.Runtime.View.Skills.SkillAnimCues.FreshClip(i, w.Tick);
+            // fix round 6 (item 1): a predicted wind-up hands over to the sim's swing, or fades when anything else started
+            if (_predicting)
+            {
+                bool other = (aa + 1e-9 < _lastAnimAction || cue != null) && actor.SwingTick == _predSwingTick;
+                HitFeelTuning.PredictStep step = HitFeelTuning.StepPrediction(actor.SwingTick != _predSwingTick, other, Time.unscaledTimeAsDouble - _predWall);
+                if (step == HitFeelTuning.PredictStep.Abort) AbortPrediction(simTime);
+            }
             if (!corpse && aa + 1e-9 < _lastAnimAction && (actor.AttackCd > 0 || actor.AbilityCd > 0 || cue != null)) BeginAction(m, actor, cfg, simTime, cue, w.Tick);
             _lastAnimAction = aa;
 
