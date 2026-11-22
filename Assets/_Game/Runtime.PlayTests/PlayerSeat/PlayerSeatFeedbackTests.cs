@@ -127,6 +127,23 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
                 }
             }
             if (!r.Hit) { r.Note = "no Hit within wind-up + " + T.ContactSlackTicks + " ticks (" + string.Join(" ", Events(head, SimEventType.AttackContact).Select(x => "contact v" + x.Value)) + ")"; yield break; }
+            // fix round 6 (F03 / D3): the hit frame itself, sampled AFTER it rendered (its LateUpdates set the flash material
+            // and added the kick; the next frame's Update takes the kick off again), so rendered frame 0 is measured, not
+            // skipped by the loop's real-time waits
+            yield return new WaitForEndOfFrame();
+            if (Time.frameCount == r.HitFrame)
+            {
+                if (model != null && FlashShare(model) >= CriticalMass.Runtime.View.Anim.HitFeelTuning.FlashShareSafe) r.FlashFrame = 0;
+                if (cam0 != null)
+                {
+                    Vector3 pe = cam0.WorldToScreenPoint(fixedPoint);   // the camera as rendered: the kick is on it now
+                    double movedE = new Vector2(pe.x - px0.x, pe.y - px0.y).magnitude * 1080.0 / Math.Max(1, Screen.height);
+                    if (movedE > r.CamPxPeak) { r.CamPxPeak = movedE; r.CamPxFrame = 0; }
+                    if (movedE >= 6 && r.CamPx6Frame < 0) r.CamPx6Frame = 0;
+                    double kickE = CameraShake.KickApplied.magnitude * 1080.0 / Math.Max(1e-3, 2 * Math.Tan(cam0.fieldOfView * Math.PI / 360) * Math.Max(0.5, Vector3.Distance(cam0.transform.position, fixedPoint)));
+                    if (kickE > r.KickPxPeak) { r.KickPxPeak = kickE; r.KickPxFrame = 0; }
+                }
+            }
             for (int f = 0; f < T.CueFrames; f++)
             {
                 r.KickPeak = Math.Max(r.KickPeak, CameraShake.Applied.magnitude);
@@ -278,7 +295,19 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
             // fix round 5 (item 4): a virtual-device press queued now is delivered by the Input System's next update, at
             // the start of the next frame: that frame is the press frame the player sees
             int pressFrame = Time.frameCount + 1;
-            yield return TickFrame(() => Pin(e, px, pz));
+            // fix round 6: the drawn pose weight on each rendered frame from the press to press + 2, read at the end of
+            // that frame (ActorViews.LocalSwingWeightDrawn), so the rig measures what was rendered, not a later loop pass
+            float drawnBest = 0f;
+            int drawnFrames = 0;
+            while (Time.frameCount <= pressFrame + 2 && drawnFrames < 8)
+            {
+                yield return null;   // the next frame, after its Update (where TickFrame steps the sim)
+                if (Time.frameCount == pressFrame) { Pin(e, px, pz); S.Tick(1); }   // the press frame's sim step, as TickFrame
+                yield return new WaitForEndOfFrame();
+                drawnFrames++;
+                if (CriticalMass.Runtime.View.ActorViews.LocalSwingWeightFrame == Time.frameCount && Time.frameCount >= pressFrame)
+                    drawnBest = Math.Max(drawnBest, CriticalMass.Runtime.View.ActorViews.LocalSwingWeightDrawn);
+            }
             ReleaseAttack();
             bool started = Events(head, SimEventType.AttackStart).Any(q => q.A == 0);
             float best = 0;
@@ -292,7 +321,7 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
             if (reported) best = Math.Max(best, last.Value);
             int framesAfterPress = reported ? last.Frame - pressFrame : -1;
             AssertAtControls("the end");
-            Check("F30 SwingPose", Tag(ClassId.Warrior, v), "sim accepted " + started + ", SwingCommit pose weight " + best.ToString("0.00") + " drawn " + framesAfterPress + " rendered frames after the press frame [" + LedgerDump(cursor) + "]", ">= 0.8 within 2 frames of the press", started && best >= T.SwingPoseWeight && reported && framesAfterPress >= 0 && framesAfterPress <= 2);
+            Check("F30 SwingPose", Tag(ClassId.Warrior, v), "sim accepted " + started + ", drawn pose weight by press + 2 " + drawnBest.ToString("0.00") + "; SwingCommit ledger weight " + best.ToString("0.00") + " at " + framesAfterPress + " frames after the press [" + LedgerDump(cursor) + "]", ">= 0.8 drawn within 2 frames of the press", started && Math.Max(drawnBest, best) >= T.SwingPoseWeight && reported && framesAfterPress >= 0 && framesAfterPress <= 2);
         }
 
         [UnityTest]
@@ -925,6 +954,9 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
                     int ix = (int)Math.Floor(cx), iz = (int)Math.Floor(cz);
                     if (ix < 1 || iz < 1 || ix >= W.Map.Width - 1 || iz >= W.Map.Height - 1) continue;
                     if (W.Map.Cells[iz * W.Map.Width + ix] != Cell.Floor || BuilderWalls.CellRefusal(W, ix, iz) != 0) continue;
+                    // fix round 6: the rig picked a cell the sim then refused (Terraform v-3, RefusedOccupied: a pad / hill /
+                    // shrine keep-out), so no pop could show; ask the sim's own dig rule first (a read)
+                    if (Terraform.DigRefusal(W, ix, iz) != 0) continue;
                     double ccx = ix + 0.5, ccz = iz + 0.5;
                     bool busy = W.Nodes.Any(nd => Math.Abs(nd.X - ccx) < 1.0 && Math.Abs(nd.Z - ccz) < 1.0)
                         || (W.Depth.Sources != null && W.Depth.Sources.Any(sn => sn != null && Math.Abs(sn.X - ccx) < 1.0 && Math.Abs(sn.Z - ccz) < 1.0))
@@ -998,13 +1030,22 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
         public IEnumerator D0_FiveRestarts_ThenLeftShift_NoErrors()
         {
             // defect 0: any error or exception logged fails a UnityTest by itself (LogAssert); this states it at the end too
+            int errors = 0; string firstError = null;
+            Application.LogCallback onLog = (msg, stack, type) =>
+            {
+                if (type == LogType.Error || type == LogType.Exception || type == LogType.Assert) { errors++; if (firstError == null) firstError = msg; }
+            };
+            Application.logMessageReceived += onLog;
             for (int k = 0; k < 5; k++) yield return Load(ClassId.Warrior, k % 2 == 0 ? CameraView.TopDown : CameraView.ThirdPerson);
             Press(Kb.leftShiftKey);
             for (int f = 0; f < 3; f++) yield return TickFrame();
             Release(Kb.leftShiftKey);
             for (int f = 0; f < 20; f++) yield return TickFrame();
-            LogAssert.NoUnexpectedReceived();
-            Check("D0 RestartsThenShift", "5 match loads then a left Shift press", "no error or exception logged", "none", true);
+            Application.logMessageReceived -= onLog;
+            // fix round 6: the test is about errors and exceptions (UnityTest fails on those by itself). NoUnexpectedReceived
+            // also failed it on a plain info line ("[Log] [CM.Replay] not saved: left after 1 s", ReplayCapture.End on each
+            // quick restart): count errors, exceptions and asserts ourselves instead
+            Check("D0 RestartsThenShift", "5 match loads then a left Shift press", errors == 0 ? "no error or exception logged" : errors + " error(s), first: " + firstError, "none", errors == 0);
         }
 
         [UnityTest]

@@ -249,6 +249,9 @@ namespace CriticalMass.Runtime.Game
         /// <summary>Why gameplay input is shut off (null when it is not). Pure read.</summary>
         string FindLockout()
         {
+            // fix round 6: a reader that disabled itself for missing input actions already logged its one error and handed the
+            // seat to the autopilot: not a lockout (no second error, no repair that would re-enable it)
+            if (Input != null && Input.ActionsMissing) return null;
             if (Input == null || !Input.isActiveAndEnabled) return "input reader off";
             InputActionMap map = InputSystem.actions != null ? InputSystem.actions.FindActionMap("Player", false) : null;
             if (map == null) return "no Player action map";

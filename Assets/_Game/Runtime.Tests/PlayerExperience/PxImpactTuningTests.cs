@@ -315,7 +315,7 @@ namespace CriticalMass.Runtime.Tests
             Assert.Greater(w0, 0.3f, "the press frame already moves");
             Assert.IsTrue(HitFeelTuning.PredictedSwing(2 / 60.0, windup, out _, out float w2));
             Assert.GreaterOrEqual(w2, 0.8f, "committed by 2 frames");
-            Assert.IsTrue(HitFeelTuning.PredictedSwing(0.1, windup, out double a6, out _));
+            Assert.IsTrue(HitFeelTuning.PredictedSwing(0.05, windup, out double a6, out _));
             Assert.LessOrEqual(a6, windup * HitFeelTuning.PredictHoldShare + 1e-9, "never the strike before the sim swings");
             Assert.IsFalse(HitFeelTuning.PredictedSwing(HitFeelTuning.PredictTimeout + 0.01, windup, out _, out _), "a refused press fades");
         }
@@ -364,10 +364,44 @@ namespace CriticalMass.Runtime.Tests
         [Test]
         public void NameTagsArePlacedAfterTheKickLikeTheHealthBars()
         {
-            int tags = OrderOf(typeof(CriticalMass.Runtime.Hud.Mechanics.DepthHud));
+            // fix round 6: the DepthHud itself stays at the default order (the bar tests need it there); its late tag pass moves
+            Assert.AreEqual(0, OrderOf(typeof(CriticalMass.Runtime.Hud.Mechanics.DepthHud)), "the HUD itself keeps the default order");
+            int tags = OrderOf(typeof(CriticalMass.Runtime.Hud.Mechanics.DepthHudTagsLate));
             Assert.Greater(tags, OrderOf(typeof(CameraShake)), "after the kick is applied");
             Assert.GreaterOrEqual(tags, OrderOf(typeof(CriticalMass.Runtime.Hud.GameHud)), "with the bars' camera");
             Assert.Less(tags, OrderOf(typeof(CriticalMass.Runtime.View.LowViewTags)), "before the low-view tag pass");
+        }
+
+        /// <summary>Fix round 6 (item 1, review pass 6: TNT thrown, predicted wind-up held at 0.56 for 566 ms+): a predicted
+        /// wind-up hands over to the sim's melee swing; any other action (TNT throw, ability, skill cue, verb) or no swing
+        /// within the timeout aborts it, and the abort's fade ends by 0.12 s after the press.</summary>
+        [Test]
+        public void APredictedWindupHandsOverOrFadesWithinPoint12Seconds()
+        {
+            Assert.AreEqual(HitFeelTuning.PredictStep.HandOver, HitFeelTuning.StepPrediction(true, false, 0.02), "the sim swung");
+            Assert.AreEqual(HitFeelTuning.PredictStep.HandOver, HitFeelTuning.StepPrediction(true, true, 0.02), "a swing wins over its own AnimAction reset");
+            Assert.AreEqual(HitFeelTuning.PredictStep.Abort, HitFeelTuning.StepPrediction(false, true, 0.02), "TNT / ability / verb started instead");
+            Assert.AreEqual(HitFeelTuning.PredictStep.Continue, HitFeelTuning.StepPrediction(false, false, 0.03), "waiting for the tick");
+            Assert.AreEqual(HitFeelTuning.PredictStep.Abort, HitFeelTuning.StepPrediction(false, false, HitFeelTuning.PredictTimeout + 0.001), "refused: no swing");
+            Assert.LessOrEqual(HitFeelTuning.PredictTimeout + AttackTiming.Retrigger, 0.12 + 1e-9, "faded by 0.12 s after the press, worst case");
+            Assert.Greater(HitFeelTuning.PredictTimeout, 1.0 / 30.0, "longer than one sim tick, so an accepted press is not aborted");
+        }
+
+        /// <summary>Fix round 6 (advisory 4): the reduce-flashing flash (the default) is clearly gentler than the intense one
+        /// (at most 30% of its unshaded share, 60% of its length) and still visible (share >= 0.2, >= 4 frames at 60 fps).</summary>
+        [Test]
+        public void TheReducedFlashIsGentlerButStillVisible()
+        {
+            UnityEngine.Vector4 safe = HitFeelTuning.HitFlashVector(true), full = HitFeelTuning.HitFlashVector(false);
+            Assert.LessOrEqual(safe.w, 0.3f * full.w + 1e-4f, "dimmer");
+            Assert.GreaterOrEqual(safe.w, 0.2f, "still visible");
+            foreach (bool own in new[] { true, false })
+                foreach (bool third in new[] { true, false })
+                {
+                    double s = HitFeelTuning.FlashSeconds(own, third, true), f = HitFeelTuning.FlashSeconds(own, third, false);
+                    Assert.Less(s, f, "shorter");
+                    Assert.GreaterOrEqual(s, 4 / 60.0 - 1e-9, "at least 4 frames");
+                }
         }
 
         [Test]

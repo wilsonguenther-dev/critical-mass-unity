@@ -37,7 +37,7 @@ namespace CriticalMass.Runtime.View.Anim
         /// reduce flashing 0.45 of the cream (no white frame). Before this the flash only set the albedo colours to white:
         /// the shading bands and time-of-day grade kept a cream fighter almost the same, and a textured model (Warrior /
         /// Builder base map) ignored them entirely, so no flash showed on the victim at 1080p.</summary>
-        public const float FlashShareFull = 0.92f, FlashShareSafe = 0.45f;
+        public const float FlashShareFull = 0.92f, FlashShareSafe = 0.25f;   // round 6: safe 0.45 -> 0.25 (pass 6: only ~11% dimmer than intense)
         public static readonly UnityEngine.Color FlashWhite = new UnityEngine.Color(1f, 0.99f, 0.96f, 1f);
         /// <summary>The `_HitFlash` vector for a flash copy (rgb colour, a share).</summary>
         public static UnityEngine.Vector4 HitFlashVector(bool reduceFlashing)
@@ -46,6 +46,13 @@ namespace CriticalMass.Runtime.View.Anim
             return new UnityEngine.Vector4(c.r, c.g, c.b, reduceFlashing ? FlashShareSafe : FlashShareFull);
         }
         public static double FlashSeconds(bool own, bool thirdPerson) => own && thirdPerson ? FlashOwn3PSeconds : FlashSeconds(own);
+        /// <summary>Fix round 6 (advisory 4): under reduce flashing (the default) the flash is also SHORTER: 60% of the
+        /// intense length (own 72 ms, other 60 ms, third-person own 108 ms: still 4-6 frames at 60 fps, so it reads).</summary>
+        public const double FlashSafeLengthShare = 0.6;
+        /// <summary>Fix round 6: the share of the safe strength the reduce-flashing copy moves its albedo toward the cream.</summary>
+        public const float FlashSafeColourShare = 0.6f;
+        public static double FlashSeconds(bool own, bool thirdPerson, bool reduceFlashing) =>
+            FlashSeconds(own, thirdPerson) * (reduceFlashing ? FlashSafeLengthShare : 1.0);
         /// <summary>A new flash may start on a victim whose last flash began `sinceLast` wall seconds ago.</summary>
         public static bool FlashAllowed(double sinceLast) => !(sinceLast < FlashMinGapSeconds);
         public static double MaxFlashesPerSecond => 1.0 / FlashMinGapSeconds;
@@ -160,10 +167,27 @@ namespace CriticalMass.Runtime.View.Anim
         /// <summary>Fix round 5 (item 4): the local press is shown before the sim's tick takes it (presentation only): the
         /// wind-up pose starts on the press frame and holds at most PredictHoldShare of the wind-up until the sim's swing
         /// starts; if the sim has not started it within PredictTimeout (s, wall) the pose fades out like a feint.</summary>
-        public const double PredictTimeout = 0.12, PredictHoldShare = 0.35;
+        public const double PredictTimeout = 0.06, PredictHoldShare = 0.35;   // round 6: 0.06 + the 0.06 re-trigger fade = gone by 0.12 s
 
         /// <summary>Fix round 5 (pure; tests): the predicted swing's age (s into the wind-up) and weight, `wall` s after the
         /// press. Null age past the timeout (the caller aborts).</summary>
+        /// <summary>Fix round 6: what a predicted wind-up does this frame.</summary>
+        public enum PredictStep { Continue, HandOver, Abort }
+
+        /// <summary>
+        /// Fix round 6 (pure; tests; review pass 6: a Demolitions press with TNT ready threw the TNT and the predicted wind-up
+        /// stayed raised at 0.56 for 566 ms+). Every frame, before the pose: the sim's melee swing started (its SwingTick
+        /// moved) -> HandOver (the swing continues the same clip); any OTHER action started instead (AnimAction reset: TNT,
+        /// an ability, a throw, a skill cue, a verb) or PredictTimeout passed with no swing -> Abort (the predicted pose fades
+        /// out over the re-trigger fade, 0.06 s, and the other action's own pose takes over); else Continue.
+        /// </summary>
+        public static PredictStep StepPrediction(bool simSwingStarted, bool otherActionStarted, double wall)
+        {
+            if (simSwingStarted) return PredictStep.HandOver;
+            if (otherActionStarted || !(wall >= 0) || wall > PredictTimeout) return PredictStep.Abort;
+            return PredictStep.Continue;
+        }
+
         public static bool PredictedSwing(double wall, double windupSeconds, out double age, out float weight)
         {
             age = 0; weight = 0f;
