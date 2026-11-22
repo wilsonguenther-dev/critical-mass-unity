@@ -123,7 +123,12 @@ namespace CriticalMass.Sim.Core
                 // once, so a refused jump at the island edge is not silent. Value: 2 = past the coyote window, 1 = no landing.
                 if (wantJump && a.JumpBuffer == 0 && PhysicsFeel.On(w) && PhysicsFeel.Cfg(w).JumpRefusedEvent)
                     World.PushEvent(w, SimEventType.JumpRefused, i, -1, w.X[i], w.Z[i], a.UnsupportedTicks > Jump.CoyoteTicks(cfg) ? 2 : 1);
-                if (vx != 0 || vz != 0) Collide.MoveActor(w, i, vx * dt, vz * dt, false, true);
+                if (vx != 0 || vz != 0)
+                {
+                    double sx = vx * dt, sz = vz * dt;
+                    KaijuWalkSlide(w, i, ref sx, ref sz);   // px DM: walk round the Kaiju's body, not into it
+                    Collide.MoveActor(w, i, sx, sz, false, true);
+                }
                 Knock.Step(w, i, dt); // DG-70: the knock velocity on top, through the same wall-sliding mover
                 a.Moving = moving;
                 if (stunned) continue;
@@ -142,6 +147,22 @@ namespace CriticalMass.Sim.Core
             }
             Collide.SeparateActors(w);
             TerrainHeight.MovementEnd(w); // b15 terrain height: levels, slows, climb counters (no-op without the rule)
+        }
+
+        /// <summary>px DM (PhysicsFeelConfig.KaijuWalkSlide, Full rules): a walker in contact with the hatched solid Kaiju loses
+        /// the into-body share of its walking step (slides along the body's tangent).</summary>
+        private static void KaijuWalkSlide(World w, int i, ref double sx, ref double sz)
+        {
+            if (!PhysicsFeel.On(w) || !PhysicsFeel.Cfg(w).KaijuWalkSlide) return;
+            Kaiju k = w.Kaiju;
+            if (k == null || k.State == KaijuState.Egg || !Phys.On(w, w.Config.Physics.SolidKaiju)) return;
+            double dx = w.X[i] - k.X, dz = w.Z[i] - k.Z, d2 = dx * dx + dz * dz;
+            double rr = w.Config.Physics.KaijuBodyRadius + Collide.ActorRadius(w, i) + PhysicsFeel.Cfg(w).KaijuWalkSlideSlack;
+            if (d2 >= rr * rr || d2 < 1e-12) return;
+            double d = System.Math.Sqrt(d2), ux = dx / d, uz = dz / d, into = sx * ux + sz * uz;
+            if (into >= 0) return;
+            sx -= ux * into;
+            sz -= uz * into;
         }
 
         /// <summary>

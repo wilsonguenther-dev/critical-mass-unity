@@ -646,6 +646,10 @@ Regenerate: `tools/balance/balance-report.sh tuning-index (or the balance-report
 | `Depth.Dodge.CooldownTicks` | 90 | int | `Assets/_Game/Sim/Config/DodgeConfig.cs` | From the press to the next dodge (3.0 s). |
 | `Depth.Dodge.MinMoveInput` | 0.2 | double | `Assets/_Game/Sim/Config/DodgeConfig.cs` | The move input decides the direction when its length is over this; else the facing. |
 | `Depth.Dodge.MinClearTicks` | 2 | int | `Assets/_Game/Sim/Config/DodgeConfig.cs` | A planned path with fewer clear ticks than this is refused. |
+| `Depth.Dodge.DodgeReward` | true | bool | `Assets/_Game/Sim/Config/DodgeConfig.cs` | px DM timed-dodge reward: a dodged whiff stays open to a PUNISH critical for DodgePunishSeconds; a PERFECT dodge refunds PerfectDodgeCooldownRefund. The DODGED event is raised either way. |
+| `Depth.Dodge.DodgePunishSeconds` | 0.8 | double | `Assets/_Game/Sim/Config/DodgeConfig.cs` | Seconds after a dodged whiff's contact in which a melee hit on the attacker is a PUNISH critical (dodge-then-hit lands a critical 0.64 -> 0.83 vs Normal bots). |
+| `Depth.Dodge.PerfectDodgeTicks` | 2 | int | `Assets/_Game/Sim/Config/DodgeConfig.cs` | A dodge started this many ticks or fewer before contact is PERFECT (HitBlocked Tier 1). |
+| `Depth.Dodge.PerfectDodgeCooldownRefund` | 0 | double | `Assets/_Game/Sim/Config/DodgeConfig.cs` | Share of the dodge cooldown a PERFECT dodge gives back (0.5 measured: +1 duel of 288, not worth a rule). |
 | `Depth.Dodge.ReactionTicks` | [12, 8, 5] | int[] | `Assets/_Game/Sim/Config/DodgeConfig.cs` | A bot reacts to a threat only once it has existed this many ticks (the ORDER's numbers). |
 | `Depth.Dodge.DodgeChance` | [0.15, 0.35, 0.6] | double[] | `Assets/_Game/Sim/Config/DodgeConfig.cs` | Chance a bot dodges a slam, claw or melee threat (one decision per threat per bot, a stateless hash of seed, tick and id). |
 | `Depth.Dodge.TntChance` | [0.1, 0.25, 0.4] | double[] | `Assets/_Game/Sim/Config/DodgeConfig.cs` | b13 r3: chance a bot dodges an enemy TNT it stands next to (its own roll, lower than the others). |
@@ -941,6 +945,8 @@ Regenerate: `tools/balance/balance-report.sh tuning-index (or the balance-report
 | `Depth.HutChoices.SwiftFeetScale` | 1.1 | double | `Assets/_Game/Sim/Config/HutChoicesConfig.cs` | SWIFT FEET: the team moves this much faster while off the hill (beyond the hill radius + SwiftHillMargin). |
 | `Depth.HutChoices.SwiftHillMargin` | 2 | double | `Assets/_Game/Sim/Config/HutChoicesConfig.cs` |  |
 | `Depth.PhysicsFeel.Enabled` | true | bool | `Assets/_Game/Sim/Config/PhysicsFeelConfig.cs` |  |
+| `Depth.PhysicsFeel.KaijuWalkSlide` | false | bool | `Assets/_Game/Sim/Config/PhysicsFeelConfig.cs` | px DM: a walker touching the Kaiju walks round its body instead of into it. OFF: shiver gate hard flags 2 -> 8 (a trade). |
+| `Depth.PhysicsFeel.KaijuWalkSlideSlack` | 0.05 | double | `Assets/_Game/Sim/Config/PhysicsFeelConfig.cs` | Contact slack (u) for KaijuWalkSlide. |
 | `Depth.PhysicsFeel.CornerNudgeMax` | 0.35 | double | `Assets/_Game/Sim/Config/PhysicsFeelConfig.cs` | Largest overlap with a corner cell that is slid round (u; PhysicsConfig.CornerNudgeMax 0.1 otherwise). |
 | `Depth.PhysicsFeel.WallSlideKeep` | 0.92 | double | `Assets/_Game/Sim/Config/PhysicsFeelConfig.cs` | Share of the step kept along a wall when one axis is blocked and the input is within WallSlideFullDeg of the wall (pure projection keeps cos(angle): 71 percent at 45 degrees). |
 | `Depth.PhysicsFeel.WallSlideFullDeg` | 45 | double | `Assets/_Game/Sim/Config/PhysicsFeelConfig.cs` |  |
@@ -972,6 +978,7 @@ Regenerate: `tools/balance/balance-report.sh tuning-index (or the balance-report
 | `Depth.Seat.RefuseRepeatSeconds` | 1 | double | `Assets/_Game/Sim/Config/PlayerSeatConfig.cs` | A held or mashed button raises at most one ActionRefused per this many seconds, per actor and button. |
 | `Depth.Seat.InteractSlack` | 0 | double | `Assets/_Game/Sim/Config/PlayerSeatConfig.cs` | Slack (u) on the interact reaches when deciding an E press has nothing in reach (0 = the systems' exact reaches). |
 | `Depth.Seat.PointBlankRange` | 1.7 | double | `Assets/_Game/Sim/Config/PlayerSeatConfig.cs` | Human Demolitions with TNT ready: an enemy within this (centre to centre) inside her pry-bar arc gets the pry bar; the TNT stays ready. 0 = off. |
+| `Depth.Seat.PointBlankStructures` | true | bool | `Assets/_Game/Sim/Config/PlayerSeatConfig.cs` | px DM (review defect 9): an enemy barricade or wall cell inside her pry-bar reach and arc also takes the pry bar instead of a throw. |
 | `Depth.Seat.HealerFightAimRadius` | 1.2 | double | `Assets/_Game/Sim/Config/PlayerSeatConfig.cs` | Human Healer: an attack press aimed within this of an enemy inside her lantern reach swings the lantern even with hurt allies near. 0 = off. |
 | `Depth.Seat.HealerAimPickRadius` | 2 | double | `Assets/_Game/Sim/Config/PlayerSeatConfig.cs` | Human Healer mend target: the hurt ally nearest the aim when within this of it, else the most hurt ally in range. |
 | `Depth.Seat.MinerDigsAwayFromVein` | true | bool | `Assets/_Game/Sim/Config/PlayerSeatConfig.cs` | A human Miner's F away from an ore vein digs the cell ahead with the Builder's dig rule (no carry, no place). Bots never dig. |

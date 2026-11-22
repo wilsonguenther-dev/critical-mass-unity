@@ -317,6 +317,77 @@ namespace CriticalMass.Sim.Core
             return left > 0 ? left : 0;
         }
 
+        /// <summary>px DM: the tick actor id's last dodge started (derived from its cooldown; very negative when it never dodged).</summary>
+        public static int LastStart(World w, int id)
+        {
+            DodgeState s = w.Dodges;
+            if (id < 0 || id >= s.Ready.Length) return int.MinValue / 2;
+            return s.Start[id] >= 0 ? s.Start[id] : s.Ready[id] - Durations.T30(w.Config, w.Config.Depth.Dodge.CooldownTicks);
+        }
+
+        /// <summary>
+        /// px DM (lead's call 14, the timed-dodge reward): Combat.ResolveSwing calls this at the contact tick of actor i's melee
+        /// swing from (ax, az) along (fx, fz), after CombatFeel.AfterContact. Every living enemy j that DODGED the swing raises
+        /// ONE HitBlocked (A = j, B = i, Value = BlockedDodge, Radius = the swing's damage it avoided, Tier 1 = PERFECT: the
+        /// dodge started PerfectDodgeTicks or fewer before contact). Dodged = j is in reach and arc now but inside its i-frames,
+        /// or j is out of the reach or arc now, started its dodge during the wind-up (or up to DashTicks before it) and the
+        /// spot it dodged from was inside the reach and arc. With DodgeReward on and a whiff (hits 0) the attacker stays open
+        /// to a PUNISH critical for DodgePunishSeconds, and a perfect dodge refunds PerfectDodgeCooldownRefund of its cooldown.
+        /// Full rules only. The event replaces lane S2's two dodge reports for melee (Combat's out-of-arc one and Damage's
+        /// i-frame one), so a dodged swing says DODGED exactly once whether the dash left the reach, the arc or neither.
+        /// </summary>
+        public static void SwingDodges(World w, int i, double ax, double az, double fx, double fz, double range, double halfRad, bool body, int hits, double dmg, bool report)
+        {
+            if (!On(w)) return;
+            DodgeState s = w.Dodges;
+            DodgeConfig dc = w.Config.Depth.Dodge;
+            Actor a = w.Actors[i];
+            int cd = Durations.T30(w.Config, dc.CooldownTicks);
+            int n = w.ActorCount;
+            for (int j = 0; j < n && j < s.Ready.Length; j++)
+            {
+                Actor t = w.Actors[j];
+                if (j == i || !t.Alive || t.Team == a.Team) continue;
+                int last = s.Start[j] >= 0 ? s.Start[j] : s.Ready[j] - cd;   // the dash in flight, else the last one (from its cooldown)
+                if (last > w.Tick || last < a.SwingTick - dc.DashTicks) continue;   // no dodge around this wind-up (cheap test first)
+                double rt = w.Config.Class(t.Cls).Radius, reach = range + rt;
+                bool inside = InSwing(w.X[j] - ax, w.Z[j] - az, fx, fz, reach, halfRad, body, rt);
+                bool dodged;
+                if (inside) dodged = Immune(w, j, DamageCause.Melee);
+                else
+                {
+                    int b = j * s.Stride;
+                    dodged = last >= a.SwingTick - dc.DashTicks && InSwing(s.PathX[b] - ax, s.PathZ[b] - az, fx, fz, reach, halfRad, body, rt);
+                }
+                if (!dodged) continue;
+                int before = w.Tick - last;
+                bool perfect = before >= 1 && before <= dc.PerfectDodgeTicks;
+                if (report) World.PushEvent(w, SimEventType.HitBlocked, j, i, w.X[j], w.Z[j], PlayerReasons.BlockedDodge, null, DamageCause.None, dmg, 0, 0, 0, perfect ? 1 : 0, 0, 0);
+                if (!dc.DodgeReward) continue;
+                if (hits <= 0 && CombatFeel.On(w))
+                {
+                    int until = w.Tick + CombatFeel.Ticks(w, dc.DodgePunishSeconds);
+                    if (w.Depth.Feel.WhiffRecoverUntil[i] < until) w.Depth.Feel.WhiffRecoverUntil[i] = until;
+                }
+                if (perfect && dc.PerfectDodgeCooldownRefund > 0)
+                {
+                    int refund = (int)(cd * dc.PerfectDodgeCooldownRefund);
+                    s.Ready[j] = s.Ready[j] - refund > w.Tick ? s.Ready[j] - refund : w.Tick;
+                }
+            }
+        }
+
+        /// <summary>True when the offset (dx, dz) from the swing's origin lies inside its reach and (body-widened) arc.</summary>
+        private static bool InSwing(double dx, double dz, double fx, double fz, double reach, double halfRad, bool body, double rt)
+        {
+            double d2 = dx * dx + dz * dz;
+            if (d2 > reach * reach) return false;
+            if (d2 <= 1e-12) return true;
+            double d = System.Math.Sqrt(d2);
+            double cos = body ? Combat.WidenedCos(halfRad, rt, d) : JsMath.Cos(halfRad);
+            return (dx * fx + dz * fz) / d >= cos - 1e-9;
+        }
+
         /// <summary>Ticks until actor id may dodge again (0 = ready).</summary>
         public static int CooldownTicks(World w, int id)
         {

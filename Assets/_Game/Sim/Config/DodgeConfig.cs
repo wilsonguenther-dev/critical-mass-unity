@@ -25,6 +25,21 @@ namespace CriticalMass.Sim.Config
         /// <summary>A planned path with fewer clear ticks than this is refused.</summary>
         public int MinClearTicks = 2;
 
+        // ---- px DM (player-experience lane DM, 2026-11-22): the timed-dodge reward (lead's call 14). Full rules only (Dodge.On).
+        /// <summary>The reward rule's own switch: a melee swing dodged by an enemy (it started its dodge during the wind-up from
+        /// a spot the swing would have hit, or took the contact inside its i-frames) leaves the WHIFFING attacker open to a PUNISH
+        /// critical strike for DodgePunishSeconds after the contact tick (instead of only its own recovery), and a PERFECT dodge
+        /// gives back PerfectDodgeCooldownRefund of the dodge cooldown. False = no reward (the DODGED event is raised either way).</summary>
+        public bool DodgeReward = true;
+        /// <summary>Real seconds after a dodged whiff's contact tick in which a melee hit on the attacker is a PUNISH critical
+        /// (CombatFeel crit kind 2). The attacker's own whiff recovery (0.33 to 0.47 s) was too short: a 0.2 s human who dodged
+        /// landed the punish 2% (side dodge) to 16% (dodge through) of the time; data/dm-defence/VERBS.txt.</summary>
+        public double DodgePunishSeconds = 0.8;
+        /// <summary>A dodge started this many ticks or fewer before the contact tick is PERFECT (HitBlocked Tier 1).</summary>
+        public int PerfectDodgeTicks = 2;
+        /// <summary>Share of the dodge cooldown a PERFECT dodge gives back (0 = none).</summary>
+        public double PerfectDodgeCooldownRefund = 0;
+
         // ---- bots (Sim/Bots/BotReflex.cs). Arrays: Easy, Normal, Hard.
         /// <summary>A bot reacts to a threat only once it has existed this many ticks (the ORDER's numbers).</summary>
         public int[] ReactionTicks = { 12, 8, 5 };

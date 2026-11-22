@@ -106,7 +106,9 @@ namespace CriticalMass.Sim.Core
             if (fromActor && w.Actors[sourceId].Team == t.Team) return 0;
             if (B13Hooks.Immune(w, targetId, cause))   // b13-hook
             {
-                if (report) Blocked(w, targetId, sourceId, Dodge.Immune(w, targetId, cause) ? PlayerReasons.BlockedDodge : PlayerReasons.BlockedImmune, 0);
+                // px DM: a melee hit taken inside dodge i-frames is reported by Dodge.SwingDodges (once per swing, with PERFECT)
+                bool dodged = Dodge.Immune(w, targetId, cause);
+                if (report && !(dodged && cause == DamageCause.Melee)) Blocked(w, targetId, sourceId, dodged ? PlayerReasons.BlockedDodge : PlayerReasons.BlockedImmune, 0);
                 return 0;
             }
             // The id written to lastAttacker and the events: the actor, KaijuSource, else -1.
