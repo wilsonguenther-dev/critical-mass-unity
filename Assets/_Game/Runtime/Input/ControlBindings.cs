@@ -432,8 +432,12 @@ namespace CriticalMass.Runtime.Input
         public static void LoadJson(InputActionAsset asset, string json)
         {
             if (asset == null) return;
-            asset.RemoveAllBindingOverrides();
-            if (!string.IsNullOrEmpty(json)) asset.LoadBindingOverridesFromJson(json);
+            // Review defect 0: overrides change only while the asset is disabled (PlayerActionsLifetime).
+            PlayerActionsLifetime.ChangeWhileDisabled(asset, () =>
+            {
+                asset.RemoveAllBindingOverrides();
+                if (!string.IsNullOrEmpty(json)) asset.LoadBindingOverridesFromJson(json);
+            });
             BindingsChanged?.Invoke();
         }
 
@@ -455,7 +459,7 @@ namespace CriticalMass.Runtime.Input
             catch (Exception e)
             {
                 // DG-53: a corrupt or foreign cm.bindings must never stop the game: drop it once and keep the defaults.
-                if (asset != null) asset.RemoveAllBindingOverrides();
+                if (asset != null) PlayerActionsLifetime.ChangeWhileDisabled(asset, asset.RemoveAllBindingOverrides);
                 PlayerPrefs.DeleteKey(PrefsKey);
                 Debug.LogWarning($"[CM.Controls] saved bindings could not be read ({e.GetType().Name}); using the defaults");
                 BindingsChanged?.Invoke();
@@ -465,7 +469,7 @@ namespace CriticalMass.Runtime.Input
         /// <summary>Every binding back to Controls.inputactions and the saved overrides deleted.</summary>
         public static void ResetAll(InputActionAsset asset)
         {
-            if (asset != null) asset.RemoveAllBindingOverrides();
+            if (asset != null) PlayerActionsLifetime.ChangeWhileDisabled(asset, asset.RemoveAllBindingOverrides);
             PlayerPrefs.DeleteKey(PrefsKey);
             ControlPresets.Forget();
             PlayerPrefs.Save();

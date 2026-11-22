@@ -101,19 +101,23 @@ namespace CriticalMass.Runtime.Input
         public static void Apply(InputActionAsset asset, ControlPreset p)
         {
             if (asset == null) return;
-            asset.RemoveAllBindingOverrides();
-            InputActionMap map = ControlBindings.Map(asset);
-            foreach (Remap r in Remaps(p))
+            // Review defect 0: the preset's overrides are applied while the asset is disabled (PlayerActionsLifetime).
+            PlayerActionsLifetime.ChangeWhileDisabled(asset, () =>
             {
-                InputAction a = map != null ? map.FindAction(r.Action, false) : null;
-                if (a == null) continue;
-                for (int i = 0; i < a.bindings.Count; i++)
-                    if (string.Equals(a.bindings[i].path, r.From, StringComparison.OrdinalIgnoreCase))
-                    {
-                        a.ApplyBindingOverride(i, r.To);
-                        break;
-                    }
-            }
+                asset.RemoveAllBindingOverrides();
+                InputActionMap map = ControlBindings.Map(asset);
+                foreach (Remap r in Remaps(p))
+                {
+                    InputAction a = map != null ? map.FindAction(r.Action, false) : null;
+                    if (a == null) continue;
+                    for (int i = 0; i < a.bindings.Count; i++)
+                        if (string.Equals(a.bindings[i].path, r.From, StringComparison.OrdinalIgnoreCase))
+                        {
+                            a.ApplyBindingOverride(i, r.To);
+                            break;
+                        }
+                }
+            });
             PlayerPrefs.SetString(PrefsKey, p.ToString());
             _leftHanded = p == ControlPreset.LeftHanded;
             ControlBindings.Persist(asset);   // saves and raises BindingsChanged
