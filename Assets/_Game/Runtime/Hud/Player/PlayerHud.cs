@@ -25,6 +25,7 @@ namespace CriticalMass.Runtime.Hud.Player
         public readonly DamageNumbers Numbers;
         public readonly WorldPops Pops;
         public readonly PlayerTally Tally;
+        public readonly ChannelBar Channel;
         public readonly AssistTracker Assists = new AssistTracker();
 
         World _world;
@@ -45,6 +46,7 @@ namespace CriticalMass.Runtime.Hud.Player
             Tags = new ActionTags(world);
             Numbers = new DamageNumbers(world);
             Pops = new WorldPops(world);
+            Channel = new ChannelBar(world);
             Tally = playerCard != null ? new PlayerTally(playerCard) : null;
             Current = this;
         }
@@ -68,6 +70,7 @@ namespace CriticalMass.Runtime.Hud.Player
                 Tags.Clear();
                 Numbers.Clear();
                 Pops.Clear();
+                Channel.Clear();
                 Tally?.Clear();
                 Assists.Clear();
             }
@@ -89,12 +92,19 @@ namespace CriticalMass.Runtime.Hud.Player
             Numbers.Tick(w, alpha, cam, scale, dt);
             Pops.Tick(w, me, alpha, cam, scale, dt);
             Tally?.Tick(w, me, Assists);
+            Channel.Tick(w, me, alpha, cam, scale, dt);
             Hurt.Tick(me, s != null && s.HasPlayer ? s.Hp01 : 1f, s != null && s.HasPlayer && s.Alive, dt);
         }
 
         void OnEvent(World w, SimEvent e, int me)
         {
             Pops.OnEvent(w, e, me);
+            if (e.A == me)
+            {
+                if (e.Type == SimEventType.WorldAction && e.Value <= 0) Channel.OnStart(e.B, (float)e.Radius, me);
+                else if (e.Type == SimEventType.Gather || e.Type == SimEventType.SourceGather) Channel.OnComplete(true);
+                else if (e.Type == SimEventType.OreMined && e.Value >= 0) Channel.OnComplete(false);
+            }
             switch (e.Type)
             {
                 case SimEventType.Hit:

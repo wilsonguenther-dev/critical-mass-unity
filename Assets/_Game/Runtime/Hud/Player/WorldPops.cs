@@ -33,6 +33,7 @@ namespace CriticalMass.Runtime.Hud.Player
                 case PlayerReasons.WorldCorrupt: return "CORRUPTED";
                 case PlayerReasons.WorldPurify: return "PURIFIED";
                 case PlayerReasons.WorldRepair: return "REPAIRED";
+                case ActionTags.WorldGather: return "GATHERED";
                 default: return "DONE";
             }
         }
@@ -154,6 +155,8 @@ namespace CriticalMass.Runtime.Hud.Player
                     if (e.A == me) Verb(w, "PURIFIED", PlayerReasons.WorldPurify, e.X, e.Z, me, (float)e.Value);
                     return;
                 case SimEventType.WorldAction:
+                    // lane S2: Value 0 = a channel START (gather / mine): the ChannelBar shows it, the pop waits for the unit
+                    if (e.A == me && e.Value <= 0 && (e.B == ActionTags.WorldGather || e.B == PlayerReasons.WorldMineOre)) return;
                     if (e.A == me) Verb(w, WorldWordsFor(e.B, Mathf.RoundToInt((float)e.Value)), e.B, e.X, e.Z, me, (float)e.Value);
                     return;
             }

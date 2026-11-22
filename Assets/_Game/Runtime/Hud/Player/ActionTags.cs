@@ -22,6 +22,8 @@ namespace CriticalMass.Runtime.Hud.Player
         /// <summary>S2's new HitBlocked code for the Farmer's point-blank glancing blow (TOO CLOSE). Read by name at run
         /// time from PlayerReasons when it lands (lane S2); until then this value. See FINDINGS "Needs from other lanes".</summary>
         public static readonly int BlockedGlancing = ReasonCode("BlockedGlancing", 8);
+        // Lane S2's other new codes, keyed by NUMBER so the words exist before and after the combine (S2 67b56400).
+        public const int ButtonStationBuy = 8, RefusedCarrying = 11, RefusedInAir = 12, RefusedRuleOff = 13, WorldGather = 10;
 
         /// <summary>A PlayerReasons constant by name (fallback when the lane that adds it has not merged yet).</summary>
         public static int ReasonCode(string name, int fallback)
@@ -61,6 +63,7 @@ namespace CriticalMass.Runtime.Hud.Player
                 case PlayerReasons.ButtonDodge: return "DODGE";
                 case PlayerReasons.ButtonCancel: return "CANCEL";
                 case PlayerReasons.ButtonJump: return "JUMP";
+                case ButtonStationBuy: return "UPGRADE";
                 default: return "PRESS";
             }
         }
@@ -93,6 +96,9 @@ namespace CriticalMass.Runtime.Hud.Player
                 case PlayerReasons.RefusedOutOfRange: return "OUT OF RANGE";
                 case PlayerReasons.RefusedNothingToCancel: return "NOTHING TO CANCEL";
                 case PlayerReasons.RefusedTeamLimit: return "TEAM LIMIT REACHED";
+                case RefusedCarrying: return button == PlayerReasons.ButtonDodge ? "CAN'T DODGE WHILE CARRYING" : "PUT YOUR LOAD DOWN FIRST";
+                case RefusedInAir: return "ALREADY IN THE AIR";
+                case RefusedRuleOff: return button == ButtonStationBuy ? "STATION UPGRADES ARE OFF: THE HUT LEVELS THE TEAM" : "OFF IN THIS MATCH";
                 default: return "CAN'T DO THAT NOW";
             }
         }

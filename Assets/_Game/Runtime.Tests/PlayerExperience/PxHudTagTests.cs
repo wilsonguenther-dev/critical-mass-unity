@@ -54,10 +54,36 @@ namespace CriticalMass.Runtime.Tests.PlayerExperience
                     {
                         string w = ActionTags.RefusalWords(b.Value, r.Value, (ClassId)cls, 3);
                         Assert.AreNotEqual("CAN'T DO THAT NOW", w, r.Key + " / " + b.Key + " / " + (ClassId)cls);
-                        Assert.LessOrEqual(w.Length, 32, r.Key + " fits one pill");
+                        Assert.LessOrEqual(w.Length, 52, r.Key + " fits one pill (520 px)");
                     }
             Assert.AreEqual("ON COOLDOWN 3 s", ActionTags.RefusalWords(PlayerReasons.ButtonAbility, PlayerReasons.RefusedCooldown, ClassId.Warrior, 3));
             Assert.AreEqual("NO ORE VEIN HERE", ActionTags.RefusalWords(PlayerReasons.ButtonDigPlace, PlayerReasons.RefusedNoTarget, ClassId.Miner, 0));
+        }
+
+        [Test]
+        public void LaneS2CodesAreWordedByNumberAndUnknownCodesFallBack()
+        {
+            // S2 (67b56400) adds these to PlayerReasons; the words exist by number before and after the combine
+            Assert.AreEqual("UPGRADE", ActionTags.ButtonWords(8));
+            Assert.AreEqual("STATION UPGRADES ARE OFF: THE HUT LEVELS THE TEAM", ActionTags.RefusalWords(8, 13, ClassId.Miner, 0));
+            Assert.AreEqual("CAN'T DODGE WHILE CARRYING", ActionTags.RefusalWords(PlayerReasons.ButtonDodge, 11, ClassId.Farmer, 0));
+            Assert.AreEqual("ALREADY IN THE AIR", ActionTags.RefusalWords(PlayerReasons.ButtonJump, 12, ClassId.Warrior, 0));
+            Assert.AreEqual("GATHERED", WorldPops.WorldWordsFor(10, 1));
+            Assert.AreEqual("TOO CLOSE -4", ActionTags.BlockedWords(8, 4));
+            // never an exception, always words
+            foreach (int code in new[] { -999, -1, 0, 99, int.MaxValue })
+            {
+                Assert.IsNotEmpty(ActionTags.BlockedWords(code, code));
+                Assert.IsNotEmpty(ActionTags.ButtonWords(code));
+                Assert.IsNotEmpty(ActionTags.RefusalWords(code, code, ClassId.Builder, code));
+                Assert.IsNotEmpty(WorldPops.WorldWordsFor(code, code));
+                Assert.IsNotEmpty(WorldPops.StructureWordsFor(code));
+            }
+            // the channel bar: mining runs on the clock and goes a grace after its time; a source gather with no time shows the word
+            Assert.AreEqual(0.5f, ChannelBar.ClockProgress(0.5f, 1f), 1e-4f);
+            Assert.IsTrue(ChannelBar.ClockAlive(1.2f, 1f));
+            Assert.IsFalse(ChannelBar.ClockAlive(1.5f, 1f));
+            Assert.IsTrue(ChannelBar.ClockAlive(2f, 0f));
         }
 
         [Test]
