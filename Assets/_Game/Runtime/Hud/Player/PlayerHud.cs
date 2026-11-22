@@ -23,6 +23,8 @@ namespace CriticalMass.Runtime.Hud.Player
         public readonly KillConfirm Kills;
         public readonly ActionTags Tags;
         public readonly DamageNumbers Numbers;
+        public readonly WorldPops Pops;
+        public readonly PlayerTally Tally;
         public readonly AssistTracker Assists = new AssistTracker();
 
         World _world;
@@ -42,6 +44,8 @@ namespace CriticalMass.Runtime.Hud.Player
             Kills = new KillConfirm(root);
             Tags = new ActionTags(world);
             Numbers = new DamageNumbers(world);
+            Pops = new WorldPops(world);
+            Tally = playerCard != null ? new PlayerTally(playerCard) : null;
             Current = this;
         }
 
@@ -63,6 +67,8 @@ namespace CriticalMass.Runtime.Hud.Player
                 Kills.Clear();
                 Tags.Clear();
                 Numbers.Clear();
+                Pops.Clear();
+                Tally?.Clear();
                 Assists.Clear();
             }
             if (_cursor < 0 || _cursor > w.EventHead) _cursor = w.EventHead;
@@ -73,6 +79,7 @@ namespace CriticalMass.Runtime.Hud.Player
                 _cursor = w.EventHead - World.EventCapacity;
             }
             ScanBlasts(w);
+            Pops.BeforeEvents(w, me);
             for (; _cursor < w.EventHead; _cursor++) OnEvent(w, w.Events[_cursor % World.EventCapacity], me);
             Bars.Tick(w, me, alpha, cam, scale, dt);
             Marker.Tick(w, me, alpha, cam, scale, dt);
@@ -80,11 +87,14 @@ namespace CriticalMass.Runtime.Hud.Player
             Kills.Tick(dt);
             Tags.Tick(w, alpha, cam, scale, dt);
             Numbers.Tick(w, alpha, cam, scale, dt);
+            Pops.Tick(w, me, alpha, cam, scale, dt);
+            Tally?.Tick(w, me, Assists);
             Hurt.Tick(me, s != null && s.HasPlayer ? s.Hp01 : 1f, s != null && s.HasPlayer && s.Alive, dt);
         }
 
         void OnEvent(World w, SimEvent e, int me)
         {
+            Pops.OnEvent(w, e, me);
             switch (e.Type)
             {
                 case SimEventType.Hit:

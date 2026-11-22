@@ -18,15 +18,15 @@ namespace CriticalMass.Runtime.Hud
     public sealed class Scoreboard : MonoBehaviour
     {
         public const int MaxRows = 16;
-        public const int Columns = 6;   // class, KO, deaths, hill s, biomass, corruption
-        public const float TableW = 780f, Gap = 40f, RowH = 36f, Pitch = 40f, HeadH = 132f, FootH = 24f;
+        public const int Columns = 9;   // class, KO, deaths, hill s, biomass, corruption; player-experience lane D: + DMG, HEAL, AST
+        public const float TableW = 860f, Gap = 32f, RowH = 36f, Pitch = 40f, HeadH = 132f, FootH = 24f;
         public const float FadeSeconds = 0.12f;
 
-        static readonly string[] Headings = { "CLASS", "KO", "DEATHS", "HILL S", "BIOMASS", "CORRUPTION" };
+        static readonly string[] Headings = { "CLASS", "KO", "DEATHS", "HILL S", "BIOMASS", "CORRUPTION", "DMG", "HEAL", "AST" };
         /// <summary>Column x (from the table's left) and width.</summary>
         // owner walk 1: CORRUPTION gets 128 px (it spilled out of 100 px even at the 11 px floor); the number columns give it room
-        static readonly float[] ColX = { 52f, 262f, 342f, 438f, 534f, 642f };
-        static readonly float[] ColW = { 210f, 76f, 92f, 92f, 104f, 128f };
+        static readonly float[] ColX = { 52f, 246f, 362f, 590f, 668f, 756f, 444f, 520f, 302f };   // on screen: CLASS KO AST DEATHS DMG HEAL HILL BIOMASS CORRUPTION
+        static readonly float[] ColW = { 190f, 56f, 82f, 78f, 88f, 100f, 76f, 70f, 60f };
 
         /// <summary>Opens the board regardless of input (captures, the results screen). Default false.</summary>
         public static bool ForceOpen;
@@ -294,6 +294,14 @@ namespace CriticalMass.Runtime.Hud
             HudText.Set(row.Cells[3], NumberCache.Int((int)System.Math.Floor(s.HillSeconds)));
             HudText.Set(row.Cells[4], NumberCache.Int(s.BiomassDelivered));
             HudText.Set(row.Cells[5], NumberCache.Int(s.CorruptionDelivered));
+            // player-experience lane D (P5 F12): damage and healing from MatchStats (the results screen's numbers), assists
+            // from the HUD's tracker (an 8 s damage window before a knock-out by someone else)
+            CriticalMass.Runtime.Game.MatchStats ms = CriticalMass.Runtime.Game.MatchStatsRecorder.Current;
+            CriticalMass.Runtime.Game.ActorStats st = ms != null && ms.Actors != null && s.Id >= 0 && s.Id < ms.ActorCount && s.Id < ms.Actors.Length ? ms.Actors[s.Id] : null;
+            HudText.Set(row.Cells[6], NumberCache.Int(st != null ? (int)System.Math.Round(st.Damage) : 0));
+            HudText.Set(row.Cells[7], NumberCache.Int(st != null ? (int)System.Math.Round(st.HealingDone) : 0));
+            CriticalMass.Runtime.Hud.Player.PlayerHud px = CriticalMass.Runtime.Hud.Player.PlayerHud.Current;
+            HudText.Set(row.Cells[8], NumberCache.Int(px != null ? px.Assists.Assists(s.Id) : 0));
         }
 
         // ---- read-back for tests and captures
