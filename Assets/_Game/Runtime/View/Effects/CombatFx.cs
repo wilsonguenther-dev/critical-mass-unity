@@ -392,6 +392,9 @@ namespace CriticalMass.Runtime.View.Effects
                 {
                     bool onMe = e.A == me, byMe = e.B == me && e.A != me;
                     if (!onMe && !byMe) return;
+                    // lead's call 12: the top tier that is not a kill is the critical look until lane S1's CriticalHit
+                    // event is wired (at the combine: call OnCritical(victim, attacker, kind) from that event instead).
+                    if (e.Kind == FxKind.Hit && e.Tier >= 2) { OnCritical(e.A, e.B, 0); return; }
                     CriticalMass.Runtime.Camera.FightState.MarkCombat(Time.unscaledTimeAsDouble);
                     HitFeelTuning.KickKind k = e.Kind == FxKind.Death ? (onMe ? HitFeelTuning.KickKind.MyDeath : HitFeelTuning.KickKind.MyKill)
                         : onMe ? HitFeelTuning.KickKind.OnMe : HitFeelTuning.KickKind.ByMe;
@@ -408,6 +411,35 @@ namespace CriticalMass.Runtime.View.Effects
                     if (e.A == me) CriticalMass.Runtime.Camera.FightState.MarkCombat(Time.unscaledTimeAsDouble);
                     return;
             }
+        }
+
+        /// <summary>
+        /// CRITICAL HIT (lead's call 12, 2026-11-22), view only: kind 0 = the top-tier look (Tier 2, not a kill), 1 counter,
+        /// 2 punish, 3 back hit (lane S1's SimEventType.CriticalHit Value). For hits by or on the local player: the two-stage
+        /// burst, radial lines and the gold follow-through (FxScene.SpawnCritical), 140 ms hit-stop on both fighters
+        /// (CombatFeed.CritHoldTick), the full-body Hit_B and a bigger recoil (CombatFeed.CritTick, read by ActorAnimator and
+        /// ActorViews), a 1.6x camera kick plus a 2 deg FOV punch (zero under REDUCE MOTION) and the heavy rumble. Ledger:
+        /// ImpactBurst (stage-2 size), CameraKick (in CameraShake.Kick), HitStop (ActorViews, 140 ms). Call it the tick of
+        /// the Hit (after FxScene spawned it).
+        /// </summary>
+        public void OnCritical(int victim, int attacker, int kind)
+        {
+            World w = _driver != null ? _driver.World : null;
+            if (w == null || _feed == null || victim < 0 || victim >= w.ActorCount) return;
+            int me = LocalSeat.Actor;
+            bool onMe = victim == me, byMe = attacker == me && victim != me;
+            if (!onMe && !byMe) return;
+            int tick = _feed.LastHitTick[victim];
+            _feed.CritTick[victim] = tick;
+            _feed.CritKind[victim] = (byte)Mathf.Clamp(kind, 0, 255);
+            _feed.CritHoldTick[victim] = tick;
+            if (attacker >= 0 && attacker < w.ActorCount) _feed.CritHoldTick[attacker] = tick;
+            CriticalMass.Runtime.Camera.FightState.MarkCombat(Time.unscaledTimeAsDouble);
+            CriticalMass.Runtime.Camera.CameraShake.Kick(onMe ? HitFeelTuning.KickKind.CritOnMe : HitFeelTuning.KickKind.CritByMe,
+                SimSpace.ToWorld(_feed.HitDirX[victim], 0, _feed.HitDirZ[victim]), victim);
+            CriticalMass.Runtime.Camera.CameraShake.FovPunch(HitFeelTuning.CritFovPunchDeg);
+            CriticalMass.Runtime.View.Reactions.CameraResponse.HitRumble(true);
+            if (_scene != null) PlayerFeedback.Report(FeedbackChannel.ImpactBurst, victim, _scene.SpawnCritical(attacker), FxSource);
         }
 
         /// <summary>
@@ -711,7 +743,9 @@ namespace CriticalMass.Runtime.View.Effects
             }
             if (holdT >= 0 && holdT < 2.0)
             {
-                double hold = HoldFor(_feed.HoldTier[i]);
+                bool crit = _feed.CritHoldTick[i] == _feed.HoldTick[i];   // a critical hit: 140 ms on both fighters
+                double holdWall = crit ? HitFeelTuning.HoldCritWallSeconds(FeelGate.ReduceMotion) : Anim.HitFeel.HoldWallSeconds(_feed.HoldTier[i], FeelGate.ReduceMotion);
+                double hold = crit ? (_scene != null ? _scene.S(holdWall) : holdWall * 2) : HoldFor(_feed.HoldTier[i]);
                 fx.Holding = holdT < hold;
                 fx.HoldOffset = System.Math.Min(holdT, hold);
                 // px lane C: the ledger's HitStop for the victim and the attacker (own when either is the local player)
@@ -720,7 +754,7 @@ namespace CriticalMass.Runtime.View.Effects
                 {
                     _holdSeen[i] = hk;
                     fx.HoldNew = hold > 0;
-                    fx.HoldMs = (float)(Anim.HitFeel.HoldWallSeconds(_feed.HoldTier[i], FeelGate.ReduceMotion) * 1000);
+                    fx.HoldMs = (float)(holdWall * 1000);
                     int me = LocalSeat.Actor;
                     fx.HoldOwn = OwnVictimAt(i, hk) || (_feed.LastHitBy[i] == me && _feed.LastHitTick[i] == hk);
                 }

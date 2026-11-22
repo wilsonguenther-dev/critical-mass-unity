@@ -103,6 +103,11 @@ namespace CriticalMass.Runtime.View.Effects
         public readonly int[] FeintTick;
         /// <summary>px lane C: attacker i's last AttackContact tick and what it hit (bodies + 1 for a structure; 0 = whiff).</summary>
         public readonly int[] ContactTick, ContactHits;
+        /// <summary>Critical hits (lead's call 12; set by CombatFx.OnCritical): the tick actor i TOOK a critical hit
+        /// (CritTick, its kind CritKind: 0 top-tier look, 1 counter, 2 punish, 3 back hit) and the tick it held for one,
+        /// as victim or attacker (CritHoldTick: the longer hit-stop).</summary>
+        public readonly int[] CritTick, CritHoldTick;
+        public readonly byte[] CritKind;
         /// <summary>px lane C: attacker i's last StructureHit tick (a wall swing is not a whiff).</summary>
         public readonly int[] StructureTick;
         /// <summary>px lane C: true once any StructureHit event was decoded this world (polling then stands down).</summary>
@@ -135,6 +140,9 @@ namespace CriticalMass.Runtime.View.Effects
             KnockZ = new double[actorCapacity];
             FeintTick = Filled(actorCapacity, int.MinValue / 2);
             ContactTick = Filled(actorCapacity, int.MinValue / 2);
+            CritTick = Filled(actorCapacity, int.MinValue / 2);
+            CritHoldTick = Filled(actorCapacity, int.MinValue / 2);
+            CritKind = new byte[actorCapacity];
             ContactHits = new int[actorCapacity];
             StructureTick = Filled(actorCapacity, int.MinValue / 2);
             _airLen = new int[actorCapacity];
@@ -157,7 +165,8 @@ namespace CriticalMass.Runtime.View.Effects
             for (int i = 0; i < _capacity; i++)
             {
                 LastHitBy[i] = -1;
-                KnockTick[i] = FeintTick[i] = ContactTick[i] = StructureTick[i] = int.MinValue / 2;
+                KnockTick[i] = FeintTick[i] = ContactTick[i] = StructureTick[i] = CritTick[i] = CritHoldTick[i] = int.MinValue / 2;
+                CritKind[i] = 0;
                 KnockU[i] = 0;
                 ContactHits[i] = 0;
             }

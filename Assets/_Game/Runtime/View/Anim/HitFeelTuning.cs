@@ -59,14 +59,17 @@ namespace CriticalMass.Runtime.View.Anim
         static double EaseOut(double x) => x <= 0 ? 0 : x >= 1 ? 1 : 1 - (1 - x) * (1 - x);
 
         /// <summary>Drawn travel along the blow the eye should see `age` wall s after a knock of `knock` u (pure).</summary>
-        public static double KnockWant(double age, double knock)
+        public static double KnockWant(double age, double knock) => KnockWant(age, knock, MinVisualKnock);
+
+        /// <summary>KnockWant with a recoil floor (critical hits: CritMinVisualKnock).</summary>
+        public static double KnockWant(double age, double knock, double minVisual)
         {
             if (!(age >= 0) || knock <= 0) return 0;
             double f;
             if (age < KnockFrontSeconds) f = (1 + KnockOvershoot) * EaseOut(age / KnockFrontSeconds);
             else f = 1 + KnockOvershoot * (1 - Smooth((age - KnockFrontSeconds) / KnockSettleSeconds));
             double want = knock * f;
-            if (knock < MinVisualKnock) want += (MinVisualKnock - knock) * Recoil(age);
+            if (knock < minVisual) want += (minVisual - knock) * Recoil(age);
             return want;
         }
 
@@ -79,10 +82,13 @@ namespace CriticalMass.Runtime.View.Anim
         }
 
         /// <summary>The view-only lead (u along the blow) on top of what the interpolated body has `travelled` (pure).</summary>
-        public static double KnockLead(double age, double knock, double travelled)
+        public static double KnockLead(double age, double knock, double travelled) => KnockLead(age, knock, travelled, MinVisualKnock);
+
+        /// <summary>KnockLead with a recoil floor (critical hits: CritMinVisualKnock).</summary>
+        public static double KnockLead(double age, double knock, double travelled, double minVisual)
         {
             if (!(age >= 0) || age >= KnockLeadFadeTo || knock <= 0) return 0;
-            double lead = KnockWant(age, knock) - Math.Max(0, travelled);
+            double lead = KnockWant(age, knock, minVisual) - Math.Max(0, travelled);
             if (lead <= 0) return 0;
             double fade = age <= KnockLeadFadeFrom ? 1 : 1 - Smooth((age - KnockLeadFadeFrom) / (KnockLeadFadeTo - KnockLeadFadeFrom));
             return Math.Min(MaxKnockLead, lead * fade);
@@ -188,13 +194,43 @@ namespace CriticalMass.Runtime.View.Anim
         /// <summary>Kick envelope (wall s): out in KickRise, spring back by KickReturn.</summary>
         public const double KickRise = 0.025, KickReturn = 0.15;
 
-        public enum KickKind { ByMe, OnMe, MyKill, MyDeath }
+        public enum KickKind { ByMe, OnMe, MyKill, MyDeath, CritByMe, CritOnMe }
+
+        // ---- critical hits (lead's call 12, 2026-11-22): the top tier (Tier 2 that is not a kill) when the local player is
+        // the attacker or the victim. Lane S1's CriticalHit event (Value 1 counter, 2 punish, 3 back hit) is wired to
+        // CombatFx.OnCritical at the combine; until then every own Tier-2 non-kill hit takes this look (kind 0).
+        /// <summary>The critical kick is this many times the plain hit kick (by me / on me).</summary>
+        public const float CritKickMul = 1.6f;
+        /// <summary>The critical FOV punch: +2 deg, out with the kick envelope (zero under reduce motion).</summary>
+        public const float CritFovPunchDeg = 2f;
+        public const double CritFovPunchSeconds = 0.2;
+        /// <summary>The critical hit-stop on both fighters (130-150 ms band; the plain top tier is 110 ms).</summary>
+        public const double HoldCriticalOwn = 0.14;
+        public static double HoldCritWallSeconds(bool reduceMotion) => reduceMotion ? 0 : HoldCriticalOwn;
+        /// <summary>The critical burst: stage 1 the cracked impact frame, stage 2 a bigger star with radial lines 50 ms later.</summary>
+        public const float BurstCritStage1 = 1.6f, BurstCritStage2 = 2.0f;
+        public const double BurstCritStage2Delay = 0.05, BurstCritLife = 0.34;
+        public const int CritRadialLines = 10;
+        /// <summary>The critical victim recoil floor (u, inside MaxDrawnOffset) and the follow-through trail colour (hot gold).</summary>
+        public const double CritMinVisualKnock = 0.34;
+        public static readonly Color32 CritTrail = new Color32(255, 196, 64, 255);
+
+        /// <summary>The critical punch envelope (0..1) t wall seconds after the hit: out in 25 ms, home by 0.2 s.</summary>
+        public static float FovPunchEnvelope(double t)
+        {
+            if (!(t >= 0) || t >= CritFovPunchSeconds) return 0f;
+            if (t < KickRise) return (float)(t / KickRise);
+            double s = (t - KickRise) / (CritFovPunchSeconds - KickRise);
+            return (float)(1 - s * s * (3 - 2 * s));
+        }
 
         public static float KickShare(KickKind k) =>
-            k == KickKind.ByMe ? KickShareByMe : k == KickKind.OnMe ? KickShareOnMe : k == KickKind.MyKill ? KickShareKill : KickShareDeath;
+            k == KickKind.ByMe ? KickShareByMe : k == KickKind.OnMe ? KickShareOnMe : k == KickKind.MyKill ? KickShareKill :
+            k == KickKind.CritByMe ? KickShareByMe * CritKickMul : k == KickKind.CritOnMe ? KickShareOnMe * CritKickMul : KickShareDeath;
 
         public static float KickMin(KickKind k) =>
-            k == KickKind.ByMe ? KickMinByMe : k == KickKind.OnMe ? KickMinOnMe : k == KickKind.MyKill ? KickMinKill : KickMinDeath;
+            k == KickKind.ByMe ? KickMinByMe : k == KickKind.OnMe ? KickMinOnMe : k == KickKind.MyKill ? KickMinKill :
+            k == KickKind.CritByMe ? KickMinByMe * CritKickMul : k == KickKind.CritOnMe ? KickMinOnMe * CritKickMul : KickMinDeath;
 
         /// <summary>World height (u) the screen shows at distance d with a vertical FOV.</summary>
         public static float VisibleHeight(double distance, double fovDeg) => (float)(2 * distance * Math.Tan(fovDeg * 0.5 * Math.PI / 180));

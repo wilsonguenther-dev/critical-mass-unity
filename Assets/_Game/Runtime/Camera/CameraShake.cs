@@ -77,6 +77,23 @@ namespace CriticalMass.Runtime.Camera
             return u;
         }
 
+        // ---- critical hits (lead's call 12): a +2 deg FOV punch, taken off again by Reset like the position offset
+        float _punchAt = -10f, _punchDeg, _fovApplied;
+        UnityEngine.Camera _fovCam;
+        /// <summary>The FOV added this frame (tests, captures).</summary>
+        public static float FovPunchApplied => _instance != null ? _instance._fovApplied : 0f;
+
+        /// <summary>A critical hit's FOV punch (deg); zero under REDUCE MOTION or HIT KICK 0. Returns the degrees started.</summary>
+        public static float FovPunch(float deg)
+        {
+            if (_instance == null || FeelGate.ReduceMotion || deg <= 0f) return 0f;
+            float scale = CriticalMass.Runtime.Menu.GameSettings.HitKickScale;
+            if (scale <= 0f) return 0f;
+            _instance._punchDeg = deg * Mathf.Min(1f, scale);
+            _instance._punchAt = Time.unscaledTime;
+            return _instance._punchDeg;
+        }
+
         /// <summary>The followed fighter's distance from the lens the kick is sized at: third person ThirdDistance, else the
         /// top-down rig's distance.</summary>
         public static double FocusDistance() => GroundView.PlayActive ? FollowCamera.ThirdDistance : GameplayCamera.Distance;
@@ -133,9 +150,16 @@ namespace CriticalMass.Runtime.Camera
             float ke = _kickU > 0f && !FeelGate.ReduceMotion ? CriticalMass.Runtime.View.Anim.HitFeelTuning.KickEnvelope(now - _kickAt) : 0f;
             if (_trauma > 0f && FeelGate.ShakeScale <= 0f) _trauma = 0f;
             _kickNow = Vector3.zero;
-            if (_trauma <= 0f && ke <= 0f) return;
+            float pe = _punchDeg > 0f && !FeelGate.ReduceMotion ? CriticalMass.Runtime.View.Anim.HitFeelTuning.FovPunchEnvelope(now - _punchAt) : 0f;
+            if (_trauma <= 0f && ke <= 0f && pe <= 0f) return;
             UnityEngine.Camera cam = UnityEngine.Camera.main;
             if (cam == null) return;
+            if (pe > 0f)
+            {
+                _fovApplied = _punchDeg * pe;
+                cam.fieldOfView += _fovApplied;
+                _fovCam = cam;
+            }
             float dt = Time.unscaledDeltaTime;
             Transform tr = cam.transform;
             Vector3 off = Vector3.zero;
@@ -160,7 +184,10 @@ namespace CriticalMass.Runtime.Camera
         /// <summary>Takes this frame's offset off the camera (CameraShakeReset, start of the next frame).</summary>
         public static void Reset()
         {
-            if (_instance == null || _instance._shaken == null) return;
+            if (_instance == null) return;
+            if (_instance._fovCam != null) { _instance._fovCam.fieldOfView -= _instance._fovApplied; _instance._fovCam = null; }
+            _instance._fovApplied = 0f;
+            if (_instance._shaken == null) return;
             _instance._shaken.position -= _instance._applied;
             _instance._shaken = null;
             _instance._applied = Vector3.zero;

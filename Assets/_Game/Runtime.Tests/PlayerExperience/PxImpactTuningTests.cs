@@ -318,6 +318,31 @@ namespace CriticalMass.Runtime.Tests
             Assert.AreEqual(!behindOnly, FightState.EnemyInFront(w, 0, HitFeelTuning.FightRange, HitFeelTuning.FightConeDeg), "behind me is not 'in front'");
         }
 
+        // ---------------------------------------------------------------- critical hits (lead's call 12)
+
+        [Test]
+        public void ACriticalHitReadsClearlyAboveAHeavyHit()
+        {
+            foreach (var v in Views)
+            {
+                float by = HitFeelTuning.KickU(HitFeelTuning.KickKind.ByMe, v.dist, v.fov), cby = HitFeelTuning.KickU(HitFeelTuning.KickKind.CritByMe, v.dist, v.fov);
+                float on = HitFeelTuning.KickU(HitFeelTuning.KickKind.OnMe, v.dist, v.fov), con = HitFeelTuning.KickU(HitFeelTuning.KickKind.CritOnMe, v.dist, v.fov);
+                Assert.AreEqual(by * HitFeelTuning.CritKickMul, cby, 1e-4f, v.name + ": my critical kicks 1.6x my hit");
+                Assert.AreEqual(on * HitFeelTuning.CritKickMul, con, 1e-4f, v.name + ": a critical on me kicks 1.6x a hit on me");
+                Assert.LessOrEqual(HitFeelTuning.KickPx(con, v.dist, v.fov), 1080f * 0.04f, v.name + ": still not a yank");
+            }
+            Assert.That(HitFeelTuning.HoldCritWallSeconds(false), Is.InRange(0.13, 0.15), "130-150 ms hit-stop");
+            Assert.AreEqual(0, HitFeelTuning.HoldCritWallSeconds(true), "none under reduce motion");
+            Assert.Greater(HitFeelTuning.HoldCritWallSeconds(false), HitFeelTuning.HoldWallSeconds(2, false));
+            Assert.Greater(HitFeelTuning.BurstCritStage2, HitFeelTuning.BurstSize(2, true, 60), "a bigger burst than the top plain tier");
+            Assert.Greater(HitFeelTuning.BurstCritStage2Delay, 0.0, "two stages");
+            Assert.AreEqual(2f, HitFeelTuning.CritFovPunchDeg, 1e-6f);
+            Assert.AreEqual(1f, HitFeelTuning.FovPunchEnvelope(HitFeelTuning.KickRise), 1e-4f);
+            Assert.AreEqual(0f, HitFeelTuning.FovPunchEnvelope(HitFeelTuning.CritFovPunchSeconds), 1e-6f, "the lens is home again");
+            Assert.LessOrEqual(HitFeelTuning.CritMinVisualKnock, HitFeelTuning.MaxDrawnOffset, "the bigger recoil still fits the placement check");
+            Assert.Greater(HitFeelTuning.KnockWant(0.07, 0.1, HitFeelTuning.CritMinVisualKnock), HitFeelTuning.KnockWant(0.07, 0.1), "a critical recoils further");
+        }
+
         // ---------------------------------------------------------------- decode: whiff vs contact, knock
 
         sealed class Sink : IFxSink

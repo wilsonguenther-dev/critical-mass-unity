@@ -482,7 +482,8 @@ namespace CriticalMass.Runtime.View
             drawn = 0f; check = false;
             if (_fx == null || !_fx.Knock(i, out double age, out double k, out double x0, out double z0, out double dx, out double dz)) return Vector3.zero;
             double travelled = (x - x0) * dx + (z - z0) * dz;
-            double lead = Anim.HitFeelTuning.KnockLead(age, k, travelled);
+            bool crit = _fx.Feed.CritTick[i] == _fx.Feed.KnockTick[i];   // lead's call 12: a critical recoils harder
+            double lead = Anim.HitFeelTuning.KnockLead(age, k, travelled, crit ? Anim.HitFeelTuning.CritMinVisualKnock : Anim.HitFeelTuning.MinVisualKnock);
             drawn = (float)(Math.Max(0, travelled) + lead);
             if (_knockReported == null || _knockReported.Length < _actors.Length) { _knockReported = new int[_actors.Length]; for (int n = 0; n < _knockReported.Length; n++) _knockReported[n] = int.MinValue; }
             int kt = _fx.Feed.KnockTick[i];

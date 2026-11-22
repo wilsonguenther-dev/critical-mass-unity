@@ -110,13 +110,45 @@ namespace CriticalMass.Runtime.View.Effects
         private struct Droplet { public double Born; public Vector3 P0, V; public float Size, TLand, GroundY; public bool Landed, Pool; public double DirX, DirZ; }
         private struct Decal { public double Born, Life; public Vector3 P; public float Size, Rot, Grow; public uint Seed; public byte Kind, Shape; public float DirA; }
         private struct Ring { public double Born, Life; public Vector3 P; public float R0, R1, Width, Facing; public Color32 Col; public byte Kind; }
-        private struct Trail { public double Born; public Vector3 P; public float Facing, Arc, Radius; public Color32 Team; public byte Kind; public int Actor, SwingTick; public bool Local; }
+        private struct Trail { public double Born; public Vector3 P; public float Facing, Arc, Radius; public Color32 Team; public byte Kind; public int Actor, SwingTick; public bool Local, Crit; }
         /// <summary>px lane C: trail kinds past the classes: a whiff's wind streak, a dodger's after-image streak.</summary>
         private const byte TrailWhiff = 100, TrailDodge = 101;
 
         /// <summary>px lane C: the world size (u) of the burst the last own hit spawned (0 when the last hit was not own):
         /// CombatFx reports it to the ledger as ImpactBurst.</summary>
         public float LastBurstSize { get; private set; }
+
+        // the last hit SpawnHit drew (OnCritical adds to it the same tick)
+        double _lastHitAt, _lastHitDirX, _lastHitDirZ;
+        Vector3 _lastHitP, _lastHitTan;
+        uint _lastHitSeed;
+
+        /// <summary>
+        /// Critical hits (lead's call 12): on top of the hit SpawnHit just drew, a two-stage burst (the cracked impact frame,
+        /// then a bigger star 50 ms later), radial spark lines, and the attacker's swing trail recoloured hot gold for its
+        /// follow-through. Sets LastBurstSize to the stage-2 size (the ledger's ImpactBurst). Returns that size.
+        /// </summary>
+        public float SpawnCritical(int attacker)
+        {
+            double t = _lastHitAt;
+            AddBurst(t, _lastHitP, Anim.HitFeelTuning.BurstCritStage1, 4, _lastHitSeed + 11, _lastHitTan, S(Anim.HitFeelTuning.BurstCritLife));
+            AddBurst(t + S(Anim.HitFeelTuning.BurstCritStage2Delay), _lastHitP, Anim.HitFeelTuning.BurstCritStage2, 1, _lastHitSeed + 12, _lastHitTan,
+                S(Anim.HitFeelTuning.BurstCritLife));
+            int n = Anim.HitFeelTuning.CritRadialLines;
+            for (int k = 0; k < n; k++)
+            {
+                double a = k * Math.PI * 2 / n;
+                AddSpark(t, _lastHitP, Math.Cos(a), Math.Sin(a), _lastHitSeed + 13, (uint)(k + 120), 1);
+            }
+            AddRing(t, _lastHitP, 0.3f, 1.2f, 0.12f, S(0.22), SparkWhite, 5);
+            // the swing's follow-through in the critical colour
+            int best = -1; double born = double.NegativeInfinity;
+            for (int i = 0; i < MaxTrails; i++)
+                if (_trails[i].Actor == attacker && _trails[i].Kind < TrailWhiff && _trails[i].Born > born) { born = _trails[i].Born; best = i; }
+            if (best >= 0) { _trails[best].Team = Anim.HitFeelTuning.CritTrail; _trails[best].Crit = true; }
+            LastBurstSize = Anim.HitFeelTuning.BurstCritStage2;
+            return LastBurstSize;
+        }
         private struct Puff { public double Born, Life; public Vector3 P0, V; public float Size; public Color32 Col; public byte Kind; }
 
         private readonly Burst[] _bursts = new Burst[MaxBursts];
@@ -540,6 +572,7 @@ namespace CriticalMass.Runtime.View.Effects
             float dmg01 = Mathf.Clamp01((float)(e.Value / 45.0));
             byte tier = death ? (byte)2 : e.Tier;
             Vector3 tan = SwingTangent(ref e);
+            _lastHitAt = t; _lastHitP = contact; _lastHitTan = tan; _lastHitSeed = seed; _lastHitDirX = e.DirX; _lastHitDirZ = e.DirZ;
             // Shape language per tier: light = star burst; heavy = star + slash arc along the swing; critical or finishing =
             // the big cracked impact frame. Kaiju melee adds three claw rakes.
             // px lane C (2026-11-22): sized for the shipped cameras and tiered, own hits (the local player is the attacker or
@@ -664,6 +697,7 @@ namespace CriticalMass.Runtime.View.Effects
             tr.Actor = e.A;
             tr.SwingTick = e.A >= 0 && e.A < w.ActorCount ? w.Actors[e.A].SwingTick : -1;
             tr.Local = e.A == LocalSeat.Actor;
+            tr.Crit = false;
         }
 
         /// <summary>px lane C: a whiff's thin wind streak, past the arc's end at the true reach (over-rotation), pale.</summary>
@@ -682,6 +716,7 @@ namespace CriticalMass.Runtime.View.Effects
             tr.Actor = -1;
             tr.SwingTick = -1;
             tr.Local = e.A == LocalSeat.Actor;
+            tr.Crit = false;
         }
 
         /// <summary>
@@ -709,6 +744,7 @@ namespace CriticalMass.Runtime.View.Effects
                 tr.Actor = e.A;
                 tr.SwingTick = -1;
                 tr.Local = e.Local;
+                tr.Crit = false;
                 for (int k = 0; k < 2; k++) AddPuff(t, W(e.X, h + 0.1, e.Z), seed, (uint)(k + 90), 0.24f, DustLight, 2, -e.DirZ, e.DirX);
             }
             else if (why == PlayerReasons.BlockedWall)
@@ -1109,7 +1145,7 @@ namespace CriticalMass.Runtime.View.Effects
                 {
                     float centre = -tr.Facing, half = tr.Arc * 0.5f;
                     float head = Mathf.Lerp(centre + half, centre - half, sweep), tail = Mathf.Lerp(centre + half, head, Mathf.Clamp01(t * 1.4f));
-                    Color32 wc = ClassTrailColour((ClassId)tr.Kind, tr.Team);
+                    Color32 wc = tr.Crit ? tr.Team : ClassTrailColour((ClassId)tr.Kind, tr.Team);
                     Vector3 cr = tr.P + Vector3.up * 0.95f;
                     float k = tr.Local ? 1f : 0.7f;
                     air.Crescent(cr, gr, gu, tr.Radius, 0.1f, tail, head, 14, A(Navy, 0), A(Navy, fade * 0.7f * k));

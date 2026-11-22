@@ -922,6 +922,9 @@ namespace CriticalMass.Runtime.View.Anim
             bool own = i == LocalSeat.Actor || (i < feed.LastHitBy.Length && feed.LastHitBy[i] == LocalSeat.Actor);
             if (own && !blocked && _react.Weight < HitFeelTuning.ReactionWeightOwn)
                 _react = new HitReaction(_react.Clip, _react.Layer, HitFeelTuning.ReactionWeightOwn, _react.Tier, _react.Side, _react.TwistDeg);
+            // lead's call 12: a critical hit on/by the local player is the full-body Hit_B at full weight, twisted harder.
+            if (actor.Alive && !blocked && i < feed.CritTick.Length && feed.CritTick[i] == feed.LastHitTick[i])
+                _react = new HitReaction(ArtMapping.HitHeavy, ReactionLayer.FullBody, 1f, HitTier.Critical, side, _react.TwistDeg * 1.4f);
             _hasReact = true;
         }
 
