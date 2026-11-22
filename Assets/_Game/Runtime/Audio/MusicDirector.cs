@@ -234,8 +234,8 @@ namespace CriticalMass.Runtime.Audio
         }
 
         /// <summary>Tests: whether Awake finished, and a way to hold the rebuild (edit mode has no Destroy).</summary>
-        internal bool ReadyForTests => _ready;
-        internal void HoldRebuildForTests() => _rebuildAt = float.MaxValue;
+        public bool ReadyForTests => _ready;
+        public void HoldRebuildForTests() => _rebuildAt = float.MaxValue;
 
         void Awake()
         {
