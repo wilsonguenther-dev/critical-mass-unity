@@ -145,6 +145,8 @@ namespace CriticalMass.Runtime.Audio.Sound
             // quiet), 3 and 2 voices at most, pitch jitter 10% on top of the body pitch (SoundFeed.Weight): a brawl is a few
             // voices, the nearest and your own first, never a wall.
             C("pain", null, S("pain_a", "pain_b", "pain_c"), 0.42f, 1f, 0.1f, 3, 0.12f, 28, Near),
+            // px lane F fix round: the same pain voices for a hit I dealt or took (own priority, its own repeat guard).
+            C("own_pain", null, S("pain_a", "pain_b", "pain_c"), 0.42f, 1f, 0.1f, 2, 0f, 70, Near),
             C("effort", null, S("effort_a", "effort_b"), 0.3f, 1f, 0.1f, 2, 0.15f, 18, Near),
             C("death", F("impactSoft_heavy_000", "impactSoft_heavy_001"), null, 0.6f, 1f, 0.08f, 3, 0.1f, 50, Mid, layer: "death_ko", layerGain: 0.55f),
             C("death_ko", null, S("death_ko"), 0.5f, 1f, 0.06f, 3, 0.1f, 45, Mid),
@@ -309,6 +311,10 @@ namespace CriticalMass.Runtime.Audio.Sound
             C("denied", null, S("px_denied"), 0.35f, 1f, 0f, 1, 0.25f, 70, Ui, SoundBus.Ui, variants: 1),
             C("shield_clang", null, S("px_shield_clang"), 0.55f, 1f, 0.04f, 2, 0.06f, 45, Mid),
             C("dodge_phew", null, S("px_phew"), 0.45f, 1f, 0.06f, 2, 0.06f, 40, Near),
+            // px lane F fix round: the local player's own defence (own priority, captioned) and the glancing hit.
+            C("my_dodge", null, S("px_my_dodge"), 0.6f, 1f, 0.04f, 2, 0f, 88, Ui, caption: "Dodged"),
+            C("my_shield", null, S("px_shield_clang"), 0.7f, 1.06f, 0.03f, 2, 0f, 88, Ui, layer: "block_shield", layerGain: 0.6f, caption: "Blocked"),
+            C("glance_tap", null, S("px_glance"), 0.3f, 1f, 0.06f, 2, 0.1f, 30, Near),
             C("block_wall", null, S("px_wall_thud"), 0.5f, 1f, 0.06f, 2, 0.06f, 35, Mid),
             C("structure_solid", null, S("px_clonk"), 0.55f, 1f, 0.05f, 2, 0.08f, 40, Mid),
             C("dig_start", null, S("px_dig_scrape"), 0.45f, 1f, 0.08f, 2, 0.1f, 32, Mid),
@@ -329,7 +335,7 @@ namespace CriticalMass.Runtime.Audio.Sound
         {
             // cues 9..15 (px lane F): my weapon impacts thud / crack / clank / bell, the hit-confirm tick, my hurt thump, my shield ring
             R(SimEventType.Hit, Pick.Hit, "hit_flesh_light", "hit_flesh_heavy", "hit_flesh_crit", "hit_armor", "block_shield", "block_heavy", "kaiju_melee", "grunt", "pain",
-                "own_impact_thud", "own_impact_crack", "own_impact_clank", "own_impact_bell", "hit_confirm", "own_hurt", "own_hurt_block"),
+                "own_impact_thud", "own_impact_crack", "own_impact_clank", "own_impact_bell", "hit_confirm", "own_hurt", "own_hurt_block", "own_pain"),
             R(SimEventType.Death, Pick.Death, "death", "hit_flesh_crit", "kaiju_melee", "my_death", "kill_sting", "kill_confirm", "assist_sting"),
             R(SimEventType.Respawn, Pick.Respawn, "respawn", "my_respawn"),
             R(SimEventType.Gather, Pick.Fixed, "gather_done"),
@@ -424,7 +430,8 @@ namespace CriticalMass.Runtime.Audio.Sound
             // ---- player-experience wave reporting events (lane F routes; SoundFeed.Blocked / Structure / Refused / WorldAct)
             // HitBlocked by Value: spawn protect, passive, immune = clang; dodge = phew; wall = thud; ward = WardAbsorb's
             // block_heavy; shield = the Hit's own block cue.
-            R(SimEventType.HitBlocked, Pick.Blocked, "shield_clang", "dodge_phew", "block_wall"),
+            // + my dodge, my shield block (local Warrior), the glancing hit (BlockedGlancing 8, 2 s per target).
+            R(SimEventType.HitBlocked, Pick.Blocked, "shield_clang", "dodge_phew", "block_wall", "my_dodge", "my_shield", "glance_tap"),
             // StructureHit by kind: barricade wood knock, built wall chip, breakable crack, piece wood, solid clonk.
             R(SimEventType.StructureHit, Pick.Structure, "barricade_hit", "sb_wall_hit", "wall_crack", "hit_wood", "structure_solid"),
             // ActionRefused: the local player's own only, one soft neutral tick (the event is already rate limited).

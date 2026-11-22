@@ -98,7 +98,9 @@ namespace CriticalMass.Runtime.Flow
             Pace = Pace > 0 ? Pace : 0,
         };
 
-        public static MatchRequest From(MatchSetupChoice s, int seed) => new MatchRequest
+        public static MatchRequest From(MatchSetupChoice s, int seed) => FromNormal(PlayModes.Normalize(s), seed);
+
+        static MatchRequest FromNormal(MatchSetupChoice s, int seed) => new MatchRequest
         {
             Seed = seed,
             Team = s.Team,
@@ -282,6 +284,7 @@ namespace CriticalMass.Runtime.Flow
 
         static void PrepareMatch(MatchSetupChoice s, int seed)
         {
+            s = PlayModes.Normalize(s);   // px lane F: a Duel / Range choice is 1 v 1 whoever built it
             LastSetup = s;
             // feat/ground-camera: -seed N in an autoplay run plays every match on seed N (same moment for the camera grabs).
             if (seed <= 0 && Autoplay)

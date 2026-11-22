@@ -41,6 +41,7 @@ namespace CriticalMass.Runtime.Tests.PlayerExperience
         [TearDown]
         public void RestoreState()
         {
+            GameFlow.ResetForTests();
             foreach (KeyValuePair<string, (bool has, int v)> kv in _prefs)
                 if (kv.Value.has) PlayerPrefs.SetInt(kv.Key, kv.Value.v); else PlayerPrefs.DeleteKey(kv.Key);
             PlayerPrefs.Save();
@@ -75,7 +76,7 @@ namespace CriticalMass.Runtime.Tests.PlayerExperience
                     Assert.AreEqual(enemy, w.Actors[1].Cls, mine + " v " + enemy + ": the enemy's class");
                     Assert.AreNotEqual(w.Actors[0].Team, w.Actors[1].Team);
                     Assert.AreEqual(PlayModes.DuelMatchSeconds, cfg.MatchSeconds, "a 3:00 clock (no knock-out limit in the sim)");
-                    Assert.GreaterOrEqual(cfg.HatchSeconds, cfg.MatchSeconds, "no Kaiju in a duel");
+                    Assert.Greater(cfg.HatchSeconds, cfg.MatchSeconds, "no Kaiju in a duel");
                     Assert.AreEqual(0, cfg.Bots.PassiveSeconds, "the duel bot fights");
                 }
             MatchSetupChoice d = PlayModes.DuelChoice(MatchSetupChoice.Default, ClassId.Miner, ClassId.Healer, BotDifficulty.Easy);
@@ -115,6 +116,46 @@ namespace CriticalMass.Runtime.Tests.PlayerExperience
         }
 
         [Test]
+        public void ADuelOrRangeQueuedWithOnlyItsModeIsOneVersusOneWithNoKaijuAndTheRangeHasNoAutopilot()
+        {
+            // the Editor review queued Mode = Duel / Range by hand (team size left at 16) and got a 16 v 16 world: the mode
+            // now normalises its own choice on GameFlow's path (PrepareMatch -> PlayModes.Normalize -> MatchRequest.From)
+            foreach (MatchMode m in new[] { MatchMode.Duel, MatchMode.Range })
+            {
+                MatchSetupChoice raw = MatchSetupChoice.Default;
+                raw.Mode = m;
+                raw.TeamSize = 16;
+                GameFlow.ResetForTests();
+                HumanControlGuard.IdleAutopilotEnabled = true;
+                GameFlow.QueueMatch(raw, 99);
+                MatchRequest r = GameFlow.RequestForBuild();
+                Assert.IsNotNull(r, m + ": queued");
+                Assert.AreEqual(m, r.Mode);
+                Assert.AreEqual(1, r.TeamSize, m + ": team size 1 whoever built the choice");
+                Assert.IsFalse(r.Backdrop, m + ": never a backdrop (no actor-0 autopilot)");
+                var cfg = GameConfig.CreateDefault();
+                World w = World.CreateWorld(r.ToWorldOptions(cfg));
+                Assert.AreEqual(2, w.ActorCount, m + ": me and one opponent");
+                Assert.Greater(w.Config.HatchSeconds, w.Config.MatchSeconds, m + ": the egg never hatches inside the match");
+                if (m == MatchMode.Range) Assert.IsFalse(HumanControlGuard.IdleAutopilotEnabled, "no AFK autopilot on the range");
+                else Assert.IsTrue(HumanControlGuard.IdleAutopilotEnabled, "a duel keeps the idle autopilot setting");
+            }
+            GameFlow.ResetForTests();
+        }
+
+        [Test]
+        public void AWholeDuelRunsToTheFinalWhistleWithoutAKaiju()
+        {
+            MatchSetupChoice c = PlayModes.DuelChoice(MatchSetupChoice.Default, ClassId.Warrior, ClassId.Farmer, BotDifficulty.Normal);
+            World w = Build(c, out GameConfig cfg);
+            int ticks = (int)System.Math.Ceiling((cfg.MatchSeconds + 2) * cfg.SimHz);
+            for (int i = 0; i < ticks && w.Match.Phase != MatchPhase.Ended; i++) SimStep.Step(w);
+            Assert.AreEqual(MatchPhase.Ended, w.Match.Phase, "a duel ends on its 3:00 clock");
+            Assert.IsFalse(w.Match.Hatched, "and the Kaiju never hatched");
+            Assert.AreEqual(2, w.ActorCount);
+        }
+
+        [Test]
         public void OtherModesKeepTheirRulesBitForBit()
         {
             foreach (MatchMode m in new[] { MatchMode.Custom, MatchMode.Quick, MatchMode.FullBattle, MatchMode.Training, MatchMode.Practice, MatchMode.Spectate, MatchMode.Demo })
@@ -126,6 +167,8 @@ namespace CriticalMass.Runtime.Tests.PlayerExperience
                 Assert.AreEqual(a.HatchSeconds, b.HatchSeconds, m.ToString());
                 Assert.AreEqual(a.PassiveBotSeconds, b.PassiveBotSeconds, m.ToString());
                 Assert.AreEqual(0, b.OnlyClassPlusOne, m + ": the roster mix is untouched");
+                Assert.IsFalse(b.NoKaiju, m + ": the Kaiju still hatches");
+                Assert.AreEqual(c.TeamSize, PlayModes.Normalize(c).TeamSize, m + ": Normalize leaves it alone");
             }
         }
 
