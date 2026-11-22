@@ -88,8 +88,12 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
         public const double ChaseCatchShareMin = 0.40, ChaseCatchShareMax = 0.80;   // PLAN.md P3 (40 to 80%); the gate brief's first numbers were 0.50 / 0.90
 
         // ---- S42: bot fairness
-        /// <summary>S42: a Normal bot's land rate against a lag-6 circle-strafing human lies in this band.</summary>
+        /// <summary>S42 before px S4: the PLAN band on one mixed strafer; no longer asserted (split into S42a / S42b below).</summary>
         public const double BotLandMin = 0.40, BotLandMax = 0.75;
+        /// <summary>px S4, lead's call 13: S42a, a Normal bot lands at most this on the dodging strafer (dodging pays).</summary>
+        public const double BotLandDodgingMax = 0.60;
+        /// <summary>px S4, lead's call 13: S42b, a Normal bot lands at least this on the close strafer who never steps out.</summary>
+        public const double BotLandStandingMin = 0.40;
         /// <summary>S42: bot swings measured per class.</summary>
         public const int BotSwings = 40;
 

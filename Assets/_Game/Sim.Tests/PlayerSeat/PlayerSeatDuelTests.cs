@@ -277,25 +277,48 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
         [TestCase(ClassId.Demolitions)]
         [TestCase(ClassId.Builder)]
         [TestCase(ClassId.Healer)]
-        public void S42_BotFair_NormalBotLandRate_VsStrafingHuman(ClassId x)
+        public void S42a_DodgingPays_NormalBotLandRate_VsDodgingHuman(ClassId x)
+        {
+            // Lead's call 13 (px S4): the old 0.40-0.75 band mixed two players. A player who dodges must make a Normal bot
+            // miss: against the dodging strafer (edge of the bot's reach, sees the wind-up 6 ticks late, steps out, comes back
+            // in to punish; HumanModel.DodgeSpacing) the bot lands AT MOST BotLandDodgingMax.
+            S42Measure(x, true, out double land, out string detail);
+            bool ok = PxLog.Line("S42a DodgingPays_NormalBotLandRate_VsDodgingHuman", "Normal " + x + " bot vs a lag-6 dodging " + x, detail, "<= " + T.BotLandDodgingMax, land <= T.BotLandDodgingMax);
+            Assert.IsTrue(ok, "Normal " + x + " bot lands " + PxLog.F(land) + " on a dodging human (limit <= " + T.BotLandDodgingMax + "): " + detail);
+        }
+
+        [TestCase(ClassId.Warrior)]
+        [TestCase(ClassId.Farmer)]
+        [TestCase(ClassId.Miner)]
+        [TestCase(ClassId.Demolitions)]
+        [TestCase(ClassId.Builder)]
+        [TestCase(ClassId.Healer)]
+        public void S42b_StandingInReachCosts_NormalBotLandRate_VsCloseStrafer(ClassId x)
+        {
+            // Lead's call 13 (px S4): a player who never steps out (circles at 0.8 x his range, inside the bot's reach) gets
+            // hit: the Normal bot lands AT LEAST BotLandStandingMin. No upper bound.
+            S42Measure(x, false, out double land, out string detail);
+            bool ok = PxLog.Line("S42b StandingInReachCosts_NormalBotLandRate_VsCloseStrafer", "Normal " + x + " bot vs a lag-6 close strafer " + x, detail, ">= " + T.BotLandStandingMin, land >= T.BotLandStandingMin);
+            Assert.IsTrue(ok, "Normal " + x + " bot lands " + PxLog.F(land) + " on a close strafer who never steps out (limit >= " + T.BotLandStandingMin + "): " + detail);
+        }
+
+        static void S42Measure(ClassId x, bool dodging, out double land, out string detail)
         {
             var t = new Tally();
             int spaced = 0;
             for (int k = 0; t.TheirSwings < T.BotSwings && k < 16; k++)
             {
                 Seat s = PlayerSeatRig.Duel(x, x, TargetMode.RealBot, PlayerSeatRig.AngleOf(k, 8), k, T.HumanLagTicks, strafe: true);
-                // px S4: the strafer used to circle at 0.8 x its range, so deep inside the bot's reach that the hit arc covered
-                // any aim error (bot land 0.80-0.95). A dodging player strafes at the edge of the bot's reach, steps out when he
-                // sees the wind-up (6 ticks late) and comes back in to punish: HumanModel.DodgeSpacing. The band is unchanged.
-                s.Human.DodgeSpacing = true;
+                s.Human.DodgeSpacing = dodging;
                 s.KeepThemAbove = 0.35;
                 s.KeepMeAbove = 0.35;
                 int before = t.TheirSwings;
                 t.Add(PlayerSeatRig.Play(s, 20, st => st.Spy.Contacts(st.Them).Count + before >= T.BotSwings));
                 spaced += s.Human.SpaceOutCount;
             }
-            bool ok = PxLog.Line("S42 BotFair_NormalBotLandRate_VsStrafingHuman", "Normal " + x + " bot vs a lag-6 strafing " + x, "bot land " + PxLog.F(t.TheirLand) + " (" + t.TheirLanded + " of " + t.TheirSwings + "), human land " + PxLog.F(t.Land) + " (" + t.Landed + " of " + t.Swings + "), step-outs " + spaced, "in [" + T.BotLandMin + ", " + T.BotLandMax + "]", t.TheirSwings >= T.BotSwings / 2 && t.TheirLand >= T.BotLandMin && t.TheirLand <= T.BotLandMax);
-            Assert.IsTrue(ok);
+            Assert.GreaterOrEqual(t.TheirSwings, T.BotSwings / 2, "too few bot swings to measure (" + t.TheirSwings + ")");
+            land = t.TheirLand;
+            detail = "bot land " + PxLog.F(t.TheirLand) + " (" + t.TheirLanded + " of " + t.TheirSwings + "), human land " + PxLog.F(t.Land) + " (" + t.Landed + " of " + t.Swings + "), step-outs " + spaced;
         }
 
         // ------------------------------------------------------------------ S43 / S44 / S45
