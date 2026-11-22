@@ -34,11 +34,11 @@ Settings, Controls, with a conflict warning and RESET ALL.
 | Full map | M | M | M | D-pad up |
 | Base station | B | B | B | Press the right stick (R3) |
 | Station: buy | ENTER | ENTER | ENTER or click | A / cross in the panel |
-| Emote wheel | T | T | T | Press the left stick (L3) |
+| Emote wheel | T | T | T | Hold the left stick (L3) 0.3 s |
 | HUD cursor | L ALT | L ALT | L ALT | D-pad down |
 | Minimap zoom | N | N | N | D-pad right |
 | Character panel | P | P | P or click the portrait | (HUD cursor) |
-| Camera view: high / ground | F5 | F5 | F5 | Double-tap View / Create |
+| Camera view: high / ground | F5 | F5 | F5 | Double-tap the left stick (L3) |
 | Pause | ESC | ESC | ESC | Menu / Options |
 | Menus: move focus | W A S D or arrows | Arrows | Arrows or hover | D-pad or left stick |
 | Menus: confirm / back | ENTER or SPACE / ESC | ENTER or SPACE / ESC | ENTER or click / ESC | A / B (cross / circle) |
@@ -119,7 +119,7 @@ connected, the one used last plays.
 
 A low camera about 3 m behind and 1.6 m above a fighter, over his shoulder, with the horizon and the sky on screen.
 
-Watching (spectating, or knocked out and waiting to respawn): CAMERA VIEW (F5, double-tap View) switches between the
+Watching (spectating, or knocked out and waiting to respawn): CAMERA VIEW (F5, double-tap L3) switches between the
 high view and ground view. Q / E or LB / RB pick the previous or next fighter (while spectating, the spectator's own
 keys do it and ground view follows), right mouse drag or the right stick orbits (the camera swings back behind the
 fighter 2.5 s after you let go), F6 turns the auto-director on or off (it cuts between duels, crowds, the hill,
@@ -131,3 +131,11 @@ stick move relative to the camera; attacks and abilities go toward the reticle a
 from this camera: keyboard-only play (nothing turns the camera), walk to pointer, and precise dig / place targeting
 (the target is the ground point ahead of you at the reticle's distance).
 
+
+## b16 finish: camera view off the View button (2026-11-22)
+
+The Editor review found the View / Create button doing two things: hold for the scoreboard, double-tap for the camera
+view. Every controller button already had a job, so the camera view moved to a double tap of the left stick (L3), and
+the emote wheel on L3 now opens after a 0.3 s hold on a controller (the quick-chat wheel's rule), so a tap or a double
+tap never flashes it. Keyboard T still opens the emote wheel at once. The controls screen and the rebinding rows read
+the binding itself, so they show "DOUBLE-TAP L3" without a text change.

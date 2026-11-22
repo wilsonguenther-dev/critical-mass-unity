@@ -18,8 +18,9 @@ namespace CriticalMass.Runtime.Hud.Mechanics
     /// </summary>
     public static class B16Words
     {
-        public const string AfkHead = "A BOT IS PLAYING FOR YOU";
-        public const string AfkLine = "Press any key to take over.";
+        /// <summary>b16 finish: the idle panel says exactly what the AUTOPILOT banner says (one wording for one state).</summary>
+        public static string AfkHead => CriticalMass.Runtime.Spectator.PlayerPresence.BannerWhat(false);
+        public static string AfkLine => CriticalMass.Runtime.Spectator.PlayerPresence.BannerPress(CriticalMass.Runtime.Input.ControlBindings.ActiveDevice);
         public const string HideHint = " (H hides this tip)";
         public const string PrefPrefix = "cm.tips.b16.";
 
@@ -98,6 +99,8 @@ namespace CriticalMass.Runtime.Hud.Mechanics
         SimDriverBehaviour _driver;
         Canvas _canvas;
         RectTransform _root, _space, _afk;
+        Text _afkLine;
+        CriticalMass.Runtime.Spectator.PlayerPresence _presence;
         int _epoch = -1;
         bool _wasAlive = true, _tipOpen;
         string _shownTip;
@@ -117,7 +120,7 @@ namespace CriticalMass.Runtime.Hud.Mechanics
             p.RimPx = 2f;
             p.RimColor = CMTokens.ToolBrass.Color;
             MenuUi.Fit(MenuUi.Label(_afk, "Head", CMTokens.Display, 22, CMTokens.ToolBrass.Color, TextAnchor.MiddleCenter, 12f, 8f, W - 24f, 42f, B16Words.AfkHead, 2f), 18);
-            MenuUi.Fit(MenuUi.Label(_afk, "Line", CMTokens.Ui, 18, CMTokens.WarmCream.Color, TextAnchor.MiddleCenter, 12f, 52f, W - 24f, 34f, B16Words.AfkLine, 1.5f), 15);
+            _afkLine = MenuUi.Fit(MenuUi.Label(_afk, "Line", CMTokens.Ui, 18, CMTokens.WarmCream.Color, TextAnchor.MiddleCenter, 12f, 52f, W - 24f, 34f, B16Words.AfkLine, 1.5f), 16);
             _afk.gameObject.SetActive(false);
         }
 
@@ -141,8 +144,12 @@ namespace CriticalMass.Runtime.Hud.Mechanics
                 _tipOpen = false;
                 _shownTip = null;
             }
-            bool afk = MechRules.Autopiloted(w, me);
+            // b16 finish: one message for one state. The AUTOPILOT banner (PlayerPresence) already says it with the same
+            // words; this panel shows only when the sim hands the fighter to a bot and the banner is not up.
+            if (_presence == null) _presence = GetComponent<CriticalMass.Runtime.Spectator.PlayerPresence>();
+            bool afk = MechRules.Autopiloted(w, me) && !(_presence != null && _presence.BannerVisible);
             if (_afk.gameObject.activeSelf != afk) _afk.gameObject.SetActive(afk);
+            if (afk && _afkLine != null) HudText.Set(_afkLine, B16Words.AfkLine);
             TickTips(w, me);
         }
 

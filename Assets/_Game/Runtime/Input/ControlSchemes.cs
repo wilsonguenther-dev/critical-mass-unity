@@ -135,7 +135,7 @@ namespace CriticalMass.Runtime.Input
         }
 
         /// <summary>feat/ground-camera: a double-tap binding (MultiTap) is its own gesture, so it may share a button with a
-        /// press or hold (Camera view: double-tap View; Scoreboard: hold View).</summary>
+        /// press or hold (b16 finish: Camera view is a double tap of L3; the emote wheel opens on an L3 hold).</summary>
         public const string DoubleTapSuffix = " (double tap)";
 
         public static bool IsDoubleTap(InputBinding b) =>

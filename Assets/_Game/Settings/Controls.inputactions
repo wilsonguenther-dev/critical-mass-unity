@@ -986,7 +986,7 @@
                 {
                     "name": "",
                     "id": "360dc137-ad6c-41b5-9be8-1245e7eb6cde",
-                    "path": "<Gamepad>/select",
+                    "path": "<Gamepad>/leftStickPress",
                     "interactions": "MultiTap",
                     "processors": "",
                     "groups": "Gamepad",
