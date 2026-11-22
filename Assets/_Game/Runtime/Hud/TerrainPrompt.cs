@@ -136,7 +136,8 @@ namespace CriticalMass.Runtime.Hud
                 if (_shown) HudText.Set(_label, _text);
             }
             int slot = -1;
-            if (_shown) { PromptStack.Want(PromptStack.Source.Strip); slot = PromptStack.SlotOf(PromptStack.Source.Strip); }
+            // review fix round 2 (pass-2 defect 5): the state strip steps back in a fight (one line under my feet) and returns after
+            if (_shown && !CriticalMass.Runtime.Hud.Player.PxFight.Active) { PromptStack.Want(PromptStack.Source.Strip); slot = PromptStack.SlotOf(PromptStack.Source.Strip); }
             else PromptStack.Release(PromptStack.Source.Strip);
             bool vis = slot >= 0;
             if (_chip.gameObject.activeSelf != vis) _chip.gameObject.SetActive(vis);

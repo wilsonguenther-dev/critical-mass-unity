@@ -240,6 +240,15 @@ namespace CriticalMass.Runtime.Hud.Player
         /// appended later): DODGED / BLOCKED in my word row, cream on a brass rim (a success, not a hurt).</summary>
         public void OnDefended(World w, int me, int attacker, int code, double lost)
         {
+            if (code == BlockedGlancing)
+            {
+                // review fix round 2 (pass-2 defect 6): a glancing hit ON me says it too, small and rate-limited (one word per
+                // GlanceRepeat seconds), the same soft stone pill my glancing hit on him shows
+                Text g = _words.Show(BlockedWords(code, 0), 2450, me, Vector3.zero, SelfLift, PxPalette.Cream,
+                    CriticalMass.Runtime.Hud.Style.CMTokens.Stone.Color, false, 0.8f, GlanceRepeat);
+                if (g != null) PlayerFeedback.Report(FeedbackChannel.BlockedTag, me, Mathf.RoundToInt((float)lost), g, code);
+                return;
+            }
             if (!IsDefence(code)) return;
             Text t = _words.Show(BlockedWords(code, 0), 2400 + code, me, Vector3.zero, SelfLift, PxPalette.Cream, PxPalette.Brass, true, Seconds);
             if (t != null) PlayerFeedback.Report(FeedbackChannel.BlockedTag, me, Mathf.RoundToInt((float)lost), t, code);

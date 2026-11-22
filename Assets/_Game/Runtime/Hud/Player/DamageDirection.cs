@@ -100,6 +100,26 @@ namespace CriticalMass.Runtime.Hud.Player
             for (int i = 0; i < Arcs; i++) { _arcs[i].Age = Life; PxUi.Show(_arcs[i].G, false); }
         }
 
+        /// <summary>
+        /// Review fix round 2 (gate tier F, F20: the third-person arrow sat 20 deg off the attacker's on-screen bearing): the
+        /// arc is centred on the screen, not on my feet, and the fight framing swings the camera. An attacker in front of
+        /// the camera: the bearing from the arc centre to him on screen, this frame. Behind it: his ground direction against
+        /// the camera's CURRENT yaw (flattened forward = screen up).
+        /// </summary>
+        static float ThirdPersonBearing(UnityEngine.Camera cam, Vector2 centrePx, Vector3 mePos, Vector3 src)
+        {
+            Vector3 sp = cam.WorldToScreenPoint(src);
+            Vector2 d = new Vector2(sp.x, sp.y) - centrePx;
+            if (sp.z > 0.05f && d.sqrMagnitude > 4f) return PxBearing.FromScreenDelta(d.x, d.y);
+            Transform t = cam.transform;
+            Vector3 fwd = t.forward;
+            fwd.y = 0f;
+            if (fwd.sqrMagnitude < 1e-6f) fwd = t.up;
+            fwd.Normalize();
+            Vector3 right = new Vector3(fwd.z, 0f, -fwd.x);
+            return PxBearing.FromBasis(src.x - mePos.x, src.z - mePos.z, fwd.x, fwd.z, right.x, right.z);
+        }
+
         public void Tick(World w, int me, double alpha, UnityEngine.Camera cam, float scale, float dt)
         {
             bool third = PxProject.ThirdPerson;
@@ -120,7 +140,7 @@ namespace CriticalMass.Runtime.Hud.Player
                 Vector3 src = a.Point;
                 if (a.Source >= 0 && a.Source < w.ActorCount && w.Actors[a.Source].Alive) src = PxProject.Actor(w, a.Source, alpha, 1.0f);
                 else if (a.Source == SourceKaiju) src = PxProject.Point(w, w.Kaiju.X, w.Kaiju.Z, 1.0f);
-                float bearing = PxProject.Bearing(cam, mePos, src.x - mePos.x, src.z - mePos.z);
+                float bearing = third ? ThirdPersonBearing(cam, centre * scale, mePos, src) : PxProject.Bearing(cam, mePos, src.x - mePos.x, src.z - mePos.z);
                 RectTransform rt = a.G.rectTransform;
                 rt.anchoredPosition = centre;
                 rt.localRotation = Quaternion.Euler(0f, 0f, -bearing);

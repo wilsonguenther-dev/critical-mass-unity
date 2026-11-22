@@ -1159,6 +1159,7 @@ namespace CriticalMass.Runtime.Hud
             // sized per camera, heal / Kaiju / wall numbers)
             // player-experience lane D: health bars over every unit in view, hit marker, damage direction, kill confirm,
             // tags and pops (Hud/Player); replaces the 3-second overhead hearts
+            PlayerFeedback.CurrentTick = w.Tick;   // review fix round 2 (gate tier F): ledger entries carry the sim tick
             PlayerHud?.Tick(w, s, Driver != null ? Driver.Alpha : 1.0, cam, scale, dt, w.EventHead);   // GameHud is the allowed event reader
         }
 

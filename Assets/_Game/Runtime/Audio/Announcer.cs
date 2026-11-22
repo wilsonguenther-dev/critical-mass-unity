@@ -720,7 +720,8 @@ namespace CriticalMass.Runtime.Audio
         void UpdateSubtitle(float now, bool hidden)
         {
             if (_canvas == null) return;
-            bool show = !hidden && _current != null && now < _lineEnds && SubtitlesEnabled;
+            // review fix round 2: no subtitle sticker over a fight (the voice still plays); it does not come back for that line
+            bool show = !hidden && _current != null && now < _lineEnds && SubtitlesEnabled && !CriticalMass.Runtime.Hud.Player.PxFight.Active;
             float a = 0f;
             if (show)
             {

@@ -758,7 +758,8 @@ namespace CriticalMass.Runtime.Audio.Sound
             }
             if (!_fallsFound && w != null && (Time.frameCount % 30) == 0 && _fallTries < 40) FindFalls(w);
             // b14 review: no sound caption over the Characters screen, Controls page or another menu that covers the match
-            _captions.Update(now, SoundCaptions.HiddenNow(_paused, _title));
+            // review fix round 2 (pass-2 defect 5): no caption line under my feet during a fight (PxFight); they come back after
+            _captions.Update(now, SoundCaptions.HiddenNow(_paused, _title) || CriticalMass.Runtime.Hud.Player.PxFight.Active);
         }
 
         private void UpdateListener(World w)
@@ -1035,6 +1036,9 @@ namespace CriticalMass.Runtime.Audio.Sound
             if (cue < 0 || cue >= _words.Length || _words[cue] == null) return;
             if (!Announcer.SubtitlesEnabled) return;
             if (YieldsToBanner(_family[cue], Announcer.OwnsHillNews)) return;
+            // review fix round 2 (one message at a time, nothing over the fight): the autopilot captions drop during a fight
+            // (the autopilot plate tells it)
+            if (CriticalMass.Runtime.Hud.Player.PxFight.Active && _family[cue] == "autopilot") return;
             bool up = _until[0] > now && _cue[0] >= 0;
             bool sameFamily = up && _cue[0] != cue && _family[_cue[0]] == _family[cue];
             if (!sameFamily && now - _last[cue] < RepeatGap) return;
