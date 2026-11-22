@@ -145,7 +145,7 @@ namespace CriticalMass.Runtime.Audio.Sound
         double _initRetryAt;
 
         /// <summary>True when the voices, clips and planner exist (LateUpdate runs only then).</summary>
-        internal bool Ready => _plan != null && _src != null && _clips != null && _subLast != null && _captions != null;
+        public bool Ready => _plan != null && _src != null && _clips != null && _subLast != null && _captions != null;
 
         /// <summary>Builds what is missing of clips, voices, planner and captions; never throws (logs once).</summary>
         private bool InitCore()
@@ -171,10 +171,10 @@ namespace CriticalMass.Runtime.Audio.Sound
         }
 
         /// <summary>Tests: hold the init retry (edit mode builds nothing).</summary>
-        internal void HoldInitForTests() => _initRetryAt = double.MaxValue;
+        public void HoldInitForTests() => _initRetryAt = double.MaxValue;
 
         /// <summary>LateUpdate's guard (tests call it): false = not built yet, the frame is skipped without a throw.</summary>
-        internal bool UpdateGuard()
+        public bool UpdateGuard()
         {
             if (Ready) return true;
             double now = Time.unscaledTimeAsDouble;
