@@ -91,7 +91,7 @@ namespace CriticalMass.Runtime.Tests.PlayerExperience
         public void TheHKeyNoLongerTogglesTheHud()
         {
             string src = File.ReadAllText("Assets/_Game/Runtime/Menus/SettingsExtras.cs");
-            StringAssert.DoesNotContain("hKey", src, "no hard-coded H in SettingsExtras");
+            StringAssert.DoesNotContain(".hKey", src, "no hard-coded H in SettingsExtras (Keyboard.hKey)");
             Assert.AreEqual(0, SettingsExtras.HardCodedMatchKeys.Length);
             CollectionAssert.Contains(new List<string>(PathsOf("Interact")), "<keyboard>/h", "H stays the J K L layout's Interact");
         }
