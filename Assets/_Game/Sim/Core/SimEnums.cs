@@ -266,6 +266,10 @@ namespace CriticalMass.Sim.Core
         /// <summary>A world action by an actor that changed the world and has no other event: A = the actor,
         /// B = PlayerReasons.World* kind, (X, Z) = where, Value = amount (cells, units).</summary>
         WorldAction,
+        /// <summary>px S1 [9] view only: a melee hit was CRITICAL (earned, never rolled): A = the victim, B = the attacker,
+        /// (X, Z) = the victim, Value = kind (1 counter: hit inside his wind-up, 2 punish: hit in the recovery of his whiff,
+        /// 3 back hit: from his rear arc), Radius = the bonus damage dealt. The Hit event of the same strike carries Tier 2.</summary>
+        CriticalHit,
     }
 
     /// <summary>CM b13 [K]: the Kaiju type decided by the biomass mix at the hatch (Elder = today's Kaiju; appended members only).</summary>

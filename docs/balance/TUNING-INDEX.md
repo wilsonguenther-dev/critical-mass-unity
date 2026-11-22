@@ -4,7 +4,7 @@ Every tuning field the sim reads from `GameConfig`, found by reflection (`Assets
 
 Regenerate: `tools/balance/balance-report.sh tuning-index (or the balance-report workflow, mode tuning-index)`. `TuningIndexTests` fails when a field has no row here. Paths work as `--set Path=Value` switches for the balance report.
 
-893 fields.
+896 fields.
 
 ## (top level)
 
@@ -869,7 +869,10 @@ Regenerate: `tools/balance/balance-report.sh tuning-index (or the balance-report
 | `Depth.CombatFeel.WoundedHealShare` | 0.3 | double | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` | [4] Share of mend and pulse healing a wounded body receives. Baseline: one Healer bot (15.8 HP/s) out-healed a 50%-landing human in 25 of 36 match-ups (audit); probe healed mode 29/288 kills within 20 s. |
 | `Depth.CombatFeel.WoundedFountainShare` | 0.25 | double | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` | [4] Share of the fountain's 30 HP/s a wounded body receives in its own fountain. |
 | `Depth.CombatFeel.WoundedSlowHpShare` | 0.3 | double | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` | [5] A wounded body below this share of its HP moves at WoundedSlowMultiplier (catchable when it flees). Baseline: off the hill a 29%-HP bot fled from a lag-6 human Warrior and was caught within 4 s 5 of 48 times. |
-| `Depth.CombatFeel.WoundedSlowMultiplier` | 0.75 | double | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` | pass 2: 0.85 -> 0.75 (lag-6 Warrior catch within 4 s 17/48 -> 22/48) |
+| `Depth.CombatFeel.WoundedSlowMultiplier` | 0.75 | double | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` |  |
+| `Depth.CombatFeel.CritEnabled` | true | bool | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` | [9] Critical strikes, earned by skill and never rolled (co-founder ask, PLAN call 12): a melee hit on a body in its own wind-up (counter), in the recovery of its whiff (punish) or from its rear arc (back hit). |
+| `Depth.CombatFeel.CritDamageMul` | 1.25 | double | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` | [9] Damage of a critical hit, applied after every other multiplier (kinds do not stack). Start value of the ask. |
+| `Depth.CombatFeel.CritBackArcDeg` | 120 | double | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` | [9] The rear arc (degrees, centred on the back) a back hit comes from: 120 = more than 120 deg off his facing. |
 | `Depth.CombatFeel.BotHumanLimits` | true | bool | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` | [2] Bots fight by human limits (BotAim): aim delay, aim error and a class-arc press cone. False = b16 bots. |
 | `Depth.CombatFeel.BotMeleeAimDelayTicks` | [5, 8, 2] | int[] | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` | [2] Melee aim delay (ticks at 30 Hz) by BotDifficulty (Normal, Easy, Hard): the bot aims at where its target was this long ago (a 0.2 s human = 6). |
 | `Depth.CombatFeel.BotMeleeAimErrorDeg` | [20, 35, 5] | double[] | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` | [2] Melee aim error (degrees, uniform +-) by BotDifficulty, redrawn every 1/3 s. |

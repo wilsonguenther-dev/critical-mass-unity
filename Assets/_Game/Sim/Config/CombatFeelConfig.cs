@@ -262,7 +262,17 @@ namespace CriticalMass.Sim.Config
         /// <summary>[5] A wounded body below this share of its HP moves at WoundedSlowMultiplier (catchable when it flees).
         /// Baseline: off the hill a 29%-HP bot fled from a lag-6 human Warrior and was caught within 4 s 5 of 48 times.</summary>
         public double WoundedSlowHpShare = 0.3;
-        public double WoundedSlowMultiplier = 0.75;   // pass 2: 0.85 -> 0.75 (lag-6 Warrior catch within 4 s 17/48 -> 22/48)
+        public double WoundedSlowMultiplier = 0.75;
+        /// <summary>[9] Critical strikes, earned by skill and never rolled (co-founder ask, PLAN call 12): a melee hit on a body in
+        /// its own wind-up (counter), in the recovery of its whiff (punish) or from its rear arc (back hit). Measured in
+        /// data/s1-combat/crit/. OFF by default: the ask's bar "the strong model gains >= 5 points" is not shown yet. Measured on
+        /// (288 duels each): lag-6 0.50 -> 0.50, 50%-player 0.28 -> 0.30, first-match floor 0.27 -> 0.27, a 0.13 s human 0.53 ->
+        /// 0.54 (+1; the probe has no feint / back-circling model yet). Turn on once that model shows the gain.</summary>
+        public bool CritEnabled = false;
+        /// <summary>[9] Damage of a critical hit, applied after every other multiplier (kinds do not stack). Start value of the ask.</summary>
+        public double CritDamageMul = 1.25;
+        /// <summary>[9] The rear arc (degrees, centred on the back) a back hit comes from: 120 = more than 120 deg off his facing.</summary>
+        public double CritBackArcDeg = 120;   // pass 2: 0.85 -> 0.75 (lag-6 Warrior catch within 4 s 17/48 -> 22/48)
         /// <summary>[2] Bots fight by human limits (BotAim): aim delay, aim error and a class-arc press cone. False = b16 bots.</summary>
         public bool BotHumanLimits = true;
         /// <summary>[2] Melee aim delay (ticks at 30 Hz) by BotDifficulty (Normal, Easy, Hard): the bot aims at where its target

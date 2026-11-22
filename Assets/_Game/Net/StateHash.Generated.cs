@@ -1093,6 +1093,10 @@ namespace CriticalMass.Net
             A(ref h, o.BufferTick);
             M(ref h, o.Buffered);
             A(ref h, o.CancelUsed);
+            A(ref h, o.CritFrom);
+            A(ref h, o.CritKind);
+            A(ref h, o.CritTick);
+            M(ref h, o.Crits);
             A(ref h, o.FeintLockUntil);
             M(ref h, o.Feints);
             M(ref h, o.HitCancels);
@@ -1120,6 +1124,7 @@ namespace CriticalMass.Net
             M(ref h, o.Swings);
             D(ref h, o.TntSelfDamage);
             M(ref h, o.TntSelfHits);
+            A(ref h, o.WhiffRecoverUntil);
             M(ref h, o.Whiffs);
             A(ref h, o.WoundedUntil);
         }
