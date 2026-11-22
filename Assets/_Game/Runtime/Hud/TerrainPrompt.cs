@@ -243,9 +243,9 @@ namespace CriticalMass.Runtime.Hud
         {
             BuilderTool tool = (BuilderTool)((key >> 19) & 7);
             int tier = (key >> 22) & 3, n = (key >> 24) & 15, max = (key >> 28) & 7;
-            string line = BuilderToolbelt.Word(tool, tier);
-            if (tool == BuilderTool.Dig || tool == BuilderTool.Place) line += "   ·   BLOCKS " + n + "/" + max;
-            else if (n > 0) line += "   ·   " + n + " WOOD";
+            // review fix round (defect 11): one prompt per action: the world prompt under the fighter says the verb ("F DIG"),
+            // this strip says only the state and the switch
+            string line = tool == BuilderTool.Dig || tool == BuilderTool.Place ? "BLOCKS " + n + "/" + max : n > 0 ? n + " WOOD" : BuilderToolbelt.Word(tool, tier);
             line += "   ·   " + TrialText.Fill("{Switch}", device) + ": " + BuilderToolbelt.Word((BuilderTool)(key & 7), tier);
             if (device != ControlDevice.Gamepad) line += "   ·   1-7: PICK";
             return line;
@@ -259,7 +259,7 @@ namespace CriticalMass.Runtime.Hud
             {
                 int v = (key >> 19) & 63, v12 = (key >> 19) & 4095;
                 if ((key & (1 << 16)) != 0) return CriticalMass.Runtime.View.Mechanics.BuilderBank.WoodWord + " " + v12 + "   ·   " + TrialText.Fill("{Ability}", device) + ": BUILD";
-                if ((key & (1 << 17)) != 0) return "CARRYING " + v + "/" + ((key >> 25) & 63) + "   ·   HOLD " + TrialText.Fill("{Interact}", device) + ": GATHER";
+                if ((key & (1 << 17)) != 0) return "CARRYING " + v + "/" + ((key >> 25) & 63);   // review fix (defect 11): the world prompt says HOLD E GATHER
                 return DemolitionsLine(CriticalMass.Runtime.View.Affordance.GrenadeTuning.AttackThrows(w.Config), v12, device);
             }
             int pillar = key & 3;
@@ -267,7 +267,7 @@ namespace CriticalMass.Runtime.Hud
                 return TrialText.Fill("{Attack}", device) + "  KNOCK IT DOWN   ·   FROM HERE: " + (pillar == Topple.Ramp ? "RAMP" : "WALL");
             int carried = (key >> 5) & 31, max = (key >> 10) & 31;
             bool place = ((key >> 3) & 3) == (int)TerraformMode.Place;
-            string line = TrialText.Fill("{DigPlace}", device) + (place ? "  PLACE BLOCK" : "  DIG GROUND") + "   ·   BLOCKS " + carried + "/" + max;
+            string line = "BLOCKS " + carried + "/" + max;   // review fix (defect 11): the world prompt says F DIG / F PLACE BLOCK
             // The other mode is one switch away (the sim flips by itself only on a full or an empty carry).
             if (!place && carried > 0) line += "   ·   " + TrialText.Fill("{Switch}", device) + ": PLACE";
             else if (place && carried < max) line += "   ·   " + TrialText.Fill("{Switch}", device) + ": DIG";
