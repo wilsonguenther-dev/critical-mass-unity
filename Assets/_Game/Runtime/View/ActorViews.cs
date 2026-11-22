@@ -517,9 +517,14 @@ namespace CriticalMass.Runtime.View
         {
             UnityEngine.Object src = DrawnRenderer(m);
             int me = LocalSeat.Actor;
-            if (hasFx && fx.FlashNew && fx.FlashOwn) PlayerFeedback.Report(FeedbackChannel.HitFlash, i, fx.FlashStrength, src);
-            if (hasFx && fx.HoldNew && fx.HoldOwn && fx.HoldMs > 0f) PlayerFeedback.Report(FeedbackChannel.HitStop, i, fx.HoldMs, src);
-            if (knockCheck && hasFx && fx.Own) PlayerFeedback.Report(FeedbackChannel.KnockVisual, i, knockDrawn, src);
+            // round 3: each cue is reported ONCE per occurrence, keyed on its own start (flash start, hold tick, knock tick),
+            // on any frame it is drawn, never on a one-frame latch another caller may already have taken.
+            if (_cues == null || _cues.Length < _actors.Length) _cues = Anim.ImpactCueLedger.Make(_actors.Length);
+            int hk = int.MinValue; float hms = 0f; bool hown = false;
+            bool holding = hasFx && fx.Holding && _fx.HoldOf(i, out hk, out hms, out hown);
+            Anim.ImpactCueLedger.Frame(ref _cues[i], i, src,
+                hasFx && fx.Flash, hasFx && fx.FlashOwn, hasFx ? _fx.FlashStartOf(i) : double.NegativeInfinity, fx.FlashStrength,
+                holding, hown, hk, hms, knockCheck, hasFx && fx.Own, knockDrawn);
             // fix round 2 (gate F30): SwingCommit for MY swing, once, 2 rendered frames after the press tick's swing appears,
             // with the pose weight actually drawn then (keyed on the sim's SwingTick, not on the animator's own latch,
             // which the gate never saw report). The animator's latch is drained so it never doubles.
@@ -535,6 +540,7 @@ namespace CriticalMass.Runtime.View
             }
         }
 
+        Anim.ImpactCueLedger.Seen[] _cues;
         int _swingSeenTick = int.MinValue, _swingSeenFrame;
         bool _swingReported = true;
 
@@ -554,6 +560,8 @@ namespace CriticalMass.Runtime.View
                     if (any == null) any = r;
                 }
                 if (any != null) return any;
+                // round 3: never skip and never an inactive source when the model has any renderer at all
+                for (int k = 0; k < rs.Length; k++) if (rs[k] != null) return rs[k];
             }
             return this;
         }

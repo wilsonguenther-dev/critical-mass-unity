@@ -594,7 +594,18 @@ namespace CriticalMass.Runtime.View.Effects
                 Vector3 vc = W(e.X, h + 0.95, e.Z);
                 Vector3 away = lens != null ? vc - lens.transform.position : Vector3.zero;
                 away.y = 0f;
-                if (away.sqrMagnitude > 1e-4f) contact = vc + away.normalized * (float)(r + 0.2);
+                if (away.sqrMagnitude > 1e-4f)
+                {
+                    Vector3 an = away.normalized;
+                    contact = vc + an * (float)(r + 0.2);
+                    // round 3: the impact frame keeps its punch: a small bright star on the NEAR side at the contact point
+                    // and short spark lines flying away from the lens (0.35 u, 0.1 s: a small part of him, never his body)
+                    Vector3 near = vc - an * (float)(r * 0.9);
+                    AddBurst(t, near, CriticalMass.Runtime.View.Anim.HitFeelTuning.NearSpark3PSize, 0, seed + 7, Vector3.zero,
+                        S(CriticalMass.Runtime.View.Anim.HitFeelTuning.NearSpark3PLife));
+                    for (int k = 0; k < CriticalMass.Runtime.View.Anim.HitFeelTuning.NearSpark3PLines; k++)
+                        AddSpark(t, near, e.DirX, e.DirZ, seed + 7, (uint)(k + 150), 1);
+                }
             }
             _lastHitThird = third;
             _lastHitAt = t; _lastHitP = contact; _lastHitTan = tan; _lastHitSeed = seed; _lastHitDirX = e.DirX; _lastHitDirZ = e.DirZ;

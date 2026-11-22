@@ -29,6 +29,10 @@ namespace CriticalMass.Runtime.View.Anim
 
         public static float FlashStrength(bool reduceFlashing, bool own) => reduceFlashing ? (own ? FlashSafeOwn : FlashSafeOther) : FlashFull;
         public static double FlashSeconds(bool own) => own ? FlashOwnSeconds : FlashOtherSeconds;
+        /// <summary>Round 3: in third person the own-hit flash lasts 180 ms wall so it spans the impact frame AND the hit-stop
+        /// hold (the review saw no flash on the victim at impact); starts stay one per FlashMinGapSeconds (under 3 a second).</summary>
+        public const double FlashOwn3PSeconds = 0.18;
+        public static double FlashSeconds(bool own, bool thirdPerson) => own && thirdPerson ? FlashOwn3PSeconds : FlashSeconds(own);
         /// <summary>A new flash may start on a victim whose last flash began `sinceLast` wall seconds ago.</summary>
         public static bool FlashAllowed(double sinceLast) => !(sinceLast < FlashMinGapSeconds);
         public static double MaxFlashesPerSecond => 1.0 / FlashMinGapSeconds;
@@ -209,6 +213,11 @@ namespace CriticalMass.Runtime.View.Anim
         // ---- fix round 2 (review pass 2): third person
         /// <summary>Own hit burst in third person: this share of the size, at most this long (s wall), drawn behind the victim.</summary>
         public const float Burst3PShare = 0.6f;
+        /// <summary>Round 3: the near-side contact spark in third person (u, s wall, spark lines): it marks the impact frame
+        /// without covering more than a small part of the victim (0.35 u against a ~1 x 2 u body).</summary>
+        public const float NearSpark3PSize = 0.35f;
+        public const double NearSpark3PLife = 0.1;
+        public const int NearSpark3PLines = 4;
         public const double Burst3PLife = 0.16;
         /// <summary>
         /// Third-person kick multipliers: the kick moves the lens, and a lens translation shifts a point by u / depth, so at the
@@ -285,5 +294,57 @@ namespace CriticalMass.Runtime.View.Anim
 
         /// <summary>Rumble for landed hits by me and on me (was none for light hits: shock 0.10 under the 0.15 threshold).</summary>
         public const float RumbleLightMs = 50f, RumbleHeavyMs = 105f, RumbleLightLow = 0.3f, RumbleLightHigh = 0.45f, RumbleHeavyLow = 0.6f, RumbleHeavyHigh = 0.55f;
+    }
+
+    /// <summary>
+    /// Round 3 (review pass 3: no HitFlash / HitStop in the ledger): reports each impact cue exactly once per occurrence,
+    /// keyed on the occurrence's own start (flash start time, hold tick), so a cue is never lost to a one-frame latch and
+    /// never reported twice. Pure; ActorViews keeps one Seen per actor.
+    /// </summary>
+    public static class ImpactCueLedger
+    {
+        public struct Seen { public double Flash; public int Hold; }
+
+        public static Seen[] Make(int n)
+        {
+            var a = new Seen[n];
+            for (int k = 0; k < n; k++) { a[k].Flash = double.NaN; a[k].Hold = int.MinValue; }
+            return a;
+        }
+
+        /// <summary>True the first time `key` is seen (and remembers it).</summary>
+        public static bool Once(ref double seen, double key)
+        {
+            if (double.IsNegativeInfinity(key) || key.Equals(seen)) return false;
+            seen = key;
+            return true;
+        }
+
+        public static bool Once(ref int seen, int key)
+        {
+            if (key == int.MinValue || key == seen) return false;
+            seen = key;
+            return true;
+        }
+
+        /// <summary>
+        /// One drawn frame of actor `actor`'s impact cues (ActorViews.ReportCues): HitFlash once per flash start while an own
+        /// flash is drawn, HitStop once per hold tick while an own hold is drawn, KnockVisual on the knock's check frame.
+        /// `source` must be the drawn renderer (never null: the caller falls back to itself). Returns the cues reported.
+        /// </summary>
+        public static int Frame(ref Seen seen, int actor, UnityEngine.Object source,
+                                bool flashOn, bool flashOwn, double flashStart, float flashStrength,
+                                bool holding, bool holdOwn, int holdTick, float holdMs,
+                                bool knockCheck, bool knockOwn, float knockDrawn)
+        {
+            int n = 0;
+            if (flashOn && flashOwn && Once(ref seen.Flash, flashStart))
+            { CriticalMass.Runtime.Game.PlayerFeedback.Report(CriticalMass.Runtime.Game.FeedbackChannel.HitFlash, actor, flashStrength, source); n++; }
+            if (holding && holdOwn && holdMs > 0f && Once(ref seen.Hold, holdTick))
+            { CriticalMass.Runtime.Game.PlayerFeedback.Report(CriticalMass.Runtime.Game.FeedbackChannel.HitStop, actor, holdMs, source); n++; }
+            if (knockCheck && knockOwn)
+            { CriticalMass.Runtime.Game.PlayerFeedback.Report(CriticalMass.Runtime.Game.FeedbackChannel.KnockVisual, actor, knockDrawn, source); n++; }
+            return n;
+        }
     }
 }
