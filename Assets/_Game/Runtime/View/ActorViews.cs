@@ -300,6 +300,10 @@ namespace CriticalMass.Runtime.View
             models += SyncBarricades(w, cfg, map);
 
             HillDef hill = map.Hill;
+            // px lane F (pass 3): no hill zone, no hill plate. The practice range sets the world's Hill.Radius to 0 (nothing
+            // scores); the map's HillDef may still carry the authored radius, so the world's config decides.
+            bool noHill = w.Config == null || w.Config.Hill == null || w.Config.Hill.Radius <= 0;
+            if (_hill.gameObject.activeSelf == noHill) _hill.gameObject.SetActive(!noHill);
             double hh = GroundHeight(map, hill.X, hill.Z);
             float d = (float)(2 * hill.R);
             _hill.localPosition = SimSpace.ToWorld(hill.X, hh + HillThickness / 2.0, hill.Z);
