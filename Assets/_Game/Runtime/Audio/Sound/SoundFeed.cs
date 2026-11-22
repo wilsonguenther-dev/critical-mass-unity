@@ -50,7 +50,9 @@ namespace CriticalMass.Runtime.Audio.Sound
         private readonly int[] _airLen;
         // px lane F: the tick each actor last landed a hit (for MY assists: index = victim, value = my last hit tick on them),
         // and the tick each attacker's swing was already answered (HitBlocked / StructureHit / a Kaiju hit): no whiff swish.
-        private readonly int[] _myHitOn, _answered;
+        private readonly int[] _myHitOn, _answered, _glancedAt;
+        /// <summary>px lane F: one glancing-hit tap per target per this many seconds (it rides on every Farmer close hit).</summary>
+        public const double GlanceSeconds = 2.0;
         /// <summary>px lane F: an assist is a kill by someone else on an enemy I hit within this many seconds.</summary>
         public const double AssistSeconds = 5.0;
         /// <summary>px lane F: the low-health heartbeat state of the local player (updated every tick).</summary>
@@ -73,12 +75,13 @@ namespace CriticalMass.Runtime.Audio.Sound
             _airLen = new int[_capacity];
             _myHitOn = new int[_capacity];
             _answered = new int[_capacity];
+            _glancedAt = new int[_capacity];
             ResetTicks();
         }
 
         private void ResetTicks()
         {
-            for (int i = 0; i < _capacity; i++) { _myHitOn[i] = int.MinValue; _answered[i] = int.MinValue; }
+            for (int i = 0; i < _capacity; i++) { _myHitOn[i] = int.MinValue; _answered[i] = int.MinValue; _glancedAt[i] = int.MinValue; }
             LastStructureTick = int.MinValue;
             Heart.Reset();
         }
@@ -406,6 +409,9 @@ namespace CriticalMass.Runtime.Audio.Sound
             }
             if (mine && t < _capacity) _myHitOn[t] = w.Tick;
             bool px = cues.Length > 15;
+            // px lane F fix round: the pain voice of a hit I dealt or took is its own cue (own_pain, same voices), so the
+            // planner's 30 ms same-cue repeat guard never lets a crowd pain swallow mine.
+            int painCue = cues.Length > 16 && (mine || onMe) ? cues[16] : cues.Length > 8 ? cues[8] : -1;
             // cues: flesh light, heavy, crit, armour, shield block, heavy block, Kaiju blow, knockback grunt, pain.
             // Blasts, slams and falls already have their own big sound: their hits only grunt.
             bool melee = ev.Cause == DamageCause.Melee || ev.Cause == DamageCause.KaijuMelee || ev.Cause == DamageCause.None;
@@ -434,7 +440,7 @@ namespace CriticalMass.Runtime.Audio.Sound
                 }
                 else Emit(sink, cue, w, ev.X, ev.Z, own, threat, 1f, 1f, t);
                 // feat/hit-feel-1: the victim's pain voice, pitched by body (Weight) with the cue's own jitter.
-                if (cues.Length > 8) Emit(sink, cues[8], w, ev.X, ev.Z, own, threat, 1f, SoundFeed.Weight(w.Actors[t].Cls), t);
+                if (painCue >= 0) Emit(sink, painCue, w, ev.X, ev.Z, own, threat, 1f, SoundFeed.Weight(w.Actors[t].Cls), t);
             }
             else if (mine && px && ev.Value > 0 && SoundPrefs.HitConfirm) Emit(sink, cues[13], w, ev.X, ev.Z, true, false, 1f, 1f, t);   // my blast landed on them
             // px lane F: MY hurt thump, scaled by the share of my health the hit took (a scratch is quiet, a big blow is full).
@@ -499,18 +505,40 @@ namespace CriticalMass.Runtime.Audio.Sound
             int code = (int)ev.Value;
             int cue;
             float g = 1f;
+            bool ext = cues.Length > 5;   // the fix-round cues: my dodge, my shield, the glancing tap
             switch (code)
             {
                 case PlayerReasons.BlockedSpawnProtect:
                 case PlayerReasons.BlockedImmune: cue = cues[0]; break;
                 case PlayerReasons.BlockedPassive: cue = cues[0]; g = 0.6f; break;
-                case PlayerReasons.BlockedDodge: cue = cues[1]; break;
+                // MY successful dodge has its own rising cue at own priority; their dodge of my swing is the phew
+                case PlayerReasons.BlockedDodge: cue = ext && ev.A == me ? cues[3] : cues[1]; break;
                 case PlayerReasons.BlockedWall: cue = cues[2]; break;
-                default: Silenced++; return;   // Ward: WardAbsorb plays block_heavy; Shield: the Hit plays the block; newer codes: their own event
+                case PlayerReasons.BlockedShield:
+                    // my raised shield took it (A = me) or my swing hit a raised shield (B = me); the crowd's: the Hit's block cue
+                    if (!ext || (ev.A != me && ev.B != me)) { Silenced++; return; }
+                    cue = cues[4];
+                    if (ev.A != me) g = 0.75f;
+                    break;
+                case PlayerReasons.BlockedGlancing:
+                {
+                    // lane S2: the hit landed reduced (the Farmer's staff inside her close range); it rides on every such hit,
+                    // so one soft tap per target per GlanceSeconds.
+                    int t = ev.A;
+                    if (!ext || t < 0 || t >= _capacity) { Silenced++; return; }
+                    int gap = (int)Math.Ceiling(GlanceSeconds * Math.Max(1.0, w.Config.SimHz));
+                    if (_glancedAt[t] != int.MinValue && w.Tick - _glancedAt[t] < gap) { Silenced++; return; }
+                    _glancedAt[t] = w.Tick;
+                    cue = cues[5];
+                    g = ev.A == me || ev.B == me ? 1f : 0.6f;
+                    Emit(sink, cue, w, ev.X, ev.Z, ev.A == me || ev.B == me, false, g, 1f, ev.A, 0, ev.A, code);
+                    return;
+                }
+                default: Silenced++; return;   // Ward: WardAbsorb plays block_heavy; newer codes: their own event
             }
             bool own = ev.A == me || ev.B == me;
             if (!own) g *= 0.7f;
-            Emit(sink, cue, w, ev.X, ev.Z, own, ev.A == me, g, 1f, ev.A, ev.B == me ? Fb(FeedbackChannelWhiff) : 0, ev.A, code);
+            Emit(sink, cue, w, ev.X, ev.Z, own, ev.A == me && code != PlayerReasons.BlockedDodge, g, 1f, ev.A, ev.B == me ? Fb(FeedbackChannelWhiff) : 0, ev.A, code);
         }
 
         /// <summary>px lane F: a structure took a hit (A attacker, B Structure* kind). cues: barricade, built wall, breakable,

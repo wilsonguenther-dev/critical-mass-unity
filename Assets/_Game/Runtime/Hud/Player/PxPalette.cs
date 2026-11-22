@@ -23,6 +23,10 @@ namespace CriticalMass.Runtime.Hud.Player
         /// <summary>Lane S1's skill critical (COUNTER / PUNISH / BACK HIT) number: the hot light pink of the damage family
         /// (h 318), lighter and larger than the tier-2 magenta.</summary>
         public static readonly Color CritSkill = CMTokens.ParseHex("#FF6FD2");
+        /// <summary>Review fix (defect 10): low health is NOT the hurt magenta: a dark red-black heartbeat vignette and an
+        /// orange bar / word (h 22), so "I am low" and "I was just hit" differ at a glance.</summary>
+        public static readonly Color LowVignette = CMTokens.ParseHex("#1C0508");
+        public static readonly Color LowInk = CMTokens.ParseHex("#FF8A3D");
         public static readonly Color Heal = CMTokens.ParseHex("#5CE38A");
         /// <summary>The "chunk just lost" segment of every bar.</summary>
         public static readonly Color Chunk = Color.white;

@@ -56,7 +56,7 @@ bot by mistake.
 | File | What it covers |
 | --- | --- |
 | `PlayerSeatSimTests.cs` | Presses in isolation: S1/S2/S4/S7 primary and ability per class, S8 blocked hits reported (spawn, dodge, ward, wall), S16/S18/S25/S26 class oddities, S30/S47 autopilot, S33 every button x every scene answered within 2 ticks, S34, S46 the input buffer. |
-| `PlayerSeatDuelTests.cs` | Duels: S3 strafer land rate, S5/S5b lag-6 human vs Normal bots, S6 kill through a Healer, S11 chase, S35 human vs human, S41 fountain, S42 bot fairness, S43 the 50% Warrior, S44 Healer rules, S45 the middle classes. |
+| `PlayerSeatDuelTests.cs` | Duels: S3 strafer land rate, S5/S5b lag-6 human vs Normal bots, S6 kill through a Healer, S11 chase, S35 human vs human, S41 fountain, S42a / S42b bot fairness (see below), S43 the 50% Warrior, S44 Healer rules, S45 the middle classes. |
 | `PlayerSeatWorldTests.cs` | Class verbs and the world: S9-S31 and S32, S36-S40 (structures, Kaiju, dig, ladder/bridge, bank). |
 | `PlayerSeatImpactSoak.cs` | (`Slow`, `PlayerSeatSoak`) 5v5 and 16v16 over 24 seeds, all-Normal against a strong seat 0, with uplift and seat-0 shares. |
 | `PlayerSeatTargets.cs` | Every threshold. |
@@ -101,3 +101,18 @@ tests) now compile into the project, and they join the unfiltered PlayMode and E
 
 Fix the game, never a test. A number in a Targets file changes only with the lead's sign-off, and the reason goes in the
 comment beside it. Sim changes that move S1/S4 numbers re-pin them in the same PR as the golden hashes.
+
+## S42 bot fairness: two tests (px S4, lead's call 13)
+
+The first S42 asserted one band (a Normal bot lands 0.40 to 0.75 on a strafing human) against one strafer that circled at
+0.8 x its own range, deep inside the bot's reach, so the hit arc covered any aim error (bots landed 0.80 to 0.95). Moving that
+strafer to a player who really dodges (the edge of the bot's reach, sees the wind-up 6 ticks late, steps out until it has
+resolved, comes back in to punish: `HumanModel.DodgeSpacing`) dropped the bots to 0.05 to 0.50. The one band mixed two
+different players, so S42 is now two honest tests:
+
+- **S42a DodgingPays**: against the dodging strafer a Normal bot lands **at most 0.60**, every class
+  (`PlayerSeatTargets.BotLandDodgingMax`). Dodging must pay.
+- **S42b StandingInReachCosts**: against the old close strafer that never steps out a Normal bot lands **at least 0.40**, every
+  class (`PlayerSeatTargets.BotLandStandingMin`); no upper bound: a player who does not dodge gets hit.
+
+Both print the bot's and the human's land counts and the number of step-outs in the assert message.

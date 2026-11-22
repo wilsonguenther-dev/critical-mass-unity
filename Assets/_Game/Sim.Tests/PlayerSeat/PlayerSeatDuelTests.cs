@@ -184,19 +184,40 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
         [TestCase(ClassId.Healer)]
         public void S11_Warrior_Chase_CatchesRunnerAt30Pct(ClassId runner)
         {
+            // px S4 rig: the runner used to start 1.5 u away, inside the Warrior's reach, and standing in HoldHill (hold 0.7 +
+            // inertia 0.25 beats the 0.9 retreat score, so it never fled: "retreated in 0"), so it was always caught. The test
+            // is a FLEEING target (PLAN P3: "a chance of escape"): it now starts ChaseStartBeyondReach outside the Warrior's
+            // reach, already running: in Retreat, moving away from the Warrior at its full speed. Band unchanged.
             int caught = 0, retreated = 0;
+            GameConfig gc = PlayerSeatRig.Config();
+            double gap = gc.Class(ClassId.Warrior).AttackRange + gc.Class(runner).Radius + T.ChaseStartBeyondReach;
             for (int k = 0; k < T.Angles; k++)
             {
-                Seat s = PlayerSeatRig.Duel(ClassId.Warrior, runner, TargetMode.RealBot, PlayerSeatRig.AngleOf(k, T.Angles), k, T.HumanLagTicks, distance: 1.5);
+                Seat s = PlayerSeatRig.Duel(ClassId.Warrior, runner, TargetMode.RealBot, PlayerSeatRig.AngleOf(k, T.Angles), k, T.HumanLagTicks, distance: gap);
                 s.W.Actors[s.Them].Hp = T.ChaseRunnerHpShare * s.W.Actors[s.Them].MaxHp;
-                bool ran = false;
-                s.BeforeTick = q => ran |= q.W.Actors[q.Them].AiState == AiState.Retreat;
+                bool ran = false, started = false;
+                s.BeforeTick = q =>
+                {
+                    World qw = q.W;
+                    if (!started)
+                    {
+                        started = true;
+                        BotsState bs = BotBrain.GetBotsState(qw);
+                        qw.Actors[q.Them].AiState = AiState.Retreat;
+                        if (bs != null) bs.StateSince[q.Them] = qw.Match.Time;
+                        double ux = qw.X[q.Them] - qw.X[q.Me], uz = qw.Z[q.Them] - qw.Z[q.Me], ud = Math.Sqrt(ux * ux + uz * uz);
+                        double sp = qw.Config.Class(runner).MoveSpeed;
+                        qw.Vx[q.Them] = ux / ud * sp;
+                        qw.Vz[q.Them] = uz / ud * sp;
+                    }
+                    ran |= qw.Actors[q.Them].AiState == AiState.Retreat;
+                };
                 DuelResult r = PlayerSeatRig.Play(s, T.ChaseSeconds);
                 if (r.Won) caught++;
                 if (ran) retreated++;
             }
             double share = (double)caught / T.Angles;
-            bool ok = PxLog.Line("S11 Warrior_Chase_CatchesRunnerAt30Pct", "lag-6 Warrior vs " + runner + " bot at 29%", caught + "/" + T.Angles + " caught within " + T.ChaseSeconds + " s (bot retreated in " + retreated + ")", "share in [" + T.ChaseCatchShareMin + ", " + T.ChaseCatchShareMax + "]", share >= T.ChaseCatchShareMin && share <= T.ChaseCatchShareMax);
+            bool ok = PxLog.Line("S11 Warrior_Chase_CatchesRunnerAt30Pct", "lag-6 Warrior vs a running " + runner + " bot at 29%, " + PxLog.F(T.ChaseStartBeyondReach) + " u outside reach", caught + "/" + T.Angles + " caught within " + T.ChaseSeconds + " s (bot retreated in " + retreated + ")", "share in [" + T.ChaseCatchShareMin + ", " + T.ChaseCatchShareMax + "]", share >= T.ChaseCatchShareMin && share <= T.ChaseCatchShareMax);
             Assert.IsTrue(ok);
         }
 
@@ -256,19 +277,48 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
         [TestCase(ClassId.Demolitions)]
         [TestCase(ClassId.Builder)]
         [TestCase(ClassId.Healer)]
-        public void S42_BotFair_NormalBotLandRate_VsStrafingHuman(ClassId x)
+        public void S42a_DodgingPays_NormalBotLandRate_VsDodgingHuman(ClassId x)
+        {
+            // Lead's call 13 (px S4): the old 0.40-0.75 band mixed two players. A player who dodges must make a Normal bot
+            // miss: against the dodging strafer (edge of the bot's reach, sees the wind-up 6 ticks late, steps out, comes back
+            // in to punish; HumanModel.DodgeSpacing) the bot lands AT MOST BotLandDodgingMax.
+            S42Measure(x, true, out double land, out string detail);
+            bool ok = PxLog.Line("S42a DodgingPays_NormalBotLandRate_VsDodgingHuman", "Normal " + x + " bot vs a lag-6 dodging " + x, detail, "<= " + T.BotLandDodgingMax, land <= T.BotLandDodgingMax);
+            Assert.IsTrue(ok, "Normal " + x + " bot lands " + PxLog.F(land) + " on a dodging human (limit <= " + T.BotLandDodgingMax + "): " + detail);
+        }
+
+        [TestCase(ClassId.Warrior)]
+        [TestCase(ClassId.Farmer)]
+        [TestCase(ClassId.Miner)]
+        [TestCase(ClassId.Demolitions)]
+        [TestCase(ClassId.Builder)]
+        [TestCase(ClassId.Healer)]
+        public void S42b_StandingInReachCosts_NormalBotLandRate_VsCloseStrafer(ClassId x)
+        {
+            // Lead's call 13 (px S4): a player who never steps out (circles at 0.8 x his range, inside the bot's reach) gets
+            // hit: the Normal bot lands AT LEAST BotLandStandingMin. No upper bound.
+            S42Measure(x, false, out double land, out string detail);
+            bool ok = PxLog.Line("S42b StandingInReachCosts_NormalBotLandRate_VsCloseStrafer", "Normal " + x + " bot vs a lag-6 close strafer " + x, detail, ">= " + T.BotLandStandingMin, land >= T.BotLandStandingMin);
+            Assert.IsTrue(ok, "Normal " + x + " bot lands " + PxLog.F(land) + " on a close strafer who never steps out (limit >= " + T.BotLandStandingMin + "): " + detail);
+        }
+
+        static void S42Measure(ClassId x, bool dodging, out double land, out string detail)
         {
             var t = new Tally();
+            int spaced = 0;
             for (int k = 0; t.TheirSwings < T.BotSwings && k < 16; k++)
             {
                 Seat s = PlayerSeatRig.Duel(x, x, TargetMode.RealBot, PlayerSeatRig.AngleOf(k, 8), k, T.HumanLagTicks, strafe: true);
+                s.Human.DodgeSpacing = dodging;
                 s.KeepThemAbove = 0.35;
                 s.KeepMeAbove = 0.35;
                 int before = t.TheirSwings;
                 t.Add(PlayerSeatRig.Play(s, 20, st => st.Spy.Contacts(st.Them).Count + before >= T.BotSwings));
+                spaced += s.Human.SpaceOutCount;
             }
-            bool ok = PxLog.Line("S42 BotFair_NormalBotLandRate_VsStrafingHuman", "Normal " + x + " bot vs a lag-6 strafing " + x, "bot land " + PxLog.F(t.TheirLand) + " (" + t.TheirLanded + " of " + t.TheirSwings + "), human land " + PxLog.F(t.Land), "in [" + T.BotLandMin + ", " + T.BotLandMax + "]", t.TheirSwings >= T.BotSwings / 2 && t.TheirLand >= T.BotLandMin && t.TheirLand <= T.BotLandMax);
-            Assert.IsTrue(ok);
+            Assert.GreaterOrEqual(t.TheirSwings, T.BotSwings / 2, "too few bot swings to measure (" + t.TheirSwings + ")");
+            land = t.TheirLand;
+            detail = "bot land " + PxLog.F(t.TheirLand) + " (" + t.TheirLanded + " of " + t.TheirSwings + "), human land " + PxLog.F(t.Land) + " (" + t.Landed + " of " + t.Swings + "), step-outs " + spaced;
         }
 
         // ------------------------------------------------------------------ S43 / S44 / S45
@@ -367,7 +417,7 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
                             s.Human.KeepRange = x == ClassId.Farmer;
                             models.Add(s.Human);
                         })
-                        : Cell(x, them, TargetMode.RealBot, T.Angles, T.FloorLagTicks, half: true, bots: bots);
+                        : Cell(x, them, TargetMode.RealBot, T.Angles, T.FloorLagTicks, half: true, bots: bots, setup: (s, k) => s.Human.AimHelp = T.FloorAimHelp);
                     All6(row, c);
                 }
                 All6(all, row);
@@ -385,7 +435,7 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
         {
             var n = Sweep(false, BotDifficulty.Normal);
             var e = Sweep(false, BotDifficulty.Easy);
-            bool a = PxLog.Line("S48a Floor_FirstMatchPlayer", "0.3 s reactions, every other swing off, no dodge/feint vs Normal (30 pairs x 8)", "land " + PxLog.F(n.all.Land) + ", won " + n.all.Wins + "/" + n.all.Reps + " = " + PxLog.F(n.all.Share) + " [" + string.Join("; ", n.rows) + "]", "land >= " + PxLog.F(T.FloorLandMin) + ", win >= " + PxLog.F(T.FloorWinVsNormalMin), n.all.Land >= T.FloorLandMin && n.all.Share >= T.FloorWinVsNormalMin);
+            bool a = PxLog.Line("S48a Floor_FirstMatchPlayer", "0.3 s reactions, every other swing off, no dodge/feint, aim help " + (T.FloorAimHelp >= 2 ? "High" : T.FloorAimHelp == 1 ? "Low" : "Off") + " vs Normal (30 pairs x 8)", "land " + PxLog.F(n.all.Land) + ", won " + n.all.Wins + "/" + n.all.Reps + " = " + PxLog.F(n.all.Share) + " [" + string.Join("; ", n.rows) + "]", "land >= " + PxLog.F(T.FloorLandMin) + ", win >= " + PxLog.F(T.FloorWinVsNormalMin), n.all.Land >= T.FloorLandMin && n.all.Share >= T.FloorWinVsNormalMin);
             bool b = PxLog.Line("S48a Floor_FirstMatchPlayer", "the same model vs Easy bots", "won " + e.all.Wins + "/" + e.all.Reps + " = " + PxLog.F(e.all.Share) + " [" + string.Join("; ", e.rows) + "]", ">= " + PxLog.F(T.FloorWinVsEasyMin), e.all.Share >= T.FloorWinVsEasyMin);
             Assert.IsTrue(a && b);
         }

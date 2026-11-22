@@ -151,6 +151,9 @@ namespace CriticalMass.Runtime.Hud
             Gamepad pad = Gamepad.current;
             bool paused = _input != null && _input.State.Paused;
             bool key = kb != null && kb.pKey.wasPressedThisFrame;   // controls-1: P (C is the arrow hand's jump)
+            // review fix round (defect 1): P is also Cancel / feint (J K L layout) and the match runs under the panel: the hard
+            // key opens it only between matches or from the pause menu; in play the HUD portrait click opens it.
+            if (CriticalMass.Runtime.Flow.GameFlow.LiveMatchView && !paused) key = false;
             // D-pad up navigates the pause menu while paused; it opens the panel only in play.
             // Integration batch 2: D-pad up is the Map action (full map) and a spectator objective; the panel opens with P (controls-1; was C)
             // or a click on the HUD portrait, and closes with B.

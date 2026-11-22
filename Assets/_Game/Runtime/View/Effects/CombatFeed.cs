@@ -29,6 +29,9 @@ namespace CriticalMass.Runtime.View.Effects
         /// <summary>px lane S3: SimEventType.CriticalHit (lead's call 12): A = victim, B = attacker, Value = kind (1 counter,
         /// 2 punish, 3 back hit), Extra = the bonus damage. Raised right after the critical Hit of the same tick.</summary>
         Critical,
+        /// <summary>Lane C fix round (defect 8): SimEventType.Terraform that changed the ground: A = the digger, B = the cell,
+        /// (X, Z) = the cell centre, Value = Terraform.Dug (1) or Placed (2). Refusals are not sent (lane D words them).</summary>
+        Dig,
     }
 
     /// <summary>One decoded effect event. Tick is the sim tick the sim raised it in (exact: decoded once per tick).</summary>
@@ -110,6 +113,10 @@ namespace CriticalMass.Runtime.View.Effects
         /// (CritTick, its kind CritKind: 0 top-tier look, 1 counter, 2 punish, 3 back hit) and the tick it held for one,
         /// as victim or attacker (CritHoldTick: the longer hit-stop).</summary>
         public readonly int[] CritTick, CritHoldTick;
+        /// <summary>Lane C fix round (defect 6): the tick actor i's hit was cut by a raised shield (HitBlocked BlockedShield,
+        /// pre-scanned so the Hit of the same tick decodes as a Block) and the tick its last hit decoded as a Block (no flash,
+        /// no hit burst: the block look instead).</summary>
+        public readonly int[] ShieldTick, BlockTick;
         public readonly byte[] CritKind;
         /// <summary>px lane C: attacker i's last StructureHit tick (a wall swing is not a whiff).</summary>
         public readonly int[] StructureTick;
@@ -144,6 +151,8 @@ namespace CriticalMass.Runtime.View.Effects
             FeintTick = Filled(actorCapacity, int.MinValue / 2);
             ContactTick = Filled(actorCapacity, int.MinValue / 2);
             CritTick = Filled(actorCapacity, int.MinValue / 2);
+            ShieldTick = Filled(actorCapacity, int.MinValue / 2);
+            BlockTick = Filled(actorCapacity, int.MinValue / 2);
             CritHoldTick = Filled(actorCapacity, int.MinValue / 2);
             CritKind = new byte[actorCapacity];
             ContactHits = new int[actorCapacity];
@@ -168,7 +177,7 @@ namespace CriticalMass.Runtime.View.Effects
             for (int i = 0; i < _capacity; i++)
             {
                 LastHitBy[i] = -1;
-                KnockTick[i] = FeintTick[i] = ContactTick[i] = StructureTick[i] = CritTick[i] = CritHoldTick[i] = int.MinValue / 2;
+                KnockTick[i] = FeintTick[i] = ContactTick[i] = StructureTick[i] = CritTick[i] = CritHoldTick[i] = ShieldTick[i] = BlockTick[i] = int.MinValue / 2;
                 CritKind[i] = 0;
                 KnockU[i] = 0;
                 ContactHits[i] = 0;
@@ -195,6 +204,14 @@ namespace CriticalMass.Runtime.View.Effects
                 from = w.EventHead - World.EventCapacity;
             }
             _pcCount = 0;
+            // fix round (defect 6): a shield-cut hit raises HitBlocked(BlockedShield) next to its Hit, in either order: mark
+            // the shielded targets first so their Hit decodes as a Block (the block look, no flash, no hit burst).
+            for (int n = from; n < w.EventHead; n++)
+            {
+                SimEvent pe = w.Events[n % World.EventCapacity];
+                if (pe.Type == SimEventType.HitBlocked && (int)Math.Round(pe.Value) == PlayerReasons.BlockedShield && pe.A >= 0 && pe.A < _capacity)
+                    ShieldTick[pe.A] = w.Tick;
+            }
             for (int n = from; n < w.EventHead; n++)
             {
                 SimEvent ev = w.Events[n % World.EventCapacity];
@@ -279,8 +296,9 @@ namespace CriticalMass.Runtime.View.Effects
                     double dx = ev.X - sx, dz = ev.Z - sz, d = Math.Sqrt(dx * dx + dz * dz);
                     if (d > 1e-6) { dx /= d; dz /= d; }
                     else { dx = -JsMath.Cos(w.Actors[t].Facing); dz = -JsMath.Sin(w.Actors[t].Facing); }
-                    bool blocked = !death && w.Actors[t].Cls == ClassId.Warrior && w.Actors[t].AbilityActive > 0 &&
-                                   Damage.IsFrontal(w, t, sx, sz);
+                    bool blocked = !death && ((w.Actors[t].Cls == ClassId.Warrior && w.Actors[t].AbilityActive > 0 &&
+                                   Damage.IsFrontal(w, t, sx, sz)) || ShieldTick[t] == w.Tick);
+                    if (blocked) BlockTick[t] = w.Tick;
                     Begin(death ? FxKind.Death : blocked ? FxKind.Block : FxKind.Hit, w, t, ev.B, ev.X, ev.Z, ev.Value);
                     _e.Cause = ev.Cause;
                     _e.DirX = dx;
@@ -396,6 +414,14 @@ namespace CriticalMass.Runtime.View.Effects
                         _e.AttCls = w.Actors[s].Cls;
                         _e.AttFacing = w.Actors[s].SwingFacing;
                     }
+                    return true;
+                }
+                case SimEventType.Terraform:
+                {
+                    int code = (int)Math.Round(ev.Value);
+                    if (ev.B < 0 || (code != 1 && code != 2)) return false;   // Terraform.Dug / Placed only
+                    Begin(FxKind.Dig, w, ev.A, ev.B, ev.X, ev.Z, code);
+                    if (ev.A >= 0 && ev.A < w.ActorCount) { _e.HasAttacker = true; _e.AttCls = w.Actors[ev.A].Cls; }
                     return true;
                 }
                 case SimEventType.CriticalHit:

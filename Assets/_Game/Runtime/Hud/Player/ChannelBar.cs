@@ -20,7 +20,7 @@ namespace CriticalMass.Runtime.Hud.Player
     public sealed class ChannelBar
     {
         public const float W = 132f, H = 10f, Below = 36f, Grace = 0.4f, ZeroTolerance = 0.15f, DoneFlash = 0.18f;
-        public const string HoldWord = "HOLD E", MineWord = "MINING";
+        public const string HoldWord = "GATHERING", MineWord = "MINING";   // review fix (defect 11): a state word; the world prompt says HOLD E
 
         readonly RectTransform _rt;
         readonly CanvasGroup _group;

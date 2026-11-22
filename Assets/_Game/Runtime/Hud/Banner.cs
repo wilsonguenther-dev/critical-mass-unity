@@ -318,7 +318,9 @@ namespace CriticalMass.Runtime.Hud
             double now = Now();
             // online-rooms-5: no banner over the online menus (the attract match behind them is not news).
             // online-rooms-6: banners only in a live match view (never over a menu or the loading screen).
-            if ((Hold != null && Hold()) || !Flow.GameFlow.LiveMatchView)
+            // review fix round (defect 5): banners wait while the local player is in a fight (hit dealt or taken in the last
+            // 3 s, Player/PxFight.cs) and enter after it; one message at a time, never over the fight
+            if ((Hold != null && Hold()) || !Flow.GameFlow.LiveMatchView || CriticalMass.Runtime.Hud.Player.PxFight.Active)
             {
                 Queue.Postpone(now);
                 _wallVersion = -1;   // the wall clock restarts when the banner enters fresh after the takeover

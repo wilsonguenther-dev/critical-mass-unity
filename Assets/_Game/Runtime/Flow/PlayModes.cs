@@ -52,8 +52,14 @@ namespace CriticalMass.Runtime.Flow
         public double PassiveBotSeconds;
         /// <summary>px lane F: the bot roster's only class, + 1 (0 = the config's own mix). Duel and range: the enemy's class.</summary>
         public int OnlyClassPlusOne;
+        /// <summary>px lane F fix round: the egg never hatches (duel and range): HatchSeconds goes an hour past the final
+        /// whistle, so Kaiju.Ai's "time + eps >= hatch" can never fire on the last tick.</summary>
+        public bool NoKaiju;
 
-        public bool IsDefault => MatchSeconds <= 0 && HatchSeconds <= 0 && PassiveBotSeconds <= 0 && OnlyClassPlusOne <= 0;
+        /// <summary>How far past the final whistle a NoKaiju match puts the hatch.</summary>
+        public const double NoKaijuMargin = 3600;
+
+        public bool IsDefault => MatchSeconds <= 0 && HatchSeconds <= 0 && PassiveBotSeconds <= 0 && OnlyClassPlusOne <= 0 && !NoKaiju;
 
         /// <summary>Writes the non-zero fields into cfg (the hatch never lands after the final whistle).</summary>
         public void ApplyTo(GameConfig cfg)
@@ -63,6 +69,7 @@ namespace CriticalMass.Runtime.Flow
             if (HatchSeconds > 0) cfg.HatchSeconds = Math.Min(HatchSeconds, cfg.MatchSeconds);
             if (PassiveBotSeconds > 0 && cfg.Bots != null) cfg.Bots.PassiveSeconds = PassiveBotSeconds;
             if (OnlyClassPlusOne > 0) OnlyClass(cfg, (ClassId)(OnlyClassPlusOne - 1));
+            if (NoKaiju) cfg.HatchSeconds = cfg.MatchSeconds + NoKaijuMargin;
         }
 
         /// <summary>px lane F: every bot-filled roster slot takes class c (all three class-mix tables the sim reads, one-hot).
@@ -223,8 +230,8 @@ namespace CriticalMass.Runtime.Flow
                 case MatchMode.Practice: return new MatchRules { MatchSeconds = PracticeMatchSeconds, PassiveBotSeconds = PracticeMatchSeconds };
                 case MatchMode.Demo:
                     return new MatchRules { MatchSeconds = DemoMatchSeconds, HatchSeconds = DemoHatchSeconds, PassiveBotSeconds = DemoPassiveSeconds };
-                case MatchMode.Duel: return new MatchRules { MatchSeconds = DuelMatchSeconds, HatchSeconds = DuelMatchSeconds };
-                case MatchMode.Range: return new MatchRules { MatchSeconds = RangeMatchSeconds, HatchSeconds = RangeMatchSeconds };
+                case MatchMode.Duel: return new MatchRules { MatchSeconds = DuelMatchSeconds, HatchSeconds = DuelMatchSeconds, NoKaiju = true };
+                case MatchMode.Range: return new MatchRules { MatchSeconds = RangeMatchSeconds, HatchSeconds = RangeMatchSeconds, NoKaiju = true };
                 default: return default;
             }
         }
@@ -240,6 +247,25 @@ namespace CriticalMass.Runtime.Flow
                 r.OnlyClassPlusOne = MatchSetup.Playable.Contains(c.EnemyClass) ? (int)c.EnemyClass + 1 : (int)ClassId.Warrior + 1;
             if (c.Mode == MatchMode.Range && c.Dummy != RangeDummy.Fighting) r.PassiveBotSeconds = RangeMatchSeconds;
             return r;
+        }
+
+        /// <summary>
+        /// px lane F fix round (Editor review: "QueueMatch with Mode = Range / Duel produced a 16 v 16 world"): a choice that
+        /// names Duel or Range is a duel or the range whoever built it. Team size 1 always; the range dummy's difficulty
+        /// follows its kind (Standing Easy, Moving Hard). Every other mode is returned unchanged. MatchRequest.From and
+        /// GameFlow.PrepareMatch both pass through here, so a script that sets only Mode gets the real mode.
+        /// </summary>
+        public static MatchSetupChoice Normalize(MatchSetupChoice c)
+        {
+            if (c.Mode != MatchMode.Duel && c.Mode != MatchMode.Range) return c;
+            c.TeamSize = c.Mode == MatchMode.Duel ? DuelSize : RangeSize;
+            if (!MatchSetup.Playable.Contains(c.EnemyClass)) c.EnemyClass = ClassId.Warrior;
+            if (c.Mode == MatchMode.Range)
+            {
+                if (c.Dummy == RangeDummy.Standing) c.BotDifficulty = CriticalMass.Sim.Core.BotDifficulty.Easy;
+                else if (c.Dummy == RangeDummy.Moving) c.BotDifficulty = CriticalMass.Sim.Core.BotDifficulty.Hard;
+            }
+            return c;
         }
 
         /// <summary>px lane F: a duel setup (team size 1, my class, the enemy's class, its difficulty).</summary>

@@ -57,6 +57,36 @@ namespace CriticalMass.Runtime.Camera
         }
 
         /// <summary>A living enemy within range of actor me, inside +-coneDeg of its facing (pure on the world).</summary>
+        /// <summary>The enemy the third-person fight framing shows (lane C fix round): the aim lock, else the hittable
+        /// target, else the nearest living enemy within range in a 75 degree cone of the facing; -1 none. Only within range.</summary>
+        public static int Target(World w, int me, double range)
+        {
+            if (w == null || me < 0 || me >= w.ActorCount || !w.Actors[me].Alive) return -1;
+            int lk = CriticalMass.Runtime.Input.AimAssist.LockTarget, ht = CriticalMass.Runtime.Input.AimAssist.HittableTarget;
+            if (Valid(w, me, lk, range)) return lk;
+            if (Valid(w, me, ht, range)) return ht;
+            Actor a = w.Actors[me];
+            double fx = Math.Cos(a.Facing), fz = Math.Sin(a.Facing), cos = Math.Cos(75 * Math.PI / 180), best = range * range;
+            int pick = -1;
+            for (int j = 0; j < w.ActorCount; j++)
+            {
+                Actor b = w.Actors[j];
+                if (j == me || !b.Alive || b.Team == a.Team) continue;
+                double dx = w.X[j] - w.X[me], dz = w.Z[j] - w.Z[me], d2 = dx * dx + dz * dz;
+                if (d2 > best) continue;
+                if (d2 > 1e-6 && (dx * fx + dz * fz) / Math.Sqrt(d2) < cos) continue;
+                best = d2; pick = j;
+            }
+            return pick;
+        }
+
+        static bool Valid(World w, int me, int j, double range)
+        {
+            if (j < 0 || j >= w.ActorCount || j == me || !w.Actors[j].Alive || w.Actors[j].Team == w.Actors[me].Team) return false;
+            double dx = w.X[j] - w.X[me], dz = w.Z[j] - w.Z[me];
+            return dx * dx + dz * dz <= range * range;
+        }
+
         public static bool EnemyInFront(World w, int me, double range, double coneDeg)
         {
             if (w == null || me < 0 || me >= w.ActorCount) return false;

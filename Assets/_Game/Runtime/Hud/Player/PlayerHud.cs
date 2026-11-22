@@ -26,6 +26,9 @@ namespace CriticalMass.Runtime.Hud.Player
         public readonly WorldPops Pops;
         public readonly PlayerTally Tally;
         public readonly ChannelBar Channel;
+        /// <summary>Wall clock of my last working defence (dodge / shield): MechanicsHud shows BLOCKED, not STUNNED, then.</summary>
+        public float DefendedAt { get; private set; } = -100f;
+        public bool DefendedRecently => Time.unscaledTime - DefendedAt < 0.6f;
         /// <summary>Criticals I dealt this match (the tally's CRIT n).</summary>
         public int Criticals { get; private set; }
         World _critWorld;
@@ -131,6 +134,7 @@ namespace CriticalMass.Runtime.Hud.Player
             Pops.Tick(w, me, alpha, cam, scale, dt);
             Tally?.Tick(w, me, Assists, Criticals);
             Channel.Tick(w, me, alpha, cam, scale, dt);
+            Hurt.SetBearing(Direction.LastBearing);
             Hurt.Tick(me, s != null && s.HasPlayer ? s.Hp01 : 1f, s != null && s.HasPlayer && s.Alive, dt);
         }
 
@@ -149,12 +153,13 @@ namespace CriticalMass.Runtime.Hud.Player
                     if (e.A >= 0 && e.B >= 0) Assists.OnHit(e.A, e.B, w.Match.Time);
                     if (e.B == me && e.A != me && e.A >= 0)
                     {
+                        PxFight.Mark();
                         Bars.OnMyHit(e.A, w.Match.Time);
                         Marker.OnMyHit(w, e.A, e.Tier, _alpha);
                         Numbers.Add(e.A, PxProject.Actor(w, e.A, _alpha, DamageNumbers.NumberLift), (float)e.Value,
                             e.Tier >= 2 ? DamageNumbers.Kind.Crit : e.Tier == 1 ? DamageNumbers.Kind.Heavy : DamageNumbers.Kind.Hit);
                     }
-                    else if (e.A == me && e.B != me && me >= 0 && me < w.ActorCount) OnHurt(w, e, me);
+                    else if (e.A == me && e.B != me && me >= 0 && me < w.ActorCount) { PxFight.Mark(); OnHurt(w, e, me); }
                     break;
                 case SimEventType.Death:
                 {
@@ -169,6 +174,12 @@ namespace CriticalMass.Runtime.Hud.Player
                 }
                 case SimEventType.HitBlocked:
                     if (e.B == me && e.A != me) Tags.OnBlocked(w, e.A, (int)e.Value, e.X, e.Z, e.Radius);
+                    else if (e.A == me && e.B != me)
+                    {
+                        Tags.OnDefended(w, me, e.B, (int)e.Value, e.Radius);
+                        if (ActionTags.IsDefence((int)e.Value)) DefendedAt = Time.unscaledTime;
+                        PxFight.Mark();
+                    }
                     break;
                 case SimEventType.AttackCancel:
                     if (e.A == me) Tags.OnInterrupted(w, me);
@@ -224,7 +235,8 @@ namespace CriticalMass.Runtime.Hud.Player
                 case SimEventType.AutopilotChanged:
                     // lane S3: the sim's idle autopilot took the local fighter (Value 1) or handed it back (0); the plate in
                     // B16MechHud holds while it drives, this tag marks both edges over the fighter.
-                    if (e.A == me) Tags.OnAutopilot(w, me, e.Value >= 0.5);
+                    // review fix round (defect 11): autopilot is told ONE way, by the plate (B16MechHud) / the guard's banner;
+                    // no extra tag over the fighter (it stacked 'You have control' on 'Autopilot on' for a frame)
                     break;
             }
         }
