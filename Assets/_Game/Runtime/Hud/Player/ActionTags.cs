@@ -57,13 +57,46 @@ namespace CriticalMass.Runtime.Hud.Player
                 case PlayerReasons.BlockedSpawnProtect: return "PROTECTED";
                 case PlayerReasons.BlockedDodge: return "DODGED";
                 case PlayerReasons.BlockedWard: return "WARD";
-                case PlayerReasons.BlockedWall: return "BLOCKED";
+                case PlayerReasons.BlockedWall: return "WALL IN THE WAY";
                 case PlayerReasons.BlockedPassive: return "IMMUNE";
                 case PlayerReasons.BlockedImmune: return "IMMUNE";
-                case PlayerReasons.BlockedShield: return amount > 0 ? Minus("SHIELD -", amount) : "SHIELD";
+                case PlayerReasons.BlockedShield: return Blocked;   // review fix (defect 6): a shield that takes the hit says BLOCKED
             }
-            if (code == BlockedGlancing) return amount > 0 ? Minus("TOO CLOSE -", amount) : "TOO CLOSE";
-            return "BLOCKED";
+            if (code == BlockedGlancing) return TooClose;   // review fix (defect 15): small and once per target per 2 s, no number
+            // a code appended later (lane DM's dodge report, ...): worded by its constant's name, never an exception
+            string name = BlockedName(code);
+            if (name != null)
+            {
+                if (name.IndexOf("Dodg", System.StringComparison.OrdinalIgnoreCase) >= 0) return Dodged;
+                if (name.IndexOf("Parr", System.StringComparison.OrdinalIgnoreCase) >= 0) return "PARRIED";
+                if (name.IndexOf("Glanc", System.StringComparison.OrdinalIgnoreCase) >= 0) return TooClose;
+            }
+            return Blocked;
+        }
+
+        public const string Blocked = "BLOCKED", Dodged = "DODGED", TooClose = "TOO CLOSE";
+        public const float GlanceRepeat = 2f;
+
+        static System.Collections.Generic.Dictionary<int, string> _blockedNames;
+        /// <summary>The PlayerReasons Blocked* constant with this value (null when none), read once by reflection.</summary>
+        public static string BlockedName(int code)
+        {
+            if (_blockedNames == null)
+            {
+                _blockedNames = new System.Collections.Generic.Dictionary<int, string>();
+                foreach (System.Reflection.FieldInfo f in typeof(PlayerReasons).GetFields(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static))
+                    if (f.IsLiteral && f.FieldType == typeof(int) && f.Name.StartsWith("Blocked") && !_blockedNames.ContainsKey((int)f.GetRawConstantValue()))
+                        _blockedNames[(int)f.GetRawConstantValue()] = f.Name;
+            }
+            return _blockedNames.TryGetValue(code, out string n) ? n : null;
+        }
+
+        /// <summary>True when a HitBlocked code is my own defence working (a dodge or a shield): worth a word over me.</summary>
+        public static bool IsDefence(int code)
+        {
+            if (code == PlayerReasons.BlockedDodge || code == PlayerReasons.BlockedShield) return true;
+            string n = BlockedName(code);
+            return n != null && (n.IndexOf("Dodg", System.StringComparison.OrdinalIgnoreCase) >= 0 || n.IndexOf("Parr", System.StringComparison.OrdinalIgnoreCase) >= 0);
         }
 
         /// <summary>The name of a PlayerReasons.Button* code.</summary>
@@ -194,9 +227,22 @@ namespace CriticalMass.Runtime.Hud.Player
             int amount = Mathf.RoundToInt((float)lost);
             string text = BlockedWords(code, amount);
             Vector3 at = PxProject.Point(w, x, z, TargetLift);
-            Text t = _words.Show(text, 1000 + code * 4 + (target & 3), target >= 0 && target < w.ActorCount ? target : -1, at, TargetLift,
-                PxPalette.StrikeInk, PxPalette.Strike, true, Seconds);
+            bool glance = code == BlockedGlancing;
+            Text t = glance
+                ? _words.Show(text, 1500 + (target & 63), target >= 0 && target < w.ActorCount ? target : -1, at, TargetLift,
+                    PxPalette.Cream, CriticalMass.Runtime.Hud.Style.CMTokens.Stone.Color, false, 0.8f, GlanceRepeat)
+                : _words.Show(text, 1000 + code * 4 + (target & 3), target >= 0 && target < w.ActorCount ? target : -1, at, TargetLift,
+                    PxPalette.StrikeInk, PxPalette.Strike, true, Seconds);
             if (t != null) PlayerFeedback.Report(FeedbackChannel.BlockedTag, target, amount, t, code);
+        }
+
+        /// <summary>Review fix (defect 6): MY defence worked (HitBlocked with me as the target: a dodge, a shield, a parry
+        /// appended later): DODGED / BLOCKED in my word row, cream on a brass rim (a success, not a hurt).</summary>
+        public void OnDefended(World w, int me, int attacker, int code, double lost)
+        {
+            if (!IsDefence(code)) return;
+            Text t = _words.Show(BlockedWords(code, 0), 2400 + code, me, Vector3.zero, SelfLift, PxPalette.Cream, PxPalette.Brass, true, Seconds);
+            if (t != null) PlayerFeedback.Report(FeedbackChannel.BlockedTag, me, Mathf.RoundToInt((float)lost), t, code);
         }
 
         public void OnInterrupted(World w, int me)

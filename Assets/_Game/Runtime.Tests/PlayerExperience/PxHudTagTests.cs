@@ -35,11 +35,14 @@ namespace CriticalMass.Runtime.Tests.PlayerExperience
             {
                 string w = ActionTags.BlockedWords(c.Value, 12);
                 Assert.IsFalse(string.IsNullOrEmpty(w), c.Key);
-                if (c.Value != PlayerReasons.BlockedWall) Assert.AreNotEqual("BLOCKED", w, c.Key + " falls through to the generic word");
+                if (c.Value != PlayerReasons.BlockedShield) Assert.AreNotEqual("BLOCKED", w, c.Key + " falls through to the generic word (only a shield says BLOCKED)");
                 Assert.LessOrEqual(w.Length, 16, c.Key + " fits one pill");
             }
-            Assert.AreEqual("SHIELD -12", ActionTags.BlockedWords(PlayerReasons.BlockedShield, 12));
-            Assert.AreEqual("TOO CLOSE -5", ActionTags.BlockedWords(ActionTags.BlockedGlancing, 5));
+            Assert.AreEqual("BLOCKED", ActionTags.BlockedWords(PlayerReasons.BlockedShield, 12), "a shield that takes the hit says BLOCKED");
+            Assert.AreEqual("DODGED", ActionTags.BlockedWords(PlayerReasons.BlockedDodge, 0));
+            Assert.IsTrue(ActionTags.IsDefence(PlayerReasons.BlockedDodge) && ActionTags.IsDefence(PlayerReasons.BlockedShield));
+            Assert.IsFalse(ActionTags.IsDefence(PlayerReasons.BlockedWall) || ActionTags.IsDefence(PlayerReasons.BlockedSpawnProtect));
+            Assert.AreEqual("TOO CLOSE", ActionTags.BlockedWords(ActionTags.BlockedGlancing, 5), "the glancing word is small and has no number");
         }
 
         [Test]
@@ -69,7 +72,7 @@ namespace CriticalMass.Runtime.Tests.PlayerExperience
             Assert.AreEqual("CAN'T DODGE WHILE CARRYING", ActionTags.RefusalWords(PlayerReasons.ButtonDodge, 11, ClassId.Farmer, 0));
             Assert.AreEqual("ALREADY IN THE AIR", ActionTags.RefusalWords(PlayerReasons.ButtonJump, 12, ClassId.Warrior, 0));
             Assert.AreEqual("GATHERED", WorldPops.WorldWordsFor(10, 1));
-            Assert.AreEqual("TOO CLOSE -4", ActionTags.BlockedWords(8, 4));
+            Assert.AreEqual("TOO CLOSE", ActionTags.BlockedWords(8, 4));
             // never an exception, always words
             foreach (int code in new[] { -999, -1, 0, 99, int.MaxValue })
             {

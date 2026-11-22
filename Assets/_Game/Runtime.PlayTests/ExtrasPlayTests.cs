@@ -122,7 +122,7 @@ namespace CriticalMass.Runtime.PlayTests
             _menu.ShowSettings((PauseMenu.Tab)4);
             yield return null;
             Item("HIDE NAMES").Stepped(1);
-            Item("CLEAN HUD   (H)").Stepped(1);
+            Item("CLEAN HUD").Stepped(1);
             Item("SUBTITLES").Stepped(1);
             Item("UI SCALE").Stepped(1);
             Item("INTENSE FLASHING").Stepped(1);
@@ -161,24 +161,21 @@ namespace CriticalMass.Runtime.PlayTests
         }
 
         [UnityTest]
-        public IEnumerator HTogglesTheCleanHudAndUiScaleScalesTheHud()
+        public IEnumerator HNoLongerTogglesTheCleanHudAndUiScaleScalesTheHud()
         {
+            // player-experience combine (lane I): H is Interact on the J K L layout, so it no longer toggles the clean HUD
+            // (the CLEAN HUD row on the extras page does)
             GameHud hud = _driver.GetComponent<GameHud>();
             Assert.IsNotNull(hud);
             yield return null;
             Assert.IsTrue(hud.Canvas.enabled);
+            bool before = SettingsExtras.CleanHud;
             InputSystem.QueueStateEvent(_kb, new KeyboardState(Key.H));
             yield return null;
             InputSystem.QueueStateEvent(_kb, new KeyboardState());
             yield return null;
-            Assert.IsTrue(SettingsExtras.CleanHud);
-            Assert.IsFalse(hud.Canvas.enabled, "H hides the HUD");
-            InputSystem.QueueStateEvent(_kb, new KeyboardState(Key.H));
-            yield return null;
-            InputSystem.QueueStateEvent(_kb, new KeyboardState());
-            yield return null;
-            Assert.IsFalse(SettingsExtras.CleanHud);
-            Assert.IsTrue(hud.Canvas.enabled, "H shows it again");
+            Assert.AreEqual(before, SettingsExtras.CleanHud, "H does not toggle the clean HUD");
+            Assert.IsTrue(hud.Canvas.enabled, "H does not hide the HUD");
 
             SettingsExtras.UiScalePercent = 120;
             yield return null;

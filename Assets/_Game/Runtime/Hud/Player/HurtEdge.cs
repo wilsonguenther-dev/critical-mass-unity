@@ -17,8 +17,8 @@ namespace CriticalMass.Runtime.Hud.Player
     /// </summary>
     public sealed class HurtEdge
     {
-        public const float LowEnter = 0.30f, LowExit = 0.35f, LowHz = 1.2f, HurtSeconds = 0.35f, WordSeconds = 2.5f;
-        public const float HurtMin = 0.22f, HurtMax = 0.7f, LowMin = 0.16f, LowMax = 0.42f, LowSteady = 0.3f;
+        public const float LowEnter = 0.30f, LowExit = 0.35f, LowHz = 0.8f, HurtSeconds = 0.25f, WordSeconds = 2.5f, WordPx = 28f;
+        public const float HurtMin = 0.22f, HurtMax = 0.7f, LowMin = 0.34f, LowMax = 0.62f, LowSteady = 0.5f, SideFloor = 0.12f;
         public const string LowWord = "LOW HEALTH";
 
         /// <summary>The low-health state after one step (pure; tests): enter below LowEnter, leave at or above LowExit.</summary>
@@ -36,18 +36,20 @@ namespace CriticalMass.Runtime.Hud.Player
         /// <summary>True while the low-health warning is on (GameHud tints the card's bar).</summary>
         public bool Low => _isLow;
         /// <summary>The card bar colour while low (pulsing unless REDUCE FLASHING).</summary>
-        public Color LowBarColour { get; private set; } = PxPalette.Hurt;
+        public Color LowBarColour { get; private set; } = PxPalette.LowInk;
         public PxEdgeGlow HurtGlow => _hurt;
         public Text Word => _word;
 
         public HurtEdge(RectTransform root, RectTransform playerCard)
         {
-            _hurt = Edge(root, "Hurt Vignette", 0.22f, out _hurtGroup);
-            _low = Edge(root, "Low Health Edge", 0.16f, out _lowGroup);
+            _hurt = Edge(root, "Hurt Vignette", 0.18f, out _hurtGroup);
+            _low = Edge(root, "Low Health Edge", 0.30f, out _lowGroup);
+            _low.color = PxPalette.LowVignette;   // review fix (defect 10): a dark heartbeat vignette, not the hurt magenta
             if (playerCard != null)
             {
                 // over the health plate (it starts at y 22 of the card), clear of the ability names (x >= 392)
-                _word = PxUi.Label(playerCard, "Low Health Word", CMTokens.Display, UiScale.TypeSmall, PxPalette.Hurt, TextAnchor.MiddleLeft, 136f, -2f, 240f, 24f, 2.5f);
+                // review fix (defect 10): 28 px (was ~16), orange, just above the health plate and under the tally line
+                _word = PxUi.Label(playerCard, "Low Health Word", CMTokens.Display, (int)WordPx, PxPalette.LowInk, TextAnchor.MiddleLeft, 136f, -14f, 300f, 34f, 3f);
                 _word.text = LowWord;
                 _word.gameObject.SetActive(false);
             }
@@ -91,6 +93,30 @@ namespace CriticalMass.Runtime.Hud.Player
             if (_word != null) PxUi.Show(_word, false);
         }
 
+        /// <summary>Per-edge strength of a hurt flash from bearing (degrees clockwise from screen-up; pure; tests): the edge
+        /// facing the hit is full, the opposite one SideFloor.</summary>
+        public static Vector4 SidesFor(float bearing)
+        {
+            float r = bearing * Mathf.Deg2Rad, up = Mathf.Cos(r), right = Mathf.Sin(r);
+            return new Vector4(Mathf.Max(SideFloor, -up), Mathf.Max(SideFloor, right), Mathf.Max(SideFloor, up), Mathf.Max(SideFloor, -right));
+        }
+
+        /// <summary>A heartbeat: two beats a cycle (lub-dub), 0..1 (pure; tests).</summary>
+        public static float Heartbeat(float phase)
+        {
+            float f = phase - Mathf.Floor(phase);
+            float a = Mathf.Exp(-Mathf.Pow((f - 0.08f) / 0.05f, 2f)), b = 0.7f * Mathf.Exp(-Mathf.Pow((f - 0.28f) / 0.06f, 2f));
+            return Mathf.Clamp01(a + b);
+        }
+
+        /// <summary>Points the showing hurt flash at the side the hit came from (DamageDirection's last bearing).</summary>
+        public void SetBearing(float bearing)
+        {
+            if (_hurtA <= 0f) return;
+            Vector4 s = SidesFor(bearing);
+            if ((s - _hurt.Sides).sqrMagnitude > 0.004f) { _hurt.Sides = s; _hurt.SetVerticesDirty(); }
+        }
+
         public void Tick(int me, float hp01, bool alive, float dt)
         {
             if (_hurtA > 0f)
@@ -117,10 +143,10 @@ namespace CriticalMass.Runtime.Hud.Player
             }
             _lowT += dt;
             float phase = _lowT * LowHz;
-            float wave = 0.5f - 0.5f * Mathf.Cos(phase * Mathf.PI * 2f);
+            float wave = Heartbeat(phase);
             if (!calm && Mathf.Floor(phase) != _lastCycle) { _lastCycle = Mathf.Floor(phase); PxFlashBudget.TryOnset(Time.unscaledTime); }
             PxUi.Alpha(_lowGroup, calm ? LowSteady : Mathf.Lerp(LowMin, LowMax, wave));
-            LowBarColour = calm ? PxPalette.Hurt : Color.Lerp(PxPalette.Hurt, PxPalette.StrikeInk, wave * 0.6f);
+            LowBarColour = PxPalette.LowInk;   // steady orange: the vignette carries the beat
             if (_word != null && _wordAge < WordSeconds)
             {
                 _wordAge += dt;

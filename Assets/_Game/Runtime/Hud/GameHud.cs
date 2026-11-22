@@ -841,6 +841,10 @@ namespace CriticalMass.Runtime.Hud
 
         void ApplyKaiju(HudState s)
         {
+            // review fix (lane F): no Kaiju in this mode (Duel, Practice Range): no egg countdown, no meter, no panel
+            RectTransform kc = Clusters[(int)HudCluster.Kaiju];
+            if (kc != null && kc.gameObject.activeSelf == s.NoKaiju) kc.gameObject.SetActive(!s.NoKaiju);
+            if (s.NoKaiju) return;
             bool egg = !s.Hatched || s.Kaiju == KaijuState.Egg;
             Color state = KaijuColour(s.Kaiju);
             _eggFrame.SetRim(egg ? CMTokens.EggSeam.Color : state);

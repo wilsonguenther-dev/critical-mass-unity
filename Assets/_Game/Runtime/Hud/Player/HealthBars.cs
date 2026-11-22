@@ -218,7 +218,7 @@ namespace CriticalMass.Runtime.Hud.Player
                 float k = WidthFor(dist) * (focus ? FocusScale : 1f) / BaseW;
                 if (Mathf.Abs(b.Scale - k) > 0.01f) { b.Scale = k; b.Rt.localScale = new Vector3(k, k, 1f); }
                 float tag = low ? TagLens.Scale(dist) : 1f;
-                b.Rt.anchoredPosition = p / scale - new Vector2(0f, TagHalfPx * tag + GapPx + (BaseH + 2f * FramePx) * k * 0.5f);
+                b.Rt.anchoredPosition = UnitStack.BarCentre(p / scale, tag, (BaseH + 2f * FramePx) * k);   // review fix: one layout owner
                 Color fill = enemy ? PxPalette.Strike : CMTokens.Team(a.Team);
                 if (b.Glow > 0f) fill = Color.Lerp(fill, PxPalette.Heal, b.Glow / HealGlowSeconds);
                 b.Fill.SetFill(fill);
@@ -228,8 +228,8 @@ namespace CriticalMass.Runtime.Hud.Player
                 if (focus != b.Focus)
                 {
                     b.Focus = focus;
-                    b.Word.gameObject.SetActive(focus);
-                    if (focus) HudText.Set(b.Word, KillWords.ClassUpper[Mathf.Clamp((int)a.Cls, 0, KillWords.ClassUpper.Length - 1)]);
+                    // review fix round (defect 4, fewer things): no class word under the focus bar; the name tag names him
+                    b.Word.gameObject.SetActive(false);
                 }
                 if (ev > 0) PlayerFeedback.Report(enemy ? FeedbackChannel.EnemyHealthBar : FeedbackChannel.AllyHealthBar, i, b.Shown, b.Fill);
             }

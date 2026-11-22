@@ -461,14 +461,14 @@ namespace CriticalMass.Runtime.Hud
             float ease = 1f - (1f - _popT) * (1f - _popT);
             // HUD zones: the bubble steps back (transparent, still live) while the death recap or the "you are the ..."
             // line holds the lower lane beside it.
-            bool yield = HudZones.Blocked(HudZone.Lower, HudPriority.Guide);
+            bool yield = HudZones.Blocked(HudZone.Lower, HudPriority.Guide) || CriticalMass.Runtime.Hud.Player.PxFight.Active;   // review fix: never over a fight
             _group.alpha = yield ? 0f : Mathf.Lerp(0f, 1f, Mathf.Clamp01(_popT * 2f));
             float y = Mathf.Lerp(_fromY, _toY, 1f - (1f - _slideT) * (1f - _slideT));
             if (_slideT >= 1f) _fromY = _toY;
             Place(_panel, Margin - (1f - ease) * 40f, y, PanelW, PanelH);
             _panel.localScale = Vector3.one * Mathf.Lerp(0.92f, 1f, ease);
             Place(_chip, Margin, y + PanelH - ChipSize, ChipSize, ChipSize);
-            HudText.Set(_chipKey, ControlDeviceKey());
+            HudText.Set(_chipKey, HardKeysAllowed ? ControlDeviceKey() : string.Empty);
 
             // Pose: the expression lives in the portrait art; the pose sells it on the stand-in too.
             float k = 1f - _reactT;
@@ -521,8 +521,13 @@ namespace CriticalMass.Runtime.Hud
             if (showPoint) _pointPivot.localRotation = Quaternion.Euler(0, 0, Mathf.Atan2(_pointDir.y, _pointDir.x) * Mathf.Rad2Deg);
         }
 
+        /// <summary>Review fix round (defect 1): no hard-coded key in a live match: G is Ping and D-pad Up is the Map there.
+        /// In play the guide steps back by itself while the player fights (PxFight) and comes back after.</summary>
+        public static bool HardKeysAllowed => !CriticalMass.Runtime.Flow.GameFlow.LiveMatchView;
+
         static bool TogglePressed()
         {
+            if (!HardKeysAllowed) return false;
             Keyboard kb = Keyboard.current;
             if (kb != null && kb.gKey.wasPressedThisFrame) return true;
             Gamepad pad = Gamepad.current;
