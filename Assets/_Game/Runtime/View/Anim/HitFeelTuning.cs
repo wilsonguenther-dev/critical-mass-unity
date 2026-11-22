@@ -126,7 +126,7 @@ namespace CriticalMass.Runtime.View.Anim
         public const double StrikeFrames = 5;
         public const double StrikeSecondsTarget = StrikeFrames / RenderHz;
         /// <summary>The strike never takes more than this share of a short wind-up (the anticipation needs the rest).</summary>
-        public const double StrikeMaxShare = 0.45;
+        public const double StrikeMaxShare = 0.4;   // the share the fix/hit-feel-3 tests encode
         /// <summary>Ease from the clip start into the wind-up extreme (the anticipation pose), sim s at most.</summary>
         public const double AnticipationSeconds = 0.12;
         /// <summary>Standing still, the base layer (hips, legs) also plays the swing at this weight against idle 1 (75%).</summary>
