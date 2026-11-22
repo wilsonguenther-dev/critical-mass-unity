@@ -254,6 +254,10 @@ namespace CriticalMass.Runtime.Menu
             }
             set
             {
+                // lane C fix round (review defect 12, the owner's ruling: first person is hidden): with the switch off the
+                // setter refuses FirstPerson and stores THIRD PERSON, so nothing can ask for a view the game does not give.
+                if (value == CriticalMass.Runtime.Camera.CameraView.FirstPerson && !CriticalMass.Runtime.Camera.FollowCamera.FirstPersonEnabled)
+                    value = CriticalMass.Runtime.Camera.CameraView.ThirdPerson;
                 if (value != CriticalMass.Runtime.Camera.CameraView.TopDown) PlayerPrefs.SetInt(CameraViewKey, (int)value);
                 SetB(GroundCameraKey, value != CriticalMass.Runtime.Camera.CameraView.TopDown);
             }
