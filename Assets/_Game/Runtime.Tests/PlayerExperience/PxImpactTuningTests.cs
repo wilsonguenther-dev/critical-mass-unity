@@ -340,6 +340,18 @@ namespace CriticalMass.Runtime.Tests
             finally { UnityEngine.Object.DestroyImmediate(asset); }
         }
 
+        /// <summary>Fix round 5 (item 8): the first-match class-pick card's body line is 26 px at 1080p (at least 22 if it must
+        /// shrink), three lines fit its box, and DIFFICULTY is above the 16 px floor.</summary>
+        [Test]
+        public void TheClassPickCardBodyTextIsReadableAt1080p()
+        {
+            Assert.GreaterOrEqual(CriticalMass.Runtime.Menus.StarterPick.BodyType, 26);
+            Assert.GreaterOrEqual(CriticalMass.Runtime.Menus.StarterPick.BodyTypeMin, 22);
+            Assert.LessOrEqual(3 * CriticalMass.Runtime.Menus.StarterPick.BodyType * CriticalMass.Runtime.Menus.StarterPick.BodyLineSpacing,
+                CriticalMass.Runtime.Menus.StarterPick.BodyBoxH, "three lines fit the box");
+            Assert.Greater(CriticalMass.Runtime.Menus.StarterPick.DifficultyType, CriticalMass.Runtime.Hud.Style.UiScale.TypeMin);
+        }
+
         [Test]
         public void TheTopDownAimLeanIsCappedAndUsesTheRawAim()
         {

@@ -21,6 +21,11 @@ namespace CriticalMass.Runtime.Menus
     {
         public const string DoneKey = "cm.flow.starterpick.done";
         public const float CardW = 500f, CardH = 250f, CardGap = 30f, Row0 = 200f, Row1 = 520f;
+        /// <summary>Fix round 5 (item 8, review pass 4: the card text read very small at 1080p): the card's body line at 26 px
+        /// (was the 22 px body size; shrinks to 22 only if a line would not fit its box), three lines in the 104 px box; the
+        /// DIFFICULTY label at the 18 px secondary size (was the 16 px floor).</summary>
+        public const int BodyType = 26, BodyTypeMin = UiScale.TypeBody, DifficultyType = UiScale.TypeSmall;
+        public const float BodyBoxH = 104f, BodyLineSpacing = 1.05f;
 
         /// <summary>The order on screen: the three recommended starters first.</summary>
         public static readonly ClassId[] Order = { ClassId.Farmer, ClassId.Warrior, ClassId.Miner, ClassId.Healer, ClassId.Demolitions, ClassId.Builder };
@@ -143,11 +148,12 @@ namespace CriticalMass.Runtime.Menus
             Text name = MenuUi.Label(t, "Name", CMTokens.Display, UiScale.TypeLead, Cream, TextAnchor.MiddleLeft, 28f, 24f, CardW - 56f, 54f, "", 3f);
             MenuUi.Fit(name, UiScale.TypeSmall);
             Words(name, FlowWords.ClassName(c));
-            Text line = MenuUi.Label(t, "Does", CMTokens.Ui, UiScale.TypeBody, Cream, TextAnchor.UpperLeft, 28f, 88f, CardW - 56f, 104f, "", 2f);
+            Text line = MenuUi.Label(t, "Does", CMTokens.Ui, BodyType, Cream, TextAnchor.UpperLeft, 28f, 88f, CardW - 56f, BodyBoxH, "", 2f);
             line.horizontalOverflow = HorizontalWrapMode.Wrap;
-            line.lineSpacing = 1.05f;
+            line.lineSpacing = BodyLineSpacing;
+            MenuUi.Fit(line, BodyTypeMin);
             Words(line, Does(c));
-            Text dl = MenuUi.Label(t, "Difficulty Label", CMTokens.Ui, UiScale.TypeMin, CMTokens.WithAlpha(Cream, 0.75f), TextAnchor.MiddleLeft, 28f, 198f, 140f, 28f, "", 2f);
+            Text dl = MenuUi.Label(t, "Difficulty Label", CMTokens.Ui, DifficultyType, CMTokens.WithAlpha(Cream, 0.75f), TextAnchor.MiddleLeft, 28f, 198f, 140f, 28f, "", 2f);
             Words(dl, "DIFFICULTY");
             if (recommended)
             {
