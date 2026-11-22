@@ -70,6 +70,7 @@ namespace CriticalMass.Sim.Diagnostics
         private int _lastKills;
         private Move _move;
         private InputFrame _frame;
+        private bool _wasAlive = true;
 
         private const int Buttons = 8;
         private const int ButtonJump = PlayerReasons.ButtonJump;
@@ -135,9 +136,13 @@ namespace CriticalMass.Sim.Diagnostics
             for (int k = 0; k < _tickEvents.Count; k++) Effects(w, _tickEvents[k], tick);
             Contacts(w, tick);
             JumpCheck(w, tick);
+            if (!me.Alive)
+                for (int k = 0; k < _open.Count; k++)
+                    if (_open[k].Resolved == null && _open[k].Kind != "hit_taken") Resolve(_open[k], tick, "died", 0, null);   // killed before the answer came
             Timeouts(tick);
             Sample(w, f, auto, tick);
             Close(w, tick, false);
+            _wasAlive = me.Alive;
         }
 
         /// <summary>
@@ -280,7 +285,7 @@ namespace CriticalMass.Sim.Diagnostics
             };
             if (kind == "press") { Presses++; if (button > 0 && button < Buttons) _pressTick[button] = tick; }
             else if (kind == "repeat") Repeats++;
-            if (!a.Alive && kind != "hit_taken") Resolve(r, tick, "dead", 0, "dead");
+            if (!a.Alive && !_wasAlive && kind != "hit_taken") Resolve(r, tick, "dead", 0, "dead");   // pressed while already dead
             Target(w, r);
             _open.Add(r);
             return r;
@@ -409,6 +414,11 @@ namespace CriticalMass.Sim.Diagnostics
                     return;
                 case SimEventType.TntThrown:
                     r = Waiting(PlayerReasons.ButtonAttack) ?? Waiting(PlayerReasons.ButtonAbility) ?? Waiting(PlayerReasons.ButtonDigPlace);
+                    if (r == null)
+                    {
+                        Rec same = ResolvedLatest("tnt");   // the throw's Ability event (TntThrownCode) already answered the press this tick
+                        if (same != null && same.ResolveTick == tick) r = same;
+                    }
                     if (r == null && attackHeld) r = Open(w, "repeat", PlayerReasons.ButtonAttack, tick);
                     Resolve(r, tick, "tnt", 0, null);
                     if (r != null) r.CloseAt = Math.Max(r.CloseAt, tick + 3 * CueWindowTicks);   // fuse: keep it open for the blast

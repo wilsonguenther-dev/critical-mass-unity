@@ -112,7 +112,7 @@ sim_hz, tick, actors, resolve_window_ticks, cue_window_ticks, move_sample_ticks`
 winding_up} (after the press tick's step), resolved, resolve_ticks`, then:
 - `resolved`: `swing_started | buffered | refused | ability | tnt | mend | pulse | dodge | feint | hit_cancel | jump |
   dig | place | mine | build | mine_placed | piece_placed | barricade | gather | bank | feed | corrupt | purify | repair |
-  Gather | SourceGather | DeliverBiomass | BankDeposit | Handoff | PiecePickedUp ... (event names) | dead | nothing`
+  Gather | SourceGather | DeliverBiomass | BankDeposit | Handoff | PiecePickedUp ... (event names) | dead (pressed while dead) | died (killed before the answer came) | nothing`
 - refused: `reason` (the `PlayerReasons.Refused*` code, or the system's own negative code) and `reason_name`
   (`cooldown, no_target, not_your_class, no_resource, blocked_place, staggered, carry_full, out_of_range,
   nothing_to_cancel, team_limit, carrying, in_air, rule_off`, or `terraform:someone_there`, `piece:no_target`,
