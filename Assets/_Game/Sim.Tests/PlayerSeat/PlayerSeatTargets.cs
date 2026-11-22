@@ -82,6 +82,8 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
         public const double ChaseRunnerHpShare = 0.29;
         /// <summary>S11: a lag-6 human Warrior lands the finishing hit within this...</summary>
         public const double ChaseSeconds = 4;
+        /// <summary>px S4: the runner starts this far outside the Warrior's reach (range + runner radius), already in Retreat.</summary>
+        public const double ChaseStartBeyondReach = 0.5;
         /// <summary>... in a share of 8 angles in this band (above the top: no escape at all for the runner, against Travis's rule).</summary>
         public const double ChaseCatchShareMin = 0.40, ChaseCatchShareMax = 0.80;   // PLAN.md P3 (40 to 80%); the gate brief's first numbers were 0.50 / 0.90
 

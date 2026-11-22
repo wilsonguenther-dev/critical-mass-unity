@@ -184,19 +184,40 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
         [TestCase(ClassId.Healer)]
         public void S11_Warrior_Chase_CatchesRunnerAt30Pct(ClassId runner)
         {
+            // px S4 rig: the runner used to start 1.5 u away, inside the Warrior's reach, and standing in HoldHill (hold 0.7 +
+            // inertia 0.25 beats the 0.9 retreat score, so it never fled: "retreated in 0"), so it was always caught. The test
+            // is a FLEEING target (PLAN P3: "a chance of escape"): it now starts ChaseStartBeyondReach outside the Warrior's
+            // reach, already running: in Retreat, moving away from the Warrior at its full speed. Band unchanged.
             int caught = 0, retreated = 0;
+            GameConfig gc = PlayerSeatRig.Config();
+            double gap = gc.Class(ClassId.Warrior).AttackRange + gc.Class(runner).Radius + T.ChaseStartBeyondReach;
             for (int k = 0; k < T.Angles; k++)
             {
-                Seat s = PlayerSeatRig.Duel(ClassId.Warrior, runner, TargetMode.RealBot, PlayerSeatRig.AngleOf(k, T.Angles), k, T.HumanLagTicks, distance: 1.5);
+                Seat s = PlayerSeatRig.Duel(ClassId.Warrior, runner, TargetMode.RealBot, PlayerSeatRig.AngleOf(k, T.Angles), k, T.HumanLagTicks, distance: gap);
                 s.W.Actors[s.Them].Hp = T.ChaseRunnerHpShare * s.W.Actors[s.Them].MaxHp;
-                bool ran = false;
-                s.BeforeTick = q => ran |= q.W.Actors[q.Them].AiState == AiState.Retreat;
+                bool ran = false, started = false;
+                s.BeforeTick = q =>
+                {
+                    World qw = q.W;
+                    if (!started)
+                    {
+                        started = true;
+                        BotsState bs = BotBrain.GetBotsState(qw);
+                        qw.Actors[q.Them].AiState = AiState.Retreat;
+                        if (bs != null) bs.StateSince[q.Them] = qw.Match.Time;
+                        double ux = qw.X[q.Them] - qw.X[q.Me], uz = qw.Z[q.Them] - qw.Z[q.Me], ud = Math.Sqrt(ux * ux + uz * uz);
+                        double sp = qw.Config.Class(runner).MoveSpeed;
+                        qw.Vx[q.Them] = ux / ud * sp;
+                        qw.Vz[q.Them] = uz / ud * sp;
+                    }
+                    ran |= qw.Actors[q.Them].AiState == AiState.Retreat;
+                };
                 DuelResult r = PlayerSeatRig.Play(s, T.ChaseSeconds);
                 if (r.Won) caught++;
                 if (ran) retreated++;
             }
             double share = (double)caught / T.Angles;
-            bool ok = PxLog.Line("S11 Warrior_Chase_CatchesRunnerAt30Pct", "lag-6 Warrior vs " + runner + " bot at 29%", caught + "/" + T.Angles + " caught within " + T.ChaseSeconds + " s (bot retreated in " + retreated + ")", "share in [" + T.ChaseCatchShareMin + ", " + T.ChaseCatchShareMax + "]", share >= T.ChaseCatchShareMin && share <= T.ChaseCatchShareMax);
+            bool ok = PxLog.Line("S11 Warrior_Chase_CatchesRunnerAt30Pct", "lag-6 Warrior vs a running " + runner + " bot at 29%, " + PxLog.F(T.ChaseStartBeyondReach) + " u outside reach", caught + "/" + T.Angles + " caught within " + T.ChaseSeconds + " s (bot retreated in " + retreated + ")", "share in [" + T.ChaseCatchShareMin + ", " + T.ChaseCatchShareMax + "]", share >= T.ChaseCatchShareMin && share <= T.ChaseCatchShareMax);
             Assert.IsTrue(ok);
         }
 
