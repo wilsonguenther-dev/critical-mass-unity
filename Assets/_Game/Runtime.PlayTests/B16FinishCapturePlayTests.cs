@@ -32,6 +32,10 @@ namespace CriticalMass.Runtime.PlayTests
             ? d : Path.Combine(Application.temporaryCachePath, "b16-finish-captures");
 
         SanityWorld _w;
+#if UNITY_EDITOR
+        InputSettings.EditorInputBehaviorInPlayMode _editorInput;
+        bool _restoreInput;
+#endif
         readonly List<InputDevice> _devices = new List<InputDevice>();
 
         static void Mute()
@@ -55,6 +59,9 @@ namespace CriticalMass.Runtime.PlayTests
             foreach (InputDevice d in _devices) if (d != null && d.added) InputSystem.RemoveDevice(d);
             _devices.Clear();
             ChatSettings.TypedText = false;   // ships off; a test turned it on only for the Esc order
+#if UNITY_EDITOR
+            if (_restoreInput) { InputSystem.settings.editorInputBehaviorInPlayMode = _editorInput; _restoreInput = false; }
+#endif
             SanityWorld.Reset();
             yield return null;
         }
@@ -226,6 +233,8 @@ namespace CriticalMass.Runtime.PlayTests
             int landedAt = -1;
             for (int t = 0; t < 60; t++)
             {
+                // the Farmer's bot brain walks off between ticks: hold it in front of the swing until it lands
+                if (w.Actors[foe].Alive) Put(w, foe, w.X[0] + 1.6 * dx, w.Z[0] + 1.6 * dz);
                 _w.Tick(1);
                 if (w.Actors[foe].Hp < hp0 || !w.Actors[foe].Alive) { landedAt = t; break; }
             }
@@ -251,6 +260,12 @@ namespace CriticalMass.Runtime.PlayTests
         public IEnumerator OnlineChatPausePanelEscOrderAndWheel()
         {
             Assert.IsFalse(ChatSettings.TypedText, "typed chat ships off");
+#if UNITY_EDITOR
+            // a batch-mode Editor has no focused Game view: let the virtual keyboard reach the game (restored in TearDown)
+            _editorInput = InputSystem.settings.editorInputBehaviorInPlayMode;
+            InputSystem.settings.editorInputBehaviorInPlayMode = InputSettings.EditorInputBehaviorInPlayMode.AllDeviceInputAlwaysGoesToGameView;
+            _restoreInput = true;
+#endif
             var net = new CriticalMass.Net.LoopbackNetwork(7, 0, 0, 0);
             OnlineMatch.HostRoom(net.CreatePeer(), null, "Host");
             Assert.IsTrue(OnlineMatch.InRoom, "the loopback room did not open");
