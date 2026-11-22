@@ -16,8 +16,16 @@ namespace CriticalMass.Runtime.Input
         /// <summary>The final aim point sent to the sim this frame (valid while HasAim).</summary>
         public static bool HasAim;
         public static double AimX, AimZ;
-        /// <summary>0 = assist off, 1 = full strength (the setting in effect for the device in use).</summary>
+        /// <summary>0 = assist off, 1 = full strength (the setting in effect for the device in use): Low 0.5, High 1.</summary>
         public static float Strength;
+        /// <summary>Lane I: the hurt ally the Healer's press is bent toward this frame (-1 none; LockTarget stays enemy-only).</summary>
+        public static int AllyTarget = -1;
+        /// <summary>Lane I: the aim before the assist (the mouse point, the stick/keys point, or the camera point), so a
+        /// camera that must not follow the assist (lane C) can read the player's own aim.</summary>
+        public static bool RawHasAim;
+        public static double RawAimX, RawAimZ;
+        /// <summary>Lane I: the device class whose AIM HELP setting is in effect.</summary>
+        public static AimDevice Device;
 
         public static void Clear()
         {
@@ -25,6 +33,8 @@ namespace CriticalMass.Runtime.Input
             HittableTarget = -1;
             HasAim = false;
             Strength = 0;
+            AllyTarget = -1;
+            RawHasAim = false;
         }
     }
 }
