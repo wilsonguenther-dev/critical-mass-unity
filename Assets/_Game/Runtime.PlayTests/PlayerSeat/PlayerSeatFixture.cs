@@ -1,0 +1,307 @@
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.Linq;
+using System.Reflection;
+using CriticalMass.Runtime.Game;
+using CriticalMass.Runtime.Hud;
+using CriticalMass.Runtime.Menu;
+using CriticalMass.Sim.Config;
+using CriticalMass.Sim.Core;
+using NUnit.Framework;
+using UnityEngine;
+using UnityEngine.InputSystem;
+using UnityEngine.UI;
+using CameraView = CriticalMass.Runtime.Camera.CameraView;
+using Object = UnityEngine.Object;
+
+namespace CriticalMass.Runtime.PlayTests.PlayerSeat
+{
+    /// <summary>
+    /// Player-seat gate, tier F: the Input System's own test fixture (Input System 1.20 manual, "Set up test fixtures": a blank,
+    /// default-initialised Input System per test, restored afterwards; derive and override Setup / TearDown, calling base).
+    /// REAL devices (Keyboard, Mouse, Gamepad added inside the fixture) drive the shipped HumanInputSource of the Boot scene;
+    /// the sim clock is stopped and the test steps it a tick at a time (SanityWorld). Every test runs in the camera view it is
+    /// given (TopDown = a fresh install, ThirdPerson = the owner's prefs); the camera, clean-HUD and reduce-motion prefs the
+    /// fixture touches are saved first and restored in TearDown, nothing else is written.
+    /// </summary>
+    public abstract class PlayerSeatFixture : InputTestFixture
+    {
+        private protected SanityWorld S;
+        protected Keyboard Kb;
+        protected Mouse Ms;
+        protected Gamepad Pad;
+        protected World W => S.W;
+        protected int Me => 0;
+        protected int Enemy = -1;
+        protected int LedgerCursor;
+        protected readonly List<string> Notes = new List<string>();
+
+        static readonly string[] SavedKeys = { GameSettings.GroundCameraKey, GameSettings.CameraViewKey, SettingsExtras.CleanHudKey, GameSettings.ReduceMotionKey };
+        readonly Dictionary<string, int?> _saved = new Dictionary<string, int?>();
+
+        public override void Setup()
+        {
+            base.Setup();
+            foreach (string k in SavedKeys) _saved[k] = PlayerPrefs.HasKey(k) ? PlayerPrefs.GetInt(k) : (int?)null;
+            InputSettings s = InputSystem.settings;
+            s.backgroundBehavior = InputSettings.BackgroundBehavior.IgnoreFocus;
+            s.editorInputBehaviorInPlayMode = InputSettings.EditorInputBehaviorInPlayMode.AllDeviceInputAlwaysGoesToGameView;
+            Kb = InputSystem.AddDevice<Keyboard>();
+            Ms = InputSystem.AddDevice<Mouse>();
+            Pad = InputSystem.AddDevice<Gamepad>();
+            Notes.Clear();
+        }
+
+        public override void TearDown()
+        {
+            foreach (var kv in _saved)
+            {
+                if (kv.Value.HasValue) PlayerPrefs.SetInt(kv.Key, kv.Value.Value);
+                else PlayerPrefs.DeleteKey(kv.Key);
+            }
+            PlayerPrefs.Save();
+            SanityWorld.Reset();
+            base.TearDown();
+        }
+
+        /// <summary>Loads Boot with actor 0 as cls in the given view, the real input reader ON, the sim clock stopped.</summary>
+        protected IEnumerator Load(ClassId cls, CameraView view, bool reduceMotion = false)
+        {
+            GameSettings.CameraView = view;
+            SettingsExtras.CleanHud = false;
+            GameSettings.ReduceMotion = reduceMotion;
+            S = new SanityWorld();
+            yield return S.Load(cls, manualInput: false, settleSeconds: 1);
+            PlayerFeedback.Clear();
+            Ms.MakeCurrent();
+            for (int f = 0; f < 10; f++) yield return null;
+            Assert.AreEqual(view, GameSettings.CameraView, "the fixture set the view");
+            LedgerCursor = PlayerFeedback.Head;
+        }
+
+        /// <summary>
+        /// Takes every body but actor 0 out of the match and puts enemy slot k of class cls dist u from actor 0 in direction
+        /// (dx, dz) (unit, sim space). The enemy stays a bot unless the test pins it (Pin) each tick.
+        /// </summary>
+        protected int Isolate(ClassId cls, double dist, double dx, double dz)
+        {
+            World w = W;
+            int e = w.ActorCount / 2;
+            for (int j = 1; j < w.ActorCount; j++)
+            {
+                if (j == e) continue;
+                w.Actors[j].Alive = false;
+                w.Actors[j].RespawnIn = 1e9;
+                w.MeatDropped[j] = 1;
+                w.Depth.WasAlive[j] = 0;
+            }
+            Put(e, cls, w.X[0] + dx * dist, w.Z[0] + dz * dist);
+            w.Actors[0].SpawnProtect = 0;
+            Enemy = e;
+            return e;
+        }
+
+        protected void Put(int j, ClassId cls, double x, double z)
+        {
+            World w = W;
+            Actor a = w.Actors[j];
+            a.Cls = cls;
+            a.MaxHp = w.Config.Class(cls).MaxHp;
+            a.Hp = a.MaxHp;
+            a.Alive = true;
+            a.SpawnProtect = 0;
+            a.StandUp = 0;
+            a.AirLen = 0;
+            w.X[j] = x; w.Z[j] = z; w.PrevX[j] = x; w.PrevZ[j] = z; w.Vx[j] = 0; w.Vz[j] = 0;
+            w.Depth.WasAlive[j] = 1;
+        }
+
+        /// <summary>Holds a bot where the test wants it and never lets it swing (a passive dummy in the live match).</summary>
+        protected void Pin(int j, double x, double z)
+        {
+            World w = W;
+            w.X[j] = x; w.Z[j] = z; w.PrevX[j] = x; w.PrevZ[j] = z; w.Vx[j] = 0; w.Vz[j] = 0;
+            w.Actors[j].AttackCd = Math.Max(w.Actors[j].AttackCd, 1);
+            w.Actors[j].AbilityCd = Math.Max(w.Actors[j].AbilityCd, 1);
+            if (w.Demolitions != null && w.Demolitions.TntReadyTick != null) w.Demolitions.TntReadyTick[j] = int.MaxValue / 2;
+        }
+
+        /// <summary>The camera's flat forward as a sim-space unit (third person: where the swing goes with no mouse).</summary>
+        protected void CameraForward(out double dx, out double dz)
+        {
+            UnityEngine.Camera cam = UnityEngine.Camera.main;
+            Vector3 f = cam != null ? cam.transform.forward : Vector3.forward;
+            f.y = 0;
+            if (f.sqrMagnitude < 1e-6f) f = Vector3.forward;
+            f.Normalize();
+            SimSpace.ToSim(f, out dx, out dz);
+            SimSpace.ToSim(Vector3.zero, out double ox, out double oz);
+            dx -= ox; dz -= oz;
+            double l = Math.Sqrt(dx * dx + dz * dz);
+            if (l < 1e-9) { dx = 1; dz = 0; return; }
+            dx /= l; dz /= l;
+        }
+
+        /// <summary>The direction a test places the enemy in: the camera forward in third person, screen-right in top-down.</summary>
+        protected void FrontDir(CameraView view, out double dx, out double dz)
+        {
+            if (view == CameraView.TopDown) SanityWorld.FromScreenIntent(1, 0, out dx, out dz);
+            else CameraForward(out dx, out dz);
+        }
+
+        protected Vector2 ScreenOf(double x, double z)
+        {
+            UnityEngine.Camera cam = UnityEngine.Camera.main;
+            Vector3 p = cam.WorldToScreenPoint(SimSpace.ToWorld(x, S.Ground(x, z), z));
+            return new Vector2(p.x, p.y);
+        }
+
+        /// <summary>One frame (the input reader samples the devices) then one sim tick, views synced.</summary>
+        protected IEnumerator TickFrame(Action beforeTick = null)
+        {
+            yield return null;
+            beforeTick?.Invoke();
+            S.Tick(1);
+        }
+
+        /// <summary>The attack press as a player makes it in this view: the mouse on the enemy (top-down) or the button with the camera on it (third person).</summary>
+        protected void PressAttack(CameraView view, bool gamepad = false)
+        {
+            if (gamepad) { Press(Pad.rightTrigger); return; }
+            if (view == CameraView.TopDown && Enemy >= 0) Set(Ms.position, ScreenOf(W.X[Enemy], W.Z[Enemy]));
+            Press(Ms.leftButton);
+        }
+
+        protected void ReleaseAttack(bool gamepad = false)
+        {
+            if (gamepad) Release(Pad.rightTrigger);
+            else Release(Ms.leftButton);
+        }
+
+        /// <summary>Press, one frame + tick, release: a tap of the attack button.</summary>
+        protected IEnumerator TapAttack(CameraView view, bool gamepad = false, Action beforeTick = null)
+        {
+            PressAttack(view, gamepad);
+            yield return TickFrame(beforeTick);
+            ReleaseAttack(gamepad);
+        }
+
+        /// <summary>Sim events since head (copied).</summary>
+        protected List<SimEvent> Events(int head, SimEventType type)
+        {
+            var r = new List<SimEvent>();
+            for (int i = Math.Max(head, W.EventHead - World.EventCapacity); i < W.EventHead; i++)
+            {
+                SimEvent e = W.Events[i % World.EventCapacity];
+                if (e.Type == type) r.Add(new SimEvent { Type = e.Type, A = e.A, B = e.B, X = e.X, Z = e.Z, Value = e.Value, Impulse = e.Impulse, Cause = e.Cause });
+            }
+            return r;
+        }
+
+        /// <summary>The idle autopilot must never be the one swinging in these tests (the hit-feel audit's contaminated first runs).</summary>
+        protected void AssertAtControls(string when)
+        {
+            Assert.IsFalse(MechRules.Autopiloted(W, 0), "the idle autopilot was driving the player at " + when + ": the measurement would be a bot's");
+            Assert.IsFalse(S.Driver.HumanAutopilot, "the driver's human autopilot is on at " + when);
+        }
+
+        // ------------------------------------------------------------------ the ledger
+
+        /// <summary>A ledger entry of channel (for actor when actor >= 0) since the cursor whose Source, if any, is active and enabled.</summary>
+        protected bool Ledger(FeedbackChannel channel, int actor, out FeedbackEntry entry, int cursor = -1)
+        {
+            int from = cursor >= 0 ? cursor : LedgerCursor;
+            for (int i = Math.Max(from, PlayerFeedback.Head - PlayerFeedback.Capacity); i < PlayerFeedback.Head; i++)
+            {
+                FeedbackEntry e = PlayerFeedback.At(i);
+                if (e.Channel != channel || (actor >= 0 && e.Actor != actor)) continue;
+                if (!SourceShown(e.Source)) continue;
+                entry = e;
+                return true;
+            }
+            entry = default;
+            return false;
+        }
+
+        protected int LedgerCount(FeedbackChannel channel, int actor, int cursor)
+        {
+            int n = 0;
+            for (int i = Math.Max(cursor, PlayerFeedback.Head - PlayerFeedback.Capacity); i < PlayerFeedback.Head; i++)
+            {
+                FeedbackEntry e = PlayerFeedback.At(i);
+                if (e.Channel == channel && (actor < 0 || e.Actor == actor) && SourceShown(e.Source)) n++;
+            }
+            return n;
+        }
+
+        /// <summary>A reported cue's source must be really showing: an active GameObject and an enabled Behaviour / Renderer (null = a sound with no object).</summary>
+        protected static bool SourceShown(Object src)
+        {
+            if (src == null) return true;
+            GameObject go = src is GameObject g ? g : src is Component c ? c.gameObject : null;
+            if (go == null || !go.activeInHierarchy) return false;
+            if (src is Behaviour b && !b.isActiveAndEnabled) return false;
+            if (src is Renderer r && !r.enabled) return false;
+            return true;
+        }
+
+        /// <summary>Steps frames (one sim tick per frame for the first ticks frames, then frames without ticks) until done() or the limit.</summary>
+        protected IEnumerator Within(int ticks, int frames, Func<bool> done, Action<bool> result, Action beforeTick = null)
+        {
+            for (int t = 0; t < ticks; t++)
+            {
+                if (done()) { result(true); yield break; }
+                yield return TickFrame(beforeTick);
+            }
+            for (int f = 0; f < frames; f++)
+            {
+                if (done()) { result(true); yield break; }
+                yield return null;
+            }
+            result(done());
+        }
+
+        // ------------------------------------------------------------------ cues that exist today (read without the ledger)
+
+        /// <summary>GameHud's damage-number slots (private Text[] _dmg): an active one whose text holds the rounded value.</summary>
+        protected bool DamageNumberShown(double value)
+        {
+            GameHud hud = S.Hud;
+            if (hud == null) return false;
+            FieldInfo f = typeof(GameHud).GetField("_dmg", BindingFlags.NonPublic | BindingFlags.Instance);
+            if (!(f?.GetValue(hud) is Text[] slots)) return false;
+            string want = Math.Round(value).ToString(System.Globalization.CultureInfo.InvariantCulture);
+            return slots.Any(t => t != null && t.gameObject.activeInHierarchy && t.enabled && t.text != null && t.text.Contains(want));
+        }
+
+        protected static int PlayingSources() => Object.FindObjectsByType<AudioSource>(FindObjectsSortMode.None).Count(a => a.isPlaying);
+
+        protected static int PlayingParticles() => Object.FindObjectsByType<ParticleSystem>(FindObjectsSortMode.None).Count(p => p.isPlaying);
+
+        /// <summary>Every active, enabled uGUI Text on screen, upper case.</summary>
+        protected static List<string> ScreenTexts() =>
+            Object.FindObjectsByType<Text>(FindObjectsSortMode.None).Where(t => t.isActiveAndEnabled && !string.IsNullOrEmpty(t.text)).Select(t => t.text.ToUpperInvariant()).ToList();
+
+        protected static bool HudCanvasShown() =>
+            Object.FindObjectsByType<Canvas>(FindObjectsSortMode.None).Any(c => c.isActiveAndEnabled && c.GetComponentInParent<GameHud>() != null)
+            || Object.FindObjectsByType<Canvas>(FindObjectsSortMode.None).Any(c => c.isActiveAndEnabled && c.gameObject.name.IndexOf("Hud", StringComparison.OrdinalIgnoreCase) >= 0);
+
+        protected static double BearingDeg(double fromX, double fromZ, double toX, double toZ) => Math.Atan2(toZ - fromZ, toX - fromX) * 180 / Math.PI;
+
+        protected static double AngleGap(double a, double b)
+        {
+            double d = (a - b) % 360;
+            if (d > 180) d -= 360;
+            if (d < -180) d += 360;
+            return Math.Abs(d);
+        }
+
+        /// <summary>One "[px-f]" line per measured case in the player log (the gate parses it), and true when ok.</summary>
+        protected static bool Line(string id, string what, string measured, string target, bool ok)
+        {
+            Debug.Log("[px-f] " + id + " | " + what + " | " + measured + " | " + target + " | " + (ok ? "PASS" : "FAIL"));
+            return ok;
+        }
+    }
+}

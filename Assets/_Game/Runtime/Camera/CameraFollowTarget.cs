@@ -42,6 +42,11 @@ namespace CriticalMass.Runtime.Camera
 
         private readonly CameraDirector _director = new CameraDirector();
         private readonly LookLatch _padLook = new LookLatch();
+        /// <summary>Lane I: the Player-map action held to look around with the mouse (default the ` key).</summary>
+        public const string LookAction = "Look";
+        private InputAction _look;
+        private double _lookSearched = -1, _r3At;
+        private bool _r3Down;
         private int _hatchEpoch = int.MinValue;
         private bool _hatchSeen;
         private double _hatchTime, _hatchX, _hatchZ;
@@ -168,11 +173,15 @@ namespace CriticalMass.Runtime.Camera
         public static int EnemiesNear(World w, double hx, double hz)
         {
             if (w == null || w.ActorCount <= 0) return 0;
-            TeamId team = w.Actors[LocalSeat.Actor].Team;
+            int me = LocalSeat.Actor;
+            if (me < 0 || me >= w.ActorCount) return 0;
+            TeamId team = w.Actors[me].Team;
             double r2 = CameraDirector.CombatRadius * CameraDirector.CombatRadius;
             int n = 0;
-            for (int i = 1; i < w.ActorCount; i++)
+            // Lane I: from actor 0, skipping the local seat (online, seat 0 can be an enemy).
+            for (int i = 0; i < w.ActorCount; i++)
             {
+                if (i == me) continue;
                 Actor a = w.Actors[i];
                 if (!a.Alive || a.Team == team) continue;
                 double dx = w.X[i] - hx, dz = w.Z[i] - hz;
@@ -187,18 +196,32 @@ namespace CriticalMass.Runtime.Camera
             bool blocked = _override || Driver.HumanAutopilot || SimDriverBehaviour.CaptureMode || (_input != null && _input.State.Paused);
             double now = Time.unscaledTimeAsDouble;
             Gamepad pad = Gamepad.current;
-            _padLook.Update(!blocked && pad != null && pad.rightStickButton.isPressed, now);
+            // Lane I (2026-11-22, one job per button): R3 looks only while HELD past LookLatch.ClickSeconds. A click is the base
+            // station (inside the ring) and no longer latches look, so opening the station never pans the camera; a hold is
+            // the "survey" hold (show terrain + look) together.
+            bool r3 = !blocked && pad != null && pad.rightStickButton.isPressed;
+            if (r3 && !_r3Down) _r3At = now;
+            _r3Down = r3;
+            bool padLooking = r3 && now - _r3At >= LookLatch.ClickSeconds;
             if (blocked) return;
 
+            // Lane I: the middle mouse button is Ping only; hold-to-look is the rebindable Look action (default `).
+            if (_look == null && (_lookSearched + 2.0 < now || _lookSearched < 0))
+            {
+                _lookSearched = now;
+                InputActionMap map = ControlBindings.Map(InputSystem.actions);
+                _look = map != null ? map.FindAction(LookAction, false) : null;
+            }
             Mouse mouse = Mouse.current;
-            if (mouse != null && mouse.middleButton.isPressed && Screen.width > 0 && Screen.height > 0)
+            bool lookHeld = _look != null && _look.IsPressed() && !(Online.OnlineChatHud.EatsKeys);
+            if (mouse != null && lookHeld && Screen.width > 0 && Screen.height > 0)
             {
                 Vector2 p = mouse.position.ReadValue();
                 d.Looking = true;
                 d.LookRight = (p.x - Screen.width * 0.5) / (Screen.width * 0.5);
                 d.LookUp = (p.y - Screen.height * 0.5) / (Screen.height * 0.5);
             }
-            else if (pad != null && _padLook.Active)
+            else if (pad != null && padLooking)
             {
                 Vector2 s = pad.rightStick.ReadValue();
                 float m = s.magnitude;

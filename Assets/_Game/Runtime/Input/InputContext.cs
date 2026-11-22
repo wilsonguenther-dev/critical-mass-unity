@@ -30,6 +30,14 @@ namespace CriticalMass.Runtime.Input
         /// <summary>Does the wheel zoom the spectator camera?</summary>
         public static bool SpectatorOwnsWheel(InputContextKind k) => k == InputContextKind.Spectating;
 
+        /// <summary>
+        /// Lane I (2026-11-22, one job per button): on a controller LB is Cancel inside your own swing window (a cancel would
+        /// do something) and Next tool everywhere else (HumanInputState.Fill). HumanInputSource writes this every frame
+        /// (CombatFeel.CancelWindow for the local seat, and the CANCEL BUTTON setting on) so the HUD prompt can name the job
+        /// LB does right now: true = "CANCEL", false = "NEXT TOOL".
+        /// </summary>
+        public static bool PadLbCancels;
+
         /// <summary>The live context (full map and spectator state read from their owners).</summary>
         public static InputContextKind Current =>
             Resolve(CriticalMass.Runtime.Hud.Interact.FullMap.IsOpen, CriticalMass.Runtime.Spectator.SpectatorMode.IsSpectating);

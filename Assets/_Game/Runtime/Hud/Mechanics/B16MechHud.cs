@@ -19,7 +19,9 @@ namespace CriticalMass.Runtime.Hud.Mechanics
     public static class B16Words
     {
         /// <summary>b16 finish: the idle panel says exactly what the AUTOPILOT banner says (one wording for one state).</summary>
-        public static string AfkHead => CriticalMass.Runtime.Spectator.PlayerPresence.BannerWhat(false);
+        public static string AfkHead => CriticalMass.Runtime.Spectator.PlayerPresence.BannerWhat(false);   // B16MechViewTests pins this wording
+        /// <summary>player-experience lane D: the tag word of the autopilot plate (the guard's banner says the same).</summary>
+        public const string AfkTag = "AUTOPILOT";
         public static string AfkLine => CriticalMass.Runtime.Spectator.PlayerPresence.BannerPress(CriticalMass.Runtime.Input.ControlBindings.ActiveDevice);
         public const string HideHint = " (H hides this tip)";
         public const string PrefPrefix = "cm.tips.b16.";
@@ -98,7 +100,8 @@ namespace CriticalMass.Runtime.Hud.Mechanics
 
         SimDriverBehaviour _driver;
         Canvas _canvas;
-        RectTransform _root, _space, _afk;
+        RectTransform _root, _space, _afk, _afkFrame;
+        CanvasGroup _afkFrameGroup;
         Text _afkLine;
         CriticalMass.Runtime.Spectator.PlayerPresence _presence;
         int _epoch = -1;
@@ -112,16 +115,42 @@ namespace CriticalMass.Runtime.Hud.Mechanics
         {
             _driver = GetComponent<SimDriverBehaviour>();
             _canvas = InteractUi.MakeHudCanvas(transform, "B16 Mech HUD Canvas", SortingOrder, out _root, out _space);
-            const float W = 620f, H = 96f;
+            // player-experience lane D (item 7): the sim's idle autopilot is announced like the guard's banner (PlayerPresence),
+            // same place, same words, same weight: a 1040 x 96 plate under the match panel (HudZones.AlertTop) with a brass
+            // AUTOPILOT tag, the two lines, and a brass frame breathing round the whole screen while a bot drives the fighter.
+            // It holds the callout lane at Autopilot priority and is gone the frame the sim hands control back.
+            const float W = CriticalMass.Runtime.Spectator.PlayerPresence.BannerW, H = CriticalMass.Runtime.Spectator.PlayerPresence.BannerH;
             _afk = MenuUi.Rt(_space, "Autopilot Panel");
-            MenuUi.Place(_afk, (HudLayout.RefW - W) * 0.5f, 300f, W, H);
-            VectorShape p = MenuUi.Shape(_afk, "Panel", ShapeKind.RoundRect, 0f, 0f, W, H, CMTokens.WithAlpha(CMTokens.PanelNavy.Color, 0.94f), 12f);
-            p.OutlinePx = 3f;
-            p.RimPx = 2f;
+            MenuUi.Place(_afk, (HudLayout.RefW - W) * 0.5f, HudZones.AlertTop, W, H);
+            VectorShape p = MenuUi.Shape(_afk, "Panel", ShapeKind.RoundRect, 0f, 0f, W, H, CMTokens.VoidNavy.Color, 18f);
+            p.OutlinePx = 4f;
+            p.RimPx = 4f;
             p.RimColor = CMTokens.ToolBrass.Color;
-            MenuUi.Fit(MenuUi.Label(_afk, "Head", CMTokens.Display, 22, CMTokens.ToolBrass.Color, TextAnchor.MiddleCenter, 12f, 8f, W - 24f, 42f, B16Words.AfkHead, 2f), 18);
-            _afkLine = MenuUi.Fit(MenuUi.Label(_afk, "Line", CMTokens.Ui, 18, CMTokens.WarmCream.Color, TextAnchor.MiddleCenter, 12f, 52f, W - 24f, 34f, B16Words.AfkLine, 1.5f), 16);
+            VectorShape tag = MenuUi.Shape(_afk, "Tag", ShapeKind.RoundRect, 16f, 16f, 220f, H - 32f, CMTokens.ToolBrass.Color, 14f);
+            tag.RimPx = 0f;
+            MenuUi.Fit(MenuUi.Label(_afk, "Tag Word", CMTokens.Display, UiScale.TypeButton, CMTokens.VoidNavy.Color, TextAnchor.MiddleCenter, 16f, 16f, 220f, H - 32f, B16Words.AfkTag, 0f), 22);
+            MenuUi.Fit(MenuUi.Label(_afk, "Head", CMTokens.Ui, UiScale.TypeSmall, CMTokens.WarmCream.Color, TextAnchor.MiddleLeft, 256f, 10f, W - 276f, 30f, B16Words.AfkHead, 2f), 16);
+            _afkLine = MenuUi.Fit(MenuUi.Label(_afk, "Line", CMTokens.Display, UiScale.TypeButton, CMTokens.WarmCream.Color, TextAnchor.MiddleLeft, 256f, 40f, W - 276f, 46f, B16Words.AfkLine, 2f), 20);
             _afk.gameObject.SetActive(false);
+            _afkFrame = MenuUi.Rt(_root, "Autopilot Frame");
+            MenuUi.Stretch(_afkFrame);
+            _afkFrameGroup = _afkFrame.gameObject.AddComponent<CanvasGroup>();
+            _afkFrameGroup.blocksRaycasts = false;
+            _afkFrameGroup.interactable = false;
+            for (int e = 0; e < 4; e++)
+            {
+                Image edge = MenuUi.Rt(_afkFrame, "Edge " + e).gameObject.AddComponent<Image>();
+                edge.raycastTarget = false;
+                edge.color = CMTokens.ToolBrass.Color;
+                RectTransform er = edge.rectTransform;
+                bool vertical = e >= 2;
+                er.anchorMin = new Vector2(e == 3 ? 1f : 0f, e == 1 ? 1f : 0f);
+                er.anchorMax = new Vector2(e == 2 ? 0f : 1f, e == 0 ? 0f : 1f);
+                er.pivot = new Vector2(e == 3 ? 1f : 0f, e == 1 ? 1f : 0f);
+                er.sizeDelta = vertical ? new Vector2(CriticalMass.Runtime.Spectator.PlayerPresence.FrameEdgePx, 0f) : new Vector2(0f, CriticalMass.Runtime.Spectator.PlayerPresence.FrameEdgePx);
+                er.anchoredPosition = Vector2.zero;
+            }
+            _afkFrame.gameObject.SetActive(false);
         }
 
         void LateUpdate()
@@ -149,7 +178,15 @@ namespace CriticalMass.Runtime.Hud.Mechanics
             if (_presence == null) _presence = GetComponent<CriticalMass.Runtime.Spectator.PlayerPresence>();
             bool afk = MechRules.Autopiloted(w, me) && !(_presence != null && _presence.BannerVisible);
             if (_afk.gameObject.activeSelf != afk) _afk.gameObject.SetActive(afk);
-            if (afk && _afkLine != null) HudText.Set(_afkLine, B16Words.AfkLine);
+            if (_afkFrame != null && _afkFrame.gameObject.activeSelf != afk) _afkFrame.gameObject.SetActive(afk);
+            if (afk)
+            {
+                if (_afkLine != null) HudText.Set(_afkLine, B16Words.AfkLine);
+                HudZones.Hold(HudZone.Callout, HudPriority.Autopilot);
+                // a slow 1 Hz breathe (a live state, not a flash); steady under REDUCE FLASHING
+                float k = CriticalMass.Runtime.Menu.GameSettings.ReduceFlashing ? 0.8f : 0.6f + 0.35f * (0.5f + 0.5f * Mathf.Sin(Time.unscaledTime * Mathf.PI * 2f));
+                if (Mathf.Abs(_afkFrameGroup.alpha - k) > 1f / 255f) _afkFrameGroup.alpha = k;
+            }
             TickTips(w, me);
         }
 

@@ -289,6 +289,20 @@ namespace CriticalMass.Runtime.Audio.Sound
                 case Pick.WorldAct:
                     WorldAct(ev, w, sink, cues);
                     return;
+                case Pick.Autopilot:
+                    // the local player's fighter was taken over (Value 1) or handed back (0); nobody else's is worth a sound
+                    if (ownA) Emit(sink, cues[ev.Value > 0 ? 0 : 1], w, ev.X, ev.Z, true, false, 1f, 1f, ev.A);
+                    else Silenced++;
+                    return;
+                case Pick.Critical:
+                {
+                    int me = LocalSeat.Actor;
+                    bool mineCrit = ev.A == me || ev.B == me;
+                    double cx = ev.X, cz = ev.Z;
+                    if (ev.A >= 0 && ev.A < w.ActorCount) { cx = w.X[ev.A]; cz = w.Z[ev.A]; }
+                    Emit(sink, cues[0], w, cx, cz, mineCrit, ev.A == me, mineCrit ? 1f : 0.6f, ev.Value >= 3 ? 1.08f : 1f, ev.A);
+                    return;
+                }
                 default:
                     Silenced++;
                     return;

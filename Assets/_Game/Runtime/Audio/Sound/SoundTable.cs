@@ -62,7 +62,7 @@ namespace CriticalMass.Runtime.Audio.Sound
         Bank,
         /// <summary>px lane F: Respawn (crowd blip / my own respawn), AttackContact (whiff swish only), Feint, HitBlocked,
         /// StructureHit, ActionRefused (local only), WorldAction (channel start or the verb).</summary>
-        Respawn, Contact, Feint, Blocked, Structure, Refused, WorldAct,
+        Respawn, Contact, Feint, Blocked, Structure, Refused, WorldAct, Autopilot, Critical,
     }
 
     /// <summary>One sim event type's sound: a pick rule over a cue set, or an explicit silence with its reason.</summary>
@@ -432,6 +432,11 @@ namespace CriticalMass.Runtime.Audio.Sound
             // WorldAction: Value 0 = a channel started (dig scrape, pick strike, gather rustle); else the verb's own cue.
             R(SimEventType.WorldAction, Pick.WorldAct, "dig_start", "sb_ore_hit", "gather_start", "sb_pit_dig", "place_block", "sb_wall_place", "sb_ore_bank",
                 "egg_feed", "corrupt", "purify", "build_bridge", "gather_done"),
+            // AutopilotChanged (lane S2: A actor, Value 1 taken over / 0 handed back): the local player's own only, captioned.
+            R(SimEventType.AutopilotChanged, Pick.Autopilot, "autopilot_on", "autopilot_off"),
+            // CriticalHit (lane S1: A victim, B attacker, Value 1 counter / 2 punish / 3 back hit): own priority when I am either
+            // side, a little brighter for a back hit; a crowd crit nearby is softer. The Hit itself still plays the impact.
+            R(SimEventType.CriticalHit, Pick.Critical, "critical_hit"),
         };
 
         /// <summary>Every world-force source (draft PR #43): audible cue or silence, and the low-frequency layer.</summary>

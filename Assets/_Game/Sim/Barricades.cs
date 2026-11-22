@@ -307,7 +307,24 @@ namespace CriticalMass.Sim.Core
                 // DG-83: no chip through another wall or barricade (its own cell excepted).
                 if (Phys.On(w, w.Config.Physics.WallsBlockHits) && !SegmentClear.Clear(w.Map, ax, az, b.Cx + 0.5, b.Cz + 0.5, b.Cx, b.Cz)) continue;
                 b.Hp -= damage;
+                // lane S2: the structure answers (and the swing is no longer a whiff: Combat counts the event)
+                if (PlayerSeat.On(w)) StructureHit(w, attackerId, s, damage);
             }
+        }
+
+        /// <summary>
+        /// Lane S2: StructureHit for barricade-list slot s after it took damage: A = the attacker, B = StructureBuiltWall (a
+        /// Builder wall cell) or StructureBarricade, (X, Z) = the cell centre, Value = damage, Radius = share of its max HP left
+        /// (0 = it broke; the cell clears in BarricadesSystem / WallsSystem with BarricadeBroken / WallBroken as before).
+        /// </summary>
+        public static void StructureHit(World w, int attackerId, int s, double damage)
+        {
+            Barricade b = w.Barricades[s];
+            bool wall = BuilderWalls.IsWallSlot(w, s);
+            double max = wall ? BuilderWalls.SlotMaxHp(w, s) : w.Config.Abilities.MinerBarricade.MaxHp;
+            double left = max > 0 ? Math.Max(0, b.Hp) / max : 0;
+            World.PushEvent(w, SimEventType.StructureHit, attackerId, wall ? PlayerReasons.StructureBuiltWall : PlayerReasons.StructureBarricade,
+                b.Cx + 0.5, b.Cz + 0.5, damage, null, DamageCause.None, left);
         }
 
         /// <summary>Ttl counts down; at ttl le 0 or hp le 0 the cell returns to its stored type and BarricadeBroken is pushed.</summary>

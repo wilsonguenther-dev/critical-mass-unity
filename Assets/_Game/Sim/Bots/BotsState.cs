@@ -57,6 +57,12 @@ namespace CriticalMass.Sim.Bots
         public double[] FightModeUntil;
         public byte[] InReach;
         public byte[] Settled;
+        /// <summary>px S1 [2] (BotAim): every actor's position at each of the last BotAim.Ring ticks (slot = tick &amp; (Ring - 1),
+        /// row stride AimHistCap) and the tick each slot holds (NoTick = empty). Written once per tick in BotsThink.</summary>
+        public double[] AimHistX;
+        public double[] AimHistZ;
+        public int[] AimHistTick;
+        public int AimHistCap;
         /// <summary>Gather / corrupt node id (-1 = none).</summary>
         public int[] TargetNode;
         /// <summary>Hill hold post (Float32 storage).</summary>
@@ -173,6 +179,10 @@ namespace CriticalMass.Sim.Bots
                 RallySince = new double[cap],
                 SeenDeaths = new int[cap],
                 HillBodies = new int[2],
+                AimHistX = new double[cap * BotAim.Ring],
+                AimHistZ = new double[cap * BotAim.Ring],
+                AimHistTick = new int[BotAim.Ring],
+                AimHistCap = cap,
             };
         }
 
@@ -242,6 +252,9 @@ namespace CriticalMass.Sim.Bots
             }
             st.HillBodies[0] = 0;
             st.HillBodies[1] = 0;
+            for (int k = 0; k < BotAim.Ring; k++) st.AimHistTick[k] = CombatFeel.NoTick;   // px S1 [2]: the aim ring starts empty
+            Array.Clear(st.AimHistX, 0, st.AimHistX.Length);
+            Array.Clear(st.AimHistZ, 0, st.AimHistZ.Length);
             st.Rallies = 0;
             st.Releases = 0;
             st.TerrainJumps = 0;

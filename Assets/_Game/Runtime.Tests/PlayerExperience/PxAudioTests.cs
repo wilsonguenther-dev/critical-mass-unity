@@ -235,8 +235,41 @@ namespace CriticalMass.Runtime.Tests.PlayerExperience
             }
             Assert.AreEqual(2, SoundFeed.WorldActCue(10, true), "WorldGather (10, from feat/px-s2-class) starts with the gather rustle");
             foreach (SimEventType t in new[] { SimEventType.HitBlocked, SimEventType.StructureHit, SimEventType.ActionRefused, SimEventType.WorldAction,
-                         SimEventType.Feint, SimEventType.CorruptionRoll, SimEventType.KaijuPower, SimEventType.CrystalMined })
+                         SimEventType.Feint, SimEventType.CorruptionRoll, SimEventType.KaijuPower, SimEventType.CrystalMined,
+                         SimEventType.AutopilotChanged, SimEventType.CriticalHit })
                 Assert.AreNotEqual(Pick.Silence, Array.Find(SoundTable.Sim, r => r.Type == t).Pick, t + " is routed");
+        }
+
+        [Test]
+        public void TheAutopilotAndACriticalHitAreHeardByTheLocalPlayer()
+        {
+            World w = NewWorld();
+            (SoundFeed feed, Rec rec) = Feed(w);
+            int me = LocalSeat.Actor, foe = Enemy(w), far = Enemy(w, 3);
+            World.PushEvent(w, SimEventType.AutopilotChanged, me, -1, w.X[me], w.Z[me], 1);
+            World.PushEvent(w, SimEventType.AutopilotChanged, foe, -1, w.X[foe], w.Z[foe], 1);
+            Step(w, feed, rec);
+            Assert.AreEqual(1, rec.Plays.Count, "only my own takeover");
+            Assert.IsTrue(rec.Has("autopilot_on"));
+            Assert.IsNotNull(SoundTable.Cue(SoundTable.IndexOf("autopilot_on")).Caption);
+            rec.Plays.Clear();
+            World.PushEvent(w, SimEventType.AutopilotChanged, me, -1, w.X[me], w.Z[me], 0);
+            Step(w, feed, rec);
+            Assert.IsTrue(rec.Has("autopilot_off"), "handed back: you have control");
+
+            rec.Plays.Clear();
+            World.PushEvent(w, SimEventType.CriticalHit, foe, me, w.X[foe], w.Z[foe], 3);
+            Step(w, feed, rec);
+            SoundRequest mine = rec.Get("critical_hit");
+            Assert.IsTrue(rec.Has("critical_hit") && mine.Own, "my critical hit is at own priority");
+            rec.Plays.Clear();
+            World.PushEvent(w, SimEventType.CriticalHit, me, foe, w.X[me], w.Z[me], 1);
+            Step(w, feed, rec);
+            Assert.IsTrue(rec.Get("critical_hit").Own && rec.Get("critical_hit").Threat, "a crit on me is a threat");
+            rec.Plays.Clear();
+            World.PushEvent(w, SimEventType.CriticalHit, far, foe, w.X[far], w.Z[far], 2);
+            Step(w, feed, rec);
+            foreach (SoundRequest r in rec.Plays) Assert.IsFalse(r.Own, "someone else's crit is the crowd's");
         }
 
         [Test]

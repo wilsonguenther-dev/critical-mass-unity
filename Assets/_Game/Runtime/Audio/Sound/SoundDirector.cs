@@ -464,16 +464,15 @@ namespace CriticalMass.Runtime.Audio.Sound
         private int _heartCue = -2;
 
         /// <summary>
-        /// px lane F, combine hook for AutopilotChanged (A = actor, Value 1 taken over / 0 handed back): the lead wires it in
-        /// SoundFeed.Route as <c>case SimEventType.AutopilotChanged: if (ev.A == LocalSeat.Actor) SoundDirector.PlayAutopilot(ev.Value &gt; 0); return;</c>
-        /// (or the Hud's own handler calls it). Captioned ("Autopilot on" / "You have control").
+        /// px lane F: the autopilot cue outside the event stream (a HUD or flow caller). AutopilotChanged itself is routed by
+        /// the feed (SoundTable Pick.Autopilot), so the event never needs this. Captioned ("Autopilot on" / "You have control").
         /// </summary>
         public static bool PlayAutopilot(bool on) => Instance != null && Instance.PlayUiCue(SoundTable.IndexOf(on ? "autopilot_on" : "autopilot_off"), 1f);
 
         /// <summary>
         /// px lane F, combine hook for CriticalHit (A victim, B attacker, Value kind 1 counter / 2 punish / 3 back hit): a hard
-        /// crack with a high ring at the victim, own priority when I am either side, a little brighter for a back hit. The lead
-        /// wires it in SoundFeed.Route as <c>case SimEventType.CriticalHit: SoundDirector.PlayCritical(ev.A, ev.B, (int)ev.Value); return;</c>
+        /// crack with a high ring at the victim, own priority when I am either side, a little brighter for a back hit. The event
+        /// itself is routed by the feed (SoundTable Pick.Critical); this is for a caller outside the event stream.
         /// </summary>
         public static bool PlayCritical(int victim, int attacker, int kind)
         {

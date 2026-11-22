@@ -140,7 +140,11 @@ namespace CriticalMass.Sim.Core
                 s.Start[id] = -1;
             }
             if (!press || !CanStart(w, id)) return false;
-            if (!Begin(w, s, id, dt, dc)) return false;
+            if (!Begin(w, s, id, dt, dc))
+            {
+                PlayerSeat.Refuse(w, id, PlayerReasons.ButtonDodge, PlayerReasons.RefusedBlockedPlace);   // lane S2: no clear dash path
+                return false;
+            }
             DashTick(w, s, id, 0, dt);
             return true;
         }
@@ -300,6 +304,17 @@ namespace CriticalMass.Sim.Core
             if (id < 0 || id >= s.Start.Length || s.Start[id] < 0) return false;
             int k = w.Tick - s.Start[id];
             return k >= 0 && k < s.Len[id];
+        }
+
+        /// <summary>Lane S2: ticks left of actor id's dash (and of its recovery too when withRecover); 0 when not dodging.</summary>
+        public static int TicksLeft(World w, int id, bool withRecover)
+        {
+            if (!On(w)) return 0;
+            DodgeState s = w.Dodges;
+            if (s == null || s.Start == null || id < 0 || id >= s.Start.Length || s.Start[id] < 0) return 0;
+            int end = s.Start[id] + s.Len[id] + (withRecover ? w.Config.Depth.Dodge.RecoverTicks : 0);
+            int left = end - w.Tick;
+            return left > 0 ? left : 0;
         }
 
         /// <summary>Ticks until actor id may dodge again (0 = ready).</summary>

@@ -43,6 +43,10 @@ namespace CriticalMass.Runtime.Hud
         VectorShape _frame;
         Text _line, _tip, _tipLabel;
         Text _lookTitle;   // b15 profile: the killer's mastery title (cosmetic)
+        Text _killerState;
+        int _killer = -1, _killerHp, _killerMax, _assistKey = -1;
+        /// <summary>The killer / assist line as shown (tests).</summary>
+        public string KillerState => _killerState != null ? _killerState.text : string.Empty;
         float _age;
         int _tier = 2;
 
@@ -62,7 +66,9 @@ namespace CriticalMass.Runtime.Hud
             _frame = MenuUi.Shape(_card, "Portrait Frame", ShapeKind.Chamfer, 18f, 18f, 120f, 120f, CMTokens.VoidNavy.Color, 18f);
             _portrait = HudIcon.Make(_frame.transform, "Portrait", 7f, 7f, 106f, 106f);
             _line = MenuUi.Label(_card, "Line", CMTokens.Ui, UiScale.TypeHeading, CMTokens.WarmCream.Color, TextAnchor.MiddleLeft, 160f, 22f, 640f, 44f, "", 3f);
-            _lookTitle = MenuUi.Fit(MenuUi.Label(_card, "Look Title", CMTokens.Display, UiScale.TypeMin, CMTokens.ToolBrass.Color, TextAnchor.MiddleLeft, 160f, 62f, 640f, 18f, "", 2f), 12);
+            _lookTitle = MenuUi.Fit(MenuUi.Label(_card, "Look Title", CMTokens.Display, UiScale.TypeMin, CMTokens.ToolBrass.Color, TextAnchor.MiddleRight, 560f, 62f, 240f, 18f, "", 2f), 12);
+            // player-experience lane D (P4): the killer's class and the health he had left, and who assisted, under the line
+            _killerState = MenuUi.Fit(MenuUi.Label(_card, "Killer State", CMTokens.Ui, UiScale.TypeMin, CMTokens.WarmCream.Color, TextAnchor.MiddleLeft, 160f, 60f, 400f, 20f, "", 2f), 12);
             _tipLabel = MenuUi.Label(_card, "Tip Label", CMTokens.Display, UiScale.TypeSmall, CMTokens.ToolBrass.Color, TextAnchor.UpperLeft, 160f, 80f, 60f, 26f, "TIP", 2f);
             _tip = MenuUi.Fit(MenuUi.Label(_card, "Tip", CMTokens.Ui, UiScale.TypeBody, CMTokens.WarmCream.Color, TextAnchor.UpperLeft, 220f, 78f, 580f, 64f, "", 2f), 21);
             _tip.horizontalOverflow = HorizontalWrapMode.Wrap;
@@ -112,6 +118,39 @@ namespace CriticalMass.Runtime.Hud
             int local = _log != null ? _log.LocalActor : HudBinder.LocalActor;
             if (w != null && (w.Match.Phase == MatchPhase.Ended || (local < w.ActorCount && w.Actors[local].Alive))) { Hide(); return; }
             Animate(_log != null && _log.Paused ? 0f : Time.unscaledDeltaTime);
+            if (_age < 0.6f && w != null && _killer >= 0 && _killer < w.ActorCount) RefreshKillerState(w.Actors[_killer].Cls);   // the HUD's assist tracker reads the death this frame too
+        }
+
+        /// <summary>"WARRIOR: 42/115 HP LEFT   ASSIST: JUNO, FARMER" (rebuilt only when the assisters change).</summary>
+        void RefreshKillerState(ClassId killerClass)
+        {
+            if (_killerState == null) return;
+            CriticalMass.Runtime.Hud.Player.AssistTracker t = CriticalMass.Runtime.Hud.Player.PlayerHud.Current != null ? CriticalMass.Runtime.Hud.Player.PlayerHud.Current.Assists : null;
+            int n = t != null ? t.RecapCount : 0;
+            int key = n;
+            for (int i = 0; i < n; i++) key = key * 37 + t.RecapAt(i) + 1;
+            if (key == _assistKey) return;
+            _assistKey = key;
+            HudText.Set(_killerState, KillerStateLine(_killer, killerClass, _killerHp, _killerMax, t, n));
+        }
+
+        /// <summary>The killer / assist line (pure apart from the bot names; tests).</summary>
+        public static string KillerStateLine(int killer, ClassId killerClass, int hp, int maxHp, CriticalMass.Runtime.Hud.Player.AssistTracker t, int n)
+        {
+            var sb = new System.Text.StringBuilder(96);
+            if (killer >= 0)
+            {
+                sb.Append(KillWords.ClassUpper[Mathf.Clamp((int)killerClass, 0, KillWords.ClassUpper.Length - 1)]);
+                if (maxHp > 0) sb.Append(": ").Append(hp).Append('/').Append(maxHp).Append(" HP LEFT");
+            }
+            for (int i = 0; i < n; i++)
+            {
+                int a = t.RecapAt(i);
+                if (a == killer) continue;
+                sb.Append(i == 0 ? (sb.Length > 0 ? "   ASSIST: " : "ASSIST: ") : ", ");
+                sb.Append(CriticalMass.Runtime.View.Mechanics.DepthNames.OrFallback(a, "FIGHTER"));
+            }
+            return sb.ToString();
         }
 
         void OnEvent(CombatEvent e)
@@ -140,6 +179,16 @@ namespace CriticalMass.Runtime.Hud
             CriticalMass.Net.CosmeticLook look = CriticalMass.Runtime.Progression.LookRegistry.For(e.Other);
             CriticalMass.Runtime.Progression.LookView.Ring(_frame, e.Other >= 0 ? look.Frame : 0, CMTokens.OutlinePx, CMTokens.VoidNavy.Color);
             HudText.Set(_lookTitle, e.Other >= 0 && look.Title > 0 ? CriticalMass.Runtime.Progression.MetaWords.Title(e.OtherClass, look.Title) : string.Empty);
+            World kw = _log != null && _log.Driver != null ? _log.Driver.World : null;
+            _killer = e.Other;
+            _killerHp = _killerMax = 0;
+            if (kw != null && e.Other >= 0 && e.Other < kw.ActorCount)
+            {
+                _killerHp = Mathf.CeilToInt((float)System.Math.Max(0, kw.Actors[e.Other].Hp));
+                _killerMax = Mathf.CeilToInt((float)kw.Actors[e.Other].MaxHp);
+            }
+            _assistKey = -1;
+            RefreshKillerState(e.OtherClass);
             _age = 0f;
             _card.gameObject.SetActive(true);
             Animate(0f);

@@ -379,7 +379,10 @@ namespace CriticalMass.Sim.Tests
             foreach (int seed in new[] { 1, 2 }) PlayMatch(seed, 5, true, arm);
             double dpm = arm.Dodges / Math.Max(1e-9, arm.BotMinutes);
             Console.WriteLine("{\"item\":\"b13-jd smoke\",\"matches\":" + arm.Matches + ",\"dodgesPerBotMinute\":" + dpm.ToString("F2") + ",\"kills\":" + arm.Kills + ",\"limit\":\"1 to 4, kills > 0\"}");
-            Assert.That(dpm, Is.InRange(1.0, 4.0), "dodges per bot-minute (Normal)");
+            // px S1 [3] re-baseline: Normal bots now dodge a melee swing at BotMeleeDodgeChance 0.10 (was 0.35, an average human
+            // sidesteps few swings); measured 0.51 per bot-minute on these two seeds (local run 2026-11-22). Slams and TNT keep
+            // their chances. The upper bound is unchanged.
+            Assert.That(dpm, Is.InRange(0.25, 4.0), "dodges per bot-minute (Normal)");
             Assert.Greater(arm.Kills, 0);
         }
 

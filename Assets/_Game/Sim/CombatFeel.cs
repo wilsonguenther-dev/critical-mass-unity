@@ -40,6 +40,14 @@ namespace CriticalMass.Sim.Core
         public int[] CancelUsed;
         /// <summary>b16 CANCEL: the SwingTick of the last swing that landed (a hit-cancel needs it; a whiff never sets it).</summary>
         public int[] LandedSwing;
+        /// <summary>px S1 [4][5]: last tick of the WOUNDED window (a landed melee hit opens WoundedSeconds of it).</summary>
+        public int[] WoundedUntil;
+        /// <summary>px S1 [9] PUNISH: last tick of the recovery of this actor's last WHIFFED swing (NoTick = none).</summary>
+        public int[] WhiffRecoverUntil;
+        /// <summary>px S1 [9]: the tick, striker and kind of the critical hit DamageMul read for this target (ApplyStrike raises it).</summary>
+        public int[] CritTick, CritFrom, CritKind;
+        /// <summary>px S1 [9]: critical hits raised this match (a probe / test counter).</summary>
+        public int Crits;
         /// <summary>1 on every cell of a built ladder lane (a Bridge cell laid over a Wall), rebuilt once per tick.</summary>
         public byte[] Ladder;
         public int[] LadderCells;
@@ -73,6 +81,11 @@ namespace CriticalMass.Sim.Core
                 FeintLockUntil = new int[cap],
                 CancelUsed = new int[cap],
                 LandedSwing = new int[cap],
+                WoundedUntil = new int[cap],
+                WhiffRecoverUntil = new int[cap],
+                CritTick = new int[cap],
+                CritFrom = new int[cap],
+                CritKind = new int[cap],
                 Ladder = new byte[cells],
                 LadderCells = new int[cells],
             };
@@ -100,11 +113,17 @@ namespace CriticalMass.Sim.Core
                 FeintLockUntil[i] = CombatFeel.NoTick;
                 CancelUsed[i] = CombatFeel.NoTick;
                 LandedSwing[i] = CombatFeel.NoTick;
+                WoundedUntil[i] = CombatFeel.NoTick;
+                WhiffRecoverUntil[i] = CombatFeel.NoTick;
+                CritTick[i] = CombatFeel.NoTick;
+                CritFrom[i] = -1;
+                CritKind[i] = 0;
             }
             for (int k = 0; k < LadderCount; k++) Ladder[LadderCells[k]] = 0;
             LadderCount = 0;
             LadderTick = CombatFeel.NoTick;
             MaxLockRun = 0;
+            Crits = 0;
             Swings = Whiffs = Staggers = StaggerDiminished = StaggerImmune = StaggerArmoured = Buffered = LadderFalls = TntSelfHits = 0;
             Feints = HitCancels = ArmourBreaks = 0;
             TntSelfDamage = 0;
@@ -198,7 +217,43 @@ namespace CriticalMass.Sim.Core
                     if (NearHome(w, source)) m *= f.BuilderHomeMultiplier;
                     break;
             }
+            // px S1 [9] critical strike, last (kinds do not stack). Read on the queue, before any hit of this tick lands.
+            int kind = CritKindOf(w, source, target);
+            if (kind > 0)
+            {
+                m *= f.CritDamageMul;
+                CombatFeelState st = w.Depth.Feel;
+                st.CritTick[target] = w.Tick;
+                st.CritFrom[target] = source;
+                st.CritKind[target] = kind;
+            }
             return m;
+        }
+
+        /// <summary>
+        /// px S1 [9]: the critical kind of a melee hit by source on target now (0 none, 1 COUNTER: target is in his own wind-up,
+        /// 2 PUNISH: target is in the recovery of a whiffed swing, 3 BACK: source stands in target's rear arc). Earned, never rolled.
+        /// </summary>
+        public static int CritKindOf(World w, int source, int target)
+        {
+            CombatFeelConfig f = Cfg(w);
+            if (!f.CritEnabled || source < 0 || target < 0 || source == target) return 0;
+            Actor t = w.Actors[target];
+            if (!t.Alive) return 0;
+            if (t.SwingPending) return 1;
+            if (w.Tick <= w.Depth.Feel.WhiffRecoverUntil[target]) return 2;
+            if (f.CritBackArcDeg > 0)
+            {
+                double dx = w.X[source] - w.X[target], dz = w.Z[source] - w.Z[target];
+                double l = Math.Sqrt(dx * dx + dz * dz);
+                if (l > 1e-9)
+                {
+                    double cos = (dx * JsMath.Cos(t.Facing) + dz * JsMath.Sin(t.Facing)) / l;
+                    // the rear arc of CritBackArcDeg: the angle between his facing and the way to the attacker > 180 - arc/2
+                    if (cos < -JsMath.Cos(f.CritBackArcDeg * 0.5 * Math.PI / 180) - 1e-12) return 3;
+                }
+            }
+            return 0;
         }
 
         /// <summary>True when one of the Builder's team's walls or barricades stands within BuilderHomeRadius of him.</summary>
@@ -229,7 +284,10 @@ namespace CriticalMass.Sim.Core
         /// hit under the Poise of an armoured class winding up, else StaggerSeconds (HeavyStaggerSeconds at or over Poise)
         /// times StaggerDecay per earlier stagger in the window (at least 1 tick).
         /// </summary>
-        public static int StaggerFor(World w, int target, double amount, out bool armoured, out bool immune)
+        public static int StaggerFor(World w, int target, double amount, out bool armoured, out bool immune) => StaggerFor(w, target, amount, -1, out armoured, out immune);
+
+        /// <summary>StaggerFor with the striker (px S1 [6]: LightHitInterrupts reads its class; -1 = none).</summary>
+        public static int StaggerFor(World w, int target, double amount, int source, out bool armoured, out bool immune)
         {
             CombatFeelConfig f = Cfg(w);
             CombatFeelState s = w.Depth.Feel;
@@ -247,6 +305,12 @@ namespace CriticalMass.Sim.Core
                 armoured = true;
                 return 0;
             }
+            // px S1 [6]: a light hit (under the victim's Poise) no longer silently eats a wind-up of any class: the swing goes on
+            // (damage and knock still land); only a heavy hit staggers and cancels it (raising AttackCancel with who did it).
+            // LightHitKeepFromShare: only once this share of the wind-up has run (the swing is committed); before it a light hit
+            // still interrupts (the Farmer's quick thrust keeps its job in the duel order).
+            bool interrupts = source >= 0 && f.LightHitInterrupts != null && (int)w.Actors[source].Cls < f.LightHitInterrupts.Length && f.LightHitInterrupts[(int)w.Actors[source].Cls];
+            if (!heavy && t.SwingPending && f.LightHitsKeepWindup && !interrupts && w.Tick - t.SwingTick >= f.LightHitKeepFromShare * t.SwingWindup) return 0;
             int baseTicks = Ticks(w, heavy ? f.HeavyStaggerSeconds : f.StaggerSeconds);
             if (baseTicks <= 0) return 0;
             int count = w.Tick <= s.StaggerWindowEnd[target] ? s.StaggerCount[target] : 0;
@@ -289,7 +353,7 @@ namespace CriticalMass.Sim.Core
             s.StruckTick[target] = w.Tick;
             s.StruckBy[target] = source;
             Knock.Dir(w, target, srcX, srcZ, JsMath.Cos(src.SwingFacing), JsMath.Sin(src.SwingFacing), out double dx, out double dz);
-            int stun = StaggerFor(w, target, amount, out bool armoured, out bool immune);
+            int stun = StaggerFor(w, target, amount, source, out bool armoured, out bool immune);
             if (f.StrikeStaggers != null && (int)src.Cls < f.StrikeStaggers.Length && !f.StrikeStaggers[(int)src.Cls]) stun = 0; // b16: this class's hits do not stagger
             bool locked = InLock(s, target, w.Tick);
             bool clipped = locked && !immune && w.Tick + stun >= s.LockStart[target] + Ticks(w, f.StaggerMaxLockSeconds);
@@ -299,8 +363,23 @@ namespace CriticalMass.Sim.Core
                 if (w.Tick + stun - 1 > s.LockUntil[target] || !locked) s.LockUntil[target] = w.Tick + stun - 1;
             }
             bool onLadder = OnLadder(w, target);
+            int head0 = w.EventHead;
             double dealt = Damage.ApplyHit(w, target, amount, source, srcX, srcZ, DamageCause.Melee, dx, dz, f.Strikes[(int)src.Cls].Knock, stun);
+            if (dealt > 0 && s.CritTick[target] == w.Tick && s.CritFrom[target] == source && s.CritKind[target] > 0)
+            {
+                // px S1 [9]: the strike's Hit event reads critical (Tier 2) and one CriticalHit follows it.
+                for (int e = head0; e < w.EventHead; e++)
+                {
+                    SimEvent ev = w.Events[e % World.EventCapacity];
+                    if (ev.Type == SimEventType.Hit && ev.A == target) ev.Tier = 2;
+                }
+                double bonus = f.CritDamageMul > 0 ? dealt - dealt / f.CritDamageMul : 0;
+                World.PushEvent(w, SimEventType.CriticalHit, target, source, w.X[target], w.Z[target], s.CritKind[target], null, DamageCause.Melee, bonus);
+                s.Crits++;
+                s.CritTick[target] = NoTick;
+            }
             if (!(dealt > 0) || !t.Alive) return dealt;
+            if (f.WoundedSeconds > 0) s.WoundedUntil[target] = w.Tick + Ticks(w, f.WoundedSeconds);   // px S1 [4][5]
             if (armoured) s.StaggerArmoured++;
             if (immune) s.StaggerImmune++;
             if (clipped)
@@ -351,10 +430,63 @@ namespace CriticalMass.Sim.Core
                 s.Whiffs++;
                 double extra = Cfg(w).WhiffExtraSeconds != null && (int)a.Cls < Cfg(w).WhiffExtraSeconds.Length ? Cfg(w).WhiffExtraSeconds[(int)a.Cls] : 0;
                 a.SwingRecovery += Ticks(w, Cfg(w).WhiffRecoverySeconds + extra);
+                s.WhiffRecoverUntil[i] = w.Tick + a.SwingRecovery;   // px S1 [9] PUNISH window
             }
             else s.LandedSwing[i] = a.SwingTick; // b16 CANCEL: this swing landed (a hit-cancel may cut its recovery)
             double left = a.SwingRecovery / w.Config.SimHz;
             if (a.AttackCd < left) a.AttackCd = left;
+        }
+
+        // ------------------------------------------------------------------------------------------------ px S1 wounded
+
+        /// <summary>px S1 [4][5]: true while actor id is WOUNDED (a melee hit landed on it within the last WoundedSeconds).</summary>
+        public static bool Wounded(World w, int id) => On(w) && w.Tick <= w.Depth.Feel.WoundedUntil[id];
+
+        /// <summary>px S1 [4]: the share of a heal actor id receives now: WoundedHealShare (mend, pulse) or WoundedFountainShare
+        /// (the fountain) while wounded, else 1 (and 1 with the rule off).</summary>
+        public static double HealShare(World w, int id, bool fountain)
+        {
+            if (!Wounded(w, id)) return 1;
+            return fountain ? Cfg(w).WoundedFountainShare : Cfg(w).WoundedHealShare;
+        }
+
+        // ------------------------------------------------------------------------------------------------ px S1 swing tracking
+
+        /// <summary>
+        /// px S1 [1]: during the wind-up the swing direction (Actor.SwingFacing, read live by the view's telegraph) turns toward
+        /// the actor's current Facing (its aim, set by Movement this tick) by at most the class's SwingTrackDegPerSecond, until
+        /// SwingTrackLockTicks before the contact tick: from then on it is locked, so a late side-step or a dodge still beats it.
+        /// Plain arithmetic on doubles in actor-id order: deterministic, no allocation.
+        /// </summary>
+        public static void TrackSwing(World w, int i)
+        {
+            CombatFeelConfig f = Cfg(w);
+            Actor a = w.Actors[i];
+            if (!a.Alive || a.StandUp > 0 || a.HitStunTicks > 0) return;
+            int contact = a.SwingTick + a.SwingWindup;
+            if (contact - w.Tick <= f.SwingTrackLockTicks) return;
+            double deg = f.SwingTrackDegPerSecond;
+            int c = (int)a.Cls;
+            if (f.SwingTrackDegPerSecondByClass != null && c < f.SwingTrackDegPerSecondByClass.Length && f.SwingTrackDegPerSecondByClass[c] > 0)
+                deg = f.SwingTrackDegPerSecondByClass[c];
+            // [2] human limits: a bot corrects its wound-up swing at BotSwingTrackScale of the rate (by difficulty).
+            if (!a.IsHuman && f.BotHumanLimits && f.BotSwingTrackScale != null)
+            {
+                int k = (int)Bots.BotSkill.Of(w, i);
+                if (k < f.BotSwingTrackScale.Length) deg *= f.BotSwingTrackScale[k];
+            }
+            if (!(deg > 0)) return;
+            double lim = deg / w.Config.SimHz * Math.PI / 180;
+            double diff = a.Facing - a.SwingFacing;
+            while (diff > Math.PI) diff -= 2 * Math.PI;
+            while (diff < -Math.PI) diff += 2 * Math.PI;
+            if (diff > lim) diff = lim;
+            else if (diff < -lim) diff = -lim;
+            if (diff == 0) return;
+            double s = a.SwingFacing + diff;
+            if (s > Math.PI) s -= 2 * Math.PI;
+            else if (s < -Math.PI) s += 2 * Math.PI;
+            a.SwingFacing = s;
         }
 
         // ------------------------------------------------------------------------------------------------ b16 CANCEL
@@ -455,6 +587,9 @@ namespace CriticalMass.Sim.Core
             }
             if (w.Tick <= w.Depth.Feel.SlowUntil[i]) k *= f.StaggerSlowMultiplier;
             if (OnLadder(w, i)) k *= f.LadderSpeedMultiplier;
+            // px S1 [5]: a wounded body (hit in the last WoundedSeconds) below WoundedSlowHpShare of its HP is slowed: a
+            // fleeing target can be caught, sometimes (it still outruns a slow chaser once the window closes).
+            if (f.WoundedSlowMultiplier != 1 && Wounded(w, i) && a.Hp < f.WoundedSlowHpShare * a.MaxHp) k *= f.WoundedSlowMultiplier;
             return k;
         }
 

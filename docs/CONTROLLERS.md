@@ -21,31 +21,47 @@ Settings, Controls, with a conflict warning and RESET ALL.
 | --- | --- | --- | --- | --- |
 | Move | W A S D | Arrow keys | W A S D or arrows | Left stick |
 | Aim | Faces where you move | Faces where you move | Mouse pointer | Right stick (at rest: faces where you move) |
-| Lock facing (hold, strafe) | L or L SHIFT | L SHIFT | not needed | Right stick |
+| Lock facing (hold, strafe) | L | L CTRL | not needed | Right stick |
 | Attack (hold to repeat) | J | Z | Left click (J and Z still work) | RT / R2 |
 | Class ability | K | X | Right click (K and X still work) | LT / L2, or B / circle |
-| Jump / dodge | SPACE | C | SPACE | A / cross |
+| Jump | SPACE | C | SPACE | A / cross |
+| Dodge | L SHIFT | R CTRL | L SHIFT | RB / R1 |
+| Cancel attack (feint) | P | \\ | Mouse forward side button | LB / L1 inside your own swing window (else LB is Next tool) |
 | Interact / carry / use station | H | V | E | X / square |
 | Dig / place | U | F | F | Y / triangle |
-| Switch dig / place | I | R | Mouse wheel | LB or RB / L1 or R1 |
-| Ping wheel | G | G | G or middle click | D-pad left |
+| Next tool / switch dig and place | I (1-7 pick a Builder tool) | R | Mouse wheel | LB / L1 outside your swing window |
+| Ping | G | G | G or middle click | D-pad left |
+| Look around (hold) | ` | ` | ` | Hold R3 |
 | Show usable terrain (hold; terrain classes) | O | Q | Q | R3 (outside the base ring; inside it R3 opens the station) |
 | Scoreboard (hold) | TAB | TAB | TAB | View / Create |
 | Full map | M | M | M | D-pad up |
-| Base station | B | B | B | Press the right stick (R3) |
+| Base station | B | B | B | Click the right stick (R3) inside your base ring |
 | Station: buy | ENTER | ENTER | ENTER or click | A / cross in the panel |
 | Emote wheel | T | T | T | Hold the left stick (L3) 0.3 s |
 | HUD cursor | L ALT | L ALT | L ALT | D-pad down |
 | Minimap zoom | N | N | N | D-pad right |
-| Character panel | P | P | P or click the portrait | (HUD cursor) |
-| Camera view: high / ground | F5 | F5 | F5 | Double-tap the left stick (L3) |
+| Camera view: high / third person | F5 | F5 | F5 | Settings, CAMERA (no button) |
 | Pause | ESC | ESC | ESC | Menu / Options |
 | Menus: move focus | W A S D or arrows | Arrows | Arrows or hover | D-pad or left stick |
 | Menus: confirm / back | ENTER or SPACE / ESC | ENTER or SPACE / ESC | ENTER or click / ESC | A / B (cross / circle) |
 
-Keyboard aim: the fighter faces the way it moves, keeps that facing when you stop, and leans toward the nearest enemy
-inside a 30 degree cone up to 7 metres ahead (target assist). Hold lock facing to keep the facing while you strafe;
-lock facing turns the assist off.
+Keyboard aim: the fighter faces the way it moves and keeps that facing when you stop. Hold lock facing to keep the
+facing while you strafe.
+
+Aim help (Settings, ACCESS: AIM HELP for MOUSE, CONTROLLER and KEYS ONLY; OFF / LOW / HIGH; mouse LOW, controller and
+keys HIGH by default): from the attack press through the wind-up, and 0.4 s after, the swing turns toward the best enemy
+in front of you (HIGH: within 50 degrees and your reach + 2.5 m; LOW: 25 degrees and reach + 1.5 m), aimed where it will
+be 0.13 s later. With the keys or one stick in the third-person view the cone is measured around the way you move. On
+HIGH an enemy touching you is hit even when nothing is ahead. Outside attacks HIGH leans the facing a little (not in
+third person). It never turns the camera. Fogged enemies are never picked; a clear line is preferred. TNT throws lead
+by up to 0.5 s; the Healer's press turns to the hurt ally nearest your aim when no enemy is inside her lantern reach.
+
+Cast distance: the right stick's push sets how far roots, the healing pulse and TNT go (1 m to the ability's range);
+keyboard only, a Farmer or Healer holds the ability key to reach farther (full range after 0.5 s) and casts on
+release; a quick tap casts 3 m ahead, or at the enemy the aim help picks. The mouse casts at the pointer.
+
+Hard-coded keys in a match (not rebindable): 1-7 pick a Builder tool; F12 photo; F6 auto-director (spectating). H no
+longer hides the HUD (it is the J K L layout's Interact): CLEAN HUD is a setting on the ACCESS tab only.
 
 Every key and button can be changed in Settings, Controls (five columns: W A S D hand, arrow hand, mouse, controller,
 controller 2), saved between launches, with a warning when a key is already used and RESET TO DEFAULTS.
@@ -139,3 +155,13 @@ view. Every controller button already had a job, so the camera view moved to a d
 the emote wheel on L3 now opens after a 0.3 s hold on a controller (the quick-chat wheel's rule), so a tap or a double
 tap never flashes it. Keyboard T still opens the emote wheel at once. The controls screen and the rebinding rows read
 the binding itself, so they show "DOUBLE-TAP L3" without a text change.
+
+
+## Lane I: one job per button (2026-11-22)
+
+Middle mouse is Ping only (it used to also pan the camera while held). Looking around with the mouse moved to the `
+key (rebindable, LOOK AROUND). On a controller R3 looks only while held for 0.25 s or more, so a click on R3 opens the
+base station without panning; L3 no longer changes the camera view (a stick click while sprinting did), so L3 is the
+emote wheel only and the view is picked in Settings, CAMERA. LB stays Cancel inside your own swing window and Next tool
+everywhere else; the HUD reads InputContext.PadLbCancels to name which. Interact taps shorter than one frame now always
+reach the game.

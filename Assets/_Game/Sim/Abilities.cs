@@ -103,6 +103,7 @@ namespace CriticalMass.Sim.Core
         /// <summary>Casts each living actor's class ability on InputFrame.Ability when its cooldown is spent.</summary>
         public static void AbilitiesSystem(World w, double dt)
         {
+            PlayerSeat.PressSystem(w);   // lane S2: never-silent presses (ActionRefused), read before any system takes a press
             int n = w.ActorCount;
             for (int i = 0; i < n; i++)
             {
@@ -174,6 +175,8 @@ namespace CriticalMass.Sim.Core
                     byte next = hp > hps ? Cell.BreakableIntact : hp > 0 ? Cell.BreakableCracked : Cell.BreakableDestroyed;
                     if (next != t) MapGrid.SetCell(w, cx, cz, next);
                     World.PushEvent(w, SimEventType.WallBreak, minerId, i, cx + 0.5, cz + 0.5, next);
+                    // lane S2: the uniform structure answer (Value = hits taken, Radius = share of its hits left)
+                    if (PlayerSeat.On(w)) World.PushEvent(w, SimEventType.StructureHit, minerId, PlayerReasons.StructureBreakable, cx + 0.5, cz + 0.5, 1, null, DamageCause.Melee, Math.Max(0, hp) / (2 * hps));
                 }
             }
         }
