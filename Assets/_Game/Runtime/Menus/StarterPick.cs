@@ -31,6 +31,20 @@ namespace CriticalMass.Runtime.Menus
 
         readonly Dictionary<ClassId, MenuItem> _cards = new Dictionary<ClassId, MenuItem>();
         readonly Dictionary<ClassId, Text[]> _texts = new Dictionary<ClassId, Text[]>();
+        readonly Dictionary<ClassId, GameObject> _marks = new Dictionary<ClassId, GameObject>();
+
+        /// <summary>px lane F (pass 2 review: "cards have empty bodies"): what card c shows (tests and captures).</summary>
+        public string CardTitle(ClassId c) => _texts.TryGetValue(c, out Text[] t) ? t[0].text : null;
+        public string CardLine(ClassId c) => _texts.TryGetValue(c, out Text[] t) ? t[1].text : null;
+        /// <summary>Cards carrying the RECOMMENDED badge (Farmer, Warrior, Miner).</summary>
+        public int RecommendedMarks
+        {
+            get { int n = 0; foreach (GameObject g in _marks.Values) if (g != null && g.activeSelf) n++; return n; }
+        }
+        public bool IsRecommended(ClassId c) => _marks.TryGetValue(c, out GameObject g) && g != null && g.activeSelf;
+
+        /// <summary>Opaque: the screen sits over a live match in review captures, and nothing behind it may show.</summary>
+        protected override float WashAlpha => 1f;
         MenuItem _practice, _back;
 
         public IReadOnlyDictionary<ClassId, MenuItem> Cards => _cards;
@@ -98,8 +112,20 @@ namespace CriticalMass.Runtime.Menus
             Transform t = card.transform;
             Text name = MenuUi.Label(t, "Name", CMTokens.Display, UiScale.TypeLead, Cream, TextAnchor.MiddleLeft, 28f, 24f, CardW - 56f, 54f, FlowWords.ClassName(c), 3f);
             MenuUi.Fit(name, UiScale.TypeSmall);
-            Text line = MenuUi.Label(t, "Does", CMTokens.Ui, UiScale.TypeBody, Cream, TextAnchor.UpperLeft, 28f, 92f, CardW - 56f, 96f, Does(c), 2f);
+            Text line = MenuUi.Label(t, "Does", CMTokens.Ui, UiScale.TypeBody, Cream, TextAnchor.UpperLeft, 28f, 88f, CardW - 56f, 104f, Does(c), 2f);
             line.horizontalOverflow = HorizontalWrapMode.Wrap;
+            line.verticalOverflow = VerticalWrapMode.Overflow;   // never truncate to nothing when the text scale grows
+            if (recommended)
+            {
+                // the RECOMMENDED badge on the card itself (the row heading alone was missed in the review)
+                VectorShape badge = MenuUi.Shape(t, "Recommended Badge", ShapeKind.RoundRect, CardW - 236f, 26f, 208f, 40f, Brass, 12f);
+                badge.RimPx = 0f;
+                Text bt = MenuUi.Label(badge.transform, "Word", CMTokens.Ui, UiScale.TypeMin, Navy, TextAnchor.MiddleCenter, 0f, 0f, 208f, 40f, "RECOMMENDED", 0f);
+                bt.raycastTarget = false;
+                _marks[c] = badge.gameObject;
+                MenuUi.Fit(name, UiScale.TypeSmall);
+                name.rectTransform.sizeDelta = new Vector2(CardW - 56f - 220f, name.rectTransform.sizeDelta.y);
+            }
             line.lineSpacing = 1.05f;
             Text dl = MenuUi.Label(t, "Difficulty Label", CMTokens.Ui, UiScale.TypeMin, CMTokens.WithAlpha(Cream, 0.75f), TextAnchor.MiddleLeft, 28f, 198f, 140f, 28f, "DIFFICULTY", 2f);
             for (int k = 0; k < 3; k++)

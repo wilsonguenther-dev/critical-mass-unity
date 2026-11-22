@@ -55,11 +55,14 @@ namespace CriticalMass.Runtime.Flow
         /// <summary>px lane F fix round: the egg never hatches (duel and range): HatchSeconds goes an hour past the final
         /// whistle, so Kaiju.Ai's "time + eps >= hatch" can never fire on the last tick.</summary>
         public bool NoKaiju;
+        /// <summary>px lane F pass 2: the hill scores nothing (range): Hill.Radius 0, and Hill.HillSystem counts bodies
+        /// strictly inside the radius, so nobody is ever on it: no hill points, no hill owner, no hill time.</summary>
+        public bool NoHill;
 
         /// <summary>How far past the final whistle a NoKaiju match puts the hatch.</summary>
         public const double NoKaijuMargin = 3600;
 
-        public bool IsDefault => MatchSeconds <= 0 && HatchSeconds <= 0 && PassiveBotSeconds <= 0 && OnlyClassPlusOne <= 0 && !NoKaiju;
+        public bool IsDefault => MatchSeconds <= 0 && HatchSeconds <= 0 && PassiveBotSeconds <= 0 && OnlyClassPlusOne <= 0 && !NoKaiju && !NoHill;
 
         /// <summary>Writes the non-zero fields into cfg (the hatch never lands after the final whistle).</summary>
         public void ApplyTo(GameConfig cfg)
@@ -70,6 +73,7 @@ namespace CriticalMass.Runtime.Flow
             if (PassiveBotSeconds > 0 && cfg.Bots != null) cfg.Bots.PassiveSeconds = PassiveBotSeconds;
             if (OnlyClassPlusOne > 0) OnlyClass(cfg, (ClassId)(OnlyClassPlusOne - 1));
             if (NoKaiju) cfg.HatchSeconds = cfg.MatchSeconds + NoKaijuMargin;
+            if (NoHill && cfg.Hill != null) cfg.Hill.Radius = 0;
         }
 
         /// <summary>px lane F: every bot-filled roster slot takes class c (all three class-mix tables the sim reads, one-hot).
@@ -231,7 +235,7 @@ namespace CriticalMass.Runtime.Flow
                 case MatchMode.Demo:
                     return new MatchRules { MatchSeconds = DemoMatchSeconds, HatchSeconds = DemoHatchSeconds, PassiveBotSeconds = DemoPassiveSeconds };
                 case MatchMode.Duel: return new MatchRules { MatchSeconds = DuelMatchSeconds, HatchSeconds = DuelMatchSeconds, NoKaiju = true };
-                case MatchMode.Range: return new MatchRules { MatchSeconds = RangeMatchSeconds, HatchSeconds = RangeMatchSeconds, NoKaiju = true };
+                case MatchMode.Range: return new MatchRules { MatchSeconds = RangeMatchSeconds, HatchSeconds = RangeMatchSeconds, NoKaiju = true, NoHill = true };
                 default: return default;
             }
         }
