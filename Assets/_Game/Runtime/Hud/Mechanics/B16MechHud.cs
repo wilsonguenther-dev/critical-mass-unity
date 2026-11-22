@@ -90,7 +90,7 @@ namespace CriticalMass.Runtime.Hud.Mechanics
     /// b16 view only: (1) while the autopilot plays the local player after AfkSeconds without input, a centred panel says so;
     /// (2) the context tips: once per profile, at the moment a rule that decides matches first touches the player (own Kaiju
     /// on the circle, RALLY, the hut vote, the forward respawn, the hill cap, the first knock-out), a banner says what it does.
-    /// They respect the hints setting (Hints OFF: none) and are dismissed with H or the controller's View button (or time out).
+    /// They respect the hints setting (Hints OFF: none) and are dismissed with the controller's View button or time out (review fix: no hard-coded H in play).
     /// Nothing flashes or pulses, so the reduced-flashing setting needs nothing more. Reads the World; writes nothing to it.
     /// </summary>
     public sealed class B16MechHud : MonoBehaviour
@@ -202,8 +202,8 @@ namespace CriticalMass.Runtime.Hud.Mechanics
 
         static bool DismissPressed()
         {
-            Keyboard k = Keyboard.current;
-            if (k != null && k.hKey.wasPressedThisFrame) return true;
+            // review fix round (defect 1): H is Interact on the J K L layout; no hard-coded keyboard key in play (the tip
+            // times out by itself, a pad's Select still dismisses it)
             Gamepad g = Gamepad.current;
             return g != null && g.selectButton.wasPressedThisFrame;
         }

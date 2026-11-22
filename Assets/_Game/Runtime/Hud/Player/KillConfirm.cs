@@ -19,7 +19,10 @@ namespace CriticalMass.Runtime.Hud.Player
     public sealed class KillConfirm
     {
         public const float Seconds = 1.2f, AssistSeconds = 1.0f, StreakSeconds = 4f, PopSeconds = 0.12f, Fade = 0.25f;
-        public const float ConfirmY = -68f, StreakY = -34f, AssistY = -106f;
+        /// <summary>Review fix round (defect 5): out of the centre, in the kill-feed column under its five lines (top-right),
+        /// small (Display 22, streak 18, assist 20), 1.2 s on the wall clock. px at 1080p from the top-right corner.</summary>
+        public const float RightPx = 24f, ConfirmTop = 372f, LineW = 420f, LineH = 30f;
+        public const float ConfirmY = -68f, StreakY = -34f, AssistY = -106f;   // (old centre offsets, kept for reference)
         public const string KnockedOut = "KNOCKED OUT  ", Assist = "ASSIST  ";
         static readonly string[] StreakWords = { "", "", "DOUBLE", "TRIPLE", "QUADRUPLE", "RAMPAGE" };
 
@@ -28,7 +31,7 @@ namespace CriticalMass.Runtime.Hud.Player
 
         readonly Text _line, _streak, _assist;
         readonly CanvasGroup _lineGroup, _assistGroup;
-        float _age = 99f, _assistAge = 99f;
+        float _age = 99f, _assistAge = 99f, _shownAt = -100f, _assistAt = -100f;
         double _lastKillAt = -100;
         int _streakN;
 
@@ -41,16 +44,20 @@ namespace CriticalMass.Runtime.Hud.Player
 
         public KillConfirm(RectTransform root)
         {
-            RectTransform r = PxUi.Middle(root, "Kill Confirm", 760f, 44f);
-            r.anchoredPosition = new Vector2(0f, ConfirmY);
+            RectTransform r = PxUi.Rt(root, "Kill Confirm");
+            r.anchorMin = r.anchorMax = r.pivot = new Vector2(1f, 1f);
+            r.sizeDelta = new Vector2(LineW, LineH);
+            r.anchoredPosition = new Vector2(-RightPx, -ConfirmTop);
             _lineGroup = PxUi.Group(r);
-            _line = PxUi.Label(r, "Line", CMTokens.Display, UiScale.TypeHeading, PxPalette.Brass, TextAnchor.MiddleCenter, 0f, 0f, 760f, 44f, 3f);
-            _streak = PxUi.Label(r, "Streak", CMTokens.Display, UiScale.TypeSmall + 4, PxPalette.Cream, TextAnchor.MiddleCenter, 0f, 22f - (StreakY - ConfirmY) - 14f, 760f, 28f, 3f);
+            _line = PxUi.Label(r, "Line", CMTokens.Display, UiScale.TypeBody, PxPalette.Brass, TextAnchor.MiddleRight, 0f, 0f, LineW, LineH, 2.5f);
+            _streak = PxUi.Label(r, "Streak", CMTokens.Display, UiScale.TypeSmall, PxPalette.Cream, TextAnchor.MiddleRight, 0f, LineH + 2f, LineW, 24f, 2.5f);
             r.gameObject.SetActive(false);
-            RectTransform a = PxUi.Middle(root, "Assist Confirm", 600f, 32f);
-            a.anchoredPosition = new Vector2(0f, AssistY);
+            RectTransform a = PxUi.Rt(root, "Assist Confirm");
+            a.anchorMin = a.anchorMax = a.pivot = new Vector2(1f, 1f);
+            a.sizeDelta = new Vector2(LineW, LineH);
+            a.anchoredPosition = new Vector2(-RightPx, -ConfirmTop - LineH - 28f);
             _assistGroup = PxUi.Group(a);
-            _assist = PxUi.Label(a, "Line", CMTokens.Ui, UiScale.TypeBody, PxPalette.Cream, TextAnchor.MiddleCenter, 0f, 0f, 600f, 32f, 2.5f);
+            _assist = PxUi.Label(a, "Line", CMTokens.Ui, UiScale.TypeSmall + 2, PxPalette.Cream, TextAnchor.MiddleRight, 0f, 0f, LineW, LineH, 2.5f);
             a.gameObject.SetActive(false);
         }
 
@@ -72,6 +79,7 @@ namespace CriticalMass.Runtime.Hud.Player
             HudText.Set(_streak, StreakWord(_streakN));
             PxUi.Show(_streak, _streakN >= 2);
             _age = 0f;
+            _shownAt = Time.unscaledTime;
             PxUi.Show(_line.transform.parent, true);
             PxUi.Alpha(_lineGroup, 1f);
             Confirmed++;
@@ -83,6 +91,7 @@ namespace CriticalMass.Runtime.Hud.Player
         {
             HudText.Set(_assist, Assist + NameOf(w, victim));
             _assistAge = 0f;
+            _assistAt = Time.unscaledTime;
             PxUi.Show(_assist.transform.parent, true);
             PxUi.Alpha(_assistGroup, 1f);
             AssistsShown++;
@@ -105,7 +114,7 @@ namespace CriticalMass.Runtime.Hud.Player
             Transform lr = _line.transform.parent;
             if (lr.gameObject.activeSelf)
             {
-                _age += dt;
+                _age = Mathf.Max(_age + dt, Time.unscaledTime - _shownAt);   // wall clock: never outstays 1.2 s
                 if (_age >= Seconds) lr.gameObject.SetActive(false);
                 else
                 {
@@ -117,7 +126,7 @@ namespace CriticalMass.Runtime.Hud.Player
             Transform ar = _assist.transform.parent;
             if (ar.gameObject.activeSelf)
             {
-                _assistAge += dt;
+                _assistAge = Mathf.Max(_assistAge + dt, Time.unscaledTime - _assistAt);
                 if (_assistAge >= AssistSeconds) ar.gameObject.SetActive(false);
                 else PxUi.Alpha(_assistGroup, Mathf.Clamp01((AssistSeconds - _assistAge) / Fade));
             }

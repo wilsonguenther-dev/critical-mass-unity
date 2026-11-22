@@ -590,6 +590,16 @@ namespace CriticalMass.Runtime.Hud.Mechanics
                 stunned = alive;   // the sim's own stun (CM_SIM_PHYSICS): exact, frame for frame
                 stunLeft = (float)(ticksLeft / ticksLen);
             }
+            // review fix round (defect 13): the Miner's hit stun is the plain HitStun counter (no MechPhysics stun, no feed
+            // entry): read it too, so every class shows STUNNED when staggered
+            else if (!stunned && alive && w.Actors[me].HitStunTicks > 0 && w.Actors[me].HitStunLen > 0)
+            {
+                stunned = true;
+                stunLeft = Mathf.Clamp01(w.Actors[me].HitStunTicks / (float)w.Actors[me].HitStunLen);
+            }
+            // review fix round (defect 6): a hit my shield or dodge took says BLOCKED / DODGED in my word row, not STUNNED
+            CriticalMass.Runtime.Hud.Player.PlayerHud px = CriticalMass.Runtime.Hud.Player.PlayerHud.Current;
+            if (stunned && px != null && px.DefendedRecently) stunned = false;
             if (_stun.gameObject.activeSelf != stunned) _stun.gameObject.SetActive(stunned);
             if (stunned) _stunPie.Fill01 = stunLeft;
 

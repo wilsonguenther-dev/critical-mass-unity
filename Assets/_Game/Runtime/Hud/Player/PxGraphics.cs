@@ -37,6 +37,8 @@ namespace CriticalMass.Runtime.Hud.Player
     {
         /// <summary>Share of the half-screen the band reaches in from each edge.</summary>
         public float Band = 0.22f;
+        /// <summary>Per-edge strength (x bottom, y right, z top, w left); review fix: the hurt flash lights the side it came from.</summary>
+        public Vector4 Sides = Vector4.one;
 
         protected override void OnPopulateMesh(VertexHelper vh)
         {
@@ -47,10 +49,12 @@ namespace CriticalMass.Runtime.Hud.Player
             float ix = r.width * 0.5f * Band, iy = r.height * 0.5f * Band;
             Vector2 o0 = new Vector2(r.xMin, r.yMin), o1 = new Vector2(r.xMax, r.yMin), o2 = new Vector2(r.xMax, r.yMax), o3 = new Vector2(r.xMin, r.yMax);
             Vector2 i0 = new Vector2(r.xMin + ix, r.yMin + iy), i1 = new Vector2(r.xMax - ix, r.yMin + iy), i2 = new Vector2(r.xMax - ix, r.yMax - iy), i3 = new Vector2(r.xMin + ix, r.yMax - iy);
-            PxMesh.Quad(vh, o0, o1, i1, i0, edge, edge, none, none);
-            PxMesh.Quad(vh, o1, o2, i2, i1, edge, edge, none, none);
-            PxMesh.Quad(vh, o2, o3, i3, i2, edge, edge, none, none);
-            PxMesh.Quad(vh, o3, o0, i0, i3, edge, edge, none, none);
+            Color eb = edge, er = edge, et = edge, el = edge;
+            eb.a *= Sides.x; er.a *= Sides.y; et.a *= Sides.z; el.a *= Sides.w;
+            PxMesh.Quad(vh, o0, o1, i1, i0, eb, eb, none, none);
+            PxMesh.Quad(vh, o1, o2, i2, i1, er, er, none, none);
+            PxMesh.Quad(vh, o2, o3, i3, i2, et, et, none, none);
+            PxMesh.Quad(vh, o3, o0, i0, i3, el, el, none, none);
         }
     }
 

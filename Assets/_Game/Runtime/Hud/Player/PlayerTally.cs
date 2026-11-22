@@ -17,7 +17,7 @@ namespace CriticalMass.Runtime.Hud.Player
     /// </summary>
     public sealed class PlayerTally
     {
-        public const float X = 124f, Y = -28f, W = 500f, H = 20f;   // above the card (the card has no 38-character row free)
+        public const float X = 124f, Y = -38f, W = 500f, H = 20f;   // above the card (the card has no 38-character row free)
 
         /// <summary>The tally line (pure; tests).</summary>
         public static string Compose(int ko, int assists, int damage, int healing, int hillSeconds) => Compose(ko, assists, 0, damage, healing, hillSeconds);

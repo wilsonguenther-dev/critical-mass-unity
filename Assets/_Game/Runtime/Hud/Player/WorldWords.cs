@@ -30,6 +30,7 @@ namespace CriticalMass.Runtime.Hud.Player
             public Vector3 Point;
             public float Lift;
             public int Stack;
+            public bool Row;
             public bool Active;
         }
 
@@ -55,10 +56,12 @@ namespace CriticalMass.Runtime.Hud.Player
         }
 
         /// <summary>True (and remembered) when key has not been shown in the last RepeatSeconds (pure but for the clock).</summary>
-        public bool Allow(int key, float now)
+        public bool Allow(int key, float now) => Allow(key, now, RepeatSeconds);
+
+        public bool Allow(int key, float now, float repeat)
         {
             for (int i = 0; i < Keys; i++)
-                if (_key[i] == key && _keyAt[i] > 0f && now - _keyAt[i] < RepeatSeconds) return false;
+                if (_key[i] == key && _keyAt[i] > 0f && now - _keyAt[i] < repeat) return false;
             _key[_keyNext] = key;
             _keyAt[_keyNext] = now <= 0f ? 1e-4f : now;
             _keyNext = (_keyNext + 1) % Keys;
@@ -72,8 +75,13 @@ namespace CriticalMass.Runtime.Hud.Player
 
         /// <summary>Shows text; returns the label (the ledger's source) or null when rate limited.</summary>
         public Text Show(string text, int key, int actor, Vector3 point, float lift, Color ink, Color rim, bool strong, float seconds)
+            => Show(text, key, actor, point, lift, ink, rim, strong, seconds, RepeatSeconds);
+
+        /// <summary>As Show, with its own duplicate window. A word on a body sits in that body's word row above the name tag
+        /// (UnitStack), whatever lift is passed; a word on a point keeps its lift.</summary>
+        public Text Show(string text, int key, int actor, Vector3 point, float lift, Color ink, Color rim, bool strong, float seconds, float repeat)
         {
-            if (string.IsNullOrEmpty(text) || !Allow(key, Time.unscaledTime)) return null;
+            if (string.IsNullOrEmpty(text) || !Allow(key, Time.unscaledTime, repeat)) return null;
             Slot s = null;
             float oldest = -1f;
             for (int i = 0; i < _slots.Length; i++)
@@ -94,7 +102,8 @@ namespace CriticalMass.Runtime.Hud.Player
             s.Life = seconds;
             s.Actor = actor;
             s.Point = point;
-            s.Lift = lift;
+            s.Row = actor >= 0;
+            s.Lift = s.Row ? HealthBars.Lift : lift;
             s.Stack = Mathf.Min(stack, 3);
             int size = strong ? StrongSize : SoftSize;
             s.Text.fontSize = size;
@@ -130,10 +139,21 @@ namespace CriticalMass.Runtime.Hud.Player
                 s.Age += dt;
                 if (s.Age >= s.Life) { s.Active = false; PxUi.Show(s.Rt, false); continue; }
                 float t = s.Age / s.Life;
-                float lift = s.Lift + (calm ? 0f : Rise * t);
-                Vector3 at = s.Actor >= 0 && s.Actor < w.ActorCount ? PxProject.Actor(w, s.Actor, alpha, lift) : s.Point + Vector3.up * (lift - s.Lift);
-                if (!PxProject.Screen(cam, at, 0f, out Vector2 p)) { PxUi.Alpha(s.Group, 0f); continue; }
-                s.Rt.anchoredPosition = p / scale + new Vector2(0f, s.Stack * (PillH + 4f));
+                if (s.Row && s.Actor < w.ActorCount)
+                {
+                    // the body's word row: above the name tag, rows stacking up, no rise (UnitStack)
+                    Vector3 head = PxProject.Actor(w, s.Actor, alpha, HealthBars.Lift);
+                    if (!PxProject.Screen(cam, head, 0f, out Vector2 hp)) { PxUi.Alpha(s.Group, 0f); continue; }
+                    float tag = PxProject.ThirdPerson ? CriticalMass.Runtime.Camera.TagLens.Scale((head - cam.transform.position).magnitude) : 1f;
+                    s.Rt.anchoredPosition = hp / scale + new Vector2(0f, UnitStack.TagRowUp(tag, s.Stack));
+                }
+                else
+                {
+                    float lift = s.Lift + (calm ? 0f : Rise * t);
+                    Vector3 at = s.Point + Vector3.up * (lift - s.Lift);
+                    if (!PxProject.Screen(cam, at, 0f, out Vector2 p)) { PxUi.Alpha(s.Group, 0f); continue; }
+                    s.Rt.anchoredPosition = p / scale + new Vector2(0f, s.Stack * (PillH + 4f));
+                }
                 float a = Mathf.Clamp01((s.Life - s.Age) / FadeOut);
                 PxUi.Alpha(s.Group, a);
             }

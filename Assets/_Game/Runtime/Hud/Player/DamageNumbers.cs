@@ -56,6 +56,7 @@ namespace CriticalMass.Runtime.Hud.Player
             public int Actor;
             public Vector3 Point;
             public Vector2 Offset;
+            public int Stack;
             public bool Active;
         }
 
@@ -114,8 +115,9 @@ namespace CriticalMass.Runtime.Hud.Player
                 n.Text = HudText.Make(world, "Damage " + i, CMTokens.Mono, BaseThird, PxPalette.Cream, TextAnchor.MiddleCenter, 3f);
                 RectTransform rt = n.Text.rectTransform;
                 rt.anchorMin = rt.anchorMax = Vector2.zero;
-                rt.pivot = new Vector2(0.5f, 0.5f);
-                rt.sizeDelta = new Vector2(140f, 64f);
+                rt.pivot = new Vector2(0f, 0.5f);   // review fix: left-middle at UnitStack.NumberLeftMid (to the side of the name column)
+                rt.sizeDelta = new Vector2(220f, 72f);
+                n.Text.alignment = TextAnchor.MiddleLeft;
                 n.Group = n.Text.gameObject.AddComponent<CanvasGroup>();
                 n.Group.interactable = false;
                 n.Group.blocksRaycasts = false;
@@ -149,8 +151,8 @@ namespace CriticalMass.Runtime.Hud.Player
             n.Kind = kind;
             n.Punch = 0f;
             n.Text.rectTransform.localScale = Vector3.one;
-            float side = (stack & 1) == 0 ? 1f : -1f;
-            n.Offset = stack == 0 ? Vector2.zero : new Vector2(side * (12f + 6f * stack), size * 0.8f * stack);
+            n.Stack = Mathf.Min(stack, 2);
+            n.Offset = Vector2.zero;
             if (n.Text.fontSize != size) { n.Text.fontSize = size; ContainedText.Of(n.Text)?.Configure(size, MinSize, 1); }
             n.Text.color = ColourFor(kind);
             HudText.Set(n.Text, kind == Kind.Heal ? HealWord(v) : NumberCache.Int(v));
@@ -206,9 +208,25 @@ namespace CriticalMass.Runtime.Hud.Player
                 if (n.Age >= n.Life) { n.Active = false; n.Text.gameObject.SetActive(false); continue; }
                 float t = n.Age / n.Life;
                 float up = calm ? 0f : Rise * t;
-                Vector3 at = n.Actor >= 0 && n.Actor < w.ActorCount && w.Actors[n.Actor].Alive ? PxProject.Actor(w, n.Actor, alpha, NumberLift + up) : n.Point + Vector3.up * up;
-                if (!PxProject.Screen(cam, at, 0f, out Vector2 p)) { PxUi.Alpha(n.Group, 0f); continue; }
-                n.Text.rectTransform.anchoredPosition = p / scale + n.Offset;
+                if (n.Actor >= 0 && n.Actor < w.ActorCount && w.Actors[n.Actor].Alive)
+                {
+                    // review fix round (defect 4): from the BODY (chest), to the side of the name / bar / word column,
+                    // clamped under the word row (UnitStack): never over a name, a class, a bar or a word
+                    Vector3 chest = PxProject.Actor(w, n.Actor, alpha, UnitStack.ChestLift);
+                    Vector3 head = PxProject.Actor(w, n.Actor, alpha, HealthBars.Lift);
+                    Vector3 risen = PxProject.Actor(w, n.Actor, alpha, UnitStack.ChestLift + up);
+                    if (!PxProject.Screen(cam, chest, 0f, out Vector2 cp) || !PxProject.Screen(cam, head, 0f, out Vector2 hp) || !PxProject.Screen(cam, risen, 0f, out Vector2 rp))
+                    { PxUi.Alpha(n.Group, 0f); continue; }
+                    float tag = PxProject.ThirdPerson ? CriticalMass.Runtime.Camera.TagLens.Scale((head - cam.transform.position).magnitude) : 1f;
+                    int sz = n.Text.fontSize;
+                    n.Text.rectTransform.anchoredPosition = UnitStack.NumberLeftMid(cp / scale, hp / scale, tag, sz, (rp.y - cp.y) / scale, n.Stack);
+                }
+                else
+                {
+                    Vector3 at = n.Point + Vector3.up * up;
+                    if (!PxProject.Screen(cam, at, 0f, out Vector2 p)) { PxUi.Alpha(n.Group, 0f); continue; }
+                    n.Text.rectTransform.anchoredPosition = p / scale + n.Offset;
+                }
                 if (n.Punch > 0f)
                 {
                     n.Punch = calm ? 0f : Mathf.Max(0f, n.Punch - dt);
