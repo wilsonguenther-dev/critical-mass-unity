@@ -40,6 +40,8 @@ namespace CriticalMass.Sim.Core
         public int[] CancelUsed;
         /// <summary>b16 CANCEL: the SwingTick of the last swing that landed (a hit-cancel needs it; a whiff never sets it).</summary>
         public int[] LandedSwing;
+        /// <summary>px S1 [4][5]: last tick of the WOUNDED window (a landed melee hit opens WoundedSeconds of it).</summary>
+        public int[] WoundedUntil;
         /// <summary>1 on every cell of a built ladder lane (a Bridge cell laid over a Wall), rebuilt once per tick.</summary>
         public byte[] Ladder;
         public int[] LadderCells;
@@ -73,6 +75,7 @@ namespace CriticalMass.Sim.Core
                 FeintLockUntil = new int[cap],
                 CancelUsed = new int[cap],
                 LandedSwing = new int[cap],
+                WoundedUntil = new int[cap],
                 Ladder = new byte[cells],
                 LadderCells = new int[cells],
             };
@@ -100,6 +103,7 @@ namespace CriticalMass.Sim.Core
                 FeintLockUntil[i] = CombatFeel.NoTick;
                 CancelUsed[i] = CombatFeel.NoTick;
                 LandedSwing[i] = CombatFeel.NoTick;
+                WoundedUntil[i] = CombatFeel.NoTick;
             }
             for (int k = 0; k < LadderCount; k++) Ladder[LadderCells[k]] = 0;
             LadderCount = 0;
@@ -229,7 +233,10 @@ namespace CriticalMass.Sim.Core
         /// hit under the Poise of an armoured class winding up, else StaggerSeconds (HeavyStaggerSeconds at or over Poise)
         /// times StaggerDecay per earlier stagger in the window (at least 1 tick).
         /// </summary>
-        public static int StaggerFor(World w, int target, double amount, out bool armoured, out bool immune)
+        public static int StaggerFor(World w, int target, double amount, out bool armoured, out bool immune) => StaggerFor(w, target, amount, -1, out armoured, out immune);
+
+        /// <summary>StaggerFor with the striker (px S1 [6]: LightHitInterrupts reads its class; -1 = none).</summary>
+        public static int StaggerFor(World w, int target, double amount, int source, out bool armoured, out bool immune)
         {
             CombatFeelConfig f = Cfg(w);
             CombatFeelState s = w.Depth.Feel;
@@ -249,7 +256,10 @@ namespace CriticalMass.Sim.Core
             }
             // px S1 [6]: a light hit (under the victim's Poise) no longer silently eats a wind-up of any class: the swing goes on
             // (damage and knock still land); only a heavy hit staggers and cancels it (raising AttackCancel with who did it).
-            if (!heavy && t.SwingPending && f.LightHitsKeepWindup) return 0;
+            // LightHitKeepFromShare: only once this share of the wind-up has run (the swing is committed); before it a light hit
+            // still interrupts (the Farmer's quick thrust keeps its job in the duel order).
+            bool interrupts = source >= 0 && f.LightHitInterrupts != null && (int)w.Actors[source].Cls < f.LightHitInterrupts.Length && f.LightHitInterrupts[(int)w.Actors[source].Cls];
+            if (!heavy && t.SwingPending && f.LightHitsKeepWindup && !interrupts && w.Tick - t.SwingTick >= f.LightHitKeepFromShare * t.SwingWindup) return 0;
             int baseTicks = Ticks(w, heavy ? f.HeavyStaggerSeconds : f.StaggerSeconds);
             if (baseTicks <= 0) return 0;
             int count = w.Tick <= s.StaggerWindowEnd[target] ? s.StaggerCount[target] : 0;
@@ -292,7 +302,7 @@ namespace CriticalMass.Sim.Core
             s.StruckTick[target] = w.Tick;
             s.StruckBy[target] = source;
             Knock.Dir(w, target, srcX, srcZ, JsMath.Cos(src.SwingFacing), JsMath.Sin(src.SwingFacing), out double dx, out double dz);
-            int stun = StaggerFor(w, target, amount, out bool armoured, out bool immune);
+            int stun = StaggerFor(w, target, amount, source, out bool armoured, out bool immune);
             if (f.StrikeStaggers != null && (int)src.Cls < f.StrikeStaggers.Length && !f.StrikeStaggers[(int)src.Cls]) stun = 0; // b16: this class's hits do not stagger
             bool locked = InLock(s, target, w.Tick);
             bool clipped = locked && !immune && w.Tick + stun >= s.LockStart[target] + Ticks(w, f.StaggerMaxLockSeconds);
@@ -304,6 +314,7 @@ namespace CriticalMass.Sim.Core
             bool onLadder = OnLadder(w, target);
             double dealt = Damage.ApplyHit(w, target, amount, source, srcX, srcZ, DamageCause.Melee, dx, dz, f.Strikes[(int)src.Cls].Knock, stun);
             if (!(dealt > 0) || !t.Alive) return dealt;
+            if (f.WoundedSeconds > 0) s.WoundedUntil[target] = w.Tick + Ticks(w, f.WoundedSeconds);   // px S1 [4][5]
             if (armoured) s.StaggerArmoured++;
             if (immune) s.StaggerImmune++;
             if (clipped)
@@ -358,6 +369,19 @@ namespace CriticalMass.Sim.Core
             else s.LandedSwing[i] = a.SwingTick; // b16 CANCEL: this swing landed (a hit-cancel may cut its recovery)
             double left = a.SwingRecovery / w.Config.SimHz;
             if (a.AttackCd < left) a.AttackCd = left;
+        }
+
+        // ------------------------------------------------------------------------------------------------ px S1 wounded
+
+        /// <summary>px S1 [4][5]: true while actor id is WOUNDED (a melee hit landed on it within the last WoundedSeconds).</summary>
+        public static bool Wounded(World w, int id) => On(w) && w.Tick <= w.Depth.Feel.WoundedUntil[id];
+
+        /// <summary>px S1 [4]: the share of a heal actor id receives now: WoundedHealShare (mend, pulse) or WoundedFountainShare
+        /// (the fountain) while wounded, else 1 (and 1 with the rule off).</summary>
+        public static double HealShare(World w, int id, bool fountain)
+        {
+            if (!Wounded(w, id)) return 1;
+            return fountain ? Cfg(w).WoundedFountainShare : Cfg(w).WoundedHealShare;
         }
 
         // ------------------------------------------------------------------------------------------------ px S1 swing tracking
@@ -497,6 +521,9 @@ namespace CriticalMass.Sim.Core
             }
             if (w.Tick <= w.Depth.Feel.SlowUntil[i]) k *= f.StaggerSlowMultiplier;
             if (OnLadder(w, i)) k *= f.LadderSpeedMultiplier;
+            // px S1 [5]: a wounded body (hit in the last WoundedSeconds) below WoundedSlowHpShare of its HP is slowed: a
+            // fleeing target can be caught, sometimes (it still outruns a slow chaser once the window closes).
+            if (f.WoundedSlowMultiplier != 1 && Wounded(w, i) && a.Hp < f.WoundedSlowHpShare * a.MaxHp) k *= f.WoundedSlowMultiplier;
             return k;
         }
 

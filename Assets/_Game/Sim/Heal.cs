@@ -38,6 +38,7 @@ namespace CriticalMass.Sim.Core
                 if (!InFountainZone(w, a.Team, x, z)) continue;
                 double room = a.MaxHp - a.Hp;
                 double give = per * B13Hooks.HealScale(w, i);   // b13-hook: the fountain heals with the healed actor's team scale
+                give *= CombatFeel.HealShare(w, i, true);   // px S1 [4]: a wounded body heals at WoundedFountainShare (x 1 with the rule off)
                 double amount = give < room ? give : room;
                 a.Hp += amount;
                 healed++;

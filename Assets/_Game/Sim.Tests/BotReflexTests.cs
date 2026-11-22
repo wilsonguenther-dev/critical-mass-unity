@@ -121,6 +121,9 @@ namespace CriticalMass.Sim.Tests
                         if (o.Dodge) dodged++;
                     }
                     double share = dodged / 200.0, want = kinds[n] == BotReflex.KindTnt ? dc.TntChance[di] : dc.DodgeChance[di];   // b13 r3: TNT has its own roll
+                    // px S1 [3]: with the bots' human limits on, a melee threat rolls CombatFeelConfig.BotMeleeDodgeChance instead.
+                    double[] md = BotAim.On(w) ? w.Config.Depth.CombatFeel.BotMeleeDodgeChance : null;
+                    if (kinds[n] == BotReflex.KindMelee && md != null) want = md[di];
                     bool ok = Math.Abs(share - want) <= 0.12;
                     Console.WriteLine("{\"item\":\"b13-jd reflex\",\"difficulty\":\"" + d + "\",\"threat\":\"" + names[n] + "\",\"dodged\":" + dodged + ",\"trials\":200,\"share\":" + share.ToString("F3") +
                                       ",\"chance\":" + want.ToString("F2") + ",\"limit\":0.12,\"verdict\":\"" + (ok ? "PASS" : "FAIL") + "\"}");

@@ -1121,6 +1121,7 @@ namespace CriticalMass.Net
             D(ref h, o.TntSelfDamage);
             M(ref h, o.TntSelfHits);
             M(ref h, o.Whiffs);
+            A(ref h, o.WoundedUntil);
         }
 
         private static void H_TerrainHeightState(ref ulong h, global::CriticalMass.Sim.Core.TerrainHeightState o)
