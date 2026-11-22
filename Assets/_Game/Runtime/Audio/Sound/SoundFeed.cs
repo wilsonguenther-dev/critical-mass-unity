@@ -551,7 +551,10 @@ namespace CriticalMass.Runtime.Audio.Sound
             if (k < 0 || k >= cues.Length) { Silenced++; return; }
             bool ownA = ev.A == LocalSeat.Actor;
             if (ev.B == PlayerReasons.StructureSolid && !ownA) { Silenced++; return; }   // only ever raised for a human swing
-            Emit(sink, cues[k], w, ev.X, ev.Z, ownA, false, ownA ? 1f : 0.7f, 1f, ev.A);
+            // px lane F (gate F27): MY swing on a structure is a landed hit like a body hit: its knock / clonk at own priority,
+            // reported to the PlayerFeedback ledger as ImpactSound (actor = me, reason = the Structure* kind) when it starts.
+            if (ownA) Emit(sink, cues[k], w, ev.X, ev.Z, true, false, 1.1f, 1f, ev.A, Fb(FeedbackChannelImpact), ev.A, ev.B);
+            else Emit(sink, cues[k], w, ev.X, ev.Z, false, false, 0.7f, 1f, ev.A);
         }
 
         /// <summary>px lane F: a world action. Value 0 = a channel started (dig scrape, pick strike, gather rustle); else the
