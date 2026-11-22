@@ -65,6 +65,29 @@ namespace CriticalMass.Runtime.View.Anim
         float _lastActW;
         float _holdW;
 
+        // px lane C (2026-11-22): the committed swing (legs commit standing still, whiff over-rotation, feint abort) and the
+        // SwingCommit ledger value 2 frames after the press.
+        float _legActW;
+        double _legActT;
+        float _whiffTwist, _whiffPitch;
+        int _feintSeen = int.MinValue;
+        bool _feinting;
+        double _feintAt, _feintFromT;
+        float _feintFromW;
+        int _swingStartFrame = int.MinValue;
+        bool _commitPending, _commitReady;
+        float _commitW;
+
+        /// <summary>px lane C: true once per swing, 2 rendered frames after it began, with the attack pose weight then (the
+        /// SwingCommit ledger value; ActorViews reports it while the model is drawn).</summary>
+        public bool TakeSwingCommit(out float weight)
+        {
+            weight = _commitW;
+            if (!_commitReady) return false;
+            _commitReady = false;
+            return true;
+        }
+
         // Hits.
         int _lastHitTick = int.MinValue;
         HitReaction _react;
@@ -295,11 +318,20 @@ namespace CriticalMass.Runtime.View.Anim
             }
             else
             {
+                // px lane C: standing still, the hips and legs commit to the swing too (base layer); running keeps the legs.
+                _legActW = 0f;
+                if (_kind == 1 && _actClip != null && m.OnUpperLayer(_actClip) && SampleSwing(m, w, actor, i, alpha, simTime, combat, hasFx, fx, out double lt, out float lw, false))
+                {
+                    float still = Mathf.Clamp01(1f - Locomotion.MoveWeight(_speed) / 0.35f);
+                    _legActW = lw * still * HitFeelTuning.LegCommit;
+                    _legActT = lt;
+                }
                 idleW = PoseGround(m, actor, cfg, simTime, loopDt, air, ref scale);
             }
 
             // ---- upper body (DG-73, DG-74, DG-88, DG-71)
             float upperSum = 0f;
+            if (_actClip == null || _kind != 1 || !upperAllowed) _whiffTwist = _whiffPitch = 0f;   // px lane C
             if (upperAllowed) upperSum = PoseUpper(m, w, actor, cfg, i, alpha, simTime, dSim, combat, hasFx, fx, ref twist);
             m.UpperWeight = Mathf.Clamp01(upperSum);
 
@@ -313,7 +345,7 @@ namespace CriticalMass.Runtime.View.Anim
                 _pitch += (float)((pitch - _pitch) * kk);
             }
             else { _roll = 0f; _pitch = 0f; }
-            Quaternion rot = Quaternion.Euler(0f, (float)_yaw + twist, 0f) * Quaternion.Euler(_pitch, 0f, _roll);
+            Quaternion rot = Quaternion.Euler(0f, (float)_yaw + twist + _whiffTwist, 0f) * Quaternion.Euler(_pitch + _whiffPitch, 0f, _roll);
             if (hasFx) rot = fx.Lean * rot;
             m.SetFacing(rot);
             // fix/hit-feel-5: a brief squash along the blow (80 ms, at most 7%), a little lower and wider across it; the
@@ -506,6 +538,7 @@ namespace CriticalMass.Runtime.View.Anim
             if (_gather > 0f) m.Pose(gatherClip, _gatherT, _gather * (1f - heavy) * (1f - land), true);
             if (heavy > 0f) m.Pose(_react.Clip, hitT, heavy, false);
             if (land > 0f) m.Pose(ArtMapping.JumpLand, 0.1 + since * 1.8, land * (1f - heavy), false);
+            if (_legActW > 0f && _actClip != null) m.Pose(_actClip, _legActT, _legActW * (1f - heavy), false);   // px lane C: legs commit
             return idleW;
         }
 
@@ -577,20 +610,22 @@ namespace CriticalMass.Runtime.View.Anim
                 double windup = 0;
                 if (_kind == 1)
                 {
-                    windup = AttackTiming.SwingWindupSeconds(actor, hz);   // the sim's own swing: contact on SwingTick + SwingWindup
-                    double age = AttackTiming.SwingAge(actor, w.Tick, alpha, hz);
-                    if (combat != null && hasFx) age = combat.AttackTime(i, age, fx); // the attacker freezes on contact during the hold
-                    t = AttackTiming.ClipTime(age, ViewContact(_actClip, ClipFacts.Contact(_actClip, (float)(len * 0.5))), len, windup, _actExtreme);
-                    _actAge = age;
+                    SampleSwing(m, w, actor, i, alpha, simTime, combat, hasFx, fx, out t, out actW, true);
                 }
                 else
                 {
                     _actAge = actor.AnimAction + alpha / hz;
                     t = Math.Min(len, _actAge);
+                    actW = AttackTiming.Envelope(_actAge, t, len, windup);
                 }
-                actW = AttackTiming.Envelope(_actAge, t, len, windup);
+                if (_kind == 1 && _commitPending && Time.frameCount - _swingStartFrame >= 2)
+                {
+                    _commitPending = false;
+                    _commitReady = true;
+                    _commitW = actW;
+                }
                 if (_kind == 2 && actor.Cls == ClassId.Warrior) actW *= 1f - _holdW;
-                if (actW <= 0f && t >= len - 1e-4) _actClip = null;
+                if ((actW <= 0f && t >= len - 1e-4) || (_kind == 1 && _feinting && actW <= 0f)) { _actClip = null; _feinting = false; }
                 else
                 {
                     // fix/hit-feel-4 (FacingSanityPlayTests, Demolitions): an action clip that is not on the upper layer
@@ -688,6 +723,62 @@ namespace CriticalMass.Runtime.View.Anim
             return sum;
         }
 
+        /// <summary>
+        /// px lane C: the attack clip's time and weight now: the committed envelope (HitFeelTuning.CommitWeight, local
+        /// faster), the craft wind-up (anticipation, hold, a 4-6 frame strike ending on the sim's contact tick read LIVE from
+        /// SwingTick + SwingWindup), the follow-through held through the hit-stop on a hit (CombatFx.AttackTime) and played
+        /// faster with an over-rotation on a whiff (AttackContact with nothing hit), and a feint that rewinds and fades the
+        /// swing out (SimEventType.Feint). commit = true updates the per-swing state (whiff twist, feint latch).
+        /// </summary>
+        bool SampleSwing(ModelView m, World w, Actor actor, int i, double alpha, double simTime, CombatFx combat, bool hasFx, in ActorPoseFx fx,
+            out double t, out float actW, bool commit)
+        {
+            t = 0; actW = 0f;
+            if (_actClip == null) return false;
+            double hz = w.Config.SimHz;
+            double len = m.ClipLength(_actClip);
+            double windup = AttackTiming.SwingWindupSeconds(actor, hz);   // the sim's own swing: contact on SwingTick + SwingWindup
+            double age = AttackTiming.SwingAge(actor, w.Tick, alpha, hz);
+            double rawAge = age;
+            if (combat != null && hasFx) age = combat.AttackTime(i, age, fx); // the attacker freezes on contact during the hold
+            CombatFeed feed = combat != null ? combat.Feed : null;
+            bool whiff = false;
+            if (feed != null && i < feed.ContactTick.Length && feed.ContactTick[i] >= actor.SwingTick && actor.SwingTick > 0 && feed.ContactHits[i] == 0)
+                whiff = true;
+            double contactAge = age;
+            if (whiff && age > windup) contactAge = windup + (age - windup) * HitFeelTuning.WhiffRate;   // swing through
+            t = AttackTiming.ClipTime(contactAge, ViewContact(_actClip, ClipFacts.Contact(_actClip, (float)(len * 0.5))), len, windup, _actExtreme);
+            actW = AttackTiming.Envelope(age, t, len, windup, i == LocalSeat.Actor);
+            // feint: the sim dropped the wind-up (b16 CANCEL Value 1): rewind to the start and fade out, visibly aborted
+            if (feed != null && i < feed.FeintTick.Length && feed.FeintTick[i] >= actor.SwingTick && actor.SwingTick > 0 && feed.FeintTick[i] != _feintSeen)
+            {
+                if (commit)
+                {
+                    _feintSeen = feed.FeintTick[i];
+                    _feinting = true;
+                    _feintAt = simTime;
+                    _feintFromT = _lastActTime;
+                    _feintFromW = Math.Max(_lastActW, 0.01f);
+                }
+            }
+            if (_feinting)
+            {
+                double u = Math.Min(1, Math.Max(0, (simTime - _feintAt) / HitFeelTuning.FeintAbortSeconds));
+                t = _feintFromT * (1 - u);
+                actW = (float)(_feintFromW * (1 - u));
+            }
+            if (commit)
+            {
+                _actAge = age;
+                double since = rawAge - windup;
+                double ws = whiff && !_feinting ? HitFeelTuning.WhiffShape(since) : 0;
+                float sign = actor.Cls == ClassId.Farmer ? -1f : 1f;
+                _whiffTwist = (float)(sign * HitFeelTuning.WhiffOverRotateDeg * ws);
+                _whiffPitch = (float)(HitFeelTuning.WhiffLeanDeg * ws);
+            }
+            return true;
+        }
+
         double _actAge;
         // fix/hit-feel-5: the weapon tip (hand-local) and whether this fighter's contact reach has been measured.
         bool _reachMeasured;
@@ -771,6 +862,8 @@ namespace CriticalMass.Runtime.View.Anim
 
         void BeginAction(ModelView m, Actor actor, GameConfig cfg, double simTime, string cue = null, int tick = int.MinValue)
         {
+            _feinting = false;
+            _whiffTwist = _whiffPitch = 0f;
             ClassConfig cc = cfg.Class(actor.Cls);
             double aa = actor.AnimAction;
             // feat/light-weapons-1: a light-weapon swing sets its own cooldown; the Healer's lantern swing (not her mend) is
@@ -811,6 +904,7 @@ namespace CriticalMass.Runtime.View.Anim
                 _exTime = AttackTiming.ExtremeNow(m, clip, ViewContact(clip, ClipFacts.Contact(clip, m.ClipLength(clip) * 0.5f)));
             }
             _actExtreme = kind == 1 && clip != null ? _exTime : -1;
+            if (kind == 1 && clip != null) { _swingStartFrame = Time.frameCount; _commitPending = true; _commitReady = false; }
             _actStart = simTime - aa;
             _lastActW = 0f;
             _breakAt = -1;
@@ -824,6 +918,10 @@ namespace CriticalMass.Runtime.View.Anim
             HitSide side = HitReactions.Side(Math.Sin(yr), Math.Cos(yr), d.x, d.z);
             bool blocked = actor.Cls == ClassId.Warrior && actor.AbilityActive > 0 && side == HitSide.Front;
             _react = HitReactions.Pick(feed.LastHitDmg[i], !actor.Alive, blocked, side);
+            // px lane C: the stagger pose at full weight when the local player is the attacker or the victim (own-hit emphasis).
+            bool own = i == LocalSeat.Actor || (i < feed.LastHitBy.Length && feed.LastHitBy[i] == LocalSeat.Actor);
+            if (own && !blocked && _react.Weight < HitFeelTuning.ReactionWeightOwn)
+                _react = new HitReaction(_react.Clip, _react.Layer, HitFeelTuning.ReactionWeightOwn, _react.Tier, _react.Side, _react.TwistDeg);
             _hasReact = true;
         }
 

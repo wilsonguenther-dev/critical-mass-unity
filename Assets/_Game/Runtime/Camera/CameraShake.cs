@@ -28,8 +28,58 @@ namespace CriticalMass.Runtime.Camera
         public static float Trauma => _instance != null ? _instance._trauma : 0f;
         public static Vector3 Applied => _instance != null ? _instance._applied : Vector3.zero;
 
-        /// <summary>Share of the shake offset applied (ground view sets 0.3: a 0.32 u shake 3 u from the pivot is a lot).</summary>
+        /// <summary>Share of the SLIDER shake offset applied (ground view sets 0.3: a 0.32 u shake 3 u from the pivot is a lot).
+        /// px lane C: the hit kick below is NOT limited by it (it is sized per view already).</summary>
         public static float Limit = 1f;
+
+        // ---- px lane C (2026-11-22): the directional HIT KICK, separate from the accessibility shake slider.
+        Vector3 _kickVec;
+        float _kickAt = -10f, _kickU;
+        /// <summary>The kick offset applied this frame (tests, captures) and the size of the last kick requested (u).</summary>
+        public static Vector3 KickApplied => _instance != null ? _instance._kickNow : Vector3.zero;
+        public static float LastKickU => _instance != null ? _instance._kickU : 0f;
+        Vector3 _kickNow;
+        /// <summary>Kicks requested (also counted when reduce motion zeroes them: tests).</summary>
+        public static int KickRequests;
+
+        /// <summary>
+        /// px lane C: a small directional camera impulse for a hit by me, on me, my kill and my death. Position only (the aim
+        /// never moves: CameraShakeReset takes it off before input reads the camera), along the hit direction in the screen
+        /// plane, out in 25 ms and back by 150 ms. Sized per view as a share of the screen height at the followed fighter
+        /// (HitFeelTuning.KickU), scaled by the HIT KICK setting, zero under REDUCE MOTION, NOT scaled by the shake slider.
+        /// Reports CameraKick to the PlayerFeedback ledger (actor = the victim). Returns the size in u (0 = none).
+        /// </summary>
+        public static float Kick(CriticalMass.Runtime.View.Anim.HitFeelTuning.KickKind kind, Vector3 worldDir, int victim)
+        {
+            KickRequests++;
+            if (_instance == null || FeelGate.ReduceMotion) return 0f;
+            float scale = CriticalMass.Runtime.Menu.GameSettings.HitKickScale;
+            if (scale <= 0f) return 0f;
+            UnityEngine.Camera cam = UnityEngine.Camera.main;
+            if (cam == null) return 0f;
+            double dist = FocusDistance();
+            float u = CriticalMass.Runtime.View.Anim.HitFeelTuning.KickU(kind, dist, cam.fieldOfView, scale);
+            float now = Time.unscaledTime;
+            float left = _instance._kickU * CriticalMass.Runtime.View.Anim.HitFeelTuning.KickEnvelope(now - _instance._kickAt);
+            if (u < left) return 0f;   // a bigger kick is still running
+            Transform tr = cam.transform;
+            Vector3 fwd = Vector3.ProjectOnPlane(tr.forward, Vector3.up);
+            if (fwd.sqrMagnitude < 1e-6f) fwd = tr.up;
+            fwd.Normalize();
+            float x = Vector3.Dot(worldDir, tr.right), y = Vector3.Dot(worldDir, fwd);
+            Vector2 d = new Vector2(x, y);
+            if (d.sqrMagnitude < 1e-6f) d = new Vector2(0f, -1f);
+            d.Normalize();
+            _instance._kickVec = new Vector3(d.x, d.y, 0f);
+            _instance._kickU = u;
+            _instance._kickAt = now;
+            CriticalMass.Runtime.Game.PlayerFeedback.Report(CriticalMass.Runtime.Game.FeedbackChannel.CameraKick, victim, u, _instance);
+            return u;
+        }
+
+        /// <summary>The followed fighter's distance from the lens the kick is sized at: third person ThirdDistance, else the
+        /// top-down rig's distance.</summary>
+        public static double FocusDistance() => GroundView.PlayActive ? FollowCamera.ThirdDistance : GameplayCamera.Distance;
 
         void OnEnable() => _instance = this;
 
@@ -79,19 +129,32 @@ namespace CriticalMass.Runtime.Camera
 
         void LateUpdate()
         {
-            if (_trauma <= 0f) return;
-            if (FeelGate.ShakeScale <= 0f) { _trauma = 0f; return; }
+            float now = Time.unscaledTime;
+            float ke = _kickU > 0f && !FeelGate.ReduceMotion ? CriticalMass.Runtime.View.Anim.HitFeelTuning.KickEnvelope(now - _kickAt) : 0f;
+            if (_trauma > 0f && FeelGate.ShakeScale <= 0f) _trauma = 0f;
+            _kickNow = Vector3.zero;
+            if (_trauma <= 0f && ke <= 0f) return;
             UnityEngine.Camera cam = UnityEngine.Camera.main;
             if (cam == null) return;
             float dt = Time.unscaledDeltaTime;
-            _t += dt;
-            Vector2 o = Offset(_trauma, _t) * Limit;
             Transform tr = cam.transform;
-            Vector3 off = tr.right * o.x + tr.up * o.y;
+            Vector3 off = Vector3.zero;
+            if (_trauma > 0f)
+            {
+                _t += dt;
+                Vector2 o = Offset(_trauma, _t) * Limit;   // the slider shake: limited per view
+                off += tr.right * o.x + tr.up * o.y;
+                _trauma = Mathf.Max(0f, _trauma - dt / DecaySeconds);
+            }
+            if (ke > 0f)
+            {
+                // px lane C: the hit kick, its own size (never times Limit), along the hit in the screen plane.
+                _kickNow = (tr.right * _kickVec.x + tr.up * _kickVec.y) * (_kickU * ke);
+                off += _kickNow;
+            }
             tr.position += off;
             _shaken = tr;
             _applied = off;
-            _trauma = Mathf.Max(0f, _trauma - dt / DecaySeconds);
         }
 
         /// <summary>Takes this frame's offset off the camera (CameraShakeReset, start of the next frame).</summary>
