@@ -285,22 +285,22 @@ namespace CriticalMass.Runtime.Tests
             float r = 0.4f;
             float size = HitFeelTuning.BurstSize(0, true, 20) * HitFeelTuning.Burst3PShare;
             Assert.That(HitFeelTuning.Burst3PShare, Is.InRange(0.7f, 0.9f));
-            var chest = new Vector3(0f, 0.95f, 0f);
+            var chest = new UnityEngine.Vector3(0f, 0.95f, 0f);
             foreach (float camDeg in new[] { 0f, 36f, -36f, 90f, 180f })
             {
-                float a = camDeg * Mathf.Deg2Rad;
-                var lens = chest + new Vector3(Mathf.Sin(a), 0.8f, -Mathf.Cos(a)) * 3.2f;   // a 3P lens 3.2 u off, any yaw
-                var hitDir = new Vector3(Mathf.Sin(a + 0.4f), 0f, Mathf.Cos(a + 0.4f));   // attacker roughly between lens and him
-                Vector3 p = HitFeelTuning.ContactSpark3P(chest, lens, hitDir, r, size);
-                Vector3 toLens = lens - chest; toLens.y = 0f; toLens.Normalize();
-                Vector3 across = new Vector3(toLens.z, 0f, -toLens.x);
-                Vector3 off = p - chest;
-                Assert.Greater(Vector3.Dot(off, toLens), 0.9f * r, "near side at " + camDeg);
-                float side = Mathf.Abs(Vector3.Dot(off, across));
+                float a = camDeg * UnityEngine.Mathf.Deg2Rad;
+                var lens = chest + new UnityEngine.Vector3(UnityEngine.Mathf.Sin(a), 0.8f, -UnityEngine.Mathf.Cos(a)) * 3.2f;   // a 3P lens 3.2 u off, any yaw
+                var hitDir = new UnityEngine.Vector3(UnityEngine.Mathf.Sin(a + 0.4f), 0f, UnityEngine.Mathf.Cos(a + 0.4f));   // attacker roughly between lens and him
+                UnityEngine.Vector3 p = HitFeelTuning.ContactSpark3P(chest, lens, hitDir, r, size);
+                UnityEngine.Vector3 toLens = lens - chest; toLens.y = 0f; toLens.Normalize();
+                UnityEngine.Vector3 across = new UnityEngine.Vector3(toLens.z, 0f, -toLens.x);
+                UnityEngine.Vector3 off = p - chest;
+                Assert.Greater(UnityEngine.Vector3.Dot(off, toLens), 0.9f * r, "near side at " + camDeg);
+                float side = UnityEngine.Mathf.Abs(UnityEngine.Vector3.Dot(off, across));
                 Assert.Greater(side, size * 0.5f, "his centre clear of the burst at " + camDeg);
                 Assert.Less(side, size * 0.5f + r, "the burst still touches his edge at " + camDeg);
-                Vector3 weapon = new Vector3(hitDir.z, 0f, -hitDir.x);
-                Assert.Greater(Vector3.Dot(off, across) * Vector3.Dot(weapon, across), 0f, "on the weapon side at " + camDeg);
+                UnityEngine.Vector3 weapon = new UnityEngine.Vector3(hitDir.z, 0f, -hitDir.x);
+                Assert.Greater(UnityEngine.Vector3.Dot(off, across) * UnityEngine.Vector3.Dot(weapon, across), 0f, "on the weapon side at " + camDeg);
                 Assert.AreEqual(chest.y, p.y, 1e-4f, "chest height");
             }
         }
@@ -326,7 +326,7 @@ namespace CriticalMass.Runtime.Tests
         public void AMissingOrEmptyInputActionsAssetIsNamedNotThrown()
         {
             Assert.IsNotNull(CriticalMass.Runtime.Input.HumanInputSource.ActionsProblem(null));
-            var asset = ScriptableObject.CreateInstance<UnityEngine.InputSystem.InputActionAsset>();
+            var asset = UnityEngine.ScriptableObject.CreateInstance<UnityEngine.InputSystem.InputActionAsset>();
             try
             {
                 StringAssert.Contains("no Player map", CriticalMass.Runtime.Input.HumanInputSource.ActionsProblem(asset));
