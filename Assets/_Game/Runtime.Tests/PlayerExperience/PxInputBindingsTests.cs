@@ -84,7 +84,7 @@ namespace CriticalMass.Runtime.Tests.PlayerExperience
             }
             foreach (var kv in KnownOtherLane)
                 foreach (var (action, path) in DefaultPaths())
-                    if (path == kv.Key) Assert.Warn(action + " on " + kv.Key + " collides with " + kv.Value + " (routed to its owner)");
+                    if (path == kv.Key) Debug.LogWarning("[PxInput] " + action + " on " + kv.Key + " collides with " + kv.Value + " (routed to its owner)");
         }
 
         [Test]
