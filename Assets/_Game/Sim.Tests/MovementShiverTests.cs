@@ -552,8 +552,11 @@ namespace CriticalMass.Sim.Tests
         // the six-seed mean tests still play 4242 and print it as left out.
         // b16 combine: on the combined rules 1337's and 99's Kaiju hatch Berserk (0 s owned, runs 44953083481 / 44953691993),
         // the precondition again; 7 (180 s owned) and 2024 (180 s owned) replace them; the six-seed mean tests still play both.
+        // px S4: on the px S3 rules 2024's Kaiju is never owned (0.0 s owned, data/s4-rig/shiver-before.txt), the precondition
+        // again, not the rule. 4242 (240 s owned, idle 0.0 s; data/s4-rig/kaiju-seeds.txt) replaces it; the six-seed mean tests
+        // still play 2024. Same checks. Seen in the same scan, not chased here: seed 42 idles 7.3 s off the hill at 365 s.
         [TestCase(7)]
-        [TestCase(2024, Category = "Slow")]
+        [TestCase(4242, Category = "Slow")]
         public void InAWholeMatchTheKaijuGetsOntoTheHillAndNeverIdlesOffItWithNoTarget(int seed)
         {
             KaijuHillRun r = MeasureKaijuHill(seed);
