@@ -407,7 +407,7 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
         public void S58_Movement_NeverSticksOrShivers(ClassId c)
         {
             // the real map has no stairs or slopes in the sim (its hills are view height only, MapDef.Height01): its walkable
-            // height changes are the 9 bridges (14 with mirrors). The built ones: a Builder rope bridge and ladder, and terrain
+            // height changes are the 9 bridges (16 with mirrors). The built ones: a Builder rope bridge and ladder, and terrain
             // height bands (stacked blocks +1 / +2, dug pits -1 / -2). Each walked both ways; bridges centred and 1 u off centre.
             var bad = new List<string>();
             int n = 0;
