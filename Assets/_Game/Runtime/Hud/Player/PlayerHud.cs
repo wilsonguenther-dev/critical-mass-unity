@@ -18,6 +18,8 @@ namespace CriticalMass.Runtime.Hud.Player
 
         public readonly HealthBars Bars;
         public readonly HitMarker Marker;
+        public readonly DamageDirection Direction;
+        public readonly HurtEdge Hurt;
 
         World _world;
         int _epoch = -1;
@@ -31,6 +33,8 @@ namespace CriticalMass.Runtime.Hud.Player
         {
             Bars = new HealthBars(world);
             Marker = new HitMarker(world);
+            Direction = new DamageDirection(world);
+            Hurt = new HurtEdge(root, playerCard);
             Current = this;
         }
 
@@ -47,6 +51,8 @@ namespace CriticalMass.Runtime.Hud.Player
                 _cursor = w.EventHead;
                 Bars.Clear();
                 Marker.Clear();
+                Direction.Clear();
+                Hurt.Clear();
             }
             if (_cursor < 0 || _cursor > w.EventHead) _cursor = w.EventHead;
             if (w.EventHead - _cursor > World.EventCapacity)
@@ -54,9 +60,12 @@ namespace CriticalMass.Runtime.Hud.Player
                 Dropped += w.EventHead - World.EventCapacity - _cursor;
                 _cursor = w.EventHead - World.EventCapacity;
             }
+            ScanBlasts(w);
             for (; _cursor < w.EventHead; _cursor++) OnEvent(w, w.Events[_cursor % World.EventCapacity], me);
             Bars.Tick(w, me, alpha, cam, scale, dt);
             Marker.Tick(w, me, alpha, cam, scale, dt);
+            Direction.Tick(w, me, alpha, cam, scale, dt);
+            Hurt.Tick(me, s != null && s.HasPlayer ? s.Hp01 : 1f, s != null && s.HasPlayer && s.Alive, dt);
         }
 
         void OnEvent(World w, SimEvent e, int me)
@@ -69,6 +78,7 @@ namespace CriticalMass.Runtime.Hud.Player
                         Bars.OnMyHit(e.A, w.Match.Time);
                         Marker.OnMyHit(w, e.A, e.Tier, _alpha);
                     }
+                    else if (e.A == me && e.B != me && me >= 0 && me < w.ActorCount) OnHurt(w, e, me);
                     break;
                 case SimEventType.Death:
                     if (e.B == me && e.A != me && e.A >= 0) Marker.OnMyKill(w, e.A, e.X, e.Z);
@@ -88,6 +98,43 @@ namespace CriticalMass.Runtime.Hud.Player
                     }
                     break;
             }
+        }
+
+        // ---- the receiving end
+
+        const int BlastCap = 8;
+        readonly int[] _blastOwner = new int[BlastCap];
+        readonly double[] _blastX = new double[BlastCap], _blastZ = new double[BlastCap];
+        int _blasts;
+
+        /// <summary>This batch's explosions first (a blast's hits may precede its Explosion event in the ring).</summary>
+        void ScanBlasts(World w)
+        {
+            _blasts = 0;
+            for (int k = _cursor; k < w.EventHead && _blasts < BlastCap; k++)
+            {
+                SimEvent e = w.Events[k % World.EventCapacity];
+                if (e.Type != SimEventType.Explosion) continue;
+                _blastOwner[_blasts] = e.A;
+                _blastX[_blasts] = e.X;
+                _blastZ[_blasts] = e.Z;
+                _blasts++;
+            }
+        }
+
+        void OnHurt(World w, SimEvent e, int me)
+        {
+            float share = w.Actors[me].MaxHp > 0 ? (float)(e.Value / w.Actors[me].MaxHp) : 0.1f;
+            int src = DamageDirection.SourcePoint;
+            Vector3 point = PxProject.Point(w, e.X - e.DirX * 2.0, e.Z - e.DirZ * 2.0, 1.0f);
+            int blast = -1;
+            if (e.Cause == DamageCause.Explosion)
+                for (int i = 0; i < _blasts; i++) if (_blastOwner[i] == e.B || blast < 0) blast = i;
+            if (blast >= 0) point = PxProject.Point(w, _blastX[blast], _blastZ[blast], 1.0f);
+            else if (e.B == Damage.KaijuSource || e.B == Damage.KaijuSlamSource || e.Cause == DamageCause.KaijuMelee || e.Cause == DamageCause.KaijuSlam) src = DamageDirection.SourceKaiju;
+            else if (e.B >= 0 && e.B < w.ActorCount) src = e.B;
+            Direction.OnHurt(src, point, share);
+            Hurt.OnHurt(me, share);
         }
     }
 }

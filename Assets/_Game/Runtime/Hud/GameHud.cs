@@ -412,7 +412,7 @@ namespace CriticalMass.Runtime.Hud
                 };
             }
             _hpNumber = Label(c, "HP Number", CMTokens.Mono, UiScale.TypeBody, Cream, TextAnchor.MiddleRight, 284f, 30f, 82f, 32f, "160", 2f);
-            _hpGhost = Shape(c, "HP Ghost", ShapeKind.RoundRect, 136f, 72f, 228f, 28f, Cream, -1f);
+            _hpGhost = Shape(c, "HP Ghost", ShapeKind.RoundRect, 136f, 72f, 228f, 28f, CriticalMass.Runtime.Hud.Player.PxPalette.Chunk, -1f);
             _hpGhost.EmptyColor = Empty;
             _hpBar = Shape(c, "HP Bar", ShapeKind.RoundRect, 136f, 72f, 228f, 28f, CMTokens.Azure.Color, -1f);
 
@@ -902,12 +902,10 @@ namespace CriticalMass.Runtime.Hud
             // health: shown value drains toward the target, the cream ghost holds 0.4 s then follows
             float target = s.Alive ? s.Hp01 : 0f;
             if (_hpShown < 0) _hpShown = _hpGhostShown = target;
-            if (target < _hpGhostShown - 1e-4f && _ghostHold <= 0 && _hpShown - target > 1e-4f) _ghostHold = 0.4f;
-            _hpShown = Approach(_hpShown, target, dt * 2.5f);
-            _ghostHold -= dt;
-            if (_ghostHold <= 0) _hpGhostShown = Approach(_hpGhostShown, _hpShown, dt * 0.8f);
-            if (_hpGhostShown < _hpShown) _hpGhostShown = _hpShown;
-            _hpBar.SetFill(tc);
+            // player-experience lane D: the same chunk rule as the overhead bars (the fill drops at once, a white chunk holds
+            // 0.25 s, then drains); below 30% the bar takes the low-health colour and pulse (Hud/Player/HurtEdge.cs)
+            CriticalMass.Runtime.Hud.Player.HealthBars.Step(ref _hpShown, ref _hpGhostShown, ref _ghostHold, target, dt);
+            _hpBar.SetFill(PlayerHud != null && PlayerHud.Hurt.Low ? PlayerHud.Hurt.LowBarColour : tc);
             _hpBar.Fill01 = _hpShown;
             _hpGhost.Fill01 = _hpGhostShown;
             HudText.Set(_hpNumber, NumberCache.Int(Mathf.CeilToInt(s.Alive ? s.Hp : 0f)));
