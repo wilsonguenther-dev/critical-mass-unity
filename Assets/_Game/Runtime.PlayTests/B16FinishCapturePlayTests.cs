@@ -282,9 +282,7 @@ namespace CriticalMass.Runtime.PlayTests
             for (int f = 0; f < 120; f++) yield return null;
             Mute();
             Assert.IsTrue(OnlineMatch.InMatch, "no online session");
-            var kb = InputSystem.AddDevice<Keyboard>("B16CapKeyboard");
             var pad = InputSystem.AddDevice<Gamepad>("B16CapPad");
-            _devices.Add(kb);
             _devices.Add(pad);
             yield return Capture("p2-chat-0-match");
 
@@ -313,7 +311,9 @@ namespace CriticalMass.Runtime.PlayTests
             Assert.IsFalse(OnlineChatHud.WheelOpen, "the wheel closes on release");
             yield return Capture("p2-chat-2-after-callout");
 
-            // Esc order: typing first, then the pause menu
+            // Esc order: typing first, then the pause menu (the keyboard joins only now, so the wheel above ran on the pad)
+            var kb = InputSystem.AddDevice<Keyboard>("B16CapKeyboard");
+            _devices.Add(kb);
             ChatSettings.TypedText = true;
             for (int f = 0; f < 3; f++) yield return null;
             Key(kb, UnityEngine.InputSystem.Key.Enter);
