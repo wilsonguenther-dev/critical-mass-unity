@@ -352,6 +352,24 @@ namespace CriticalMass.Runtime.Tests
             Assert.Greater(CriticalMass.Runtime.Menus.StarterPick.DifficultyType, CriticalMass.Runtime.Hud.Style.UiScale.TypeMin);
         }
 
+        static int OrderOf(Type t)
+        {
+            var a = (UnityEngine.DefaultExecutionOrder)Attribute.GetCustomAttribute(t, typeof(UnityEngine.DefaultExecutionOrder));
+            return a != null ? a.order : 0;
+        }
+
+        /// <summary>Fix round 5 (item 6): the enemy name tags (DepthHud) are placed after the hit kick (CameraShake) and after
+        /// the health bars (GameHud), through the same camera, so the name never parts from his bar on an impact frame; and
+        /// before LowViewTags, which scales and hides them afterwards.</summary>
+        [Test]
+        public void NameTagsArePlacedAfterTheKickLikeTheHealthBars()
+        {
+            int tags = OrderOf(typeof(CriticalMass.Runtime.Hud.Mechanics.DepthHud));
+            Assert.Greater(tags, OrderOf(typeof(CameraShake)), "after the kick is applied");
+            Assert.GreaterOrEqual(tags, OrderOf(typeof(CriticalMass.Runtime.Hud.GameHud)), "with the bars' camera");
+            Assert.Less(tags, OrderOf(typeof(CriticalMass.Runtime.View.LowViewTags)), "before the low-view tag pass");
+        }
+
         [Test]
         public void TheTopDownAimLeanIsCappedAndUsesTheRawAim()
         {
