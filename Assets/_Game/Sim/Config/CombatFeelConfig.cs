@@ -229,6 +229,33 @@ namespace CriticalMass.Sim.Config
         /// <summary>Bots lead a moving target by at most this much of their wind-up (real seconds) when they chase and aim.</summary>
         public double BotLeadSeconds = 0.13;
 
+        // ---- H. px S1 player-seat combat (owner 2026-11-22 after 1.0.1409: "I can be in a player's face, swing, and I see nothing
+        // to indicate I've hit ... This is for real players. The bots are fillers"). Measured with the human-seat probe
+        // (~/cm-incidents/player-experience-rebuild-2026-11-22/data/s1-combat/), not bot-vs-bot statistics.
+        /// <summary>[1] Swing tracking: during the wind-up the swing turns toward the current aim at up to this many degrees a
+        /// second (every actor, bots too). Audit fork: a 0.2 s-lag human landed 37% -> 78% at 360. 0 = locked at the press (b16).</summary>
+        public double SwingTrackDegPerSecond = 360;
+        /// <summary>[1] Per class override of SwingTrackDegPerSecond (indexed by ClassId; 0 or null = the shared value).</summary>
+        public double[] SwingTrackDegPerSecondByClass = null;
+        /// <summary>[1] The swing stops turning this many ticks before its contact tick (a late side-step or dodge still beats it).</summary>
+        public int SwingTrackLockTicks = 2;
+
+        /// <summary>[6] A hit under the victim's Poise does not stagger (so does not cancel) a wind-up of any class; heavy hits
+        /// still do. Baseline: 378 of 2,628 human swing starts (14%) were cancelled by a 0.10 s light stagger (target at most 10%).</summary>
+        public bool LightHitsKeepWindup = true;
+        /// <summary>[2] Bots fight by human limits (BotAim): aim delay, aim error and a class-arc press cone. False = b16 bots.</summary>
+        public bool BotHumanLimits = true;
+        /// <summary>[2] Melee aim delay (ticks at 30 Hz) by BotDifficulty (Normal, Easy, Hard): the bot aims at where its target
+        /// was this long ago (a 0.2 s human = 6). Baseline: Normal bots landed 94% on a circle-strafing human (target 40-75%).</summary>
+        public int[] BotMeleeAimDelayTicks = { 5, 8, 2 };
+        /// <summary>[2] Melee aim error (degrees, uniform +-) by BotDifficulty, redrawn every 1/3 s.</summary>
+        public double[] BotMeleeAimErrorDeg = { 20, 35, 5 };
+        /// <summary>[2] A bot's swing tracks at this share of SwingTrackDegPerSecond, by BotDifficulty (Normal, Easy, Hard).
+        /// Measured: with full tracking a Normal bot landed 95% on an evasive circle-strafing human (target 40-75%).</summary>
+        public double[] BotSwingTrackScale = { 0.1, 0, 0.5 };   // Normal 0.1 -> 0.62-0.76 measured (sweep in FINDINGS)
+        /// <summary>[2] The bot presses only with the target inside its own class arc (b16: a flat 60 degrees each side for all).</summary>
+        public bool BotPressConeIsClassArc = true;
+
         public CombatFeelConfig Clone()
         {
             var c = (CombatFeelConfig)MemberwiseClone();
@@ -239,6 +266,10 @@ namespace CriticalMass.Sim.Config
             if (StrikeStaggers != null) c.StrikeStaggers = (bool[])StrikeStaggers.Clone();
             if (WhiffExtraSeconds != null) c.WhiffExtraSeconds = (double[])WhiffExtraSeconds.Clone();
             if (SoloGuard != null) c.SoloGuard = (double[])SoloGuard.Clone();
+            if (BotMeleeAimDelayTicks != null) c.BotMeleeAimDelayTicks = (int[])BotMeleeAimDelayTicks.Clone();
+            if (BotSwingTrackScale != null) c.BotSwingTrackScale = (double[])BotSwingTrackScale.Clone();
+            if (BotMeleeAimErrorDeg != null) c.BotMeleeAimErrorDeg = (double[])BotMeleeAimErrorDeg.Clone();
+            if (SwingTrackDegPerSecondByClass != null) c.SwingTrackDegPerSecondByClass = (double[])SwingTrackDegPerSecondByClass.Clone();
             return c;
         }
     }

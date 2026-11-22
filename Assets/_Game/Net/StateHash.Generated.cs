@@ -144,6 +144,10 @@ namespace CriticalMass.Net
             A(ref h, o.AbilityZ);
             M(ref h, o.ActorCount);
             A(ref h, o.Aggression);
+            M(ref h, o.AimHistCap);
+            A(ref h, o.AimHistTick);
+            A(ref h, o.AimHistX);
+            A(ref h, o.AimHistZ);
             A(ref h, o.AnchorTime);
             A(ref h, o.AnchorX);
             A(ref h, o.AnchorZ);

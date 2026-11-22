@@ -247,6 +247,9 @@ namespace CriticalMass.Sim.Core
                 armoured = true;
                 return 0;
             }
+            // px S1 [6]: a light hit (under the victim's Poise) no longer silently eats a wind-up of any class: the swing goes on
+            // (damage and knock still land); only a heavy hit staggers and cancels it (raising AttackCancel with who did it).
+            if (!heavy && t.SwingPending && f.LightHitsKeepWindup) return 0;
             int baseTicks = Ticks(w, heavy ? f.HeavyStaggerSeconds : f.StaggerSeconds);
             if (baseTicks <= 0) return 0;
             int count = w.Tick <= s.StaggerWindowEnd[target] ? s.StaggerCount[target] : 0;
@@ -355,6 +358,45 @@ namespace CriticalMass.Sim.Core
             else s.LandedSwing[i] = a.SwingTick; // b16 CANCEL: this swing landed (a hit-cancel may cut its recovery)
             double left = a.SwingRecovery / w.Config.SimHz;
             if (a.AttackCd < left) a.AttackCd = left;
+        }
+
+        // ------------------------------------------------------------------------------------------------ px S1 swing tracking
+
+        /// <summary>
+        /// px S1 [1]: during the wind-up the swing direction (Actor.SwingFacing, read live by the view's telegraph) turns toward
+        /// the actor's current Facing (its aim, set by Movement this tick) by at most the class's SwingTrackDegPerSecond, until
+        /// SwingTrackLockTicks before the contact tick: from then on it is locked, so a late side-step or a dodge still beats it.
+        /// Plain arithmetic on doubles in actor-id order: deterministic, no allocation.
+        /// </summary>
+        public static void TrackSwing(World w, int i)
+        {
+            CombatFeelConfig f = Cfg(w);
+            Actor a = w.Actors[i];
+            if (!a.Alive || a.StandUp > 0 || a.HitStunTicks > 0) return;
+            int contact = a.SwingTick + a.SwingWindup;
+            if (contact - w.Tick <= f.SwingTrackLockTicks) return;
+            double deg = f.SwingTrackDegPerSecond;
+            int c = (int)a.Cls;
+            if (f.SwingTrackDegPerSecondByClass != null && c < f.SwingTrackDegPerSecondByClass.Length && f.SwingTrackDegPerSecondByClass[c] > 0)
+                deg = f.SwingTrackDegPerSecondByClass[c];
+            // [2] human limits: a bot corrects its wound-up swing at BotSwingTrackScale of the rate (by difficulty).
+            if (!a.IsHuman && f.BotHumanLimits && f.BotSwingTrackScale != null)
+            {
+                int k = (int)Bots.BotSkill.Of(w, i);
+                if (k < f.BotSwingTrackScale.Length) deg *= f.BotSwingTrackScale[k];
+            }
+            if (!(deg > 0)) return;
+            double lim = deg / w.Config.SimHz * Math.PI / 180;
+            double diff = a.Facing - a.SwingFacing;
+            while (diff > Math.PI) diff -= 2 * Math.PI;
+            while (diff < -Math.PI) diff += 2 * Math.PI;
+            if (diff > lim) diff = lim;
+            else if (diff < -lim) diff = -lim;
+            if (diff == 0) return;
+            double s = a.SwingFacing + diff;
+            if (s > Math.PI) s -= 2 * Math.PI;
+            else if (s < -Math.PI) s += 2 * Math.PI;
+            a.SwingFacing = s;
         }
 
         // ------------------------------------------------------------------------------------------------ b16 CANCEL
