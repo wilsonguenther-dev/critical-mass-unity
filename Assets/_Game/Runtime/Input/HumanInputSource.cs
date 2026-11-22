@@ -81,10 +81,10 @@ namespace CriticalMass.Runtime.Input
 
         private void OnEnable()
         {
-            var map = InputSystem.actions.FindActionMap("Player", true);
-            EnsureDodgeAction(map); // CM b13 J: until Settings/Controls.inputactions carries the Dodge action
-            EnsureCancelAction(map); // b16: an older or rebound asset without the Cancel action gets it in memory
-            map.Enable();
+            // Review defect 0: one owner for the map's life. Dodge / Cancel are added (old assets only) with the whole asset
+            // disabled, nothing is re-created that exists, and OnDisable gives the map back (PlayerActionsLifetime).
+            var map = PlayerActionsLifetime.Acquire();
+            if (map == null) map = InputSystem.actions.FindActionMap("Player", true);
             BuilderToolbelt.Local = State.Toolbelt;   // b14: the HUD and the terrain view read the local Builder's wheel
             _map = map;
             _move = map["Move"];
@@ -229,6 +229,7 @@ namespace CriticalMass.Runtime.Input
                 _started[i] = null;
                 _canceled[i] = null;
             }
+            PlayerActionsLifetime.Release(_map);
             _map = null;
             _move = null;
             _point = null;
@@ -454,6 +455,11 @@ namespace CriticalMass.Runtime.Input
             {
                 _assist.Reset();
                 AimAssist.Clear();
+                // Review item 3: Clear drops RawHasAim; the raw aim stays published on this path too (lane C caps the
+                // camera lean with it every frame, in every branch).
+                AimAssist.RawHasAim = State.HasAim;
+                AimAssist.RawAimX = State.AimX;
+                AimAssist.RawAimZ = State.AimZ;
                 AimAssist.HasAim = State.HasAim;
                 AimAssist.AimX = State.AimX;
                 AimAssist.AimZ = State.AimZ;

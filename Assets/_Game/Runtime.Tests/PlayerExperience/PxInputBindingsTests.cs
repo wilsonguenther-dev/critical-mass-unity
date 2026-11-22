@@ -90,8 +90,35 @@ namespace CriticalMass.Runtime.Tests.PlayerExperience
         [Test]
         public void TheHKeyNoLongerTogglesTheHud()
         {
-            string src = File.ReadAllText("Assets/_Game/Runtime/Menus/SettingsExtras.cs");
-            StringAssert.DoesNotContain(".hKey", src, "no hard-coded H in SettingsExtras (Keyboard.hKey)");
+            // Behaviour (review item 14): H pressed on a keyboard, then the applier's frame: the clean-HUD flag is unchanged.
+            bool before = SettingsExtras.CleanHud;
+            Keyboard kb = InputSystem.AddDevice<Keyboard>("PxHKeyboard");
+            var go = new GameObject("PxHApplier");
+            try
+            {
+                SettingsExtras.CleanHud = false;
+                var applier = go.AddComponent<AccessibilityApplier>();
+                System.Reflection.MethodInfo late = typeof(AccessibilityApplier).GetMethod("LateUpdate",
+                    System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Public);
+                InputSystem.QueueStateEvent(kb, new UnityEngine.InputSystem.LowLevel.KeyboardState(Key.H));
+                InputSystem.Update();
+                if (late != null) late.Invoke(applier, null);
+                Assert.IsFalse(SettingsExtras.CleanHud, "H does not hide the HUD");
+                InputSystem.QueueStateEvent(kb, new UnityEngine.InputSystem.LowLevel.KeyboardState());
+                InputSystem.Update();
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(go);
+                InputSystem.RemoveDevice(kb);
+                SettingsExtras.CleanHud = before;
+            }
+            // And no code line reads the H key there (comments and names such as HardCodedMatchKeys do not count).
+            foreach (string line in File.ReadAllLines("Assets/_Game/Runtime/Menus/SettingsExtras.cs"))
+            {
+                string code = line.Contains("//") ? line.Substring(0, line.IndexOf("//", StringComparison.Ordinal)) : line;
+                Assert.IsFalse(System.Text.RegularExpressions.Regex.IsMatch(code, @"\.hKey\b|Key\.H\b"), "H read in SettingsExtras: " + line.Trim());
+            }
             Assert.AreEqual(0, SettingsExtras.HardCodedMatchKeys.Length);
             CollectionAssert.Contains(new List<string>(PathsOf("Interact")), "<keyboard>/h", "H stays the J K L layout's Interact");
         }
