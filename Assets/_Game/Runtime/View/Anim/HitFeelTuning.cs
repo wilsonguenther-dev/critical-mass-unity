@@ -140,6 +140,21 @@ namespace CriticalMass.Runtime.View.Anim
         /// <summary>The attack pose blends in to full over this many sim seconds after the press (ease-out): local player 0.05
         /// (0.89 at 2 frames of 60 fps), everyone else 0.075 (0.89 at 3 frames). Was a smoothstep over the whole wind-up.</summary>
         public const double CommitRiseLocal = 0.05, CommitRiseOther = 0.075;
+        /// <summary>Fix round 5 (item 4): the local press is shown before the sim's tick takes it (presentation only): the
+        /// wind-up pose starts on the press frame and holds at most PredictHoldShare of the wind-up until the sim's swing
+        /// starts; if the sim has not started it within PredictTimeout (s, wall) the pose fades out like a feint.</summary>
+        public const double PredictTimeout = 0.12, PredictHoldShare = 0.35;
+
+        /// <summary>Fix round 5 (pure; tests): the predicted swing's age (s into the wind-up) and weight, `wall` s after the
+        /// press. Null age past the timeout (the caller aborts).</summary>
+        public static bool PredictedSwing(double wall, double windupSeconds, out double age, out float weight)
+        {
+            age = 0; weight = 0f;
+            if (!(wall >= 0) || wall > PredictTimeout) return false;
+            age = Math.Min(wall, windupSeconds * PredictHoldShare);
+            weight = CommitWeight(wall + 1.0 / 60.0, true);   // the press frame already draws one frame's rise
+            return true;
+        }
         /// <summary>The weight the tests hold at 2 frames (local) and 3 frames (others) after the press.</summary>
         public const float CommitAtCheck = 0.8f;
         /// <summary>The render rate the frame counts are written against.</summary>

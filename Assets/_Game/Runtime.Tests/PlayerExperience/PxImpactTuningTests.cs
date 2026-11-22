@@ -305,6 +305,21 @@ namespace CriticalMass.Runtime.Tests
             }
         }
 
+        /// <summary>Fix round 5 (item 4): the predicted wind-up commits on the press frame (>= 0.8 of the pose by 2 frames of
+        /// 60 fps after it), holds short of the strike while the sim's tick is pending, and gives up after the timeout.</summary>
+        [Test]
+        public void APredictedPressCommitsTheWindupWithinTwoFrames()
+        {
+            double windup = 12 / 30.0;
+            Assert.IsTrue(HitFeelTuning.PredictedSwing(0, windup, out double a0, out float w0));
+            Assert.Greater(w0, 0.3f, "the press frame already moves");
+            Assert.IsTrue(HitFeelTuning.PredictedSwing(2 / 60.0, windup, out _, out float w2));
+            Assert.GreaterOrEqual(w2, 0.8f, "committed by 2 frames");
+            Assert.IsTrue(HitFeelTuning.PredictedSwing(0.1, windup, out double a6, out _));
+            Assert.LessOrEqual(a6, windup * HitFeelTuning.PredictHoldShare + 1e-9, "never the strike before the sim swings");
+            Assert.IsFalse(HitFeelTuning.PredictedSwing(HitFeelTuning.PredictTimeout + 0.01, windup, out _, out _), "a refused press fades");
+        }
+
         [Test]
         public void TheTopDownAimLeanIsCappedAndUsesTheRawAim()
         {

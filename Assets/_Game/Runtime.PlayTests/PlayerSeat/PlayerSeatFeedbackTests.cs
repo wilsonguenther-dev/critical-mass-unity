@@ -275,6 +275,9 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
             int head = W.EventHead, cursor = PlayerFeedback.Head;
             AssertAtControls("the press");
             PressAttack(v);
+            // fix round 5 (item 4): a virtual-device press queued now is delivered by the Input System's next update, at
+            // the start of the next frame: that frame is the press frame the player sees
+            int pressFrame = Time.frameCount + 1;
             yield return TickFrame(() => Pin(e, px, pz));
             ReleaseAttack();
             bool started = Events(head, SimEventType.AttackStart).Any(q => q.A == 0);
@@ -285,9 +288,11 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
                 yield return new WaitForSecondsRealtime(1f / 60f);
                 yield return TickFrame(() => Pin(e, px, pz));
             }
-            if (Ledger(FeedbackChannel.SwingCommit, 0, out FeedbackEntry last, cursor)) best = Math.Max(best, last.Value);
+            bool reported = Ledger(FeedbackChannel.SwingCommit, 0, out FeedbackEntry last, cursor);
+            if (reported) best = Math.Max(best, last.Value);
+            int framesAfterPress = reported ? last.Frame - pressFrame : -1;
             AssertAtControls("the end");
-            Check("F30 SwingPose", Tag(ClassId.Warrior, v), "sim accepted " + started + ", SwingCommit pose weight " + best.ToString("0.00") + " [" + LedgerDump(cursor) + "]", ">= 0.8 within 2 frames", started && best >= T.SwingPoseWeight);
+            Check("F30 SwingPose", Tag(ClassId.Warrior, v), "sim accepted " + started + ", SwingCommit pose weight " + best.ToString("0.00") + " drawn " + framesAfterPress + " rendered frames after the press frame [" + LedgerDump(cursor) + "]", ">= 0.8 within 2 frames of the press", started && best >= T.SwingPoseWeight && reported && framesAfterPress >= 0 && framesAfterPress <= 2);
         }
 
         [UnityTest]
