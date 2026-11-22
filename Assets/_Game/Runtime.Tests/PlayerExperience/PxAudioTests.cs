@@ -279,7 +279,10 @@ namespace CriticalMass.Runtime.Tests.PlayerExperience
             Assert.Greater(p.OwnReserve, 0);
             int[] crowd = { SoundTable.IndexOf("hit_flesh_heavy"), SoundTable.IndexOf("pain"), SoundTable.IndexOf("swing_heavy"),
                 SoundTable.IndexOf("step_grass"), SoundTable.IndexOf("blast_near"), SoundTable.IndexOf("kaiju_slam"), SoundTable.IndexOf("death") };
-            int[] mine = { SoundTable.IndexOf("own_impact_thud"), SoundTable.IndexOf("hit_confirm"), SoundTable.IndexOf("own_hurt"), SoundTable.IndexOf("pain") };
+            // My own-only cues. A cue the crowd shares (pain) keeps the existing 30 ms repeat guard across owners
+            // (SoundCoverageTests.CooldownsHoldForTheCrowdAndOnlyTheRepeatGuardForOwnActions): the same sample already
+            // started inside 30 ms, so the two merge into one; my own_hurt thump carries the personal hurt either way.
+            int[] mine = { SoundTable.IndexOf("own_impact_thud"), SoundTable.IndexOf("hit_confirm"), SoundTable.IndexOf("own_hurt"), SoundTable.IndexOf("kill_sting") };
             int refusedOwn = 0, startedCrowd = 0;
             double now = 0;
             for (int frame = 0; frame < 600; frame++, now += 1.0 / 60.0)
@@ -296,7 +299,7 @@ namespace CriticalMass.Runtime.Tests.PlayerExperience
                     foreach (int cue in mine)
                         if (p.Request(cue, SoundSpace.Priority(SoundTable.Cues[cue].Priority, 1f, true, false), now, 0.6, true) < 0) refusedOwn++;
             }
-            Assert.AreEqual(0, refusedOwn, "my impact, confirm, hurt and pain always get a voice");
+            Assert.AreEqual(0, refusedOwn, "my impact, confirm, hurt thump and kill sting always get a voice");
             Assert.Greater(startedCrowd, 0, "the crowd still plays");
         }
 
