@@ -58,6 +58,8 @@ namespace CriticalMass.Runtime.Camera
         /// <summary>The player's own camera yaw and pitch (auto follow or his look), before the combat framing adds its offsets.
         /// The aim (TryPlayAim) and the camera-relative move keys use the own yaw: the framing never steers a swing.</summary>
         double _ownYaw = 315, _ownPitch = FollowCamera.ThirdPitch;
+        // fix/px-combat-camera-2: the own yaw one frame ago (his turn rate: a fast turn counts as looking around)
+        double _prevOwnYaw = double.NaN;
         bool _combatOn = true;
         float _combatStrength = 1f;
         /// <summary>The combat framing's applied share 0..1 (weight x strength), the target it frames (-1 none) and the yaw it
@@ -79,6 +81,9 @@ namespace CriticalMass.Runtime.Camera
         /// <summary>Off-screen threat ring: enemies within this many u outside the view get a pointer.</summary>
         public const double ThreatRange = 14;
         const int MaxCylinders = 64, MaxStatic = 1024;
+        /// <summary>fix/px-combat-camera-2: every solid dressed piece (trees with their crowns, rocks, crystals, props,
+        /// buildings, landmarks) as cylinders from the kit meshes' bounds, and the set near the framed fight.</summary>
+        const int MaxScenery = 8192, MaxNearScenery = 256;
 
         public static GroundView Current { get; private set; }
         /// <summary>True while the local player plays from the ground camera (HumanInputSource reads it).</summary>
@@ -122,6 +127,10 @@ namespace CriticalMass.Runtime.Camera
         readonly SeeThroughCylinder[] _static = new SeeThroughCylinder[MaxStatic];
         int _staticCount, _staticVersion = -1;
         int _cylCount;
+        readonly SeeThroughCylinder[] _scenery = new SeeThroughCylinder[MaxScenery];
+        readonly SeeThroughCylinder[] _scn = new SeeThroughCylinder[MaxNearScenery];
+        int _sceneryCount, _scnCount;
+        static readonly Dictionary<string, Vector3[]> PieceBoxes = new Dictionary<string, Vector3[]>();
         GroundViewMode _lastMode;
         int _lastTarget = int.MinValue;
         int _lastSpectated = -1;
@@ -380,8 +389,9 @@ namespace CriticalMass.Runtime.Camera
                 OrbitPitch = orbitPitch,
                 Snap = snap,
                 Map = map,
-                Cylinders = _cyl,
-                CylinderCount = _cylCount,
+                // fix/px-combat-camera-2: while framed, scenery pulls the lens in exactly like a wall
+                Cylinders = _combat.K > 0 ? _scn : _cyl,
+                CylinderCount = _combat.K > 0 ? _scnCount : _cylCount,
             };
             _follow.Step(f);
             if (Mode != GroundViewMode.Play) _inputYaw = _follow.Yaw;
@@ -428,16 +438,26 @@ namespace CriticalMass.Runtime.Camera
             bool haveLine = _lastFramed >= 0;
             double ex = _lastFramedX, ez = _lastFramedZ;
             double lineYaw = haveLine ? GroundCamera.YawToward(mx, mz, ex, ez, _ownYaw) : _ownYaw;
-            double clearPlus = 1, clearMinus = 1;
+            double clearPlus = 1, clearMinus = 1, clearNone = 1;
             if (enabled && haveLine)
             {
+                // fix/px-combat-camera-2: this frame's scenery around BOTH fighters (it was last frame's trunk-only set
+                // around the look point), then each framing must fit AND see both chests (CombatFrame.SideClear).
                 double k1 = Math.Max(0, Math.Min(1, strength));
                 double fx = mx + CombatFrame.FocusShare * k1 * (ex - mx), fz = mz + CombatFrame.FocusShare * k1 * (ez - mz);
                 double gyM = GroundHeight.At(w.Map, mx, mz), gyE = GroundHeight.At(w.Map, ex, ez);
                 double fy = gyM + (gyE - gyM) * CombatFrame.FocusShare * k1 + FollowCamera.ThirdPivotHeight + (CombatFrame.FocusHeight - FollowCamera.ThirdPivotHeight) * k1;
-                clearPlus = SideClear(w.Map, fx, fy, fz, lineYaw, 1, k1);
-                clearMinus = SideClear(w.Map, fx, fy, fz, lineYaw, -1, k1);
+                GatherScenery(w, me, fx, fz, Math.Sqrt((ex - mx) * (ex - mx) + (ez - mz) * (ez - mz)));
+                double fit = CombatFrame.FovFit(_fov), myC = gyM + CombatFrame.ChestHeight, eyC = gyE + CombatFrame.ChestHeight;
+                clearPlus = CombatFrame.SideClear(w.Map, fx, fy, fz, lineYaw, 1, k1, fit, mx, myC, mz, ex, eyC, ez, _scn, _scnCount, out _, out _, out _);
+                clearMinus = CombatFrame.SideClear(w.Map, fx, fy, fz, lineYaw, -1, k1, fit, mx, myC, mz, ex, eyC, ez, _scn, _scnCount, out _, out _, out _);
+                clearNone = CombatFrame.SideClear(w.Map, fx, fy, fz, lineYaw, 0, k1, fit, mx, myC, mz, ex, eyC, ez, _scn, _scnCount, out _, out _, out _);
             }
+            else if (_combat.K <= 0) _scnCount = 0;
+            // fix/px-combat-camera-2: looking around = his look input lately (mouse look) or his own yaw turning fast (auto)
+            double turnRate = dt > 0 && !double.IsNaN(_prevOwnYaw) ? Math.Abs(GroundCamera.DeltaAngle(_prevOwnYaw, _ownYaw)) / dt : 0;
+            _prevOwnYaw = _ownYaw;
+            bool looking = (_manual && _sinceLook < CombatFrame.LookHoldSeconds) || turnRate > CombatFrame.LookRateDeg;
             var input = new CombatFrameInput
             {
                 Dt = dt,
@@ -448,9 +468,10 @@ namespace CriticalMass.Runtime.Camera
                 TargetAlive = alive,
                 OwnYaw = _ownYaw,
                 LineYaw = lineYaw,
-                Steering = _manual && _sinceLook < FollowCamera.RecenterSeconds,
+                Looking = looking,
                 ClearPlus = clearPlus,
                 ClearMinus = clearMinus,
+                NoClearFrame = clearPlus < CombatFrame.WallShare && clearMinus < CombatFrame.WallShare && clearNone < CombatFrame.WallShare,
             };
             _combat.Step(input);
             _duelTarget = _combat.Active && haveLine ? _lastFramed : -1;
@@ -492,31 +513,6 @@ namespace CriticalMass.Runtime.Camera
                 if (dx * dx + dz * dz <= keep * keep) t = last;
             }
             return t;
-        }
-
-        /// <summary>How much of the framed camera fits on one side (turn +1 / -1) at full weight (0..1, pure on the grid and
-        /// this frame's cylinders): the shoulder segment from the look point, then the pull-back along the view, each as a share
-        /// of its length (GroundCollision.Resolve, the same march GroundFollow uses).</summary>
-        double SideClear(MapDef map, double fx, double fy, double fz, double lineYaw, int turn, double strength)
-        {
-            double yaw = lineYaw + turn * CombatFrame.YawDeg;
-            double pitch = FollowCamera.ThirdPitch + (CombatFrame.PitchDeg - FollowCamera.ThirdPitch) * strength;
-            double sh = -turn * CombatFrame.ShoulderU * strength;
-            double dist = FollowCamera.ThirdDistance + (CombatFrame.Distance * CombatFrame.FovFit(_fov) - FollowCamera.ThirdDistance) * strength;
-            GroundCamera.Basis(yaw, out double ux, out double uz, out double rx, out double rz);
-            double pr = pitch * Math.PI / 180, cp = Math.Cos(pr), sp = Math.Sin(pr);
-            double share = 1, s = Math.Abs(sh);
-            if (s > 1e-6)
-            {
-                double sx = sh >= 0 ? rx : -rx, sz = sh >= 0 ? rz : -rz;
-                double got = GroundCollision.Resolve(map, fx, fy, fz, sx, 0, sz, s, _cyl, _cylCount);
-                share = Math.Min(share, got / s);
-                fx += sx * got;
-                fz += sz * got;
-            }
-            if (dist > 1e-6)
-                share = Math.Min(share, GroundCollision.Resolve(map, fx, fy, fz, -ux * cp, sp, -uz * cp, dist, _cyl, _cylCount) / dist);
-            return share;
         }
 
         void PlayFollow(World w, int id, double facing, double dt, bool snap, double orbitYaw, double orbitPitch, GroundRig rig, ref double tx, ref double tz)
@@ -935,6 +931,78 @@ namespace CriticalMass.Runtime.Camera
             _cylCount = n;
         }
 
+        /// <summary>fix/px-combat-camera-2: the scenery cylinders within reach of the framed look point (fx, fz): the lens and
+        /// both sight lines stay inside ThirdDistance + shoulder + half the fighters' gap of it. Plus the hatched Kaiju.</summary>
+        void GatherScenery(World w, int me, double fx, double fz, double gap)
+        {
+            RefreshStatic();
+            int n = 0;
+            double near = FollowCamera.ThirdDistance + CombatFrame.ShoulderU + gap + 1.0;
+            for (int i = 0; i < _sceneryCount && n < MaxNearScenery - 1; i++)
+            {
+                double dx = _scenery[i].X - fx, dz = _scenery[i].Z - fz, reach = near + _scenery[i].R;
+                if (dx * dx + dz * dz > reach * reach) continue;
+                _scn[n++] = _scenery[i];
+            }
+            Kaiju k = w.Kaiju;
+            if (w.Match.Hatched && k.State != KaijuState.Egg)
+            {
+                double a = Driver.Alpha;
+                double kx = k.PrevX + (k.X - k.PrevX) * a, kz = k.PrevZ + (k.Z - k.PrevZ) * a;
+                double ky = GroundHeight.At(w.Map, kx, kz);
+                _scn[n++] = new SeeThroughCylinder { X = kx, Z = kz, R = w.Config.Kaiju.Radius, Y0 = ky, Y1 = ky + w.Config.Render.KaijuHeight };
+            }
+            _scnCount = n;
+        }
+
+        /// <summary>fix/px-combat-camera-2: the dressing categories that stand solid in the camera's way (the walkable
+        /// surface, decals, edges, lights and the sky are not).</summary>
+        static bool SolidScenery(in WorldPlacement p) =>
+            !p.Surface && p.Cat != null && (p.Cat == "tree" || p.Cat == "rock_big" || p.Cat == "crystal" || p.Cat == "landmark" || p.Cat == "decor"
+                                            || p.Cat == "dress_tall" || p.Cat == "small_tall" || p.Cat == "small" || p.Cat == "base" || p.Cat == "struct" || p.Cat == "deco");
+
+        /// <summary>A kit piece's mesh boxes (8 corners per mesh, its own frame), from Mesh.bounds (readable or not).</summary>
+        static Vector3[] PieceCorners(WorldKitCatalog cat, string piece)
+        {
+            if (piece == null) return Array.Empty<Vector3>();
+            if (PieceBoxes.TryGetValue(piece, out Vector3[] c)) return c;
+            var list = new List<Vector3>();
+            GameObject model = cat != null ? cat.Find(piece) : null;
+            if (model != null)
+                foreach (MeshFilter mf in model.GetComponentsInChildren<MeshFilter>(true))
+                {
+                    if (mf.sharedMesh == null) continue;
+                    Bounds b = mf.sharedMesh.bounds;
+                    Matrix4x4 m = model.transform.worldToLocalMatrix * mf.transform.localToWorldMatrix;
+                    for (int k = 0; k < 8; k++)
+                        list.Add(m.MultiplyPoint3x4(b.center + Vector3.Scale(b.extents, new Vector3((k & 1) != 0 ? 1f : -1f, (k & 2) != 0 ? 1f : -1f, (k & 4) != 0 ? 1f : -1f))));
+                }
+            return PieceBoxes[piece] = list.ToArray();
+        }
+
+        /// <summary>fix/px-combat-camera-2: one placement's solid volume as cylinders (one per kit mesh: a crown and a trunk
+        /// that are separate meshes stay separate), sim space. Without the kit model: the old tree numbers with a crown
+        /// radius, rocks and crystals as small cylinders, anything else skipped. Volumes lower than 0.5 u are skipped.</summary>
+        void AddScenery(in WorldPlacement p, Vector3[] corners)
+        {
+            for (int b = 0; b + 8 <= corners.Length && _sceneryCount < MaxScenery; b += 8)
+            {
+                double x0 = double.MaxValue, x1 = double.MinValue, z0 = double.MaxValue, z1 = double.MinValue, y0 = double.MaxValue, y1 = double.MinValue;
+                var pts = new Vector3[8];
+                for (int k = 0; k < 8; k++)
+                {
+                    Vector3 v = p.Matrix.MultiplyPoint3x4(corners[b + k]);
+                    pts[k] = v;
+                    x0 = Math.Min(x0, v.x); x1 = Math.Max(x1, v.x); z0 = Math.Min(z0, -v.z); z1 = Math.Max(z1, -v.z); y0 = Math.Min(y0, v.y); y1 = Math.Max(y1, v.y);
+                }
+                if (y1 - p.Y < 0.5) continue;
+                double cx = (x0 + x1) * 0.5, cz = (z0 + z1) * 0.5, r = 0;
+                for (int k = 0; k < 8; k++) r = Math.Max(r, Math.Sqrt((pts[k].x - cx) * (pts[k].x - cx) + (-pts[k].z - cz) * (-pts[k].z - cz)));
+                if (r > 8) continue;   // a slab or an island piece, not a prop
+                _scenery[_sceneryCount++] = new SeeThroughCylinder { X = cx, Z = cz, R = r, Y0 = y0, Y1 = y1 };
+            }
+        }
+
         /// <summary>Trees and landmarks (towers) from the dressed world as cylinders (rebuilt when the dressing changes).</summary>
         void RefreshStatic()
         {
@@ -943,7 +1011,29 @@ namespace CriticalMass.Runtime.Camera
             if (_staticVersion == WorldView.DressVersion) return;
             _staticVersion = WorldView.DressVersion;
             _staticCount = 0;
+            _sceneryCount = 0;
             List<WorldPlacement> ps = _world.Plan.Placements;
+            // fix/px-combat-camera-2: WHY the framing parked in trees: the camera never used physics or renderers; its only
+            // scenery was the list below, trees as 0.6 u TRUNK cylinders (the crowns are ~2 u wide) and no rocks, crystals,
+            // props or buildings at all. The framing now tests the full set (the regular follow keeps the list below).
+            WorldKitCatalog cat = WorldKitCatalog.Load();
+            for (int i = 0; i < ps.Count && _sceneryCount < MaxScenery; i++)
+            {
+                WorldPlacement p = ps[i];
+                if (!SolidScenery(p)) continue;
+                // breakable states come and go with the match; the grid (SolidTop) already stands them up like walls
+                if (p.Piece != null && (p.Piece.IndexOf("intact", StringComparison.Ordinal) >= 0 || p.Piece.IndexOf("cracked", StringComparison.Ordinal) >= 0
+                                        || p.Piece.IndexOf("destroyed", StringComparison.Ordinal) >= 0)) continue;
+                Vector3[] corners = PieceCorners(cat, p.Piece);
+                if (corners.Length > 0) { AddScenery(p, corners); continue; }
+                double r, h;
+                if (p.Cat == "tree") { r = SeeThrough.TreeRadius * 1.5; h = p.Piece != null && p.Piece.IndexOf("tall", StringComparison.Ordinal) >= 0 ? SeeThrough.TreeHeightTall : SeeThrough.TreeHeightRound; }
+                else if (p.Cat == "rock_big") { r = 0.8; h = 1.2; }
+                else if (p.Cat == "crystal") { r = 0.6; h = 1.6; }
+                else if (p.Cat == "landmark") { r = 1.6; h = 9.0; }
+                else continue;
+                _scenery[_sceneryCount++] = new SeeThroughCylinder { X = p.SimX, Z = p.SimZ, R = r, Y0 = p.Y - 1, Y1 = p.Y + h };
+            }
             for (int i = 0; i < ps.Count && _staticCount < MaxStatic; i++)
             {
                 WorldPlacement p = ps[i];
@@ -957,6 +1047,47 @@ namespace CriticalMass.Runtime.Camera
                 else continue;
                 _static[_staticCount++] = new SeeThroughCylinder { X = p.SimX, Z = p.SimZ, R = r, Y0 = p.Y - 1, Y1 = p.Y + h };
             }
+        }
+
+        /// <summary>fix/px-combat-camera-2: the scenery volumes near the framed fight this frame (tests).</summary>
+        public int Scenery(out SeeThroughCylinder[] cyl)
+        {
+            cyl = _scn;
+            return _scnCount;
+        }
+
+        /// <summary>fix/px-combat-camera-2: the reticle (GUI pixels, y down). Unframed: the screen centre (its ground ray IS
+        /// the aim). Framed, the view is turned off his own yaw, so the reticle moves (by K) onto where the swing really
+        /// goes, his aim point (TryPlayAim): what the screen shows and where a click swings never disagree.</summary>
+        public Vector2 ReticleGui(World w)
+        {
+            var c = new Vector2(Screen.width * 0.5f, Screen.height * 0.5f);
+            float k = (float)_combat.K;
+            if (!(k > 0) || _cam == null || w == null || !TryPlayAim(w, out double ax, out double az)) return c;
+            Vector3 sp = _cam.WorldToScreenPoint(SimSpace.ToWorld(ax, GroundHeight.At(w.Map, ax, az), az));
+            if (sp.z <= 0f) return c;
+            return Vector2.Lerp(c, new Vector2(sp.x, Screen.height - sp.y), k);
+        }
+
+        /// <summary>
+        /// fix/px-combat-camera-2: where a head tag (name, bar, row words, the YOU marker) should project from. The HUD puts
+        /// tags at a fixed lift over the ground (2.65 u); the framed camera is closer and lower, so that lift drew the enemy's
+        /// name and bar far above his head, up under the resource banner. While framed (by K) the anchor moves, at the same
+        /// depth, to just above the drawn head top (CombatFrame.TagScreenY) and below the top HUD rows. Unframed: unchanged.
+        /// </summary>
+        public static Vector3 TagPoint(World w, int id, Vector3 head, float lift)
+        {
+            GroundView g = Current;
+            if (g == null || g._cam == null || g.Mode != GroundViewMode.Play || w == null || id < 0 || id >= w.ActorCount) return head;
+            float k = (float)g._combat.K;
+            if (!(k > 0)) return head;
+            FightFrame.Silhouette(w.Actors[id].Cls, 0, out _, out double h);
+            Vector3 top = new Vector3(head.x, head.y - lift + (float)h, head.z);
+            Vector3 sh = g._cam.WorldToScreenPoint(head), st = g._cam.WorldToScreenPoint(top);
+            if (sh.z <= 0f || st.z <= 0f) return head;
+            float y = (float)CombatFrame.TagScreenY(sh.y, st.y, g._cam.pixelHeight);
+            Vector3 fit = g._cam.ScreenToWorldPoint(new Vector3(sh.x, y, sh.z));
+            return Vector3.Lerp(head, fit, k);
         }
 
         /// <summary>The camera volumes near the target this frame (tests run the same Inside check).</summary>
@@ -1131,7 +1262,7 @@ namespace CriticalMass.Runtime.Camera
             World w = Driver != null ? Driver.World : null;
             if (w == null || _cam == null) return;
             // Reticle: a small cream dot with a dark ring, at the screen centre (the aim point is along this ray).
-            Vector2 c = new Vector2(Screen.width * 0.5f, Screen.height * 0.5f);
+            Vector2 c = ReticleGui(w);
             GUI.color = new Color(0.06f, 0.08f, 0.16f, 0.8f);
             GUI.DrawTexture(new Rect(c.x - 7 * s, c.y - 7 * s, 14 * s, 14 * s), Dot());
             GUI.color = new Color(1f, 0.96f, 0.86f, 1f);

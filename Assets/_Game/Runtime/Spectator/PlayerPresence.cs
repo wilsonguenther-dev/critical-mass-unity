@@ -392,7 +392,7 @@ namespace CriticalMass.Runtime.Spectator
             double x = w.PrevX[LocalSeat.Actor] + (w.X[LocalSeat.Actor] - w.PrevX[LocalSeat.Actor]) * a;
             double z = w.PrevZ[LocalSeat.Actor] + (w.Z[LocalSeat.Actor] - w.PrevZ[LocalSeat.Actor]) * a;
             double y = GroundHeight.At(w.Map, x, z) + MarkerHeight;
-            Vector3 sp = cam.WorldToScreenPoint(SimSpace.ToWorld(x, y, z));
+            Vector3 sp = cam.WorldToScreenPoint(CriticalMass.Runtime.Camera.GroundView.TagPoint(w, LocalSeat.Actor, SimSpace.ToWorld(x, y, z), MarkerHeight));   // fix/px-combat-camera-2: my own tag just above my head while framed
             if (sp.z <= 0f)
             {
                 _markerGroup.alpha = 0f;
