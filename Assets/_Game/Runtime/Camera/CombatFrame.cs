@@ -270,6 +270,8 @@ namespace CriticalMass.Runtime.Camera
         /// RespectYawDeg) this frame.</summary>
         public double Reach { get; private set; } = 1;
         public bool Respecting { get; private set; }
+        /// <summary>Seconds every pose has been blocked (logs; lets go at OcclusionGraceSeconds).</summary>
+        public double BlockedFor => _blockedFor;
         /// <summary>The framing is on (engaged or holding) this frame.</summary>
         public bool Active { get; private set; }
 
@@ -321,7 +323,9 @@ namespace CriticalMass.Runtime.Camera
             double viewFacing = Math.Abs(GroundCamera.DeltaAngle(view, f.LineYaw));
             TurnedAway = f.Enabled && (TurnedAway ? viewFacing > CombatFrame.ReacquireDeg : wasOn && f.Looking && turned > CombatFrame.ReleaseDeg);
             _blockedFor = f.NoClearFrame ? _blockedFor + dt : 0;
-            if (f.Looking || f.Manual) _respect = CombatFrame.RespectSeconds;
+            // his steering during a framed fight (or manual look mode) earns respect; the auto follow's own swing after a
+            // fight (no framing on) does not
+            if ((f.Looking && wasOn) || f.Manual) _respect = CombatFrame.RespectSeconds;
             else if (!wasOn) _respect = Math.Max(0, _respect - dt);
             Respecting = f.Manual || _respect > 0;
             bool letGo = TurnedAway || _blockedFor >= CombatFrame.OcclusionGraceSeconds;
