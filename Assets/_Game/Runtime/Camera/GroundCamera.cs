@@ -485,7 +485,7 @@ namespace CriticalMass.Runtime.Camera
         public const double RobustChestUp = 1.2, RobustBodyTall = 2.1;
         /// <summary>Distance: in at once (a wall), out only after RobustHold s clear, then on RobustOutTau (no pumping).
         /// Wall rise: up on RobustRiseTau, down after RobustHold on RobustFallTau.</summary>
-        public const double RobustHold = 0.6, RobustOutTau = 0.9, RobustRiseTau = 0.08, RobustFallTau = 0.9;
+        public const double RobustHold = 1.0, RobustOutTau = 1.3, RobustRiseTau = 0.08, RobustFallTau = 0.9;
 
         double _rise, _riseClear, _outClear;
         /// <summary>fix/px-camera-in-editor: even at RobustMin and the steepest rise the boom touches hard geometry (the
