@@ -587,6 +587,7 @@ namespace CriticalMass.Runtime.View
                 _humanLookFrame = Time.frameCount + 30;
             }
             bool intent = _human != null && _human.isActiveAndEnabled && _human.State.AttackIntent;
+            if (intent && !_intentWas && actor != null && actor.Alive) slot.Anim.NotePress();   // mv-6 readability-2 item 1
             if (intent && !_intentWas && actor != null && actor.Alive && Combat.AttackReady(w, i))
             {
                 slot.Anim.PredictSwing(m, actor, cfg, simTime);
