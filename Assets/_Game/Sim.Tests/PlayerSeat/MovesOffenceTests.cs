@@ -1074,3 +1074,123 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
         }
     }
 }
+
+namespace CriticalMass.Sim.Tests.PlayerSeat
+{
+    using System;
+    using System.Collections.Generic;
+    using CriticalMass.Sim.Config;
+    using CriticalMass.Sim.Core;
+    using NUnit.Framework;
+    using T = CriticalMass.Sim.Tests.PlayerSeat.PlayerSeatTargets;
+
+    /// <summary>fix/mv-combo-reach (Editor pass 2: the Farmer's chain never connected): a person who keeps tapping Attack and holds
+    /// toward the target lands step 2 and the finisher after the class's own step-1 knock. Every switch on.</summary>
+    [TestFixture]
+    [Category("PlayerSeat")]
+    public sealed class MovesOffenceComboReach
+    {
+        internal static string Diag = "";
+
+        internal static (int trials, int step2, int fin) Chase(ClassId me, ClassId them, bool bot, int period, int k)
+        {
+            Action<GameConfig> tweak = c =>
+            {
+                MovesConfig.PlayBuildAllOn(c.Depth.Moves);
+                if (!bot) return;
+                MovesConfig m = c.Depth.Moves;   // a Normal bot that never dodges, guards, parries or steps out
+                for (int d = 0; d < m.BotGuardChance.Length; d++) m.BotGuardChance[d] = 0;
+                for (int d = 0; d < m.BotParryChance.Length; d++) m.BotParryChance[d] = 0;
+                for (int d = 0; d < m.BotStepOutChance.Length; d++) m.BotStepOutChance[d] = 0;
+                for (int d = 0; d < c.Depth.CombatFeel.BotMeleeDodgeChance.Length; d++) c.Depth.CombatFeel.BotMeleeDodgeChance[d] = 0;
+                for (int d = 0; d < c.Depth.Dodge.DodgeChance.Length; d++) c.Depth.Dodge.DodgeChance[d] = 0;
+            };
+            Seat s = PlayerSeatRig.Duel(me, them, bot ? TargetMode.RealBot : TargetMode.Passive, PlayerSeatRig.AngleOf(k, 4), k, 0, tweak: tweak);
+            s.NoTnt = true;
+            s.KeepThemAbove = 0.6;   // a whole chain can take 40% of a body: refill early so the duel runs all 10 trials
+            s.KeepMeAbove = 0.6;
+            World w = s.W;
+            int steps = new MovesConfig().ComboSteps[(int)me];
+            int lastSwing = w.Actors[s.Me].SwingTick, curStep = 0, trials = 0, s2 = 0, fin = 0, t0 = -1;
+            Diag = "";
+            int started2 = 0, whiff2 = 0, stunned = 0, lastTrialTick = 0;
+            var contacts = new List<string>();
+            double gapSum = 0;
+            bool landed = false, inTrial = false, got2 = false, gotFin = false;
+            OffRig.Play(s, 40.0, q =>
+            {
+                Actor a = q.W.Actors[q.Me];
+                if (t0 < 0) t0 = q.W.Tick;
+                if (a.SwingTick != lastSwing)
+                {
+                    lastSwing = a.SwingTick;
+                    curStep = q.W.Moves.Offence.StepOf[q.Me];
+                    landed = false;
+                    if (curStep <= 1 && inTrial) { inTrial = false; }
+                    if (inTrial && curStep == 2) { started2++; double gx = q.W.X[q.Them] - q.W.X[q.Me], gz = q.W.Z[q.Them] - q.W.Z[q.Me]; gapSum += Math.Sqrt(gx * gx + gz * gz); }
+                }
+                if (inTrial && a.HitStunTicks > 0) stunned++;
+                if (inTrial && curStep == 2 && a.SwingPending && q.W.Tick + 1 == a.SwingTick + a.SwingWindup && contacts.Count < 6)
+                {
+                    double cx = q.W.X[q.Them] - q.W.X[q.Me], cz = q.W.Z[q.Them] - q.W.Z[q.Me];
+                    double ang = Math.Atan2(cz, cx) - a.SwingFacing;
+                    while (ang > Math.PI) ang -= 2 * Math.PI;
+                    while (ang < -Math.PI) ang += 2 * Math.PI;
+                    contacts.Add(Math.Sqrt(cx * cx + cz * cz).ToString("0.00") + "@" + (ang * 180 / Math.PI).ToString("0") + "deg" + (q.W.Actors[q.Them].SwingPending ? "S" : ""));
+                }
+                if (inTrial && curStep == 2 && !a.SwingPending && !landed && q.W.Tick == a.SwingTick + a.SwingWindup + 1) whiff2++;
+                if (!landed && !a.SwingPending && q.W.Depth.Feel.LandedSwing[q.Me] == a.SwingTick)
+                {
+                    landed = true;
+                    if (curStep <= 1) { trials++; inTrial = true; got2 = gotFin = false; }
+                    else if (inTrial)
+                    {
+                        if (curStep == 2 && !got2) { got2 = true; s2++; }
+                        if (curStep >= steps && !gotFin) { gotFin = true; fin++; }
+                    }
+                }
+                // the person: holds toward the target, aims at it, taps Attack every `period` ticks
+                double dx = q.W.X[q.Them] - q.W.X[q.Me], dz = q.W.Z[q.Them] - q.W.Z[q.Me], d = Math.Sqrt(dx * dx + dz * dz);
+                InputFrame f = q.Frames[q.Me];
+                if (d > 1e-6)
+                {
+                    f.MoveX = dx / d; f.MoveZ = dz / d;
+                    f.AimX = q.W.X[q.Them]; f.AimZ = q.W.Z[q.Them];
+                }
+                f.Attack = (q.W.Tick - t0) % period == 0;
+            }, q => trials >= 11 && !inTrial);
+            var why = new SortedDictionary<int, int>();
+            foreach (SeatEvent e in s.Spy.Of(SimEventType.HitBlocked, e => e.B == s.Me)) { int v = (int)e.Value; why[v] = why.TryGetValue(v, out int c0) ? c0 + 1 : 1; }
+            var wb = new List<string>(); foreach (var kv in why) wb.Add(kv.Key + ":" + kv.Value);
+            Diag = "started2 " + started2 + " whiff2 " + whiff2 + " gap@start2 " + (started2 > 0 ? (gapSum / started2).ToString("0.00") : "-") + " stunnedTicks " + stunned + " blocked " + string.Join(",", wb)
+                + " dodges " + s.Spy.Of(SimEventType.Dodge, e => e.A == s.Them).Count + " step2 contact " + string.Join(" ", contacts);
+            return (Math.Min(trials, 10), Math.Min(s2, 10), Math.Min(fin, 10));
+        }
+
+        [Test]
+        public void ATapperHoldingTowardTheTargetLandsStep2AndTheFinisher_DummyAndNoDodgeBot()
+        {
+            var bad = new List<string>();
+            MovesConfig mc = new MovesConfig();
+            foreach (ClassId me in T.Classes)
+            {
+                if (mc.ComboSteps[(int)me] < 2) continue;
+                var parts = new List<string>();
+                bool ok = true;
+                foreach (bool bot in new[] { false, true })
+                {
+                    int tr = 0, a2 = 0, af = 0;
+                    // the Editor's pass-2 case: a Farmer victim (the Farmer mirror too); never the Warrior, whose armoured wind-up
+                    // trades through a light hit by design (the "Warrior wins every one-on-one" ruling)
+                    ClassId them = ClassId.Farmer;
+                    var r = Chase(me, them, bot, 8, 0);
+                    tr += r.trials; a2 += r.step2; af += r.fin;
+                    parts.Add((bot ? "Normal no-dodge bot " : "passive dummy ") + them + ": step 2 " + a2 + "/" + tr + ", finisher " + af + "/" + tr + " {" + Diag + "}");
+                    if (tr < 10 || a2 < 8 || af < 6) ok = false;
+                }
+                if (!PxLog.Line("combo-reach", me + " taps every 8 ticks holding toward the target, every switch on", string.Join("; ", parts), "step 2 >= 8 of 10, finisher >= 6 of 10", ok)) bad.Add(me.ToString());
+            }
+            Assert.IsEmpty(bad);
+        }
+    }
+}
