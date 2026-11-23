@@ -13,7 +13,7 @@
 // A BOT's Attack bit keeps its old meaning (a press is a light at once): bots hold Attack while a target is in reach, so the
 // hold rule would turn every bot swing into an auto-released heavy. Bots charge only through OffenceBotCharge (lane 5).
 //
-// COMBOS (T2-3, switch Combos, every actor): a light swing that LANDS opens the chain until its cooldown is spent plus the
+// COMBOS (T2-3, switch Combos; human seats always, bots under the cap in OffenceMayChain / OffenceBotChains): a light swing that LANDS opens the chain until its cooldown is spent plus the
 // input buffer (BufferSeconds), at most ComboResetSeconds; the next light swing started inside it is the next step (wind-up x ComboStepWindupMul, never under 5 ticks, damage x ComboStepDamageMul);
 // the class's last step is the FINISHER (damage x FinisherDamageMul, knock x FinisherKnockMul, recovery +
 // FinisherExtraRecoveryTicks) and closes the chain. A whiff, a heavy, or the window running out resets to step 1. Steps keep
@@ -54,6 +54,13 @@ namespace CriticalMass.Sim.Core
         /// <summary>Demolitions' fuse strike: the tick a fuse stuck on this body blows (NoTick = none) and who lit it.</summary>
         public int[] FuseTick = new int[0];
         public int[] FuseOwner = new int[0];
+        /// <summary>Lane 5's override of a bot's combo use (OffenceBotChains): 0 = the default cap below, 1 = always chain, 2 = never.
+        /// Default cap: a bot chains fully against bots; against a human seat Easy never chains, Normal chains every second
+        /// chance (BotChainFlip), Hard always (the combo stays the human seat's skill payoff against Normal bots).</summary>
+        public byte[] BotChains = new byte[0];
+        public byte[] BotChainFlip = new byte[0];
+        /// <summary>1 = the actor's last landed melee strike was on a human seat (the bot chain cap reads it).</summary>
+        public byte[] LastHitHuman = new byte[0];
         /// <summary>Lane 5: ticks a bot holds its charge (OffenceBotCharge), 0 = none.</summary>
         public int[] BotChargeLeft = new int[0];
         /// <summary>[0] = the amount of the melee strike being applied now (Combat sets it before CombatFeel.ApplyStrike; charge armour).</summary>
@@ -80,6 +87,9 @@ namespace CriticalMass.Sim.Core
             FuseTick = new int[n];
             FuseOwner = new int[n];
             BotChargeLeft = new int[n];
+            BotChains = new byte[n];
+            BotChainFlip = new byte[n];
+            LastHitHuman = new byte[n];
         }
 
         public void Reset(World w)
@@ -102,6 +112,9 @@ namespace CriticalMass.Sim.Core
                 FuseTick[i] = CombatFeel.NoTick;
                 FuseOwner[i] = -1;
                 BotChargeLeft[i] = 0;
+                BotChains[i] = 0;
+                BotChainFlip[i] = 0;
+                LastHitHuman[i] = 0;
             }
             StrikeAmount[0] = 0;
             for (int k = 0; k < Counts.Length; k++) Counts[k] = 0;
@@ -184,6 +197,30 @@ namespace CriticalMass.Sim.Core
             s.BotChargeLeft[id] = t < lo ? lo : t > hi ? hi : t;
         }
 
+        /// <summary>Lane 5: override bot id's combo use: 1 = always chain, 2 = never, 0 = lane 4's default cap. Human seats always chain.</summary>
+        public static void OffenceBotChains(World w, int id, byte mode)
+        {
+            if (w.Moves == null || id < 0 || id >= w.ActorCount) return;
+            w.Moves.Offence.BotChains[id] = mode;
+        }
+
+        /// <summary>May actor i take the combo step it is entitled to now (human seats always; bots by the cap above).</summary>
+        static bool OffenceMayChain(World w, OffenceMovesState s, int i)
+        {
+            if (OffenceHuman(w, i)) return true;
+            if (s.BotChains[i] == 1) return true;
+            if (s.BotChains[i] == 2) return false;
+            if (s.LastHitHuman[i] == 0) return true;
+            switch (Bots.BotSkill.Of(w, i))
+            {
+                case BotDifficulty.Easy: return false;
+                case BotDifficulty.Hard: return true;
+                default:
+                    s.BotChainFlip[i] ^= 1;
+                    return s.BotChainFlip[i] == 0;
+            }
+        }
+
         // ================================================================== Combat.cs / Demolitions.cs helpers (lane 4's own files)
 
         /// <summary>Combat, right before CombatFeel.ApplyStrike: the strike's amount (charge armour reads it in StrikeKnock).</summary>
@@ -198,8 +235,9 @@ namespace CriticalMass.Sim.Core
         public static void OffenceAfterStrike(World w, int target, int source, double dealt)
         {
             if (w.Moves == null || !(dealt > 0) || source < 0 || source >= w.ActorCount || target < 0 || target >= w.ActorCount) return;
-            if (!On(w, Cfg(w).Heavy) || !OffenceIsHeavy(w, source)) return;
             OffenceMovesState s = w.Moves.Offence;
+            s.LastHitHuman[source] = w.Actors[target].IsHuman ? (byte)1 : (byte)0;
+            if (!On(w, Cfg(w).Heavy) || !OffenceIsHeavy(w, source)) return;
             s.Counts[OffenceCountHeavyHits]++;
             ClassId cls = w.Actors[source].Cls;
             if (cls == ClassId.Miner)
@@ -406,7 +444,7 @@ namespace CriticalMass.Sim.Core
             s.HeavySwingTick[i] = CombatFeel.NoTick;
             if (!On(w, m.Combos)) return windup;
             int step = 1;
-            if (s.ChainNext[i] >= 2 && w.Tick <= s.ChainUntil[i]) step = s.ChainNext[i];
+            if (s.ChainNext[i] >= 2 && w.Tick <= s.ChainUntil[i] && OffenceMayChain(w, s, i)) step = s.ChainNext[i];
             s.ChainNext[i] = 0;
             s.StepSwingTick[i] = w.Tick;
             s.StepOf[i] = step;
@@ -519,7 +557,10 @@ namespace CriticalMass.Sim.Core
                 int c = (int)src.Cls;
                 double cls = m.HeavyKnockMul != null && c < m.HeavyKnockMul.Length ? m.HeavyKnockMul[c] : 1;
                 knock *= (1 + (m.ChargeKnockMulMax - 1) * s.HeavySwingShare[source]) * cls;
-                stun = OffenceHeavyStagger(w, target, stun);
+                // "always a heavy stagger", except a class whose strikes never stagger (b16 StrikeStaggers: the Healer's lantern;
+                // her flare is a disengage through its knock, not a stun)
+                bool[] ss = CombatFeel.Cfg(w).StrikeStaggers;
+                if (ss == null || c >= ss.Length || ss[c]) stun = OffenceHeavyStagger(w, target, stun);
             }
             else if (On(w, m.Combos) && s.StepSwingTick[source] == src.SwingTick && s.StepOf[source] >= 2 && s.StepOf[source] >= OffenceSteps(w, src.Cls))
                 knock *= m.FinisherKnockMul;
