@@ -480,6 +480,8 @@ namespace CriticalMass.Runtime.Camera
         /// <summary>Never closer to the boom's pivot than this (u); the lens keeps RobustRadius clear of walls and the
         /// ground RobustFloor under it (the HUD planes at 0.4-0.6 m never meet geometry); never steeper than RobustMaxSteep
         /// (deg) looking at the chest; the chest stays RobustFrameMargin (deg) inside the frame.</summary>
+        /// <summary>The boom length the wall rise tries to give back (u).</summary>
+        public const double RobustGood = 2.8;
         public const double RobustMin = 1.6, RobustRadius = 0.6, RobustFloor = 0.7, RobustMaxSteep = 55, RobustFrameMargin = 5;
         /// <summary>The fighter for the frame rule: the sight point (chest) is RobustChestUp over his feet, he is RobustBodyTall.</summary>
         public const double RobustChestUp = 1.2, RobustBodyTall = 2.1;
@@ -528,20 +530,22 @@ namespace CriticalMass.Runtime.Camera
             OverHead = false;
             double basePitch = Pitch;
             want = Math.Max(RobustMin, want);
-            // 1. the wall rise: the smallest extra pitch (5 deg steps) that lets the boom reach RobustMin, within the
-            // steepness limit; none fits: the steepest allowed (what is still in the way is faded by the caller)
+            // 1. the wall rise: when the boom is cut short (terrain rising behind, a wall), the smallest extra pitch (5 deg
+            // steps) that gives back RobustGood of boom, else the one that gives the most; never steeper than RobustMaxSteep
+            // at the distance it would get (pass 5: the old "reach RobustMin" rule parked the lens 2.4 u away, 40 deg up)
+            double good = Math.Min(want, RobustGood);
+            double baseBoom = BoomAt(f, ox, oy, oz, ux, uz, basePitch, want);
             double riseWant = 0;
-            if (BoomAt(f, ox, oy, oz, ux, uz, basePitch, want) < RobustMin)
+            if (baseBoom < good)
             {
-                riseWant = -1;
-                double last = 0;
+                double bestD = baseBoom;
                 for (double b = 5; b <= 60; b += 5)
                 {
-                    if (SteepAt(f, ox, oy, oz, ux, uz, basePitch + b, RobustMin) > RobustMaxSteep) break;
-                    last = b;
-                    if (BoomAt(f, ox, oy, oz, ux, uz, basePitch + b, want) >= RobustMin) { riseWant = b; break; }
+                    double d = BoomAt(f, ox, oy, oz, ux, uz, basePitch + b, want);
+                    if (SteepAt(f, ox, oy, oz, ux, uz, basePitch + b, Math.Max(RobustMin, d)) > RobustMaxSteep) break;
+                    if (d >= good) { riseWant = b; break; }
+                    if (d > bestD + 0.25) { riseWant = b; bestD = d; }
                 }
-                if (riseWant < 0) riseWant = last;
             }
             if (snap || dt <= 0) { _rise = snap ? riseWant : _rise; _riseClear = 0; }
             else if (riseWant > _rise) { _rise += (riseWant - _rise) * (1 - Math.Exp(-dt / RobustRiseTau)); _riseClear = 0; }
