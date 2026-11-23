@@ -46,8 +46,18 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
         public const double DeliveryAllegiance = 37.5;
         /// <summary>F34: sim seconds of no input after which the autopilot may take over (MechRules: 15 s), plus slack.</summary>
         public const double IdleSeconds = 16;
-        /// <summary>D2 (review defect 2): in third person at melee range at least this share of the enemy's screen box is not
-        /// covered by my own fighter's box (boxes over-cover a silhouette; the Editor review measured 65-86% visible pixels).</summary>
-        public const double EnemyVisibleShareMin = 0.5;
+        /// <summary>D2 (review defect 2) / D2b (fix/px-combat-camera): in third person at 0.8 and 1.0 x reach at least this share
+        /// of the enemy's screen box is not covered by my own fighter's box. The boxes are the class silhouettes (FightFrame.
+        /// Silhouette: body radius + 0.15, class height) projected through the live camera: the renderer bounds (skinned-mesh
+        /// AABBs, ~1.9 u wide for a 2.15 u Farmer in the review logs, ground rings included) cannot reach 0.6 at 1.12 u centre to
+        /// centre from ANY camera angle (two 1.9 u boxes 1.12 u apart overlap 0.78 u even side-on), so they are logged, not
+        /// asserted. Was 0.5 on the renderer boxes.</summary>
+        public const double EnemyVisibleShareMin = 0.6;
+        /// <summary>D2b: with the combat camera on, the enemy's on-screen height at least this many times what the camera draws
+        /// at the same distance with it off (the old fight framing drew him smaller still: it pulled back 12%).</summary>
+        public const double CombatHeightGainMin = 1.4;
+        /// <summary>D2 / D2b: paced 60 fps frames to wait for the framing to settle (in 0.3 s, plus the yaw chase) or release
+        /// (1.0 s hold + 0.6 s out).</summary>
+        public const int CombatSettleFrames = 45, CombatReleaseFrames = 120;
     }
 }

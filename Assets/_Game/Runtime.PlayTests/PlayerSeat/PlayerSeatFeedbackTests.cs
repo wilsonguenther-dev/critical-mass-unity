@@ -1104,23 +1104,145 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
             return x1 < x0 ? Rect.zero : Rect.MinMaxRect(x0, y0, x1, y1);
         }
 
+        /// <summary>fix/px-combat-camera: screen rectangle (pixels) of an upright cylinder standing at sim (x, z), through the live
+        /// camera; empty when any point is behind the lens.</summary>
+        static Rect SilhouetteRect(double x, double z, double ground, double radius, double height)
+        {
+            UnityEngine.Camera cam = UnityEngine.Camera.main;
+            if (cam == null) return Rect.zero;
+            float x0 = float.MaxValue, y0 = float.MaxValue, x1 = float.MinValue, y1 = float.MinValue;
+            for (int k = 0; k < 16; k++)
+            {
+                double a = k * Math.PI / 8;
+                for (int j = 0; j < 2; j++)
+                {
+                    Vector3 sp = cam.WorldToScreenPoint(SimSpace.ToWorld(x + radius * Math.Cos(a), ground + j * height, z + radius * Math.Sin(a)));
+                    if (sp.z <= 0) return Rect.zero;
+                    x0 = Mathf.Min(x0, sp.x); y0 = Mathf.Min(y0, sp.y); x1 = Mathf.Max(x1, sp.x); y1 = Mathf.Max(y1, sp.y);
+                }
+            }
+            return Rect.MinMaxRect(x0, y0, x1, y1);
+        }
+
+        /// <summary>A fighter's class silhouette (FightFrame.Silhouette) on screen.</summary>
+        Rect FighterSilhouette(int i)
+        {
+            ClassId c = W.Actors[i].Cls;
+            CriticalMass.Runtime.Camera.FightFrame.Silhouette(c, W.Config.Class(c).Radius, out double hw, out double h);
+            return SilhouetteRect(W.X[i], W.Z[i], S.Ground(W.X[i], W.Z[i]), hw, h);
+        }
+
+        /// <summary>Share of the enemy's box not covered by mine (boxes over-cover a silhouette, so this is strict).</summary>
+        static double OutsideShare(Rect mine, Rect theirs)
+        {
+            float ox = Mathf.Max(0, Mathf.Min(mine.xMax, theirs.xMax) - Mathf.Max(mine.xMin, theirs.xMin));
+            float oy = Mathf.Max(0, Mathf.Min(mine.yMax, theirs.yMax) - Mathf.Max(mine.yMin, theirs.yMin));
+            float area = theirs.width * theirs.height;
+            return area > 0 ? 1 - ox * oy / area : 0;
+        }
+
+        /// <summary>The player's OWN camera forward (sim unit): the combat framing turns the drawn camera, the aim keeps this yaw,
+        /// so the enemy is placed straight ahead of the player's view (the worst case: unframed, exactly behind my fighter).</summary>
+        static void OwnForward(out double dx, out double dz) =>
+            CriticalMass.Runtime.Camera.GroundCamera.Basis(CriticalMass.Runtime.Camera.GroundView.AimYaw, out dx, out dz, out _, out _);
+
+        /// <summary>The lens is not inside the map's solid grid (walls, terraces, ground), with half the collision radius.</summary>
+        bool CameraInsideGeometry()
+        {
+            UnityEngine.Camera cam = UnityEngine.Camera.main;
+            if (cam == null) return false;
+            Vector3 cp = cam.transform.position;
+            SimSpace.ToSim(cp, out double cx, out double cz);
+            return CriticalMass.Runtime.Camera.GroundCollision.Inside(W.Map, cx, cp.y, cz, CriticalMass.Runtime.Camera.GroundCollision.Radius * 0.5, null, 0);
+        }
+
         [UnityTest, Timeout(SeatTestTimeoutMs)]
         public IEnumerator D2_ThirdPerson_MeleeRange_EnemyNotBehindMe([ValueSource(nameof(Classes))] ClassId x)
         {
-            yield return Load(x, CameraView.ThirdPerson);
-            CameraForward(out double dx, out double dz);
-            int e = Isolate(ClassId.Farmer, T.StandShareOfRange * W.Config.Class(x).AttackRange, dx, dz);
-            double px = W.X[e], pz = W.Z[e];
-            for (int f = 0; f < 10; f++) yield return TickFrame(() => Pin(e, px, pz));
-            Rect mine = ScreenRect(S.ActorModel(0)), theirs = ScreenRect(S.ActorModel(e));
-            Vector2 c = theirs.width > 0 ? theirs.center : ScreenOf(px, pz);
-            // the enemy's screen box minus the part my own box covers (boxes over-cover a silhouette, so this is strict)
-            float ox = Mathf.Max(0, Mathf.Min(mine.xMax, theirs.xMax) - Mathf.Max(mine.xMin, theirs.xMin)), oy = Mathf.Max(0, Mathf.Min(mine.yMax, theirs.yMax) - Mathf.Max(mine.yMin, theirs.yMin));
-            float area = theirs.width * theirs.height;
-            double visibleShare = area > 0 ? 1 - ox * oy / area : 0;
-            bool hidden = visibleShare < T.EnemyVisibleShareMin;
-            AssertAtControls("the end");
-            Check("D2 EnemyNotBehindMe", x + " third person, enemy at 0.8 x range ahead", "my fighter " + mine + ", enemy centre " + c + ", enemy box " + theirs + ", share of the enemy box not covered by my box " + visibleShare.ToString("0.00") + " (target >= " + T.EnemyVisibleShareMin + ")", "the enemy stays mostly visible past my own fighter", mine.width > 0 && theirs.width > 0 && !hidden);
+            bool? keep = GameSettings.CombatCameraOverride;
+            float? keepS = GameSettings.CombatCameraStrengthOverride;
+            try
+            {
+                GameSettings.CombatCameraOverride = true;   // the shipped default, pinned against a tester's stored switch
+                GameSettings.CombatCameraStrengthOverride = 1f;
+                yield return Load(x, CameraView.ThirdPerson);
+                OwnForward(out double dx, out double dz);
+                int e = Isolate(ClassId.Farmer, T.StandShareOfRange * W.Config.Class(x).AttackRange, dx, dz);
+                double px = W.X[e], pz = W.Z[e];
+                // fix/px-combat-camera: real 60 fps frames for the framing to ease in (0.3 s + the yaw chase); the old 10 unpaced
+                // Editor frames (~1-5 ms each) measured the camera before any framing had happened.
+                Paced(true);
+                for (int f = 0; f < T.CombatSettleFrames; f++) yield return TickFrame(() => Pin(e, px, pz));
+                yield return EndOfFrame();
+                Rect mine = FighterSilhouette(0), theirs = FighterSilhouette(e);
+                Rect mineR = ScreenRect(S.ActorModel(0)), theirsR = ScreenRect(S.ActorModel(e));
+                double visibleShare = OutsideShare(mine, theirs), rendererShare = OutsideShare(mineR, theirsR);
+                Paced(false);
+                AssertAtControls("the end");
+                Check("D2 EnemyNotBehindMe", x + " third person, combat camera on, enemy at 0.8 x range ahead of my own view",
+                    "framing " + CriticalMass.Runtime.Camera.GroundView.CombatFraming.ToString("0.00") + ", my silhouette " + mine + ", enemy silhouette " + theirs +
+                    ", share of the enemy box not covered by my box " + visibleShare.ToString("0.00") + " (target >= " + T.EnemyVisibleShareMin + "); renderer boxes (logged only) mine " + mineR + ", enemy " + theirsR + ", share " + rendererShare.ToString("0.00"),
+                    "the enemy stays mostly visible past my own fighter", mine.width > 0 && theirs.width > 0 && visibleShare >= T.EnemyVisibleShareMin);
+            }
+            finally
+            {
+                GameSettings.CombatCameraOverride = keep;
+                GameSettings.CombatCameraStrengthOverride = keepS;
+            }
+        }
+
+        static readonly double[] ReachShares = { 0.8, 1.0 };
+
+        /// <summary>
+        /// fix/px-combat-camera: the combat camera at 0.8 and 1.0 x reach, every class, the same moment measured with the switch
+        /// off then on: at least 0.6 of the enemy's silhouette box clear of mine, the enemy at least 1.4 x as tall on screen as
+        /// with the switch off, my own fighter wholly on screen, the lens outside the map's solid grid, the framing settled.
+        /// </summary>
+        [UnityTest, Timeout(SeatTestTimeoutMs)]
+        public IEnumerator D2b_ThirdPerson_CombatCamera_FramesTheFight([ValueSource(nameof(Classes))] ClassId x, [ValueSource(nameof(ReachShares))] double share)
+        {
+            bool? keep = GameSettings.CombatCameraOverride;
+            float? keepS = GameSettings.CombatCameraStrengthOverride;
+            try
+            {
+                GameSettings.CombatCameraOverride = false;
+                GameSettings.CombatCameraStrengthOverride = 1f;
+                yield return Load(x, CameraView.ThirdPerson);
+                OwnForward(out double dx, out double dz);
+                int e = Isolate(ClassId.Farmer, share * W.Config.Class(x).AttackRange, dx, dz);
+                double px = W.X[e], pz = W.Z[e];
+                Paced(true);
+                for (int f = 0; f < T.CombatReleaseFrames; f++) yield return TickFrame(() => Pin(e, px, pz));
+                yield return EndOfFrame();
+                double offK = CriticalMass.Runtime.Camera.GroundView.CombatFraming;
+                Rect offMine = FighterSilhouette(0), offTheirs = FighterSilhouette(e);
+                double offShare = OutsideShare(offMine, offTheirs);
+                GameSettings.CombatCameraOverride = true;
+                for (int f = 0; f < T.CombatSettleFrames; f++) yield return TickFrame(() => Pin(e, px, pz));
+                yield return EndOfFrame();
+                double k = CriticalMass.Runtime.Camera.GroundView.CombatFraming;
+                Rect mine = FighterSilhouette(0), theirs = FighterSilhouette(e);
+                double visible = OutsideShare(mine, theirs);
+                double gain = offTheirs.height > 0 ? theirs.height / offTheirs.height : 0;
+                UnityEngine.Camera cam = UnityEngine.Camera.main;
+                bool meOnScreen = cam != null && mine.width > 0 && mine.xMin >= 0 && mine.yMin >= 0 && mine.xMax <= cam.pixelWidth && mine.yMax <= cam.pixelHeight;
+                bool inside = CameraInsideGeometry();
+                CriticalMass.Runtime.Camera.CombatFramer fr = CriticalMass.Runtime.Camera.GroundView.Framer;
+                string side = fr != null ? "side " + fr.Turn + ", yaw +" + fr.YawOffset.ToString("0.0") + " deg, wall keep " + fr.WallKeep.ToString("0.00") : "no framer";
+                Paced(false);
+                AssertAtControls("the end");
+                Check("D2b CombatCamera", x + " third person, enemy at " + share + " x range ahead of my own view, switch off then on",
+                    "off: framing " + offK.ToString("0.00") + ", enemy box " + offTheirs + ", clear share " + offShare.ToString("0.00") +
+                    "; on: framing " + k.ToString("0.00") + " (" + side + "), my box " + mine + ", enemy box " + theirs + ", clear share " + visible.ToString("0.00") +
+                    ", enemy height x" + gain.ToString("0.00") + ", me on screen " + meOnScreen + ", lens inside the grid " + inside,
+                    "clear share >= " + T.EnemyVisibleShareMin + ", height >= x" + T.CombatHeightGainMin + ", me on screen, lens clear, framing settled (>= 0.95)",
+                    offK < 0.01 && k >= 0.95 && visible >= T.EnemyVisibleShareMin && gain >= T.CombatHeightGainMin && meOnScreen && !inside);
+            }
+            finally
+            {
+                GameSettings.CombatCameraOverride = keep;
+                GameSettings.CombatCameraStrengthOverride = keepS;
+            }
         }
 
         [UnityTest, Timeout(SeatTestTimeoutMs)]
