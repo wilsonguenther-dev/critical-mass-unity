@@ -258,7 +258,7 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
 
         /// <summary>One duel row (me vs the 5 other classes, 8 starts) with the base or the feint human model; counts the human's
         /// feints and how many the bot answered with a lane-5 read (its step-out, guard or parry decided on that very swing).</summary>
-        static Tally DuelRow(ClassId me, bool feint, Action<GameConfig> tweak, BotDifficulty bots = BotDifficulty.Normal, int lag = Lag, bool half = false, int help = Help, bool planned = false)
+        static Tally DuelRow(ClassId me, bool feint, Action<GameConfig> tweak, BotDifficulty bots = BotDifficulty.Normal, int lag = Lag, bool half = false, int help = Help, bool planned = false, double clockFrom = 0)
         {
             var all = new Tally();
             foreach (ClassId them in T.Classes)
@@ -271,6 +271,7 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
                     s.Human.Feints = feint;
                     s.Human.FeintOnStepOut = feint;   // integrator (decision 8): the feint also cancels on seeing a step-out start
                     World w = s.W;
+                    if (clockFrom > 0) w.Match.Time = clockFrom;   // round 3: past a Normal bot's beginner minute (no step-out cap)
                     var answered = new HashSet<int>();
                     var feinted = new HashSet<int>();
                     int head = s.Spy.Mark, lastKey = 0;
@@ -337,12 +338,14 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
         {
             Action<GameConfig> sw = c => { Switches(stepOut: true)(c); c.Depth.Moves.FeintBait = true; };
             var all = new Tally();
-            foreach (ClassId me in new[] { ClassId.Warrior, ClassId.Miner, ClassId.Builder }) all.Add(DuelRow(me, false, sw, planned: true));
+            foreach (ClassId me in new[] { ClassId.Warrior, ClassId.Miner, ClassId.Builder }) all.Add(DuelRow(me, false, sw, planned: true, clockFrom: 61));
             double bait = all.Feints > 0 ? (double)all.Baited / all.Feints : 0;
             var off = new Tally();
-            foreach (ClassId me in new[] { ClassId.Warrior, ClassId.Miner, ClassId.Builder }) off.Add(DuelRow(me, false, Switches(), planned: true));
+            foreach (ClassId me in new[] { ClassId.Warrior, ClassId.Miner, ClassId.Builder }) off.Add(DuelRow(me, false, Switches(), planned: true, clockFrom: 61));
             double baitOff = off.Feints > 0 ? (double)off.Baited / off.Feints : 0;
-            bool ok = PxLog.Line("mv5 T1-4b FeintBaitRate", "share of a lag-6 human's planned feints (Warrior, Miner, Builder vs Normal) the bot answered with a read on that swing",
+            // round 3 (orchestrator): a Normal bot steps out of at most 1 in 4 read swings in its first 60 s, so this rate (the
+            // spec's step-out chance) is measured from 61 s of match clock; from the match start it was 0.05 (29/625)
+            bool ok = PxLog.Line("mv5 T1-4b FeintBaitRate (from 61 s)", "share of a lag-6 human's planned feints (Warrior, Miner, Builder vs Normal) the bot answered with a read on that swing",
                 PxLog.F(bait) + " (" + all.Baited + "/" + all.Feints + "); switch off " + PxLog.F(baitOff) + " (" + off.Baited + "/" + off.Feints + ")",
                 ">= 0.15 (Normal step-out chance 0.30; switch off: 0)", bait >= 0.15 && baitOff == 0);
             Assert.IsTrue(ok);

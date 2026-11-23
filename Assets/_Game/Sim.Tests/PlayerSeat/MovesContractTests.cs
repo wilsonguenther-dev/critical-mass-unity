@@ -90,7 +90,7 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
         /// <summary>The FullMoves golden (SPEC.md rule 0.2): Full rules plus every switch on. Pinned by the combine once, after the
         /// 72-seed balance run (integration/class-moves-cand1): a moved pin means class-moves behaviour changed; re-pin only with
         /// the reason in the commit.</summary>
-        public const ulong FullMoves16v16Seed1 = 0x995EA6937985F040, FullMoves5v5Seed42 = 0x490669BBFA2488E7;   // round combine 2026-11-23: lunge stop 0.6 x reach + no body shove + arm within 0.8 x reach, bot guard/parry difficulty + clock caps (fix/mv-lunge-stop), combo reach + ChainDebt (fix/mv-combo-reach); was 0x80E1D63B4685EA5D/0x7C68E107EF10057C
+        public const ulong FullMoves16v16Seed1 = 0x7E2E255FC9CAACA4, FullMoves5v5Seed42 = 0xCDECE0EF9E4D1902;   // round 3 2026-11-23 (fix/mv-round3-defence): every LUNGE re-decided at the swing + rooted unless the stick points at the target, person swing snap, bot step-out cap (Easy, Normal first 60 s); was 0x995EA6937985F040/0x490669BBFA2488E7
 
         [Test]
         public void TheFullMovesGoldenIsReported()
