@@ -485,6 +485,9 @@ namespace CriticalMass.Runtime.Menus
             string s;
             if (Mode == SelectMode.Setup) s = pad ? "A CHOOSE   ·   Y HOW TO PLAY   ·   B BACK   ·   R STICK TURNS" : "ENTER OR CLICK TO CHOOSE   ·   H HOW TO PLAY   ·   ESC BACK   ·   DRAG TO TURN";
             else s = pad ? "D-PAD PICKS   ·   A CONFIRMS" : "1-6 OR CLICK TO PICK";
+            // mv-6 readability-3 item 4: on the death screen the NEXT LIFE line already says "1-6 TO SWITCH"; this bottom row
+            // sat on the view-mode hints and under the slot row, so under the class moves it is not drawn there
+            if (Mode != SelectMode.Setup && CriticalMass.Runtime.Hud.Player.WorldWords.MovesCap) s = string.Empty;
             HudText.Set(_hint, s);
         }
 

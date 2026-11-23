@@ -840,6 +840,92 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
     [TestFixture, Category("PlayerSeat")]
     public sealed class MovesGuardFixTests
     {
+        /// <summary>round 3 (fix/mv-combo-reach-2's chain hold: the victim of a person's open chain cannot start a swing): two
+        /// about-0.2 s humans of the same class (lag 6 vs 5-7 ticks, the second holding fire 0-3 ticks), 16 angles each, every switch on vs every switch off. Reported: the share of decided
+        /// duels the first to land a melee hit went on to win (a chain that always converts the first hit would read 1.00).
+        /// Printed, not asserted.</summary>
+        [Test]
+        public void PersonVsPerson_FirstHitWinShare()
+        {
+            foreach (ClassId me in MvDefenceRig.All)
+            {
+                var parts = new List<string>();
+                foreach (bool on in new[] { true, false })
+                {
+                    int decided = 0, firstWon = 0, timeouts = 0;
+                    for (int k = 0; k < 16; k++)
+                    {
+                        Seat s = PlayerSeatRig.Duel(me, me, TargetMode.HumanVsHuman, PlayerSeatRig.AngleOf(k, 16), k, 6, tweak: on ? MvCombine.AllOn : null);
+                        s.Human2.LagTicks = 5 + k % 3;   // about 0.2 s, varied with the hold so the mirror duel is not a same-tick trade
+                        s.Human2.HoldFireTicks = k % 4;
+                        s.NoTnt = true;
+                        DuelResult r = PlayerSeatRig.Play(s, 30);
+                        var first = s.Spy.Of(SimEventType.Hit, e => e.Cause == DamageCause.Melee && (e.A == s.Me && e.B == s.Them || e.A == s.Them && e.B == s.Me));
+                        if (r.Timeout || !(r.Won || r.Lost) || first.Count == 0) { timeouts++; continue; }
+                        decided++;
+                        bool iHitFirst = first[0].B == s.Me;
+                        if (iHitFirst == r.Won) firstWon++;
+                    }
+                    parts.Add((on ? "on " : "off ") + firstWon + "/" + decided + " (" + PxLog.F(decided > 0 ? (double)firstWon / decided : 0) + ")" + (timeouts > 0 ? ", undecided " + timeouts : ""));
+                }
+                PxLog.Line("mvg-pvp", me + " vs " + me + ", two ~0.2 s humans (lag 6 vs 5-7, hold 0-3), 16 angles", "first hitter won: " + string.Join("; ", parts), "report", true);
+            }
+        }
+
+        /// <summary>round 3 (pass 3: a click-only new player on a Normal bot trades once, then whiffs as the bot steps back): a
+        /// STATIONARY click-only human (walks up only while the bot's body edge is more than his reach + 0.6 away, never during a swing, then stands; aims at
+        /// the bot; clicks when its body edge is within his reach + 0.6; clicks when it is within his reach + 0.2 and the swing is
+        /// ready) against a Normal Farmer bot from the match start, every switch on, his first 10 swings, 3 seeds. Land rate
+        /// >= 0.6 per class.</summary>
+        [Test]
+        public void AStationaryClickOnlyNewPlayerLandsOnANormalBot()
+        {
+            var bad = new List<string>();
+            foreach (ClassId me in MvDefenceRig.All)
+            {
+                int swings = 0, landed = 0, steps = 0, guards = 0;
+                for (int rep = 0; rep < 3; rep++)
+                {
+                    Seat s = PlayerSeatRig.Duel(me, ClassId.Farmer, TargetMode.RealBot, 0, rep, tweak: MvCombine.AllOn);
+                    s.Human.Fight = false;
+                    s.NoTnt = true;
+                    World w = s.W;
+                    double reach = w.Config.Class(me).AttackRange;
+                    bool held = false;
+                    int presses = 0, ticks = 0, ready = 0;
+                    double minGap = 99;
+                    s.BeforeTick = q =>
+                    {
+                        ticks++;
+                        minGap = Math.Min(minGap, MvDefenceWatch.Dist(w, q.Me, q.Them));
+                        if (Combat.AttackReady(w, q.Me)) ready++;
+                        w.Actors[q.Me].Hp = w.Actors[q.Me].MaxHp;
+                        if (w.Actors[q.Them].Alive) w.Actors[q.Them].Hp = w.Actors[q.Them].MaxHp;   // never low: a low bot retreats
+                        q.Human.AimOverrideX = w.X[q.Them]; q.Human.AimOverrideZ = w.Z[q.Them];
+                        // he walks up to the fight only while the bot's body edge is more than his reach + 0.6 away (never through a
+                        // swing); inside that he stands and clicks
+                        double gd = MvDefenceWatch.Dist(w, q.Me, q.Them);
+                        bool walk = gd - w.Config.Class(w.Actors[q.Them].Cls).Radius > reach + 0.6 && !w.Actors[q.Me].SwingPending;
+                        q.Human.MoveOverrideX = walk ? (w.X[q.Them] - w.X[q.Me]) / gd : 0; q.Human.MoveOverrideZ = walk ? (w.Z[q.Them] - w.Z[q.Me]) / gd : 0;
+                        if (held) { held = false; return; }
+                        // he clicks when the bot looks close: its body edge within his reach + 0.6
+                        if (w.Actors[q.Them].Alive && gd - w.Config.Class(w.Actors[q.Them].Cls).Radius <= reach + 0.6 && Combat.AttackReady(w, q.Me)) { q.Human.PressAttack = true; held = true; presses++; }
+                    };
+                    s.Steps(30 * 25);   // one run (the spy keeps one Steps call's events); the first 10 swings are read below
+                    var starts = s.Spy.Of(SimEventType.AttackStart, e => e.A == s.Me && e.B == Combat.KindAttack);
+                    var contacts = s.Spy.Of(SimEventType.AttackContact, e => e.A == s.Me);
+                    int n = Math.Min(10, starts.Count);
+                    swings += n;
+                    for (int k = 0; k < Math.Min(n, contacts.Count); k++) if (contacts[k].Value > 0) landed++;
+                    MovesHooks.BotsCounts(w, s.Them, out int st, out int gu);
+                    steps += st; guards += gu;
+                }
+                double rate = swings > 0 ? (double)landed / swings : 0;
+                if (!PxLog.Line("mvg-click", me + " stationary click-only vs a Normal Farmer bot, first 10 swings x 3 seeds, every switch on", landed + " of " + swings + " landed (" + PxLog.F(rate) + "); bot step-outs " + steps + ", guards " + guards, ">= 0.6", rate >= 0.6)) bad.Add(me + " " + PxLog.F(rate));
+            }
+            Assert.IsEmpty(bad, "click-only land rate: " + string.Join(", ", bad));
+        }
+
         /// <summary>Human attacker me (lag 0, fights) vs a passive dummy defender that parries ("tap": a 2-tick press ending the tick
         /// before contact) or holds its guard ("hold") on every swing. Returns ComboStep events of me whose previous contact was
         /// parried or blocked, the step events in all, and the parries / blocks seen.</summary>
@@ -965,68 +1051,74 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
             Assert.IsEmpty(fails, string.Join(", ", fails));
         }
 
-        /// <summary>fix/mv-lunge-stop: the lunge stop, measured. A dodge-in at a Farmer 3.4 u away, the attack buffered in the dash,
-        /// the stick and the aim 0 or 30 degrees off the target (third person: both follow the lagging camera), the target
-        /// standing or walking straight away at its base speed. At the swing's contact the gap to the target's BODY EDGE is at
-        /// most 0.8 x the swing's reach, and the swing lands. Before: the gap was 0.85 x reach at the dash's end (the Miner
-        /// 1.61 u centre to centre in the sim, 1.68 u in the engine, where it whiffed).</summary>
+        /// <summary>fix/mv-lunge-stop + round 3: the lunge stop, measured. A dodge-in at a Farmer 3.0 / 3.4 / 3.6 u away, the attack
+        /// buffered in the dash, the stick and the aim 0 or 30 degrees off the target. Target standing (stick held, let go after
+        /// the dodge, or turned 90 degrees away after the dodge: pass 3's third-person Builder, whose camera-relative forward
+        /// swung with the combat camera through the wind-up), stepping away from the press, or already walking away at its base
+        /// speed (stick held, or let go at the press). A lunge that arms (the LUNGE event) LANDS, with the gap to the target's
+        /// body edge at contact at most 0.8 x the swing's reach; against a standing target it always arms; against a runner it
+        /// may not arm (a plain dodge, no LUNGE word).</summary>
         [Test]
         public void EveryLungeStopsWellInsideItsReachAndLands()
         {
             var fails = new List<string>();
+            int armed = 0, cells = 0;
+            double worst = 0;
+            string[] modes = { "standing", "standing, stick let go after the dodge", "standing, stick turned 90 deg after the dodge",
+                "stepping away", "stepping away, stick let go at the press", "walking away", "walking away, stick let go at the press" };
             foreach (ClassId me in MvDefenceRig.All)
-                foreach (string mode in new[] { "standing", "standing, stick let go after the dodge", "walking away", "walking away, stick let go after the dodge", "walking away out of range, stick let go" })
-                    foreach (double off in new[] { 0.0, 30.0 })
-                    {
-                        bool walking = mode.StartsWith("walking"), letGo = mode.Contains("let go"), far = mode.Contains("out of range");
-                        // walking: the target is at its base speed when the dodge starts (20 ticks of walking away, the player chasing)
-                        int dodgeIn = walking ? 20 : 2;
-                        Seat s = PlayerSeatRig.Duel(me, ClassId.Farmer, TargetMode.Passive, 0, 0, 0, distance: far ? 3.2 : walking ? 2.0 : 3.4, tweak: MvCombine.AllOn);
-                        s.Human.Fight = false;
-                        s.NoTnt = true;
-                        World w = s.W;
-                        int t0 = w.Tick;
-                        var gap = new Dictionary<int, double>();
-                        var hx = new Dictionary<int, double>();
-                        var tx = new Dictionary<int, double>();
-                        var tv = new Dictionary<int, double>();
-                        double ax0 = 0, az0 = 0;
-                        s.BeforeTick = q =>
+                foreach (double start in new[] { 3.0, 3.4, 3.6 })
+                    foreach (string mode in modes)
+                        foreach (double off in new[] { 0.0, 30.0 })
                         {
-                            double rd = MvDefenceWatch.Dist(w, q.Me, q.Them);
-                            gap[w.Tick] = rd - w.Config.Class(w.Actors[q.Them].Cls).Radius;
-                            hx[w.Tick] = w.X[q.Me] * ax0 + w.Z[q.Me] * az0;
-                            tx[w.Tick] = w.X[q.Them] * ax0 + w.Z[q.Them] * az0;
-                            tv[w.Tick] = w.Vx[q.Them] * ax0 + w.Vz[q.Them] * az0;
-                            double ux = (w.X[q.Them] - w.X[q.Me]) / rd, uz = (w.Z[q.Them] - w.Z[q.Me]) / rd;
-                            if (w.Tick == t0) { ax0 = ux; az0 = uz; }
-                            double a = off * Math.PI / 180;
-                            double cx = ux * Math.Cos(a) - uz * Math.Sin(a), cz = ux * Math.Sin(a) + uz * Math.Cos(a);
-                            q.Human.AimOverrideX = w.X[q.Me] + 4 * cx; q.Human.AimOverrideZ = w.Z[q.Me] + 4 * cz;
-                            // standing, let go: released after the press; a runner, let go: released AT the press (no chase: the sim
-                            // reads the stick at the press, and a held one means the player follows the dash in)
-                            bool stickOn = !(letGo && w.Tick > t0 + dodgeIn) && !(walking && letGo && w.Tick >= t0 + dodgeIn);
-                            q.Human.MoveOverrideX = stickOn ? cx : 0; q.Human.MoveOverrideZ = stickOn ? cz : 0;
-                            if (walking) { q.Dummy.MoveX = ax0; q.Dummy.MoveZ = az0; }
-                            if (w.Tick == t0 + dodgeIn) q.Human.PressDodge = true;
-                            if (w.Tick >= t0 + dodgeIn + 2 && w.Tick <= t0 + dodgeIn + 4) q.Human.PressAttack = true;
-                        };
-                        s.Steps(dodgeIn + 28);
-                        int lunges = s.Spy.Of(SimEventType.Lunge, e => e.A == s.Me).Count;
-                        var contact = s.Spy.Of(SimEventType.AttackContact, e => e.A == s.Me);
-                        int hits = s.Spy.Of(SimEventType.Hit, e => e.A == s.Them && e.B == s.Me && e.Cause == DamageCause.Melee).Count;
-                        LightWeapon lw = LightWeapons.Of(w, me);
-                        double reach = lw != null ? lw.Range : w.Config.Class(me).AttackRange;
-                        double edge = contact.Count > 0 && gap.TryGetValue(contact[0].Tick, out double g) ? g : double.NaN;
-                        // out of range: the dash cannot end within 0.8 x reach of a runner, so no lunge arms (a plain dodge), or one lands
-                        // a runner with the stick let go may be out of any dash's reach: no lunge then (a plain dodge), never a whiff
-                        bool mayRefuse = walking;
-                        bool ok = mayRefuse && lunges == 0 || lunges == 1 && hits >= 1 && edge <= 0.8 * reach + 1e-9;
-                        PxLog.Line("mvg-lunge", me + " dodge-in, target " + mode + ", stick and aim " + off + " deg off",
-                            "gap at the dodge " + PxLog.F(gap.TryGetValue(t0 + dodgeIn, out double g0) ? g0 : double.NaN) + ", contact +" + (contact.Count > 0 ? (contact[0].Tick - t0 - dodgeIn).ToString() : "-") + " travel " + (contact.Count > 0 && hx.ContainsKey(contact[0].Tick) ? PxLog.F(hx[contact[0].Tick] - hx[t0 + dodgeIn]) + " target " + PxLog.F(tx[contact[0].Tick] - tx[t0 + dodgeIn]) + " (" + PxLog.F(tx[contact[0].Tick - 1] - tx[t0 + dodgeIn]) + " a tick before, gap " + PxLog.F(gap[contact[0].Tick - 1]) + ")" + " v " + PxLog.F(tv[t0 + dodgeIn]) + "/" + PxLog.F(tv[t0 + dodgeIn + 1]) + "/" + PxLog.F(tv[contact[0].Tick]) : "-") + ", lunges " + lunges + ", body-edge gap at contact " + PxLog.F(edge) + " = " + PxLog.F(edge / reach) + " x reach " + PxLog.F(reach) + ", hits " + hits,
-                            mayRefuse ? "no lunge, or one that lands within 0.8 x reach" : "1 lunge, gap <= 0.8 x reach, it lands", ok);
-                        if (!ok) fails.Add(me + " " + mode + " " + off + " (" + PxLog.F(edge / reach) + ")");
-                    }
+                            bool standing = mode.StartsWith("standing"), walking = mode.StartsWith("walking");
+                            bool letGoAfter = mode.Contains("let go after"), letGoAtPress = mode.Contains("let go at"), turned = mode.Contains("turned");
+                            // walking: 20 ticks of walking away first (at base speed by the dodge), the player chasing; the start gap
+                            // is the gap at the press (minus what 20 ticks of the chase close)
+                            int dodgeIn = walking ? 20 : 2;
+                            Seat s = PlayerSeatRig.Duel(me, ClassId.Farmer, TargetMode.Passive, 0, 0, 0, distance: walking ? start - 1.4 : start, tweak: MvCombine.AllOn);
+                            s.Human.Fight = false;
+                            s.NoTnt = true;
+                            World w = s.W;
+                            int t0 = w.Tick;
+                            var gap = new Dictionary<int, double>();
+                            double ax0 = 0, az0 = 0;
+                            s.BeforeTick = q =>
+                            {
+                                double rd = MvDefenceWatch.Dist(w, q.Me, q.Them);
+                                gap[w.Tick] = rd - w.Config.Class(w.Actors[q.Them].Cls).Radius;
+                                double ux = (w.X[q.Them] - w.X[q.Me]) / rd, uz = (w.Z[q.Them] - w.Z[q.Me]) / rd;
+                                if (w.Tick == t0) { ax0 = ux; az0 = uz; }
+                                double a = off * Math.PI / 180;
+                                double cx = ux * Math.Cos(a) - uz * Math.Sin(a), cz = ux * Math.Sin(a) + uz * Math.Cos(a);
+                                q.Human.AimOverrideX = w.X[q.Me] + 4 * cx; q.Human.AimOverrideZ = w.Z[q.Me] + 4 * cz;
+                                bool after = w.Tick > t0 + dodgeIn;
+                                double mx = cx, mz = cz;
+                                if (letGoAfter && after || letGoAtPress && w.Tick >= t0 + dodgeIn) { mx = 0; mz = 0; }
+                                if (turned && after) { mx = -uz; mz = ux; }
+                                q.Human.MoveOverrideX = mx; q.Human.MoveOverrideZ = mz;
+                                if (walking || !standing && w.Tick >= t0 + dodgeIn) { q.Dummy.MoveX = ax0; q.Dummy.MoveZ = az0; }
+                                if (w.Tick == t0 + dodgeIn) q.Human.PressDodge = true;
+                                if (w.Tick >= t0 + dodgeIn + 2 && w.Tick <= t0 + dodgeIn + 4) q.Human.PressAttack = true;
+                            };
+                            s.Steps(dodgeIn + 28);
+                            int lunges = s.Spy.Of(SimEventType.Lunge, e => e.A == s.Me).Count;
+                            var contact = s.Spy.Of(SimEventType.AttackContact, e => e.A == s.Me);
+                            int hits = s.Spy.Of(SimEventType.Hit, e => e.A == s.Them && e.B == s.Me && e.Cause == DamageCause.Melee).Count;
+                            LightWeapon lw = LightWeapons.Of(w, me);
+                            double reach = lw != null ? lw.Range : w.Config.Class(me).AttackRange;
+                            double edge = contact.Count > 0 && gap.TryGetValue(contact[0].Tick - 1, out double g) ? g : double.NaN;
+                            double g0 = gap.TryGetValue(t0 + dodgeIn, out double gp) ? gp : double.NaN;
+                            bool ok = lunges == 0 ? !standing : lunges == 1 && hits >= 1 && edge <= 0.8 * reach + 1e-9;
+                            cells++;
+                            if (lunges == 1) { armed++; if (edge / reach > worst) worst = edge / reach; }
+                            if (!ok || lunges == 1 && edge / reach > 0.7)
+                                PxLog.Line("mvg-lunge", me + " dodge-in from " + PxLog.F(g0) + " u, target " + mode + ", stick and aim " + off + " deg off",
+                                    "lunges " + lunges + ", body-edge gap at contact " + PxLog.F(edge) + " = " + PxLog.F(edge / reach) + " x reach " + PxLog.F(reach) + ", hits " + hits,
+                                    standing ? "1 lunge, gap <= 0.8 x reach, it lands" : "no lunge, or one that lands within 0.8 x reach", ok);
+                            if (!ok) fails.Add(me + " " + start + " " + mode + " " + off + " (lunges " + lunges + ", " + PxLog.F(edge / reach) + ", hits " + hits + ")");
+                        }
+            PxLog.Line("mvg-lunge", "every class, 3.0 / 3.4 / 3.6 u, " + modes.Length + " target and stick modes, 0 / 30 deg", cells + " cells, " + armed + " lunges armed, worst gap at contact " + PxLog.F(worst) + " x reach", "every LUNGE lands within 0.8 x reach", fails.Count == 0);
             Assert.IsEmpty(fails, "lunge stop or whiff: " + string.Join(", ", fails));
         }
     }

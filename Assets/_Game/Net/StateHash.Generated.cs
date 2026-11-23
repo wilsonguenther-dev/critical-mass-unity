@@ -1367,6 +1367,8 @@ namespace CriticalMass.Net
             M(ref h, o.Refunds);
             A(ref h, o.SecondWindUsed);
             M(ref h, o.SecondWinds);
+            A(ref h, o.SnapSwing);
+            A(ref h, o.SnapTarget);
         }
 
         private static void H_MovementMovesState(ref ulong h, global::CriticalMass.Sim.Core.MovementMovesState o)

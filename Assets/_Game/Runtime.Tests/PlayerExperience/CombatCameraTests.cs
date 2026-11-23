@@ -137,7 +137,8 @@ namespace CriticalMass.Runtime.Tests
             Assert.AreEqual(0.0, f.WallKeep, 1e-9, "both sides blocked: no orbit");
             Assert.AreEqual(0.0, f.Shoulder, 0.01, "and no shoulder");
             Assert.That(Math.Abs(GroundCamera.DeltaAngle(110 + f.YawOffset, 100)), Is.LessThan(1.0), "the view eases onto the line itself");
-            Assert.Less(f.PitchOffset, 0, "the closer, lower framing stays");
+            Assert.Greater(f.PitchOffset, 0, "pass 3: the closer-and-higher fallback (no swing, a higher pitch)");
+            Assert.Less(f.Reach, 1.0, "... and nearer");
             i.ClearPlus = 1;
             Run(f, i, 1.0);
             Assert.AreEqual(1, f.Turn, "a side clears: framing moves there");
@@ -159,6 +160,8 @@ namespace CriticalMass.Runtime.Tests
                 own += 1.25;
                 i.OwnYaw = own;
                 f.Step(i);
+                own += f.TakeFold();   // GroundView folds what the framing gives up into his own yaw
+                i.OwnYaw = own;
                 double v = own + f.YawOffset;
                 Assert.AreEqual(1.25, GroundCamera.DeltaAngle(view, v), 1e-9, "frame " + k + ": the view turns exactly as far as he does");
                 view = v;
@@ -269,8 +272,10 @@ namespace CriticalMass.Runtime.Tests
             Run(f, i, 0.6);
             i.ClearPlus = i.ClearMinus = 0;
             i.NoClearFrame = true;
-            Run(f, i, CombatFrame.OutSeconds + 0.05);
-            Assert.AreEqual(0.0, f.K, 1e-9, "scenery hides a fighter from every framing: back to the normal camera");
+            Run(f, i, CombatFrame.OcclusionGraceSeconds - 0.1);
+            Assert.AreEqual(1.0, f.K, 1e-9, "pass 3: brief occlusion of every pose is tolerated");
+            Run(f, i, 0.1 + CombatFrame.OutSeconds + 0.05);
+            Assert.AreEqual(0.0, f.K, 1e-9, "scenery hides a fighter from every framing for longer: back to the normal camera");
         }
 
         // ---------------------------------------------------------------- tags (pass-2: name and bar under the banner)
@@ -284,6 +289,126 @@ namespace CriticalMass.Runtime.Tests
             Assert.AreEqual(top, CombatFrame.TagScreenY(1000, 850, H), 1e-9, "never into the top HUD rows");
             Assert.AreEqual(520, CombatFrame.TagScreenY(520, 510, H), 1e-9, "a tag already close to the head stays where it is");
             Assert.Less(top, H * 0.8, "the clamp clears the resource row (about 22% from the top in the pass-2 strips)");
+        }
+
+        // ---------------------------------------------------------------- pass 3
+
+        [Test]
+        public void OnceFramedItIsStickyWhileAutoFollowDriftsAndTheLadderTriesSmallerSwings()
+        {
+            var f = new CombatFramer();
+            CombatFrameInput i = In(true, 100, 100);
+            Run(f, i, 0.6);
+            i.OwnYaw = 100 + 70;   // auto follow behind a fighter running round the enemy: not his look
+            Run(f, i, 2.0);
+            Assert.IsFalse(f.TurnedAway, "only his own look lets go by turning");
+            Assert.AreEqual(1.0, f.K, 1e-9, "still framed");
+            // the full swing on this side is blocked, the 24 deg one is clear: keep the side at half the swing
+            var g = new CombatFramer();
+            CombatFrameInput j = In(true, 110, 100);
+            j.ClearPlus = 0.3; j.ClearPlusHalf = 1; j.ClearMinus = 0.2; j.ClearMinusHalf = 0.2;
+            Run(g, j, 1.0);
+            Assert.AreEqual(1, g.Turn, "the side with the bigger clear swing");
+            Assert.AreEqual(0.5, g.WallKeep, 1e-9, "24 deg, not nothing");
+            Assert.AreEqual(CombatFrame.PosePitch(0.5) - FollowCamera.ThirdPitch, g.PitchOffset, 0.05);
+            j.ClearPlusHalf = 0.2; j.ClearPlusQuarter = 1;
+            Run(g, j, 1.0);
+            Assert.AreEqual(0.25, g.WallKeep, 1e-9, "then 12 deg");
+            Assert.AreEqual(0.5, CombatFrame.BestSwing(0.1, 0.9, 0.9), 1e-12);
+            Assert.AreEqual(0.0, CombatFrame.BestSwing(0.1, 0.1, 0.1), 1e-12);
+        }
+
+        [Test]
+        public void ReFramingAfterHisLookRotatesTheViewAtMostTenDegreesAndSlowly()
+        {
+            // he looked away and back (manual look): the re-framing may shift the lens but turns the view <= 10 deg
+            var f = new CombatFramer();
+            CombatFrameInput i = In(true, 100, 100);
+            i.Manual = true;
+            double own = 100, view0 = own, maxStep = 0, last = own;
+            for (int k = 0; k < 120; k++)
+            {
+                i.OwnYaw = own;
+                f.Step(i);
+                own += f.TakeFold();
+                double v = own + f.YawOffset;
+                maxStep = Math.Max(maxStep, Math.Abs(GroundCamera.DeltaAngle(last, v)));
+                last = v;
+            }
+            Assert.LessOrEqual(Math.Abs(GroundCamera.DeltaAngle(view0, last)), CombatFrame.RespectYawDeg + 1e-6, "at most 10 deg on its own");
+            Assert.LessOrEqual(maxStep, CombatFrame.RespectYawRate / 60 + 1e-6, "and slowly");
+            Assert.Greater(Math.Abs(f.Shoulder), CombatFrame.ShoulderU, "it frames with a wider lens shift instead");
+        }
+
+        [Test]
+        public void WhenTheFramingLetsGoTheViewNeverUnwindsOnItsOwn()
+        {
+            // pass 3: a 57 deg drag netted +10 because the 48 deg offset unwound. Now the drawn view stays where he left it.
+            var f = new CombatFramer();
+            CombatFrameInput i = In(true, 100, 100);
+            Run(f, i, 1.0);
+            double own = 100 + f.TakeFold();
+            i.Looking = true;
+            for (int k = 0; k < 46; k++) { own += 1.25; i.OwnYaw = own; f.Step(i); own += f.TakeFold(); }   // +57 deg
+            double view = own + f.YawOffset;
+            i.Looking = false;
+            for (int k = 0; k < 120; k++)
+            {
+                i.OwnYaw = own;
+                f.Step(i);
+                own += f.TakeFold();
+                Assert.AreEqual(0, GroundCamera.DeltaAngle(view, own + f.YawOffset), CombatFrame.RespectYawDeg + 1e-6, "frame " + k + ": no swing back");
+            }
+        }
+
+        [Test]
+        public void TheFollowPullsInAtOnceAndLetsOutOnlyAfterTheWayStaysClear()
+        {
+            var g = new GroundFollow();
+            var tree = new[] { new SeeThroughCylinder { X = 0, Z = 2.5, R = 1.0, Y0 = 0, Y1 = 4 } };
+            GroundFollowInput Step(bool blocked) => new GroundFollowInput
+            {
+                Dt = 1.0 / 60, TargetX = 0, TargetZ = 0, GroundY = 0, Rig = FollowCamera.ThirdRig, SlowOut = true,
+                Cylinders = blocked ? tree : null, CylinderCount = blocked ? 1 : 0,
+            };
+            g.SetYaw(0);   // looking north (sim -z): the lens stands south of the pivot, toward +z
+            GroundFollowInput a = Step(false); a.Snap = true; g.Step(a);
+            double open = g.Dist;
+            g.Step(Step(true));
+            Assert.Less(g.Dist, open - 0.5, "a crown behind the lens: in at once");
+            double inside = g.Dist;
+            for (int k = 0; k < 20; k++) g.Step(k % 10 < 5 ? Step(false) : Step(true));   // flickering clear / blocked
+            Assert.AreEqual(inside, g.Dist, 1e-9, "no pumping while the way flickers");
+            for (int k = 0; k < 20; k++) g.Step(Step(false));   // clear for 0.33 s
+            Assert.AreEqual(inside, g.Dist, 1e-9, "not before ClearHoldSeconds");
+            for (int k = 0; k < 10; k++) g.Step(Step(false));
+            Assert.Less(g.Dist, open - 0.3, "then slowly, not in a snap");
+            for (int k = 0; k < 90; k++) g.Step(Step(false));
+            Assert.AreEqual(open, g.Dist, 0.1, "home in about a second");
+        }
+
+        [Test]
+        public void AScreenFillingCrownBetweenTheLensAndThePlayerPullsTheLensPastIt()
+        {
+            // pivot at (0, 2.2, 0); lens 4 u back toward +z; a crown 1 u in front of the lens on the sight line
+            var crown = new[] { new SeeThroughCylinder { X = 0, Z = 2.6, R = 0.9, Y0 = 1.0, Y1 = 3.6 } };
+            double dy = Math.Sin(14 * Math.PI / 180), dz = Math.Cos(14 * Math.PI / 180);
+            double t = GroundCollision.SightLimit(0, 2.2, 0, 0, dy, dz, 4.0, 0, 1.2, 0, 65, 16.0 / 9, crown, 1, out bool blocked, out _);
+            Assert.IsFalse(blocked);
+            Assert.Less(t, 4.0, "pulled in");
+            Assert.IsFalse(GroundCollision.Crosses(0, 2.2 + dy * t, dz * t, 0, 1.2, 0, CombatFrame.SightStopU, crown[0]), "the crown is behind the lens now");
+            Assert.IsTrue(GroundCollision.Crosses(0, 2.2 + dy * 4, dz * 4, 0, 1.2, 0, CombatFrame.SightStopU, crown[0]), "it stood on the sight line");
+            Assert.Greater(GroundCollision.OccluderShare(0, 2.2 + dy * 4, dz * 4, crown[0], 65, 16.0 / 9), GroundFollow.MaxOccluderShare, "and would have filled the screen");
+            Assert.AreEqual(1.0, GroundCollision.OccluderShare(0, 2.0, 2.6, crown[0], 65, 16.0 / 9), 1e-9, "inside it: all of it");
+        }
+
+        [Test]
+        public void MyTagIsPushedClearOfAnotherTag()
+        {
+            const float W = 1920, H = 1080, sw = GroundView.TagSepW * W, sh = GroundView.TagSepH * H, ceil = 810;
+            Assert.AreEqual(600f + sh, GroundView.SeparateY(960, 600, 970, 600, sw, sh, ceil), 1e-3f, "on top of his: pushed above it");
+            Assert.AreEqual(790f - sh, GroundView.SeparateY(960, 790, 960, 790, sw, sh, ceil), 1e-3f, "no room under the HUD rows: below it");
+            Assert.AreEqual(600f, GroundView.SeparateY(960, 600, 960 + sw + 1, 600, sw, sh, ceil), 1e-3f, "apart already: unchanged");
         }
 
         [Test]

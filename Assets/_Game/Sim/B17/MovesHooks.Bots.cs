@@ -204,8 +204,20 @@ namespace CriticalMass.Sim.Core
         /// and never leaves reach, so a feint had nothing to bait (measured: feint value +0 of 40 at 8).</summary>
         static readonly int[] BotsReadLag = { 9, 6, 5 };
 
+        /// <summary>Tests: bot id's step-outs and guards so far (0 when the moves are off).</summary>
+        public static void BotsCounts(World w, int id, out int stepOuts, out int guards)
+        {
+            stepOuts = guards = 0;
+            if (w.Moves == null || w.Moves.Bots == null || id < 0 || id >= w.Moves.Bots.StepOuts.Length) return;
+            stepOuts = w.Moves.Bots.StepOuts[id];
+            guards = w.Moves.Bots.Guards[id];
+        }
+
         /// <summary>fix/mv-lunge-stop: an Easy bot guards at most one read swing in this many.</summary>
         const int BotsEasyGuardEvery = 10;
+
+        /// <summary>round 3: Easy always, and Normal in its first minute, step out of at most one read swing in this many.</summary>
+        const int BotsStepOutEvery = 4;
 
         /// <summary>fix/mv-lunge-stop: a Normal bot never parries before this much match clock (s).</summary>
         const double BotsNormalParryFromSeconds = 60;
@@ -265,15 +277,19 @@ namespace CriticalMass.Sim.Core
                 // parries and guards at most one read swing in BotsEasyGuardEvery; Normal never parries before
                 // BotsNormalParryFromSeconds of match clock and guards at most one read swing in three (never the first two).
                 // Hard as before. Reads counts this read already.
+                // round 3 (pass 3: a Normal bot kiting a click-only beginner): Easy always, and Normal before
+                // BotsNormalParryFromSeconds, step out of at most one read swing in BotsStepOutEvery
                 if (d == 0)
                 {
                     pParry = 0;
                     if (BotsEasyGuardEvery * (b.Guards[id] + 1) > b.Reads[id]) pGuard = 0;
+                    if (BotsStepOutEvery * (b.StepOuts[id] + 1) > b.Reads[id]) pStep = 0;
                 }
                 else if (d == 1)
                 {
                     if (w.Match.Time < BotsNormalParryFromSeconds) pParry = 0;
                     if (3 * (b.Guards[id] + 1) > b.Reads[id]) pGuard = 0;
+                    if (w.Match.Time < BotsNormalParryFromSeconds && BotsStepOutEvery * (b.StepOuts[id] + 1) > b.Reads[id]) pStep = 0;
                 }
                 int window = m.ParryWindowTicks != null && (int)me.Cls < m.ParryWindowTicks.Length ? m.ParryWindowTicks[(int)me.Cls] : 3;
                 int parryAt = contact - (window + 1) / 2;

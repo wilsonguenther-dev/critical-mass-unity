@@ -1061,6 +1061,9 @@ namespace CriticalMass.Runtime.Audio.Sound
         public static bool YieldsToBanner(string family, bool bannerOwnsHillNews) =>
             bannerOwnsHillNews && string.Equals(family, HillFamily, StringComparison.Ordinal);
 
+        /// <summary>mv-6 readability-3 item 5: the banner's line holds the caption back (class moves only).</summary>
+        static bool BannerHolds() => CriticalMass.Runtime.Hud.Player.WorldWords.MovesCap && Announcer.SubtitlesEnabled && Announcer.IsSpeaking;
+
         /// <summary>Below this the fading pill is snapped to fully clear (no faint outline left on screen).</summary>
         public const float GhostAlpha = 0.04f;
 
@@ -1080,6 +1083,15 @@ namespace CriticalMass.Runtime.Audio.Sound
             // review fix round 2 (one message at a time, nothing over the fight): the autopilot captions drop during a fight
             // (the autopilot plate tells it)
             if (CriticalMass.Runtime.Hud.Player.PxFight.Active && _family[cue] == "autopilot") return;
+            // mv-6 readability-3 item 5: under the class moves ONE bottom-centre line at a time: while the announcer's banner
+            // line is up the caption waits (newest waiting wins, one queued) and shows when the banner is done
+            if (BannerHolds())
+            {
+                if (now - _last[cue] < RepeatGap) return;
+                _last[cue] = now;
+                _pendCue = cue; _pendPan = pan; _pendRaised = raised;
+                return;
+            }
             bool up = _until[0] > now && _cue[0] >= 0;
             bool sameFamily = up && _cue[0] != cue && _family[_cue[0]] == _family[cue];
             if (!sameFamily && now - _last[cue] < RepeatGap) return;
@@ -1116,7 +1128,9 @@ namespace CriticalMass.Runtime.Audio.Sound
                 if (_pendCue >= 0 && YieldsToBanner(_family[_pendCue], true)) { _pendCue = -1; _pendRaised = null; }
                 if (_cue[0] >= 0 && _until[0] > now && YieldsToBanner(_family[_cue[0]], true)) { _until[0] = now; _cue[0] = -1; }
             }
-            if (_pendCue >= 0 && (_until[0] <= now || now - _start[0] >= MinShow))
+            bool holds = BannerHolds();   // mv-6 readability-3 item 5
+            if (holds && _cue[0] >= 0 && _until[0] > now) { _until[0] = now; _cue[0] = -1; }   // cut at once, no ghost under the banner
+            if (!holds && _pendCue >= 0 && (_until[0] <= now || now - _start[0] >= MinShow))
             {
                 int c = _pendCue;
                 _pendCue = -1;
