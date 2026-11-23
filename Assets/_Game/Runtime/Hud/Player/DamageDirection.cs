@@ -129,6 +129,8 @@ namespace CriticalMass.Runtime.Hud.Player
             bool haveMe = me >= 0 && me < w.ActorCount;
             Vector3 mePos = haveMe ? PxProject.Actor(w, me, alpha, 1.0f) : Vector3.zero;
             Vector2 centre = new Vector2(cam.pixelWidth * 0.5f, cam.pixelHeight * 0.5f) / scale;
+            // fix/px-rough-spots (item 7): third person, the ring goes round the drawn reticle, wherever the framing put it
+            if (third) centre = HitMarker.ReticleAt(w, cam, scale, centre);
             if (!third && haveMe && PxProject.Screen(cam, mePos, 400f, out Vector2 mp)) centre = mp / scale;
             for (int i = 0; i < Arcs; i++)
             {

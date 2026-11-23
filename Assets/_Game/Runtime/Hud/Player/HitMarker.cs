@@ -123,11 +123,24 @@ namespace CriticalMass.Runtime.Hud.Player
             _hitShown = _lockShown = -1;
         }
 
+        /// <summary>fix/px-rough-spots: the third-person reticle as drawn by GroundView (GUI pixels, y down) in this HUD's units
+        /// (pixels / scale, y up); the fallback when there is no ground view.</summary>
+        public static Vector2 ReticleAt(World w, UnityEngine.Camera cam, float scale, Vector2 fallback)
+        {
+            var g = CriticalMass.Runtime.Camera.GroundView.Current;
+            if (g == null || !CriticalMass.Runtime.Camera.GroundView.PlayActive || cam == null || scale <= 0f) return fallback;
+            Vector2 r = g.ReticleGui(w);
+            return new Vector2(r.x, cam.pixelHeight - r.y) / scale;
+        }
+
         public void Tick(World w, int me, double alpha, UnityEngine.Camera cam, float scale, float dt)
         {
             bool third = PxProject.ThirdPerson;
             bool calm = CriticalMass.Runtime.Menu.GameSettings.ReduceMotion;
             Vector2 centre = new Vector2(cam.pixelWidth * 0.5f, cam.pixelHeight * 0.5f) / scale;
+            // fix/px-rough-spots (item 7): third person, the marker sits on the drawn reticle (it leaves the screen centre while a
+            // fight is framed), not on the middle of the screen
+            if (third) centre = ReticleAt(w, cam, scale, centre);
             if (_rt.gameObject.activeSelf)
             {
                 _age += dt;
