@@ -481,7 +481,7 @@ namespace CriticalMass.Runtime.Camera
         /// ground RobustFloor under it (the HUD planes at 0.4-0.6 m never meet geometry); never steeper than RobustMaxSteep
         /// (deg) looking at the chest; the chest stays RobustFrameMargin (deg) inside the frame.</summary>
         /// <summary>The boom length the wall rise tries to give back (u).</summary>
-        public const double RobustGood = 2.8;
+        public const double RobustGood = 2.8, RobustRiseBelow = 2.0;
         public const double RobustMin = 1.6, RobustRadius = 0.6, RobustFloor = 0.7, RobustMaxSteep = 55, RobustFrameMargin = 5;
         /// <summary>The fighter for the frame rule: the sight point (chest) is RobustChestUp over his feet, he is RobustBodyTall.</summary>
         public const double RobustChestUp = 1.2, RobustBodyTall = 2.1;
@@ -559,7 +559,7 @@ namespace CriticalMass.Runtime.Camera
             double good = Math.Min(want, RobustGood);
             double baseBoom = BoomAt(f, ox, oy, oz, ux, uz, basePitch, want);
             double riseWant = 0;
-            if (baseBoom < good)
+            if (baseBoom < Math.Min(want, RobustRiseBelow))   // a slightly short boom just shortens (no steep lens for 0.5 u)
             {
                 double bestD = baseBoom;
                 for (double b = 5; b <= 60; b += 5)
@@ -567,7 +567,7 @@ namespace CriticalMass.Runtime.Camera
                     double d = BoomAt(f, ox, oy, oz, ux, uz, basePitch + b, want);
                     if (SteepAt(f, ox, oy, oz, ux, uz, basePitch + b, Math.Max(RobustMin, d)) > RobustMaxSteep) break;
                     if (d >= good) { riseWant = b; break; }
-                    if (d > bestD + 0.25) { riseWant = b; bestD = d; }
+                    if (d > bestD + 0.4) { riseWant = b; bestD = d; }
                 }
             }
             if (snap || dt <= 0) { _rise = snap ? riseWant : _rise; _riseClear = 0; }
