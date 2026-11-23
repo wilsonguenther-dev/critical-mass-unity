@@ -496,6 +496,10 @@ namespace CriticalMass.Runtime.View.Anim
 
         double _actStart;
         float _mvGuardW, _mvChargeW, _mvChargeShare, _mvGlideW;   // class moves lane 6: guard, charge and glide pose weights
+        /// <summary>Class moves lane 6 (tests, reviewer): the drawn guard / charge / glide pose weights this frame.</summary>
+        public float MovesGuardWeight => _mvGuardW;
+        public float MovesChargeWeight => _mvChargeW;
+        public float MovesGlideWeight => _mvGlideW;
 
         // ------------------------------------------------------------------ ground: locomotion, heavy hits, gather, idle
 
