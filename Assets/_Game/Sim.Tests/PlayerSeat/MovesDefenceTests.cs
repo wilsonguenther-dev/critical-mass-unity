@@ -840,6 +840,38 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
     [TestFixture, Category("PlayerSeat")]
     public sealed class MovesGuardFixTests
     {
+        /// <summary>round 3 (fix/mv-combo-reach-2's chain hold: the victim of a person's open chain cannot start a swing): two
+        /// about-0.2 s humans of the same class (lag 6 vs 5-7 ticks, the second holding fire 0-3 ticks), 16 angles each, every switch on vs every switch off. Reported: the share of decided
+        /// duels the first to land a melee hit went on to win (a chain that always converts the first hit would read 1.00).
+        /// Printed, not asserted.</summary>
+        [Test]
+        public void PersonVsPerson_FirstHitWinShare()
+        {
+            foreach (ClassId me in MvDefenceRig.All)
+            {
+                var parts = new List<string>();
+                foreach (bool on in new[] { true, false })
+                {
+                    int decided = 0, firstWon = 0, timeouts = 0;
+                    for (int k = 0; k < 16; k++)
+                    {
+                        Seat s = PlayerSeatRig.Duel(me, me, TargetMode.HumanVsHuman, PlayerSeatRig.AngleOf(k, 16), k, 6, tweak: on ? MvCombine.AllOn : null);
+                        s.Human2.LagTicks = 5 + k % 3;   // about 0.2 s, varied with the hold so the mirror duel is not a same-tick trade
+                        s.Human2.HoldFireTicks = k % 4;
+                        s.NoTnt = true;
+                        DuelResult r = PlayerSeatRig.Play(s, 30);
+                        var first = s.Spy.Of(SimEventType.Hit, e => e.Cause == DamageCause.Melee && (e.A == s.Me && e.B == s.Them || e.A == s.Them && e.B == s.Me));
+                        if (r.Timeout || !(r.Won || r.Lost) || first.Count == 0) { timeouts++; continue; }
+                        decided++;
+                        bool iHitFirst = first[0].B == s.Me;
+                        if (iHitFirst == r.Won) firstWon++;
+                    }
+                    parts.Add((on ? "on " : "off ") + firstWon + "/" + decided + " (" + PxLog.F(decided > 0 ? (double)firstWon / decided : 0) + ")" + (timeouts > 0 ? ", undecided " + timeouts : ""));
+                }
+                PxLog.Line("mvg-pvp", me + " vs " + me + ", two ~0.2 s humans (lag 6 vs 5-7, hold 0-3), 16 angles", "first hitter won: " + string.Join("; ", parts), "report", true);
+            }
+        }
+
         /// <summary>round 3 (pass 3: a click-only new player on a Normal bot trades once, then whiffs as the bot steps back): a
         /// STATIONARY click-only human (walks up only while the bot's body edge is more than his reach + 0.6 away, never during a swing, then stands; aims at
         /// the bot; clicks when its body edge is within his reach + 0.6; clicks when it is within his reach + 0.2 and the swing is
