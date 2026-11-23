@@ -855,6 +855,10 @@ namespace CriticalMass.Runtime.View.Affordance
             p.Button = "Interact";
             p.Hold = true;
             p.Count = a.CarryAmount + a.CarryMeat;
+            // class moves lane 6 (review item 4): Count here is what the fighter already CARRIES (food / wood / water / meat), so
+            // "HOLD E  CHOP WOOD (0)" meant "you carry nothing yet". Under the class moves a zero load is not shown
+            // ("HOLD E  CHOP WOOD"); the count shows once there is a load. Every switch off keeps today's text.
+            if (p.Count <= 0 && w.Moves != null) p.Count = -1;   // mv-6
             bool atShrine = D2(ox, oz, sh.X, sh.Z) <= shr * shr;
             int ni = SimResources.GatherNode(w, id);
             int si = src != null ? Sources.SourceInReach(w, id) : -1;
