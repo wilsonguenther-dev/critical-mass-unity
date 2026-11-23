@@ -73,6 +73,8 @@ namespace CriticalMass.Runtime.Camera
         public static CombatFramer Framer => Current != null ? Current._combat : null;
         /// <summary>The yaw the swing and the move keys use while playing (the player's own; the drawn camera may be turned
         /// by the combat framing).</summary>
+        /// <summary>fix/px-combat-camera-3: the third-person lens distance from the pivot this frame (0 when not playing low).</summary>
+        public static double LensDistance => Current != null && PlayActive ? Current._follow.Dist : 0;
         public static double AimYaw => Current != null ? Current._ownYaw : 315;
         /// <summary>Lane C's old pivot lift constant (kept for its tests; no longer applied).</summary>
         public const double FightLift = 0.15;
@@ -132,6 +134,14 @@ namespace CriticalMass.Runtime.Camera
         readonly SeeThroughCylinder[] _scenery = new SeeThroughCylinder[MaxScenery];
         readonly SeeThroughCylinder[] _scn = new SeeThroughCylinder[MaxNearScenery];
         int _sceneryCount, _scnCount;
+        // fix/px-combat-camera-3: the plain follow's own real-size scenery set (crowns, groves, rocks, buildings, Kaiju)
+        readonly SeeThroughCylinder[] _fol = new SeeThroughCylinder[MaxNearScenery];
+        int _folCount;
+        // fix/px-combat-camera-3: the let-go assist (shoulder to the enemy's side, a little more pitch) and its side
+        double _assist;
+        int _assistSide = 1;
+        bool _sightWide;
+        double _sightR;
         static readonly Dictionary<string, Vector3[]> PieceBoxes = new Dictionary<string, Vector3[]>();
         GroundViewMode _lastMode;
         int _lastTarget = int.MinValue;
@@ -349,6 +359,7 @@ namespace CriticalMass.Runtime.Camera
                 facing = w.Actors[target].Facing;
             }
             double gy = GroundHeight.At(map, tx, tz);
+            double tx0 = tx, tz0 = tz, gy0 = gy;   // the followed body itself (the sight line's end)
 
             // Orbit / look input.
             ReadLook(paused, dt, out double orbitYaw, out double orbitPitch);
@@ -376,6 +387,9 @@ namespace CriticalMass.Runtime.Camera
             }
 
             GatherCylinders(w, tx, tz, target);
+            // fix/px-combat-camera-3 (pass 3: the plain follow parked inside tree crowns): it collides with the same
+            // real-size scenery as the framing (this frame's set around the look point), playing or watching.
+            _folCount = GatherScenery(w, tx, tz, 0, _fol, target);
             var f = new GroundFollowInput
             {
                 Dt = paused ? 0 : dt,
@@ -391,11 +405,20 @@ namespace CriticalMass.Runtime.Camera
                 OrbitPitch = orbitPitch,
                 Snap = snap,
                 Map = map,
-                // fix/px-combat-camera-2: while framed, scenery pulls the lens in exactly like a wall
-                Cylinders = _combat.K > 0 ? _scn : _cyl,
-                CylinderCount = _combat.K > 0 ? _scnCount : _cylCount,
+                // fix/px-combat-camera-3: scenery pulls the lens in exactly like a wall, framed or not
+                Cylinders = _fol,
+                CylinderCount = _folCount,
+                SlowOut = Mode == GroundViewMode.Play,
+                SightOn = Mode == GroundViewMode.Play && target >= 0,
+                SightX = tx0,
+                SightY = gy0 + 1.2,
+                SightZ = tz0,
+                VFovDeg = _cam != null ? _cam.fieldOfView : FollowCamera.FovDefault,
+                Aspect = _cam != null ? _cam.aspect : 16.0 / 9.0,
             };
             _follow.Step(f);
+            _sightWide = _follow.SightBlocked;
+            _sightR = _follow.SightR;
             if (Mode != GroundViewMode.Play) _inputYaw = _follow.Yaw;
             ApplyCamera();
 
@@ -423,11 +446,12 @@ namespace CriticalMass.Runtime.Camera
         void StepCombat(World w, int me, GroundRig rig, double dt, bool snap, double leadX, double leadZ,
                         ref double tx, ref double tz, ref double gy, ref double lift, ref double extra, ref double shoulder)
         {
-            bool enabled = !rig.FirstPerson && (GameSettings.CombatCameraOverride ?? _combatOn) && !CriticalMass.Runtime.View.Effects.FeelGate.ReduceMotion;
-            double strength = GameSettings.CombatCameraStrengthOverride ?? _combatStrength;
+            // fix/px-combat-camera-3 (pass 3: switching it off took ~0.6 s to start): the setting is read every frame
+            bool enabled = !rig.FirstPerson && GameSettings.CombatCamera && !CriticalMass.Runtime.View.Effects.FeelGate.ReduceMotion;
+            double strength = GameSettings.CombatCameraStrength;
             double a = Driver.Alpha;
             double mx = w.PrevX[me] + (w.X[me] - w.PrevX[me]) * a, mz = w.PrevZ[me] + (w.Z[me] - w.PrevZ[me]) * a;
-            int t = enabled ? CombatTarget(w, me, _lastFramed) : -1;
+            int t = enabled ? CombatTarget(w, me, _lastFramed, _combat.Active || _combat.Weight > 0) : -1;
             bool alive = false;
             if (t >= 0) _lastFramed = t;
             if (_lastFramed >= 0 && _lastFramed < w.ActorCount && w.Actors[_lastFramed].Alive)
@@ -440,7 +464,7 @@ namespace CriticalMass.Runtime.Camera
             bool haveLine = _lastFramed >= 0;
             double ex = _lastFramedX, ez = _lastFramedZ;
             double lineYaw = haveLine ? GroundCamera.YawToward(mx, mz, ex, ez, _ownYaw) : _ownYaw;
-            double clearPlus = 1, clearMinus = 1, clearNone = 1;
+            double clearPlus = 1, clearMinus = 1, clearNone = 1, plusHalf = 0, minusHalf = 0, plusQuarter = 0, minusQuarter = 0;
             if (enabled && haveLine)
             {
                 // fix/px-combat-camera-2: this frame's scenery around BOTH fighters (it was last frame's trunk-only set
@@ -449,11 +473,17 @@ namespace CriticalMass.Runtime.Camera
                 double fx = mx + CombatFrame.FocusShare * k1 * (ex - mx), fz = mz + CombatFrame.FocusShare * k1 * (ez - mz);
                 double gyM = GroundHeight.At(w.Map, mx, mz), gyE = GroundHeight.At(w.Map, ex, ez);
                 double fy = gyM + (gyE - gyM) * CombatFrame.FocusShare * k1 + FollowCamera.ThirdPivotHeight + (CombatFrame.FocusHeight - FollowCamera.ThirdPivotHeight) * k1;
-                GatherScenery(w, me, fx, fz, Math.Sqrt((ex - mx) * (ex - mx) + (ez - mz) * (ez - mz)));
+                _scnCount = GatherScenery(w, fx, fz, Math.Sqrt((ex - mx) * (ex - mx) + (ez - mz) * (ez - mz)), _scn);
                 double fit = CombatFrame.FovFit(_fov), myC = gyM + CombatFrame.ChestHeight, eyC = gyE + CombatFrame.ChestHeight;
-                clearPlus = CombatFrame.SideClear(w.Map, fx, fy, fz, lineYaw, 1, k1, fit, mx, myC, mz, ex, eyC, ez, _scn, _scnCount, out _, out _, out _);
-                clearMinus = CombatFrame.SideClear(w.Map, fx, fy, fz, lineYaw, -1, k1, fit, mx, myC, mz, ex, eyC, ez, _scn, _scnCount, out _, out _, out _);
-                clearNone = CombatFrame.SideClear(w.Map, fx, fy, fz, lineYaw, 0, k1, fit, mx, myC, mz, ex, eyC, ez, _scn, _scnCount, out _, out _, out _);
+                // fix/px-combat-camera-3: the ladder: each side at 48, 24 and 12 deg (the smaller swings only when needed),
+                // then the closer-and-higher fallback
+                double Clear(int turn, double swing) => CombatFrame.SideClear(w.Map, fx, fy, fz, lineYaw, turn, swing, k1, fit, mx, myC, mz, ex, eyC, ez, _scn, _scnCount, out _, out _, out _);
+                clearPlus = Clear(1, 1);
+                clearMinus = Clear(-1, 1);
+                if (clearPlus < CombatFrame.WallShare) { plusHalf = Clear(1, 0.5); if (plusHalf < CombatFrame.WallShare) plusQuarter = Clear(1, 0.25); }
+                if (clearMinus < CombatFrame.WallShare) { minusHalf = Clear(-1, 0.5); if (minusHalf < CombatFrame.WallShare) minusQuarter = Clear(-1, 0.25); }
+                bool anySwing = Math.Max(clearPlus, Math.Max(clearMinus, Math.Max(plusHalf, Math.Max(minusHalf, Math.Max(plusQuarter, minusQuarter))))) >= CombatFrame.WallShare;
+                clearNone = anySwing ? 1 : Clear(0, 0);
             }
             else if (_combat.K <= 0) _scnCount = 0;
             // fix/px-combat-camera-2: looking around = his look input lately (mouse look) or his own yaw turning fast (auto)
@@ -473,9 +503,23 @@ namespace CriticalMass.Runtime.Camera
                 Looking = looking,
                 ClearPlus = clearPlus,
                 ClearMinus = clearMinus,
-                NoClearFrame = clearPlus < CombatFrame.WallShare && clearMinus < CombatFrame.WallShare && clearNone < CombatFrame.WallShare,
+                ClearPlusHalf = plusHalf,
+                ClearMinusHalf = minusHalf,
+                ClearPlusQuarter = plusQuarter,
+                ClearMinusQuarter = minusQuarter,
+                Manual = _manual,
+                NoClearFrame = clearNone < CombatFrame.WallShare,
             };
             _combat.Step(input);
+            // fix/px-combat-camera-3 (pass 3: after a drag the view swung back 45 deg): the yaw the framing gives up becomes
+            // his own, so the drawn view never unwinds on its own and the aim stays on screen centre
+            double fold = _combat.TakeFold();
+            if (fold != 0)
+            {
+                _yawFollow.Reset(_yawFollow.Yaw + fold);
+                _ownYaw = _yawFollow.Yaw;
+                _prevOwnYaw = _ownYaw;
+            }
             _duelTarget = _combat.Active && haveLine ? _lastFramed : -1;
             if (!_combat.Active && _combat.Weight <= 0) _lastFramed = -1;
             double k = _combat.K;
@@ -487,21 +531,70 @@ namespace CriticalMass.Runtime.Camera
                 double gyE = GroundHeight.At(w.Map, ex, ez);
                 gy += (gyE - gy) * share;       // stairs, bridges: the look point sits between the two grounds
                 lift += _combat.Lift;
-                extra += (CombatFrame.Distance * CombatFrame.FovFit(_fov) - rig.Distance) * k;
+                extra += (CombatFrame.Distance * CombatFrame.FovFit(_fov) * _combat.Reach - rig.Distance) * k;
                 shoulder += _combat.Shoulder;
                 _duelChest = SimSpace.ToWorld(ex, gyE + 1.1, ez);
             }
+            // fix/px-combat-camera-3 (pass 3: when the framing let go, the plain camera hid the enemy behind me): with an
+            // enemy near and no framing, a small lens shift to his side and a little more pitch (collision-checked by
+            // GroundFollow's shoulder test)
+            int near = enabled && !_combat.Active && _combat.Weight <= 0.01 ? NearestEnemy(w, me, CombatFrame.KeepRange) : -1;
+            double ag = near >= 0 ? 1 : 0;
+            _assist = snap || dt <= 0 ? (snap ? ag : _assist) : ag > _assist ? Math.Min(ag, _assist + dt / CombatFrame.AssistSeconds) : Math.Max(ag, _assist - dt / CombatFrame.AssistSeconds);
+            double pitchAdd = 0;
+            if (_assist > 0)
+            {
+                if (near >= 0)
+                {
+                    GroundCamera.Basis(_ownYaw, out _, out _, out double rx, out double rz);
+                    double lat = (w.X[near] - mx) * rx + (w.Z[near] - mz) * rz;
+                    if (Math.Abs(lat) > 0.3) _assistSide = lat > 0 ? 1 : -1;
+                }
+                double ak = _assist * _assist * (3 - 2 * _assist);
+                shoulder += _assistSide * CombatFrame.AssistShoulderU * ak;
+                pitchAdd = CombatFrame.AssistPitchDeg * ak;
+            }
             _follow.SetYaw(_ownYaw + _combat.YawOffset);
-            _follow.SetPitch(_ownPitch + _combat.PitchOffset, rig.MinPitch, rig.MaxPitch);
+            _follow.SetPitch(_ownPitch + _combat.PitchOffset + pitchAdd, rig.MinPitch, rig.MaxPitch);
+        }
+
+        /// <summary>fix/px-combat-camera-3: the nearest standing enemy within range (no facing cone), -1 none.</summary>
+        static int NearestEnemy(World w, int me, double range)
+        {
+            if (w == null || me < 0 || me >= w.ActorCount || !w.Actors[me].Alive) return -1;
+            TeamId team = w.Actors[me].Team;
+            int best = -1;
+            double bd = range * range;
+            for (int i = 0; i < w.ActorCount; i++)
+            {
+                if (i == me || !w.Actors[i].Alive || w.Actors[i].Team == team) continue;
+                double dx = w.X[i] - w.X[me], dz = w.Z[i] - w.Z[me], d2 = dx * dx + dz * dz;
+                if (d2 < bd) { bd = d2; best = i; }
+            }
+            return best;
         }
 
         /// <summary>The enemy the combat framing shows (-1 none): see StepCombat. Sticky: the body already framed is kept while
         /// he stays within 1.25 x the range (a crowd's nearest-enemy flicker never swings the camera), unless the player
         /// locks someone else.</summary>
-        static int CombatTarget(World w, int me, int last)
+        static int CombatTarget(World w, int me, int last, bool framed = false)
         {
             if (w == null || me < 0 || me >= w.ActorCount || !w.Actors[me].Alive) return -1;
             Actor a = w.Actors[me];
+            // fix/px-combat-camera-3: once framed it is sticky: the framed body while he stands within KeepRange (unless he
+            // locks someone else), else the nearest enemy within KeepRange, no facing cone
+            if (framed)
+            {
+                int lk = AimAssist.LockTarget;
+                if (lk >= 0 && lk < w.ActorCount && lk != last && w.Actors[lk].Alive && w.Actors[lk].Team != a.Team) { }
+                else if (last >= 0 && last < w.ActorCount && w.Actors[last].Alive && w.Actors[last].Team != a.Team)
+                {
+                    double dx = w.X[last] - w.X[me], dz = w.Z[last] - w.Z[me];
+                    if (dx * dx + dz * dz <= CombatFrame.KeepRange * CombatFrame.KeepRange) return last;
+                }
+                int n = NearestEnemy(w, me, CombatFrame.KeepRange);
+                if (n >= 0 && !(lk >= 0 && lk < w.ActorCount && w.Actors[lk].Alive && w.Actors[lk].Team != a.Team)) return n;
+            }
             double reach = w.Config != null ? w.Config.Class(a.Cls).AttackRange : 1.5;
             long sinceSwing = (long)w.Tick - a.SwingTick;
             bool busy = a.SwingPending || (sinceSwing >= 0 && sinceSwing <= a.SwingWindup + a.SwingRecovery + 1) || a.HitStunTicks > 0
@@ -773,10 +866,13 @@ namespace CriticalMass.Runtime.Camera
                 // follow-camera-3: aim the see-through at head and shoulders (chest + 0.35), not the belly.
                 // lane C fix round: in a framed fight the see-through line runs to the TARGET's chest, so whatever still
                 // covers him (the own fighter's ladder or shoulder, a wall in front) dithers instead of hiding the hit.
+                // fix/px-combat-camera-3: scenery the pull-in could not clear (lens right behind foliage) gets a wider
+                // dither tube, so it fades instead of filling the screen
+                float wide = _sightWide ? Mathf.Max(ViewCull.FadeRadius, (float)_sightR + 0.6f) : 0f;
                 if (_combat.K > 0.5 && _duelTarget >= 0)
-                    Shader.SetGlobalVector(FadeTargetId, new Vector4(_duelChest.x, _duelChest.y, _duelChest.z, FightFrame.FadeRadius));
+                    Shader.SetGlobalVector(FadeTargetId, new Vector4(_duelChest.x, _duelChest.y, _duelChest.z, Mathf.Max(FightFrame.FadeRadius, wide)));
                 else
-                    Shader.SetGlobalVector(FadeTargetId, new Vector4(_chest.x, _chest.y + 0.35f, _chest.z, ViewCull.FadeRadius));
+                    Shader.SetGlobalVector(FadeTargetId, new Vector4(_chest.x, _chest.y + 0.35f, _chest.z, Mathf.Max(ViewCull.FadeRadius, wide)));
                 _fadeSet = true;
                 SetHitKeep();
             }
@@ -935,9 +1031,10 @@ namespace CriticalMass.Runtime.Camera
 
         /// <summary>fix/px-combat-camera-2: the scenery cylinders within reach of the framed look point (fx, fz): the lens and
         /// both sight lines stay inside ThirdDistance + shoulder + half the fighters' gap of it. Plus the hatched Kaiju.</summary>
-        void GatherScenery(World w, int me, double fx, double fz, double gap)
+        int GatherScenery(World w, double fx, double fz, double gap, SeeThroughCylinder[] into, int target = -1)
         {
             RefreshStatic();
+            SeeThroughCylinder[] _scn = into;
             int n = 0;
             double near = FollowCamera.ThirdDistance + CombatFrame.ShoulderU + gap + 1.0;
             for (int i = 0; i < _sceneryCount && n < MaxNearScenery - 1; i++)
@@ -960,14 +1057,14 @@ namespace CriticalMass.Runtime.Camera
                 _scn[n++] = new SeeThroughCylinder { X = sx, Z = sz, R = GroveRadiusU, Y0 = gy, Y1 = gy + GroveHeightU };
             }
             Kaiju k = w.Kaiju;
-            if (w.Match.Hatched && k.State != KaijuState.Egg)
+            if (target != GroundDirector.KaijuTarget && w.Match.Hatched && k.State != KaijuState.Egg)
             {
                 double a = Driver.Alpha;
                 double kx = k.PrevX + (k.X - k.PrevX) * a, kz = k.PrevZ + (k.Z - k.PrevZ) * a;
                 double ky = GroundHeight.At(w.Map, kx, kz);
                 _scn[n++] = new SeeThroughCylinder { X = kx, Z = kz, R = w.Config.Kaiju.Radius, Y0 = ky, Y1 = ky + w.Config.Render.KaijuHeight };
             }
-            _scnCount = n;
+            return n;
         }
 
         /// <summary>fix/px-combat-camera-2: the dressing categories that stand solid in the camera's way (the walkable
@@ -1094,15 +1191,70 @@ namespace CriticalMass.Runtime.Camera
         {
             GroundView g = Current;
             if (g == null || g._cam == null || g.Mode != GroundViewMode.Play || w == null || id < 0 || id >= w.ActorCount) return head;
-            float k = (float)g._combat.K;
-            if (!(k > 0)) return head;
+            if (g._view == CameraView.FirstPerson) return head;
+            // fix/px-combat-camera-3 (pass 3: the YOU tag jumped between the top-band clamp and the head): my own tag always
+            // takes the just-above-the-head rule at full weight in third person (one stable spot); the others by K.
+            bool mine = id == LocalSeat.Actor;
+            float k = mine ? 1f : (float)g._combat.K;
+            Vector3 sh = g._cam.WorldToScreenPoint(head);
+            if (sh.z <= 0f) return head;
+            float y = sh.y;
+            if (k > 0f && FitY(g._cam, w, id, head, lift, out float fy)) y = Mathf.Lerp(sh.y, fy, k);
+            // fix/px-combat-camera-3 (pass 3: YOU sat on the enemy's tag): my tag never overlaps another fighter's tag; it
+            // is pushed above it (below when the top HUD rows leave no room)
+            if (mine) y = Separate(g, w, id, sh.x, y);
+            if (Mathf.Abs(y - sh.y) < 0.01f) return head;
+            return g._cam.ScreenToWorldPoint(new Vector3(sh.x, y, sh.z));
+        }
+
+        /// <summary>The framed rule's screen y for fighter id's tag (CombatFrame.TagScreenY).</summary>
+        static bool FitY(UnityEngine.Camera cam, World w, int id, Vector3 head, float lift, out float y)
+        {
+            y = 0f;
             FightFrame.Silhouette(w.Actors[id].Cls, 0, out _, out double h);
             Vector3 top = new Vector3(head.x, head.y - lift + (float)h, head.z);
-            Vector3 sh = g._cam.WorldToScreenPoint(head), st = g._cam.WorldToScreenPoint(top);
-            if (sh.z <= 0f || st.z <= 0f) return head;
-            float y = (float)CombatFrame.TagScreenY(sh.y, st.y, g._cam.pixelHeight);
-            Vector3 fit = g._cam.ScreenToWorldPoint(new Vector3(sh.x, y, sh.z));
-            return Vector3.Lerp(head, fit, k);
+            Vector3 sh = cam.WorldToScreenPoint(head), st = cam.WorldToScreenPoint(top);
+            if (sh.z <= 0f || st.z <= 0f) return false;
+            y = (float)CombatFrame.TagScreenY(sh.y, st.y, cam.pixelHeight);
+            return true;
+        }
+
+        /// <summary>fix/px-combat-camera-3: tag box (share of the screen) two tags may not share.</summary>
+        public const float TagSepW = 0.06f, TagSepH = 0.05f;
+
+        /// <summary>My tag's screen y pushed clear of every other standing fighter's tag near me (theirs at the HUD's lift,
+        /// K-weighted like TagPoint).</summary>
+        static float Separate(GroundView g, World w, int me, float x, float y)
+        {
+            UnityEngine.Camera cam = g._cam;
+            float W = cam.pixelWidth, H = cam.pixelHeight, sw = TagSepW * W, shh = TagSepH * H;
+            float ceiling = (float)((1 - CombatFrame.TagTopShare) * H);
+            double a = g.Driver != null ? g.Driver.Alpha : 1;
+            float k = (float)g._combat.K;
+            for (int pass = 0; pass < 2; pass++)
+                for (int i = 0; i < w.ActorCount; i++)
+                {
+                    if (i == me || !w.Actors[i].Alive) continue;
+                    double ox = w.PrevX[i] + (w.X[i] - w.PrevX[i]) * a, oz = w.PrevZ[i] + (w.Z[i] - w.PrevZ[i]) * a;
+                    double dx = ox - w.X[me], dz = oz - w.Z[me];
+                    if (dx * dx + dz * dz > 64) continue;
+                    Vector3 oh = SimSpace.ToWorld(ox, GroundHeight.At(w.Map, ox, oz) + 2.65, oz);
+                    Vector3 os = cam.WorldToScreenPoint(oh);
+                    if (os.z <= 0f) continue;
+                    float oy = os.y;
+                    if (k > 0f && FitY(cam, w, i, oh, 2.65f, out float fy)) oy = Mathf.Lerp(os.y, fy, k);
+                    y = SeparateY(x, y, os.x, oy, sw, shh, ceiling);
+                }
+            return y;
+        }
+
+        /// <summary>Pure (tests): my tag y moved clear of one other tag at (ox, oy): above it, or below when that would
+        /// cross the ceiling. Unchanged when the two boxes do not overlap.</summary>
+        public static float SeparateY(float x, float y, float ox, float oy, float sepW, float sepH, float ceiling)
+        {
+            if (Mathf.Abs(x - ox) >= sepW || Mathf.Abs(y - oy) >= sepH) return y;
+            float up = oy + sepH;
+            return up <= ceiling ? up : oy - sepH;
         }
 
         /// <summary>The camera volumes near the target this frame (tests run the same Inside check).</summary>
