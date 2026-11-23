@@ -616,6 +616,7 @@ namespace CriticalMass.Runtime.Camera
                     CamZ = oz - uz * cp * t;
                 }
             }
+            Govern(f, dt, snap, want, floor);
             Blocked = GroundCollision.Inside(f.Map, CamX, CamY, CamZ, GroundCollision.Radius, f.Cylinders, f.CylinderCount)
                       || BoomAt(f, ox, oy, oz, ux, uz, boomPitch, want) < RobustMin - 1e-6;
             SightBlocked = false;
@@ -634,6 +635,70 @@ namespace CriticalMass.Runtime.Camera
             double chestOnly = Clamp(boomPitch, sChest - half, sChest + half);
             double k = Clamp(f.BodyRule, 0, 1);
             Pitch = chestOnly + (whole - chestOnly) * k;
+        }
+
+        /// <summary>
+        /// rough-spots pass 2 (item 1: hill walk 26 camera-distance reversals a minute, fights up to 53): the distance from
+        /// the lens to the fighter himself is governed with hysteresis. The look-ahead lead, the pivot spring's lag, a
+        /// knockback and the framing's look point all move the pivot against the fighter, and each of those used to pump the
+        /// lens toward him and away again. Now the lens stays within GovBand of a held distance (moved along its own line
+        /// to the fighter, so he keeps his place on screen and the rotation is untouched). The held distance moves only when
+        /// the free lens has been more than GovDrift away from it for a while: out after GovOutHold (GovFitHold, and no
+        /// drift margin, when the two-shot fit or the framing asked for more boom; never within GovCutRelease s of a wall
+        /// cut), in after GovInHold, both slowly. A wall or prop that cuts the boom still pulls it in at once.
+        /// </summary>
+        public const double GovBand = 0.1, GovDrift = 0.4, GovOutHold = 1.5, GovFitHold = 0.1, GovOutTau = 0.9, GovFitTau = 0.3,
+            GovInHold = 2.5, GovInTau = 2.2, GovCutRelease = 3.0;
+        /// <summary>Tests and diagnostics: the governor off gives the old lens exactly.</summary>
+        public static bool GovernorOn = true;
+        double _gov = -1, _govOut, _govIn, _govWant, _govFitFor, _govDist, _govSinceCut = 99;
+        int _govMove;   // +1 easing out, -1 easing in, 0 holding
+        /// <summary>The held lens-to-fighter distance (u; negative before the first frame).</summary>
+        public double HeldDistance => _gov;
+
+        void Govern(in GroundFollowInput f, double dt, bool snap, double want, double floor)
+        {
+            double vx = CamX - f.SightX, vy = CamY - f.SightY, vz = CamZ - f.SightZ;
+            double d = Math.Sqrt(vx * vx + vy * vy + vz * vz);
+            bool fitGrew = want > _govWant + 0.05;
+            _govFitFor = fitGrew ? 0.5 : Math.Max(0, _govFitFor - dt);   // the fit asked for more boom within the last 0.5 s
+            _govWant = want;
+            double lastDist = _govDist;
+            _govDist = Dist;
+            if (!GovernorOn || snap || dt <= 0 || _gov < 0 || d < 1e-3) { _gov = d; _govOut = _govIn = 0; _govMove = 0; _govSinceCut = 99; return; }
+            // a wall or prop pulled the boom in this frame, or holds it at its limit (a slow release is not a cut)
+            bool cut = Dist < lastDist - 0.01 || (Allowed < want - 0.05 && Dist >= Allowed - 0.01);
+            _govSinceCut = cut ? 0 : _govSinceCut + dt;
+            bool fit = _govFitFor > 0;
+            if (cut && d < _gov) { _gov = d; _govIn = _govOut = 0; _govMove = 0; }
+            else if (d > _gov + (fit || _govMove > 0 ? GovBand : GovDrift))
+            {
+                _govIn = 0;
+                _govOut += dt;
+                double hold = fit ? GovFitHold : Math.Max(GovOutHold, GovCutRelease - _govSinceCut);
+                if (_govOut >= hold || _govMove > 0) { _govMove = 1; _gov += (d - GovBand - _gov) * (1 - Math.Exp(-dt / (fit ? GovFitTau : GovOutTau))); }
+            }
+            else if (d < _gov - (_govMove < 0 ? GovBand : GovDrift))
+            {
+                _govOut = 0;
+                _govIn += dt;
+                if (_govIn >= GovInHold || _govMove < 0) { _govMove = -1; _gov += (d + GovBand - _gov) * (1 - Math.Exp(-dt / GovInTau)); }
+            }
+            else { _govOut = _govIn = 0; _govMove = 0; }
+            _gov = Math.Max(RobustMin, _gov);
+            double held = Clamp(d, _gov - GovBand, _gov + GovBand);
+            if (Math.Abs(held - d) < 1e-4) return;
+            double k = held / d;
+            double nx = f.SightX + vx * k, ny = f.SightY + vy * k, nz = f.SightZ + vz * k;
+            double nfloor = GroundCollision.SolidTop(f.Map, nx, nz);
+            if (GroundCollision.Inside(f.Map, nx, ny, nz, GroundCollision.Radius, f.Cylinders, f.CylinderCount) || (held > d && ny - RobustFloor < nfloor))
+            {
+                if (held > d) { _gov = Math.Max(RobustMin, d); _govMove = 0; }   // pushed out: only into clear air
+                return;
+            }
+            CamX = nx;
+            CamY = Math.Max(ny, nfloor + RobustFloor);
+            CamZ = nz;
         }
 
         /// <summary>Over-the-head fallback height above the pivot (u).</summary>
