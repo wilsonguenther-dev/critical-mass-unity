@@ -87,8 +87,11 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
             Assert.AreEqual(Full16v16Seed1, a, "Full 16v16 seed 1 with every class-moves switch off");
         }
 
-        /// <summary>The FullMoves golden (SPEC.md rule 0.2): Full rules plus every switch on, reported, not asserted, until the
-        /// combine pins it after the balance run. Asserts only that it is deterministic.</summary>
+        /// <summary>The FullMoves golden (SPEC.md rule 0.2): Full rules plus every switch on. Pinned by the combine once, after the
+        /// 72-seed balance run (integration/class-moves-cand1): a moved pin means class-moves behaviour changed; re-pin only with
+        /// the reason in the commit.</summary>
+        public const ulong FullMoves16v16Seed1 = 0xAA950BE1A98104ED, FullMoves5v5Seed42 = 0xFA7A5C3EB565D82E;
+
         [Test]
         public void TheFullMovesGoldenIsReported()
         {
@@ -100,8 +103,10 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
             ulong a = MatchHash.Run(1, 16, 3600, ClassId.Warrior, null, moves);
             ulong b = MatchHash.Run(42, 5, 14500, ClassId.Warrior, null, moves);
             Console.WriteLine("{\"item\":\"rules-combined golden\",\"profile\":\"FullMoves\",\"16v16seed1\":\"0x" + a.ToString("X16") +
-                              "\",\"5v5seed42\":\"0x" + b.ToString("X16") + "\",\"pinned\":false}");
+                              "\",\"5v5seed42\":\"0x" + b.ToString("X16") + "\",\"pinned\":true}");
             Assert.AreEqual(a, MatchHash.Run(1, 16, 3600, ClassId.Warrior, null, moves), "FullMoves: same seed, same hash");
+            Assert.AreEqual(FullMoves16v16Seed1, a, "FullMoves 16v16 seed 1 (every class-moves switch on)");
+            Assert.AreEqual(FullMoves5v5Seed42, b, "FullMoves 5v5 seed 42 (every class-moves switch on)");
         }
 
         [Test]
