@@ -63,7 +63,7 @@ namespace CriticalMass.Sim.Config
         /// <summary>A dodge within this many degrees of an enemy direction is a dodge-in.</summary>
         public double LungeConeDeg = 35;
         /// <summary>The dash is clipped to end at this share of the dodger's reach from the enemy body.</summary>
-        public double LungeStopShare = 0.85;
+        public double LungeStopShare = 0.6;   // fix/mv-lunge-stop: was 0.85 (spec); 0.85 ended 0.85 x reach out, which whiffed live (Miner 1.68 u)
         /// <summary>The lunge swing's wind-up multiplier (Warrior 12 to 9 ticks).</summary>
         public double LungeWindupMul = 0.75;
         // ---- T1-3 refund

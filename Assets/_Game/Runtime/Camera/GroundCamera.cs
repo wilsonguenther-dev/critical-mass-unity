@@ -164,6 +164,22 @@ namespace CriticalMass.Runtime.Camera
             return false;
         }
 
+        /// <summary>fix/px-combat-camera-2: true when the sight line from a (the lens) to b (a fighter's chest) meets the grid
+        /// or a cylinder (trees with their crowns, rocks, crystals, props, buildings) before stopShort u from b. The lens
+        /// itself inside something counts as blocked.</summary>
+        public static bool Occluded(MapDef map, double ax, double ay, double az, double bx, double by, double bz, double stopShort,
+            SeeThroughCylinder[] cyl, int n)
+        {
+            double dx = bx - ax, dy = by - ay, dz = bz - az;
+            double len = Math.Sqrt(dx * dx + dy * dy + dz * dz);
+            double end = len - stopShort;
+            if (!(end > 0)) return false;
+            dx /= len; dy /= len; dz /= len;
+            for (double t = 0; t <= end; t += Step)
+                if (Inside(map, ax + dx * t, ay + dy * t, az + dz * t, CombatFrame.SightRadius, cyl, n)) return true;
+            return Inside(map, ax + dx * end, ay + dy * end, az + dz * end, CombatFrame.SightRadius, cyl, n);
+        }
+
         /// <summary>
         /// How far (u) the camera may sit from the pivot (px, py, pz) along the unit direction (dx, dy, dz), at most want.
         /// The pivot itself is never tested (it is inside the fighter). Below MinDistance the caller lifts the camera over

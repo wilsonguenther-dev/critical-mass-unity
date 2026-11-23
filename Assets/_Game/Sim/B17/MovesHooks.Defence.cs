@@ -442,7 +442,9 @@ namespace CriticalMass.Sim.Core
             d.LungeArmed[id] = 0;
             d.LungePressed[id] = 0;
             Actor a = w.Actors[id];
-            double reach = w.Config.Class(a.Cls).AttackRange;
+            // fix/mv-lunge-stop: the reach of the swing that will land (Combat.ResolveSwing's: the light weapon's or the class row)
+            LightWeapon lw = LightWeapons.Of(w, a.Cls);
+            double reach = lw != null ? lw.Range : w.Config.Class(a.Cls).AttackRange;
             double cone = JsMath.Cos(m.LungeConeDeg * Math.PI / 180);
             int best = -1;
             double bestD = double.MaxValue;
@@ -462,20 +464,39 @@ namespace CriticalMass.Sim.Core
             // the stop point is measured from where the enemy will be at the lunge's contact (its velocity over the dash and the
             // lunge wind-up), so a dodge-in on a runner ends in reach at contact, not where the runner was at the press
             DodgeConfig dc = w.Config.Depth.Dodge;
-            int lead = (dc != null ? dc.DashTicks : 6) + (int)Math.Floor(w.Dur.AttackWindup[(int)a.Cls] * DefenceLungeMul(w, id) + 1e-9);
+            // fix/mv-lunge-stop: the swing starts after the dash AND its recover ticks (Combat waits out Dodge.Active), so both count
+            int lead = (dc != null ? dc.DashTicks + dc.RecoverTicks : 8) + Math.Max(1, (int)Math.Floor(w.Dur.AttackWindup[(int)a.Cls] * DefenceLungeMul(w, id) + 1e-9));
             double leadSec = lead / w.Config.SimHz;
             double rx = w.X[best] + w.Vx[best] * leadSec - w.X[id], rz = w.Z[best] + w.Vz[best] * leadSec - w.Z[id];
-            double stop = m.LungeStopShare * reach + w.Config.Class(w.Actors[best].Cls).Radius;
+            double tr = w.Config.Class(w.Actors[best].Cls).Radius;
+            double stop = m.LungeStopShare * reach + tr;
             // guard fix (the third-person whiff): the dash steers straight at that point (inside the cone the stick picked), so
             // it ends LungeStopShare x reach in FRONT of the target, not beside it. The stick direction of a third-person
             // player is camera-relative and lags; along it, a dash ended at the closest approach (1.7 u to the side, out of the
             // swing's arc) and whiffed, while a top-down player dashed straight at the target and hit.
             double rl = Math.Sqrt(rx * rx + rz * rz);
-            if (rl > 1e-9) { dx = rx / rl; dz = rz / rl; }
+            // fix/mv-lunge-stop: a target the dash cannot bring within DefenceLungeArmMaxShare x reach of its body edge at
+            // contact (a runner, or one too far) arms no lunge: a plain dodge, no LUNGE word, not a lunge that whiffs
+            double arm = DefenceLungeArmMaxShare * reach + tr;
+            // a player holding the stick at the target follows the dash in: credit DefenceLungeChaseShare of his base speed over
+            // the recover and wind-up ticks (the measured follow is about 0.8 of it; half is the safe side)
+            InputFrame inp = w.Inputs[id];
+            bool chasing = inp != null && inp.MoveX * rx + inp.MoveZ * rz > 0;
+            double follow = chasing ? DefenceLungeChaseShare * w.Config.Class(a.Cls).MoveSpeed * (lead - (dc != null ? dc.DashTicks : 6)) / w.Config.SimHz : 0;
+            if (rl - arm - follow > distance) return distance;
             double go = rl - stop;
+            // fix/mv-lunge-stop: never past the target's body where it is at the dash's END (the dash is front-loaded: aimed
+            // at a runner's contact point it caught the runner's body mid-dash and shoved it on, out of reach)
+            double qx = w.X[best] + w.Vx[best] * ((dc != null ? dc.DashTicks : 6) / w.Config.SimHz) - w.X[id];
+            double qz = w.Z[best] + w.Vz[best] * ((dc != null ? dc.DashTicks : 6) / w.Config.SimHz) - w.Z[id];
+            double clear = Math.Sqrt(qx * qx + qz * qz) - tr - w.Config.Class(a.Cls).Radius - DefenceLungeBodyGap;
+            if (go > clear) go = clear;
             double min = distance * DefenceLungeMinShare;
             if (go < min) go = min;
             if (go > distance) go = distance;
+            // ... and with the stick let go (no chase after the dash), the gap at contact is rl - go: past the arm share, no lunge
+            if (!chasing && rl - go > arm) return distance;
+            if (rl > 1e-9) { dx = rx / rl; dz = rz / rl; }
             d.LungeArmed[id] = 1;
             d.LungeTarget[id] = best;
             d.LungeDashEnd[id] = CombatFeel.NoTick;
@@ -490,6 +511,16 @@ namespace CriticalMass.Sim.Core
             int c = DefenceCls(w, i);
             return row != null && c < row.Length && row[c] >= 0 ? row[c] : m.LungeWindupMul;
         }
+
+        /// <summary>fix/mv-lunge-stop: the farthest a lunge may end from the target's body edge at contact, as a share of the swing's
+        /// reach (the dash is LungeStopShare x reach when it can get there; clamped by the dodge distance it may end up to this).</summary>
+        const double DefenceLungeArmMaxShare = 0.8;
+
+        /// <summary>fix/mv-lunge-stop: the room a lunge dash leaves between the two bodies at the dash's end (u).</summary>
+        const double DefenceLungeBodyGap = 0.1;
+
+        /// <summary>fix/mv-lunge-stop: the share of his base speed a chasing player is credited after the dash (arm check only).</summary>
+        const double DefenceLungeChaseShare = 0.5;
 
         /// <summary>The shortest dodge-in dash, as a share of the dodge distance (an enemy already inside the stop distance).</summary>
         const double DefenceLungeMinShare = 0.2;

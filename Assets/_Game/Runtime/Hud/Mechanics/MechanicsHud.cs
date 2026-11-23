@@ -501,12 +501,40 @@ namespace CriticalMass.Runtime.Hud.Mechanics
             // mv-6 (class moves lane 6, T2-4/T2-5): the chip reads SLIDE while a Dodge press would slide (TRAVEL lit)
             bool mvSlide = CriticalMass.Runtime.View.B17.MovesRead.SlideArmed(w, me);
             if (mvSlide != _mvSlide) { _mvSlide = mvSlide; HudText.Set(_dodgeKey, MvDodgeLabel()); }
+            if (w.Moves != null) MvRefund(w, me);   // mv-6 readability-2 item 2
+        }
+
+        // mv-6 readability-2 item 2: a dodge refund (T1-3: an avoided swing gives back part of the dodge cooldown) has no
+        // event; the chip sees it as the sim's dodge-ready tick moving EARLIER (a new dodge only moves it later). The ring
+        // swells and turns cream, and the chip reads DODGE BACK for MvBackSeconds.
+        public const float MvBackSeconds = 0.9f;
+        World _mvW;
+        int _mvReady = int.MinValue;
+        float _mvBackAt = -9f;
+        bool _mvBack;
+        /// <summary>Tests / reviewer: the DODGE BACK tick is on the chip.</summary>
+        public bool DodgeBackShown => _mvBack;
+        void MvRefund(World w, int me)
+        {
+            DodgeState ds = w.Dodges;
+            if (ds == null || ds.Ready == null || me < 0 || me >= ds.Ready.Length) return;
+            int ready = ds.Ready[me];
+            if (ReferenceEquals(w, _mvW) && ready < _mvReady && _mvReady > w.Tick && ready >= w.Tick) _mvBackAt = Time.unscaledTime;
+            _mvW = w;
+            _mvReady = ready;
+            float k = (Time.unscaledTime - _mvBackAt) / MvBackSeconds;
+            bool back = k < 1f;
+            if (back != _mvBack) { _mvBack = back; HudText.Set(_dodgeKey, MvDodgeLabel()); }
+            float sc = back ? 1f + 0.4f * (1f - k) : 1f;
+            _dodgePie.transform.localScale = new Vector3(sc, sc, 1f);
+            if (back) _dodgePie.SetFill(CMTokens.WarmCream.Color);
         }
 
         bool _mvSlide;   // mv-6
         string MvDodgeLabel()   // mv-6: the dodge chip word (SLIDE key while TRAVEL is lit, else DODGE key)
         {
             string k = B13Kit.KeyOr("Dodge", ControlBindings.ActiveDevice == ControlDevice.Gamepad ? "RB" : "SHIFT");
+            if (_mvBack) return "DODGE BACK";   // readability-2 item 2
             return _mvSlide ? CriticalMass.Runtime.View.B17.MovesRead.DodgeSlotWord(true, k) : B13Kit.DodgeLabel(k);
         }
 

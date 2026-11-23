@@ -204,6 +204,12 @@ namespace CriticalMass.Sim.Core
         /// and never leaves reach, so a feint had nothing to bait (measured: feint value +0 of 40 at 8).</summary>
         static readonly int[] BotsReadLag = { 9, 6, 5 };
 
+        /// <summary>fix/mv-lunge-stop: an Easy bot guards at most one read swing in this many.</summary>
+        const int BotsEasyGuardEvery = 10;
+
+        /// <summary>fix/mv-lunge-stop: a Normal bot never parries before this much match clock (s).</summary>
+        const double BotsNormalParryFromSeconds = 60;
+
         static int BotsReadTicks(World w, int d) => d >= 0 && d < BotsReadLag.Length ? BotsReadLag[d] : 6;
 
         /// <summary>
@@ -255,6 +261,20 @@ namespace CriticalMass.Sim.Core
                 double pParry = guardOn ? BotsChance(m.BotParryChance, d) : 0;
                 double pGuard = guardOn ? BotsChance(m.BotGuardChance, d) : 0;
                 double pStep = stepOn ? BotsChance(m.BotStepOutChance, d) : 0;
+                // fix/mv-lunge-stop (seat review F10/F31): a new player's first swings are not read back at him. Easy never
+                // parries and guards at most one read swing in BotsEasyGuardEvery; Normal never parries before
+                // BotsNormalParryFromSeconds of match clock and guards at most one read swing in three (never the first two).
+                // Hard as before. Reads counts this read already.
+                if (d == 0)
+                {
+                    pParry = 0;
+                    if (BotsEasyGuardEvery * (b.Guards[id] + 1) > b.Reads[id]) pGuard = 0;
+                }
+                else if (d == 1)
+                {
+                    if (w.Match.Time < BotsNormalParryFromSeconds) pParry = 0;
+                    if (3 * (b.Guards[id] + 1) > b.Reads[id]) pGuard = 0;
+                }
                 int window = m.ParryWindowTicks != null && (int)me.Cls < m.ParryWindowTicks.Length ? m.ParryWindowTicks[(int)me.Cls] : 3;
                 int parryAt = contact - (window + 1) / 2;
                 if (r < pParry && live && parryAt > tick)
