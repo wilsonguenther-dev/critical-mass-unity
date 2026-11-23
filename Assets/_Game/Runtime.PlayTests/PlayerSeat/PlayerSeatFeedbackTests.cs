@@ -169,7 +169,7 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
                 }
                 if (!r.Seen && cue(r)) { r.Seen = true; r.SeenFrame = f; }
                 // one rendered step = 16.7 ms of real time (60 fps): cues on unscaled time (camera kick, fades) see real time pass
-                yield return new WaitForSecondsRealtime(1f / 60f);
+                yield return null;   // fix round 7: one paced 60 fps frame (PlayerSeatFixture.SeatFps)
                 if (f < T.CueTicks) yield return TickFrame(before);
             }
             r.KickPeak = Math.Max(r.KickPeak, CameraShake.Applied.magnitude);
@@ -314,7 +314,7 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
             for (int f = 0; f < T.CueFrames; f++)
             {
                 if (Ledger(FeedbackChannel.SwingCommit, 0, out FeedbackEntry got, cursor)) best = Math.Max(best, got.Value);
-                yield return new WaitForSecondsRealtime(1f / 60f);
+                yield return null;   // fix round 7: one paced 60 fps frame (PlayerSeatFixture.SeatFps)
                 yield return TickFrame(() => Pin(e, px, pz));
             }
             bool reported = Ledger(FeedbackChannel.SwingCommit, 0, out FeedbackEntry last, cursor);
@@ -845,18 +845,23 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
             W.Actors[0].AbilityCd = 0;
             Set(Ms.position, ScreenOf(px, pz));
             for (int i = 0; i < 2; i++) yield return TickFrame(() => Pin(e, px, pz));
-            int sounds = PlayingSources(), fx = PlayingParticles(), head = W.EventHead;
+            var sd = CriticalMass.Runtime.Audio.Sound.SoundDirector.Instance;
+            int sounds = PlayingSources(), fx = PlayingParticles(), head = W.EventHead, played = sd != null ? sd.Played : 0;
             Press(Ms.rightButton);
             bool cue = false;
             for (int f = 0; f < T.CueFrames && !cue; f++)
             {
                 if (f < T.CueTicks) yield return TickFrame(() => Pin(e, px, pz)); else yield return null;
                 if (f == 0) Release(Ms.rightButton);
-                cue = PlayingSources() > sounds || PlayingParticles() > fx;
+                // fix round 7: a started sound counts by the director's own play counter too (a listener paused by a silent
+                // review setting stops isPlaying; a source that ended in the same frame hid a new one in the net count)
+                cue = PlayingSources() > sounds || PlayingParticles() > fx || (sd != null && sd.Played > played);
             }
+            string audio = "director " + (sd != null ? "played +" + (sd.Played - played) + ", muted " + sd.Muted : "none") + ", listener paused " + AudioListener.pause + ", listener volume " + AudioListener.volume.ToString("0.00")
+                + ", game volume master " + GameSettings.MasterVolume.ToString("0.00") + " effects " + GameSettings.EffectsVolume.ToString("0.00") + " muteEffects " + GameSettings.MuteEffects;
             string ev = string.Join(" ", Events(head, SimEventType.Ability).Where(q => q.A == 0).Select(q => "Ability v" + q.Value));
             AssertAtControls("the end");
-            Check("F17 AbilityCastCue", x.ToString(), "a new sound or particle system within 6 frames " + cue + " (" + (ev.Length > 0 ? ev : "no Ability event") + ")", "a cast cue", cue);
+            Check("F17 AbilityCastCue", x.ToString(), "a new sound or particle system within 6 frames " + cue + " (" + (ev.Length > 0 ? ev : "no Ability event") + "; " + audio + ")", "a cast cue", cue);
         }
 
         [UnityTest]
@@ -946,23 +951,26 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
             double dx = 1, dz = 0;
             double dd = 1.6;
             bool found = false;
-            foreach (double dist in new[] { 1.6, 2.0, 2.4 })
+            // fix round 7: the sim digs the cell under the aim PULLED BACK to MinerTerraform.Reach (Terraform.TargetCell), not
+            // the cell under a 1.6-2.4 u aim: every check now runs on the cell the sim will really dig for that aim
+            double reachT = W.Config.Abilities.MinerTerraform.Reach;
+            int tcx = -1, tcz = -1, tried = 0;
+            foreach (double dist in new[] { 0.9 * reachT, 0.75 * reachT, reachT + 0.5, 0.6 * reachT })
             {
                 for (int k = 0; k < 16 && !found; k++)
                 {
-                    double a = k * Math.PI / 8, cx = W.X[0] + dist * Math.Cos(a), cz = W.Z[0] + dist * Math.Sin(a);
-                    int ix = (int)Math.Floor(cx), iz = (int)Math.Floor(cz);
+                    double a = k * Math.PI / 8, ax = W.X[0] + dist * Math.Cos(a), az = W.Z[0] + dist * Math.Sin(a);
+                    if (!Terraform.TargetCell(W, 0, ax, az, out int ix, out int iz)) continue;
+                    tried++;
                     if (ix < 1 || iz < 1 || ix >= W.Map.Width - 1 || iz >= W.Map.Height - 1) continue;
                     if (W.Map.Cells[iz * W.Map.Width + ix] != Cell.Floor || BuilderWalls.CellRefusal(W, ix, iz) != 0) continue;
-                    // fix round 6: the rig picked a cell the sim then refused (Terraform v-3, RefusedOccupied: a pad / hill /
-                    // shrine keep-out), so no pop could show; ask the sim's own dig rule first (a read)
                     if (Terraform.DigRefusal(W, ix, iz) != 0) continue;
                     double ccx = ix + 0.5, ccz = iz + 0.5;
                     bool busy = W.Nodes.Any(nd => Math.Abs(nd.X - ccx) < 1.0 && Math.Abs(nd.Z - ccz) < 1.0)
                         || (W.Depth.Sources != null && W.Depth.Sources.Any(sn => sn != null && Math.Abs(sn.X - ccx) < 1.0 && Math.Abs(sn.Z - ccz) < 1.0))
                         || Enumerable.Range(1, W.ActorCount - 1).Any(j => W.Actors[j].Alive && Math.Abs(W.X[j] - ccx) < 1.0 && Math.Abs(W.Z[j] - ccz) < 1.0);
                     if (busy) continue;
-                    dx = Math.Cos(a); dz = Math.Sin(a); dd = dist; found = true;
+                    dx = Math.Cos(a); dz = Math.Sin(a); dd = dist; found = true; tcx = ix; tcz = iz;
                 }
                 if (found) break;
             }
@@ -976,7 +984,7 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
             var dug = Events(head, SimEventType.Terraform).Where(q => q.A == 0).ToList();
             bool pop = Ledger(FeedbackChannel.WorldActionPop, 0, out FeedbackEntry p, cursor);
             AssertAtControls("the end");
-            Check("F28 WorldActionPop", "Builder DIG with F", "Terraform " + (dug.Count > 0 ? "v" + dug[0].Value : "none") + ", pop " + (pop ? "reason " + p.Reason : "none"), "a pop with WorldDig (" + PlayerReasons.WorldDig + ")", pop && p.Reason == PlayerReasons.WorldDig);
+            Check("F28 WorldActionPop", "Builder DIG with F", "Terraform " + (dug.Count > 0 ? "v" + dug[0].Value : "none") + ", pop " + (pop ? "reason " + p.Reason : "none") + "; cell " + (found ? tcx + "," + tcz : "none of " + tried + " free") + " at aim " + dd.ToString("0.00") + " u (reach " + reachT.ToString("0.00") + ")", "a pop with WorldDig (" + PlayerReasons.WorldDig + ")", pop && p.Reason == PlayerReasons.WorldDig);
         }
 
         [UnityTest]
@@ -1152,19 +1160,28 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
             double px = W.X[e], pz = W.Z[e];
             Action pin = () => Pin(e, px, pz);
             for (int f = 0; f < 3; f++) yield return TickFrame(pin);
-            // a dodge (left Shift), then a melee hit from the enemy through the sim's damage path inside the i-frames
+            // fix round 7: the enemy really swings at me and I dodge into its contact tick. Since px DM (Sim/Damage.cs:108-111)
+            // a MELEE hit inside dodge i-frames is reported only by Dodge.SwingDodges at the swing's contact (Combat.cs:254),
+            // so the old direct Damage.ApplyHit(Melee) inside the i-frames could never raise DODGED: the rig was wrong.
             int c1 = PlayerFeedback.Head, h1 = W.EventHead;
-            Press(Kb.aKey);
-            Press(Kb.leftShiftKey);
-            bool dodgeStarted = false;
-            for (int t = 0; t < 8 && !dodgeStarted; t++)
+            Actor ea = W.Actors[e];
+            double fac = Math.Atan2(W.Z[0] - W.Z[e], W.X[0] - W.X[e]);
+            int windup = W.Dur.AttackWindup[(int)ClassId.Warrior];
+            ea.Facing = fac; ea.SwingFacing = fac; ea.AnimAction = 0;
+            ea.SwingTick = W.Tick; ea.SwingWindup = windup; ea.SwingRecovery = W.Dur.Recovery[(int)ClassId.Warrior]; ea.SwingPending = true;
+            int contact = ea.SwingTick + windup;
+            Action pinSwing = () => { Pin(e, px, pz); W.Actors[e].Facing = fac; };
+            bool dodgeStarted = false, pressed = false;
+            int dodgeTick = -1;
+            for (int t = 0; t < windup + 8; t++)
             {
-                yield return TickFrame(pin);
-                if (t == 0) Release(Kb.leftShiftKey);
-                dodgeStarted = Events(h1, SimEventType.Dodge).Any(q => q.A == 0);
+                if (!pressed && W.Tick >= contact - 3) { Press(Kb.aKey); Press(Kb.leftShiftKey); pressed = true; }
+                yield return TickFrame(pinSwing);
+                if (pressed && Kb.leftShiftKey.isPressed) Release(Kb.leftShiftKey);
+                if (!dodgeStarted && Events(h1, SimEventType.Dodge).Any(q => q.A == 0)) { dodgeStarted = true; dodgeTick = W.Tick; }
             }
             Release(Kb.aKey);
-            if (dodgeStarted) Damage.ApplyHit(W, 0, 12, e, W.X[e], W.Z[e], DamageCause.Melee, 0, 0, 0, 0);
+            bool hitMe = Events(h1, SimEventType.Hit).Any(q => q.A == 0);
             for (int f = 0; f < T.CueFrames; f++) yield return TickFrame(pin);
             bool dodged = Events(h1, SimEventType.HitBlocked).Any(q => q.A == 0 && (int)q.Value == PlayerReasons.BlockedDodge);
             bool dodgeCue = LedgerReason(FeedbackChannel.BlockedTag, PlayerReasons.BlockedDodge, c1);
@@ -1180,7 +1197,7 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
             bool shielded = Events(h2, SimEventType.HitBlocked).Any(q => q.A == 0 && (int)q.Value == PlayerReasons.BlockedShield);
             bool shieldCue = LedgerReason(FeedbackChannel.BlockedTag, PlayerReasons.BlockedShield, c2);
             AssertAtControls("the end");
-            Check("D6 DodgeAndShieldCues", "Warrior dodges, then shields, a hit from a Warrior", "dodge started " + dodgeStarted + ", HitBlocked " + dodged + ", cue " + dodgeCue + "; shield: HitBlocked " + shielded + ", cue " + shieldCue + " [" + LedgerDump(c1) + "]", "a ledger cue for each", dodgeCue && shieldCue);
+            Check("D6 DodgeAndShieldCues", "Warrior dodges, then shields, a hit from a Warrior", "enemy swing contact tick " + contact + ", dodge started " + dodgeStarted + " at tick " + dodgeTick + ", hit me " + hitMe + ", HitBlocked " + dodged + ", cue " + dodgeCue + "; shield: HitBlocked " + shielded + ", cue " + shieldCue + " [" + LedgerDump(c1) + "]", "a ledger cue for each", dodgeCue && shieldCue);
         }
     }
 }

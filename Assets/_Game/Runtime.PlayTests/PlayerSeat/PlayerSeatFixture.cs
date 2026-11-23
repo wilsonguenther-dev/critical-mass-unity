@@ -79,9 +79,26 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
         [OneTimeTearDown]
         public void RestoreActionsAtFixtureEnd() => RestoreActions();
 
+        // fix round 7: the Editor is not batch mode, so FogConfig.Pin is null there and the player's fog setting (on) applies:
+        // an enemy the rig puts 0.8 reach in front of me stays fogged for ~0.25 s (10 Hz map + 0.3 s fade, FogConfig), and
+        // FogOfWar.Hides drops its model, bar, aim candidate and hittable cue (Editor 79/42 vs GitHub 107/13, where batch
+        // mode pins the fog off). The seat tests pin it off in both places; the fog has its own tests.
+        bool? _fogWas;
+        int _targetFpsWas, _vsyncWas;
+        /// <summary>Fix round 7: every rendered frame of a seat test is a real 60 fps frame (16.7 ms of wall and game time), so
+        /// the view's unscaled-time cues (commit rise, kick, fades) advance per frame as they do for a player at 60 fps; the
+        /// Editor otherwise renders test frames ~1-5 ms apart and the GitHub runner at whatever pace it has.</summary>
+        public const int SeatFps = 60;
+
         public override void Setup()
         {
             CaptureActions();
+            _fogWas = CriticalMass.Runtime.View.Fog.FogConfig.CaptureOverride;
+            CriticalMass.Runtime.View.Fog.FogConfig.CaptureOverride = false;
+            _targetFpsWas = Application.targetFrameRate;
+            _vsyncWas = QualitySettings.vSyncCount;
+            QualitySettings.vSyncCount = 0;
+            Application.targetFrameRate = SeatFps;
             try { base.Setup(); }
             catch { RestoreActions(); throw; }
             foreach (string k in SavedKeys) _saved[k] = PlayerPrefs.HasKey(k) ? PlayerPrefs.GetInt(k) : (int?)null;
@@ -102,6 +119,9 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
                 else PlayerPrefs.DeleteKey(kv.Key);
             }
             PlayerPrefs.Save();
+            CriticalMass.Runtime.View.Fog.FogConfig.CaptureOverride = _fogWas;
+            Application.targetFrameRate = _targetFpsWas;
+            QualitySettings.vSyncCount = _vsyncWas;
             try
             {
                 SanityWorld.Reset();
