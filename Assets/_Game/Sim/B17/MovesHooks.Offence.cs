@@ -264,7 +264,7 @@ namespace CriticalMass.Sim.Core
         {
             if (w.Moves == null || !(dealt > 0) || source < 0 || source >= w.ActorCount || target < 0 || target >= w.ActorCount) return;
             OffenceMovesState s = w.Moves.Offence;
-            s.LastHitHuman[source] = w.Actors[target].IsHuman ? (byte)1 : (byte)0;
+            s.LastHitHuman[source] = OffenceHuman(w, target) ? (byte)1 : (byte)0;   // a person's seat (an autopiloted seat is a bot)
             s.ChainVictim[source] = target;
             if (!On(w, Cfg(w).Heavy) || !OffenceIsHeavy(w, source)) return;
             s.Counts[OffenceCountHeavyHits]++;

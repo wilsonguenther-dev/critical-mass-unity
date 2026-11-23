@@ -838,12 +838,14 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
     [Category("PlayerSeat")]
     public sealed class MovesOffenceBotIdentity
     {
-        static string Run(Action<MovesConfig> on, int ticks)
+        static string Run(Action<MovesConfig> on, int ticks, Action<MovesConfig> baseline = null)
         {
             GameConfig ca = GameConfig.CreateBrowser5v5().ApplyRules(RulesProfile.Full);
             ca.Depth.Moves.FeintBait = true;
+            baseline?.Invoke(ca.Depth.Moves);
             GameConfig cb = GameConfig.CreateBrowser5v5().ApplyRules(RulesProfile.Full);
             cb.Depth.Moves.FeintBait = true;
+            baseline?.Invoke(cb.Depth.Moves);
             on(cb.Depth.Moves);
             World a = World.CreateWorld(new WorldOptions { Seed = 1, TeamSize = 16, HumanTeam = TeamId.Azure, HumanClass = ClassId.Warrior, Config = ca });
             World b = World.CreateWorld(new WorldOptions { Seed = 1, TeamSize = 16, HumanTeam = TeamId.Azure, HumanClass = ClassId.Warrior, Config = cb });
@@ -853,8 +855,10 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
                 MatchTick.Advance(a, null, sa);
                 MatchTick.Advance(b, null, sb);
                 for (int i = 0; i < a.ActorCount; i++)
-                    if (a.X[i] != b.X[i] || a.Z[i] != b.Z[i] || a.Actors[i].Hp != b.Actors[i].Hp)
-                        return "diverged at tick " + a.Tick + " on actor " + i + " (" + a.Actors[i].Cls + ")";
+                    if (a.X[i] != b.X[i] || a.Z[i] != b.Z[i] || a.Actors[i].Hp != b.Actors[i].Hp || a.Actors[i].SwingTick != b.Actors[i].SwingTick || a.Inputs[i].Attack != b.Inputs[i].Attack)
+                        return "diverged at tick " + a.Tick + " on actor " + i + " (" + a.Actors[i].Cls + ") swing " + a.Actors[i].SwingTick + "/" + b.Actors[i].SwingTick
+                            + " attack " + a.Inputs[i].Attack + "/" + b.Inputs[i].Attack + " stepOf " + b.Moves.Offence.StepOf[i] + " chainNext " + b.Moves.Offence.ChainNext[i]
+                            + " heavy " + (b.Moves.Offence.HeavySwingTick[i] == b.Actors[i].SwingTick) + " hp " + a.Actors[i].Hp + "/" + b.Actors[i].Hp;
             }
             return null;
         }
@@ -875,7 +879,53 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
                 string r = Run(on, 3600);
                 if (!PxLog.Line("fix-heavy bot-only identity", "16v16 seed 1, 2:00, actor 0 on autopilot: " + name + " vs every switch off", r ?? "identical for 3600 ticks", "identical", r == null)) bad.Add(name);
             }
+            // the play build: every switch on vs every switch on but Heavy and Combos (lane 4's verbs must not move bot-only play)
+            {
+                Action<MovesConfig> allBut = m => { MovesConfig.PlayBuildAllOn(m); m.Heavy = false; m.Combos = false; };
+                string r = Run(m => { m.Heavy = true; m.Combos = true; }, 3600, allBut);
+                if (!PxLog.Line("fix-heavy bot-only identity", "16v16 seed 1, 2:00: every switch on vs every switch on but Heavy and Combos", r ?? "identical for 3600 ticks", "identical", r == null)) bad.Add("play build");
+            }
+            foreach (var (name, on) in new (string, Action<MovesConfig>)[0])
+            {
+                string r = Run(on, 3600);
+                if (!PxLog.Line("fix-heavy bot-only identity", "16v16 seed 1, 2:00, actor 0 on autopilot: " + name + " vs every switch off", r ?? "identical for 3600 ticks", "identical", r == null)) bad.Add(name);
+            }
             Assert.IsEmpty(bad);
+        }
+    }
+}
+
+namespace CriticalMass.Sim.Tests.PlayerSeat
+{
+    using System;
+    using System.Collections.Generic;
+    using CriticalMass.Sim.Config;
+    using CriticalMass.Sim.Core;
+    using NUnit.Framework;
+
+    /// <summary>fix/mv-heavy-press lever probe (Slow, report only): the Healer's combine rows (every switch on) under knob specs
+    /// from CM_L4_PROBES ("spec|spec|..."; a spec is MvCombine.ApplyKnobs syntax, empty = as committed).</summary>
+    [TestFixture]
+    [Category("PlayerSeat")]
+    public sealed class MovesOffenceHealerProbe
+    {
+        [Test, Category("Slow")]
+        public void HealerRows_UnderKnobSpecs()
+        {
+            string all = Environment.GetEnvironmentVariable("CM_L4_PROBES") ?? "";
+            string cls = Environment.GetEnvironmentVariable("CM_L4_CLASS") ?? "Healer";
+            ClassId me = (ClassId)Enum.Parse(typeof(ClassId), cls);
+            foreach (string spec in all.Split('|'))
+            {
+                var parts = new List<string>();
+                foreach (string v in new[] { "base", "dodge", "guard", "strong" })
+                {
+                    var cells = new Dictionary<ClassId, int>();
+                    MvDefenceTally t = MvDefenceRig.DuelRow(me, v, c => { MovesConfig.PlayBuildAllOn(c.Depth.Moves); MvCombine.ApplyKnobs(c.Depth.Moves, spec); }, perCell: cells);
+                    parts.Add(v + " " + t.Wins + " (" + MvCombine.Cells(cells) + ")");
+                }
+                PxLog.Line("L4 probe", me + " every switch on [" + spec + "]", string.Join(", ", parts), "report", true);
+            }
         }
     }
 }
