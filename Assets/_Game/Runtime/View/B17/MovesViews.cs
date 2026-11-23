@@ -314,6 +314,7 @@ namespace CriticalMass.Runtime.View.B17
                 HideAll(_streaks);
                 if (_chainRing != null) Show(_chainRing, false);
                 WorldWords.MovesCap = false;
+                WorldWords.Focus = -1;
                 MovesPoses.PredictActor = -1;
                 MovesPoses.PredictGuard = 0f;
                 _hintLeft = 0f;
@@ -321,7 +322,8 @@ namespace CriticalMass.Runtime.View.B17
                 _world = null;
                 return;
             }
-            WorldWords.MovesCap = true;   // item 2: at most two words per body, by priority
+            WorldWords.MovesCap = true;   // item 2: words per body by priority (readability-3: one)
+            WorldWords.Focus = _focus >= 0 && _focus < w.ActorCount && w.Actors[_focus].Alive && Time.unscaledTime - _focusAt <= FocusSeconds ? _focus : -1;
             double alpha = _driver.Alpha;
             bool reduce = !CriticalMass.Runtime.View.Moments.FlashSafety.IntenseAllowed;
             int n = w.ActorCount;
@@ -759,9 +761,11 @@ namespace CriticalMass.Runtime.View.B17
                 switch (e.Type)
                 {
                     case SimEventType.Hit:
+                        if (e.A == me && e.B >= 0 && e.B != me) { _focus = e.B; _focusAt = Time.unscaledTime; }   // he hit me
                         if (e.B == me && e.A != me)
                         {
                             _lastVictimOfMe[0] = e.A;
+                            _focus = e.A; _focusAt = Time.unscaledTime;   // readability-3 item 1: my opponent
                             // readability-2 item 4: the combo hint on my first landed hit, until I have chained twice ever
                             if (PlayerPrefs.GetInt(ChainedPref, 0) < ChainedToLearn) Hint(w, me, MovesHelp.Verb.Combo);
                         }
@@ -852,6 +856,11 @@ namespace CriticalMass.Runtime.View.B17
             }
             _refundsSeen = w.Moves.Defence.Refunds;
         }
+
+        /// <summary>Readability-3 item 1: the local player's opponent (the last fighter he hit or who hit him) for this long.</summary>
+        public const float FocusSeconds = 3f;
+        int _focus = -1;
+        float _focusAt = -100f;
 
         /// <summary>Readability-3 item 7: my last dodge refund (wall time and frame), for the dodge chip's DODGE BACK.</summary>
         public static float DodgeBackAt = -9f;

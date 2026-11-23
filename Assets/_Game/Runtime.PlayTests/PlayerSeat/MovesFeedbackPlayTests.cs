@@ -138,7 +138,27 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
             Assert.Greater(WorldWords.Rank(ActionTags.FinisherWord), WorldWords.Rank("BLOCKED"));
             Assert.Greater(WorldWords.Rank("BLOCKED"), WorldWords.Rank(ActionTags.SecondWindWord));
             Assert.AreEqual(WorldWords.Rank("STUNNED"), WorldWords.Rank("PERFECT"), "the rest share the lowest rank");
-            Assert.AreEqual(2, WorldWords.MaxPerAnchor);
+            Assert.AreEqual(1, WorldWords.MaxPerAnchor, "readability-3: one word per body");
+        }
+
+        [Test]
+        public void OneCalloutBudgetRules()   // readability-3 items 1, 2
+        {
+            Assert.AreEqual(WorldWords.Group("COUNTERED"), WorldWords.Group("INTERRUPTED"), "near-duplicates merge");
+            Assert.AreEqual(WorldWords.Group("COUNTER!"), WorldWords.Group("PUNISH!"));
+            Assert.AreNotEqual(WorldWords.Group("COUNTER!"), WorldWords.Group("COUNTERED"), "mine and his are different words");
+            Assert.AreEqual(0, WorldWords.Group("BLOCKED"));
+            Assert.IsTrue(WorldWords.ShownInThirdPerson(3, 3, -1), "over me");
+            Assert.IsTrue(WorldWords.ShownInThirdPerson(7, 3, 7), "over my opponent");
+            Assert.IsFalse(WorldWords.ShownInThirdPerson(9, 3, 7), "someone else's fight stays quiet");
+            Assert.IsTrue(WorldWords.ShownInThirdPerson(-1, 3, 7), "a word on a point");
+            var feed = WorldWords.RightAnchored(new Rect(1500f, 136f, 400f, 230f), 1920f, 1080f);
+            Vector2 p = new Vector2(1600f, 1080f - 200f);
+            Assert.IsTrue(WorldWords.Clear(ref p, 40f, feed), "a word in the kill feed column moves");
+            Assert.LessOrEqual(p.y + WorldWords.PillH * 0.5f, feed.yMin, "under the panel");
+            Assert.AreEqual(DamageNumbers.Kind.Crit, DamageNumbers.Stronger(DamageNumbers.Kind.Hit, DamageNumbers.Kind.Crit));
+            Assert.AreEqual(DamageNumbers.Kind.Heavy, DamageNumbers.Stronger(DamageNumbers.Kind.Heavy, DamageNumbers.Kind.Hit));
+            Assert.AreEqual(0.25f, DamageNumbers.MergeWindow);
         }
 
         [Test]
@@ -316,12 +336,12 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
 
             yield return Expect(() => World.PushEvent(W, SimEventType.SecondWind, 0, -1, W.X[0], W.Z[0], 0), ActionTags.SecondWindWord);
             yield return Expect(() => World.PushEvent(W, SimEventType.ComboStep, 0, -1, W.X[e], W.Z[e], 2), "x2");
+            // readability-3: one word per body by rank, so the low-ranked TRIPPED goes before GUARD BREAK (rank 5) on the same body
+            int puffs = Views.PuffsAlive;
+            yield return Expect(() => World.PushEvent(W, SimEventType.Slide, 0, e, W.X[e], W.Z[e], 0), ActionTags.TrippedWord);
+            Assert.Greater(Views.PuffsAlive, puffs, "the trip throws dust (a trip with no damage too)");
             yield return Expect(() => World.PushEvent(W, SimEventType.GuardBreak, e, 0, W.X[e], W.Z[e], 0), ActionTags.GuardBreakWord);
             yield return Expect(() => World.PushEvent(W, SimEventType.FeintBaited, 0, e, W.X[0], W.Z[0], 0), ActionTags.BaitedWord);
-
-            int puffs = Views.PuffsAlive;
-            yield return Expect(() => World.PushEvent(W, SimEventType.Slide, 0, e, W.X[e], W.Z[e], 1), ActionTags.TrippedWord);
-            Assert.Greater(Views.PuffsAlive, puffs, "the trip throws dust");
 
             yield return Expect(() => World.PushEvent(W, SimEventType.HitBlocked, e, 0, W.X[e], W.Z[e], PlayerReasons.BlockedParried), ActionTags.ParryWord);
             double now = Time.unscaledTimeAsDouble;
