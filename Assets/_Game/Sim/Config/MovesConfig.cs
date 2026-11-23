@@ -206,6 +206,27 @@ namespace CriticalMass.Sim.Config
             return m;
         }
 
+        /// <summary>The switches as a bit mask (bit 0 DemoTntOnDigOnly .. bit 13 SecondWind, declaration order): what a replay
+        /// header stores (ReplayStart.MovesMask) so playback rebuilds the recorded switches. Knobs are not in it.</summary>
+        public int Mask()
+        {
+            bool[] b = { DemoTntOnDigOnly, DodgeLunge, DodgeAvoidRefund, FeintBait, BotStepOut, BuilderQuickWall,
+                Guard, Heavy, Combos, Travel, Slide, Glide, JumpEvade, SecondWind };
+            int m = 0;
+            for (int i = 0; i < b.Length; i++) if (b[i]) m |= 1 << i;
+            return m;
+        }
+
+        /// <summary>Sets every switch from a <see cref="Mask"/> value (knobs unchanged).</summary>
+        public MovesConfig SetMask(int m)
+        {
+            DemoTntOnDigOnly = (m & 1) != 0; DodgeLunge = (m & 2) != 0; DodgeAvoidRefund = (m & 4) != 0; FeintBait = (m & 8) != 0;
+            BotStepOut = (m & 16) != 0; BuilderQuickWall = (m & 32) != 0; Guard = (m & 64) != 0; Heavy = (m & 128) != 0;
+            Combos = (m & 256) != 0; Travel = (m & 512) != 0; Slide = (m & 1024) != 0; Glide = (m & 2048) != 0;
+            JumpEvade = (m & 4096) != 0; SecondWind = (m & 8192) != 0;
+            return this;
+        }
+
         public MovesConfig Clone()
         {
             var c = (MovesConfig)MemberwiseClone();

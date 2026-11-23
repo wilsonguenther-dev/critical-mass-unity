@@ -241,7 +241,8 @@ namespace CriticalMass.Runtime.Input
                 case "HudCursor": return pad ? "<Gamepad>/dpad/down" : "<Keyboard>/leftAlt";
                 case "MinimapZoom": return pad ? "<Gamepad>/dpad/right" : "<Keyboard>/n";
                 case "LockFacing": return pad ? "<Gamepad>/rightStick" : "<Keyboard>/l";
-                case "ShowTerrain": return pad ? "<Gamepad>/rightStickPress" : "<Keyboard>/q";
+                case "ShowTerrain": return pad ? "<Gamepad>/rightStickPress" : "<Keyboard>/o";   // class moves: Q is GUARD
+                case "Guard": return pad ? "<Gamepad>/buttonEast" : "<Keyboard>/q";   // class moves T2-1
             }
             return null;
         }

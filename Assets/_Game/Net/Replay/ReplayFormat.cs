@@ -36,6 +36,9 @@ namespace CriticalMass.Net.Replay
         public ClassId[] ExtraHumanClasses = new ClassId[0];
         /// <summary>The actor the recording machine's player played (the camera and HUD follow it in playback).</summary>
         public int LocalActor;
+        /// <summary>Class moves (format 2): MovesConfig.Mask() of the recorded config (0 = every switch off, and what a format 1
+        /// file reads), so a round recorded with the play build's switches plays back with them.</summary>
+        public int MovesMask;   // mv-hook
 
         /// <summary>A fresh config exactly as the recorded match built it (same order as MatchRequest.ToWorldOptions).</summary>
         public GameConfig BuildConfig()
@@ -45,6 +48,7 @@ namespace CriticalMass.Net.Replay
             if (MatchSeconds > 0) cfg.MatchSeconds = MatchSeconds;
             if (HatchSeconds > 0) cfg.HatchSeconds = Math.Min(HatchSeconds, cfg.MatchSeconds);
             if (PassiveBotSeconds > 0 && cfg.Bots != null) cfg.Bots.PassiveSeconds = PassiveBotSeconds;
+            if (MovesMask != 0 && cfg.Depth.Moves != null) cfg.Depth.Moves.SetMask(MovesMask);   // mv-hook
             return cfg;
         }
 
@@ -82,6 +86,7 @@ namespace CriticalMass.Net.Replay
             ExtraHumans = o.ExtraHumans != null ? (int[])o.ExtraHumans.Clone() : new int[0],
             ExtraHumanClasses = o.ExtraHumanClasses != null ? (ClassId[])o.ExtraHumanClasses.Clone() : new ClassId[0],
             LocalActor = localActor,
+            MovesMask = o.Config != null && o.Config.Depth != null && o.Config.Depth.Moves != null ? o.Config.Depth.Moves.Mask() : 0,   // mv-hook
         };
     }
 
@@ -259,6 +264,7 @@ namespace CriticalMass.Net.Replay
                 w.U8(h.Roster[i].Human ? 1 : 0);
                 w.Str(h.Roster[i].Name);
             }
+            w.U16(s.MovesMask & 0xFFFF);   // mv-hook: format 2, appended after the roster
         }
 
         // ------------------------------------------------------------------ read
@@ -428,6 +434,7 @@ namespace CriticalMass.Net.Replay
                 h.Roster[i].Human = r.U8() != 0;
                 h.Roster[i].Name = r.Str();
             }
+            s.MovesMask = r.Pos + 2 <= r.End ? r.U16() : 0;   // mv-hook: a format 1 header ends at the roster
             h.Start = s;
             h.FormatVersion = FormatVersion;
             // Sanity: values a real recording always has (a damaged header that passed the checksum is still refused).

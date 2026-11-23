@@ -51,7 +51,11 @@ namespace CriticalMass.Runtime.Input
             new Remap("SwitchDigPlace", "<Keyboard>/r", "<Keyboard>/comma"),
             new Remap("Ping", "<Keyboard>/g", "<Keyboard>/semicolon"),
             new Remap("HudCursor", "<Keyboard>/leftAlt", "<Keyboard>/rightAlt"),
-            new Remap("ShowTerrain", "<Keyboard>/q", "<Keyboard>/quote"),
+            // class moves: Q is GUARD now (show-terrain keeps O, a right-hand key already). Guard's mouse-column Q goes to ' and its
+            // other two keys leave ; (Ping here) and Right Shift (Jump here) for the brackets, so no key does two jobs.
+            new Remap("Guard", "<Keyboard>/q", "<Keyboard>/quote"),
+            new Remap("Guard", "<Keyboard>/semicolon", "<Keyboard>/leftBracket"),
+            new Remap("Guard", "<Keyboard>/rightShift", "<Keyboard>/rightBracket"),
         };
 
         public static IReadOnlyList<Remap> Remaps(ControlPreset p) => p == ControlPreset.LeftHanded ? LeftHandedRemaps : NoRemaps;
@@ -75,7 +79,7 @@ namespace CriticalMass.Runtime.Input
                 case ControlPreset.ArrowsZxc: return "Arrows move (right hand). Z attack, X ability, C jump, V interact, F use tool, R next tool, L CTRL lock facing, L SHIFT dodge (left hand).";
                 case ControlPreset.WasdJkl: return "WASD move (left hand). J attack, K ability, SPACE jump, H interact, U use tool, I next tool, L lock facing (right hand). L SHIFT dodge.";
                 case ControlPreset.WasdMouse: return "WASD move, SPACE jump, L SHIFT dodge, E interact, F use tool (left hand). The mouse aims, clicks attack and ability, the wheel picks the tool.";
-                default: return "Mouse in the left hand aims and attacks. Arrows move; R SHIFT jump, / interact, . dig, , switch, ; ping (right hand).";
+                default: return "Mouse in the left hand aims and attacks. Arrows move; R SHIFT jump, ' guard, / interact, . dig, , switch, ; ping (right hand).";
             }
         }
 
