@@ -415,7 +415,7 @@ namespace CriticalMass.Runtime.Camera
             double strength = GameSettings.CombatCameraStrengthOverride ?? _combatStrength;
             double a = Driver.Alpha;
             double mx = w.PrevX[me] + (w.X[me] - w.PrevX[me]) * a, mz = w.PrevZ[me] + (w.Z[me] - w.PrevZ[me]) * a;
-            int t = enabled ? CombatTarget(w, me) : -1;
+            int t = enabled ? CombatTarget(w, me, _lastFramed) : -1;
             bool alive = false;
             if (t >= 0) _lastFramed = t;
             if (_lastFramed >= 0 && _lastFramed < w.ActorCount && w.Actors[_lastFramed].Alive)
@@ -472,8 +472,10 @@ namespace CriticalMass.Runtime.Camera
             _follow.SetPitch(_ownPitch + _combat.PitchOffset, rig.MinPitch, rig.MaxPitch);
         }
 
-        /// <summary>The enemy the combat framing shows (-1 none): see StepCombat.</summary>
-        static int CombatTarget(World w, int me)
+        /// <summary>The enemy the combat framing shows (-1 none): see StepCombat. Sticky: the body already framed is kept while
+        /// he stays within 1.25 x the range (a crowd's nearest-enemy flicker never swings the camera), unless the player
+        /// locks someone else.</summary>
+        static int CombatTarget(World w, int me, int last)
         {
             if (w == null || me < 0 || me >= w.ActorCount || !w.Actors[me].Alive) return -1;
             Actor a = w.Actors[me];
@@ -482,8 +484,14 @@ namespace CriticalMass.Runtime.Camera
             bool busy = a.SwingPending || (sinceSwing >= 0 && sinceSwing <= a.SwingWindup + a.SwingRecovery + 1) || a.HitStunTicks > 0
                         || CriticalMass.Runtime.View.B17.MovesRead.GuardHeld(w, me)
                         || FightState.SinceCombat(Time.unscaledTimeAsDouble) < CombatFrame.RecentSeconds;
-            double near = reach * CombatFrame.ReachShare;
-            return FightState.Target(w, me, busy ? Math.Max(near, CombatFrame.BusyRange) : near);
+            double near = reach * CombatFrame.ReachShare, range = busy ? Math.Max(near, CombatFrame.BusyRange) : near;
+            int t = FightState.Target(w, me, range);
+            if (t >= 0 && t != last && last >= 0 && last < w.ActorCount && t != AimAssist.LockTarget && w.Actors[last].Alive && w.Actors[last].Team != a.Team)
+            {
+                double dx = w.X[last] - w.X[me], dz = w.Z[last] - w.Z[me], keep = range * 1.25;
+                if (dx * dx + dz * dz <= keep * keep) t = last;
+            }
+            return t;
         }
 
         /// <summary>How much of the framed camera fits on one side (turn +1 / -1) at full weight (0..1, pure on the grid and
@@ -697,6 +705,9 @@ namespace CriticalMass.Runtime.Camera
         void UpdateAimDistance(World w)
         {
             if (_cam == null) return;
+            // fix/px-combat-camera: while the combat framing turns the drawn camera, the screen centre is no longer the
+            // player's reticle line: keep the aim distance he had going in (a throw's reach never jumps mid-fight).
+            if (_combat.K > 0.01) return;
             Ray ray = _cam.ViewportPointToRay(new Vector3(0.5f, 0.5f, 0f));
             double hx = w.X[LocalSeat.Actor], hz = w.Z[LocalSeat.Actor];
             if (GroundHeight.TryAimPoint(ray, w.Map, hx, hz, out double sx, out double sz))
