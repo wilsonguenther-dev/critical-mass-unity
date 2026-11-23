@@ -43,8 +43,8 @@ namespace CriticalMass.Runtime.Input
     public sealed class HumanInputSource : MonoBehaviour
     {
         /// <summary>Action names in the Player map bound to game buttons, parallel to Buttons.</summary>
-        private static readonly string[] ButtonActions = { "Jump", "Attack", "Ability", "Interact", "DigPlace", "Pause", "Scoreboard", "Dodge", "Cancel" };
-        private static readonly B[] Buttons = { B.Jump, B.Attack, B.Ability, B.Interact, B.DigPlace, B.Pause, B.Scoreboard, B.Dodge, B.Cancel };
+        private static readonly string[] ButtonActions = { "Jump", "Attack", "Ability", "Interact", "DigPlace", "Pause", "Scoreboard", "Dodge", "Cancel", "Guard" };
+        private static readonly B[] Buttons = { B.Jump, B.Attack, B.Ability, B.Interact, B.DigPlace, B.Pause, B.Scoreboard, B.Dodge, B.Cancel, B.Guard };
 
         /// <summary>The human's input between two sim steps; SimDriverBehaviour calls State.Fill once per tick.</summary>
         public HumanInputState State { get; } = new HumanInputState();
@@ -217,6 +217,25 @@ namespace CriticalMass.Runtime.Input
         /// every preset: the left-handed one puts Jump on Right Shift and Ping on ; (ControlPresets.LeftHandedRemaps).</summary>
         public static readonly string[] CancelDefaults = { "<Mouse>/forwardButton", "<Keyboard>/p", "<Keyboard>/backslash", "<Gamepad>/leftShoulder" };
 
+        /// <summary>Class moves T2-1: GUARD / PARRY defaults, in the Controls tab's slot order: Q (mouse column; Q is no longer
+        /// show-terrain, which keeps O and R3), ; (by J K L), Right Shift (by the arrows), B (controller east face; no longer a
+        /// second class-ability button, LT keeps it). The left-handed preset moves them (ControlPresets.LeftHandedRemaps).</summary>
+        public static readonly string[] GuardDefaults = { "<Keyboard>/q", "<Keyboard>/semicolon", "<Keyboard>/rightShift", "<Gamepad>/buttonEast" };
+
+        /// <summary>Class moves: adds the Guard action with GuardDefaults when the actions asset lacks it (in memory only).</summary>
+        public static void EnsureGuardAction(InputActionMap map)
+        {
+            if (map == null || map.FindAction("Guard", false) != null) return;
+            bool was = map.enabled;
+            if (was) map.Disable();
+            InputAction g = map.AddAction("Guard", InputActionType.Button);
+            g.AddBinding(GuardDefaults[0], groups: "KeyboardMouse");
+            g.AddBinding(GuardDefaults[1], groups: "KeyboardMouse").WithName(ControlBindings.WasdHand);
+            g.AddBinding(GuardDefaults[2], groups: "KeyboardMouse").WithName(ControlBindings.ArrowsHand);
+            g.AddBinding(GuardDefaults[3], groups: "Gamepad");
+            if (was) map.Enable();
+        }
+
         /// <summary>b16: adds the Cancel action with CancelDefaults when the actions asset lacks it (in memory only).</summary>
         public static void EnsureCancelAction(InputActionMap map)
         {
@@ -337,7 +356,7 @@ namespace CriticalMass.Runtime.Input
             _keyAimPressed = false;
             // Tier F31: the device used most recently aims (a mouse MOVE, a deflected stick, the move keys or a keyboard attack
             // key); a resting cursor never keeps the aim from a keys player (AimDeviceArbiter.PointerHoldSeconds after its
-            // last move it lets go). A click is not aim input.
+            // last move it lets go). Fix round 7: a mouse BUTTON press is aim input (it aims at the cursor, see below).
             double nowT = Time.unscaledTimeAsDouble;
             Mouse mouse = Mouse.current;
             Vector2 md = mouse != null ? mouse.delta.ReadValue() : Vector2.zero;
@@ -345,6 +364,10 @@ namespace CriticalMass.Runtime.Input
             bool stickUsed = stick.sqrMagnitude > 0f || moveByPad;
             if (stickUsed) _devices.NoteStick(nowT);
             if (pointerMoved) _devices.NotePointerMoved(nowT);
+            // fix round 7: a mouse button press aims at the cursor for that press (noted before the keys, so a tie goes to it)
+            bool mousePressed = mouse != null && (mouse.leftButton.wasPressedThisFrame || mouse.rightButton.wasPressedThisFrame
+                || mouse.middleButton.wasPressedThisFrame || mouse.forwardButton.wasPressedThisFrame || mouse.backButton.wasPressedThisFrame);
+            if (mousePressed) _devices.NotePointerPressed(nowT);
             if (fromKeys || keyAim) _devices.NoteKeys(nowT, keyAim);
             AimResolver.Mode aimWas = Aim.Current;
             AimResolver.Mode aimNow = _devices.Decide(nowT, aimWas);
@@ -412,8 +435,22 @@ namespace CriticalMass.Runtime.Input
                     // Lane I: no built-in 30 degree snap any more (it skipped actor 0); AimAssistBrain below does it for every
                     // device, with the KEYS strength setting.
                     Aim.ResolveKeys(dx, dz, w.X[me], w.Z[me], w.Actors[me].Facing, FacingLocked, null, null, 0, out double kx, out double kz);
+                    // Class moves T1-6 (lane 6, wired by the integrator): a keyboard-only cast lands ON the assisted enemy (7 u, 30 deg),
+                    // else 3 u ahead; a held key still extends the distance (the hold rule below). Off = today's behaviour.
+                    bool movesKeysPoint = false;
+                    if (MovesInput.StickCastDistance && (State.AbilityIntent || _castHolding || _castRelease))
+                    {
+                        double heldNow = _castHolding ? Time.unscaledTimeAsDouble - _castDownAt : (_castRelease ? _castHeldFor : 0);
+                        if (heldNow < CastDistance.TapSeconds)
+                        {
+                            int ne = CollectEnemies(w);
+                            AimResolver.MovesKeysCastPoint(w.X[me], w.Z[me], kx - w.X[me], kz - w.Z[me], AbilityMaxRange(w, me), _enemyX, _enemyZ, ne,
+                                out kx, out kz, out _);
+                            movesKeysPoint = true;
+                        }
+                    }
                     // Item 2: hold the ability key to throw farther (release casts); a tap casts at the default.
-                    if (_castHolding || _castRelease)
+                    if ((_castHolding || _castRelease) && !movesKeysPoint)
                     {
                         double held = _castHolding ? Time.unscaledTimeAsDouble - _castDownAt : _castHeldFor;
                         if (held < CastDistance.TapSeconds) held = 0;
@@ -431,7 +468,9 @@ namespace CriticalMass.Runtime.Input
                 {
                     // Item 2: with the right stick pushed, its deflection picks the cast distance (1 u .. the ability's range).
                     float mag = stick.magnitude;
-                    if (mag > 0f) ScaleAim(w.X[me], w.Z[me], ref ax, ref az, CastDistance.FromStick(Math.Min(1.0, mag), AbilityMaxRange(w, me)));
+                    if (mag > 0f) ScaleAim(w.X[me], w.Z[me], ref ax, ref az, MovesInput.StickCastDistance   // class moves T1-6 (integrator)
+                        ? AimResolver.MovesStickCastDistance(Math.Min(1.0, mag), AbilityMaxRange(w, me))
+                        : CastDistance.FromStick(Math.Min(1.0, mag), AbilityMaxRange(w, me)));
                     State.SetAim(ax, az);
                 }
                 else State.ClearAim();
@@ -547,7 +586,7 @@ namespace CriticalMass.Runtime.Input
             int n = BuildCandidates(w, me, px, pz);
             LightWeapon lw = LightWeapons.Of(w, self.Cls);
             ClassConfig cc = cfg.Class(self.Cls);
-            bool tnt = CombatFeel.On(w) && self.Cls == ClassId.Demolitions && cfg.Abilities.DemolitionsTnt.ThrowOnAttack && w.Tick >= w.Demolitions.TntReadyTick[me];
+            bool tnt = CombatFeel.On(w) && self.Cls == ClassId.Demolitions && cfg.Abilities.DemolitionsTnt.ThrowOnAttack && !MovesHooks.OffenceConfigTntOnDigOnly(cfg) && w.Tick >= w.Demolitions.TntReadyTick[me];   // class moves T1-1 (integrator)
             bool abilityPress = (State.AbilityIntent || _castHolding || _castRelease) && self.Cls == ClassId.Farmer && !State.AttackIntent;
             double now = Time.unscaledTimeAsDouble;
             double dt = _lastAssistTime >= 0 ? Math.Max(0, Math.Min(0.25, now - _lastAssistTime)) : 0;

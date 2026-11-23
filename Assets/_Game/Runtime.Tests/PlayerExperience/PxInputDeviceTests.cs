@@ -28,6 +28,33 @@ namespace CriticalMass.Runtime.Tests.PlayerExperience
             Assert.AreEqual(Mode.Keys, m);
         }
 
+        /// <summary>Fix round 7 (owner's call): walk with the keys for 3 s with the cursor resting (it moved once at the start),
+        /// then click: the click hands the aim to the cursor at once, past PointerHoldSeconds, with no move.</summary>
+        [Test]
+        public void AClickAfterWalkingWithTheKeysAimsAtTheRestingCursor()
+        {
+            var a = new AimDeviceArbiter();
+            Mode m = Mode.Pointer;
+            a.NotePointerMoved(0);
+            m = a.Decide(0, m);
+            double t = 0;
+            for (; t < 3.0; t += Dt) { a.NoteKeys(t); m = a.Decide(t, m); }
+            Assert.AreEqual(Mode.Keys, m, "3 s of walking with a resting cursor: the keys aim (past the hold)");
+            a.NotePointerPressed(t);
+            a.NoteKeys(t);   // still walking on the click frame
+            m = a.Decide(t, m);
+            Assert.AreEqual(Mode.Pointer, m, "the click aims at the cursor on its own frame");
+            double u = t + Dt;
+            for (; u < t + 0.25; u += Dt) { a.NoteKeys(u); m = a.Decide(u, m); }
+            Assert.AreEqual(Mode.Pointer, m, "and after it, while the player keeps walking");
+            a.NoteKeys(t + 0.3, true);
+            m = a.Decide(t + 0.3, m);
+            Assert.AreEqual(Mode.Pointer, m, "a keyboard attack right after the click does not snatch it back");
+            double later = t + AimDeviceArbiter.KeyAttackHoldSeconds + 0.1;
+            a.NoteKeys(later, true);
+            Assert.AreEqual(Mode.Keys, a.Decide(later, m), "a keyboard attack once the cursor has rested takes it, as before");
+        }
+
         [Test]
         public void TheHandOverGoesBothWays()
         {

@@ -77,6 +77,7 @@ namespace CriticalMass.Runtime.View.B13
                 q.SetActive(false);
             }
             for (int i = 0; i < _lastTick.Length; i++) _lastTick[i] = -1;
+            gameObject.AddComponent<B17.MovesViews>();   // class moves lane 6: the new verbs' world feedback and words (inert while World.Moves is null)
             if (System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "-dodgeShots") >= 0) gameObject.AddComponent<Effects.DodgeShots>();
         }
 

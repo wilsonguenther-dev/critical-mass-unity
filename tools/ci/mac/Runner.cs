@@ -31,12 +31,15 @@ public static class Runner
                 var cases = m.GetCustomAttributes(typeof(TestCaseAttribute), true).Cast<TestCaseAttribute>().Select(c => c.Arguments).ToList();
                 if (cases.Count == 0 && Has<TestAttribute>(m)) cases.Add(new object[0]);
                 if (cases.Count == 0) continue;
+                string onlyMethods = Environment.GetEnvironmentVariable("CM_TEST_METHOD");   // optional: method-name substrings, comma separated
+                if (!string.IsNullOrEmpty(onlyMethods) && !onlyMethods.Split(',').Any(x => m.Name.Contains(x))) continue;
                 bool slow = fixtureSlow || IsSlow(m);
                 if ((mode == "fast" && slow) || (mode == "slow" && !slow) || Has<ExplicitAttribute>(m) || Has<IgnoreAttribute>(m) || Has<IgnoreAttribute>(t)) { skip += cases.Count; continue; }
                 foreach (object[] a in cases)
                 {
                     string name = t.Name + "." + m.Name + (a.Length > 0 ? "(" + string.Join(",", a.Select(x => x?.ToString() ?? "null")) + ")" : "");
                     var sw = System.Diagnostics.Stopwatch.StartNew();
+                    NUnit.Framework.Internal.TestResult ctxResult = null;
                     try
                     {
                         if (setupFailed) throw new Exception("OneTimeSetUp failed");
@@ -46,9 +49,16 @@ public static class Runner
                             try { foreach (var os in Marked<OneTimeSetUpAttribute>(t)) os.Invoke(os.IsStatic ? null : inst, null); }
                             catch { setupFailed = true; throw; }
                         }
+                        // TestContext.WriteLine needs an execution context with an OutWriter (Unity's runner has one; without it the
+                        // call throws a stackless-looking NullReferenceException: the "online lockstep NRE" reds on the Mac runner).
+                        var ctx = new NUnit.Framework.Internal.TestExecutionContext();
+                        ctx.CurrentResult = new NUnit.Framework.Internal.TestCaseResult(new NUnit.Framework.Internal.TestMethod(new NUnit.Framework.Internal.MethodWrapper(t, m)));
+                        ctx.EstablishExecutionEnvironment();
+                        ctxResult = ctx.CurrentResult;
                         foreach (var su in Marked<SetUpAttribute>(t)) su.Invoke(inst, null);
                         try { m.Invoke(m.IsStatic ? null : inst, a.Length == 0 ? null : a); }
                         finally { foreach (var td in Marked<TearDownAttribute>(t)) td.Invoke(inst, null); }
+                        if (ctxResult != null && !string.IsNullOrEmpty(ctxResult.Output)) Console.Write(ctxResult.Output);
                         pass++;
                         Console.WriteLine("PASS " + name + " (" + sw.ElapsedMilliseconds + " ms)");
                     }
@@ -59,6 +69,7 @@ public static class Runner
                         fail++;
                         string msg = (x.GetType().Name + ": " + x.Message).Replace("\n", " | ");
                         Console.WriteLine("FAIL " + name + ": " + (msg.Length > 4000 ? msg.Substring(0, 4000) : msg));
+                        if (Environment.GetEnvironmentVariable("CM_TEST_STACK") == "1") Console.WriteLine("STACK " + name + ":\n" + x);
                     }
                 }
             }

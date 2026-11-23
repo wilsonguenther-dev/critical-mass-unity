@@ -385,8 +385,10 @@ namespace CriticalMass.Runtime.View
             double z = hasFx && fx.Corpse ? fx.CorpseZ : Lerp(w.PrevZ[i], w.Z[i], a);
             if (_stressHill) StressPlace(map.Hill, i, ref x, ref z);
             // fix round 5 (item 7): a fresh knock is drawn at the current tick, not up to a tick behind it (HitFeelTuning.KnockAlphaLead)
+            double interpX = x, interpZ = z, knockAge = -1;
             if (!(hasFx && fx.Corpse) && _fx != null && _fx.Knock(i, out double kAge, out _, out _, out _, out _, out _))
             {
+                knockAge = kAge;
                 double share = Anim.HitFeelTuning.KnockAlphaLead(kAge);
                 if (share > 0) { x += (w.X[i] - x) * share; z += (w.Z[i] - z) * share; }
             }
@@ -416,7 +418,7 @@ namespace CriticalMass.Runtime.View
                 float d = (float)(2 * cfg.Class(actor.Cls).Radius);
                 if (i == 0) d *= HumanScale;
                 slot.Capsule.localScale = new Vector3(d, (float)(charHeight / 2), d);
-                slot.Capsule.localPosition += JumpLift.Offset(w, map, i, a, x, z) + B16.JumpRefusedView.Offset(w, i, a); // DG-02 jump arc; b16 [11] stumble
+                slot.Capsule.localPosition += JumpLift.Offset(w, map, i, a, x, z) + Vector3.up * B17.MovesPoses.GlideLift(w, i, a) + B16.JumpRefusedView.Offset(w, i, a); // DG-02 jump arc; b16 [11] stumble
                 SetMaterial(slot.CapsuleRenderer, ToonMaterials.Character(actor.Team == TeamId.Azure ? Palette.Azure : Palette.Crimson));
                 return false;
             }
@@ -464,9 +466,14 @@ namespace CriticalMass.Runtime.View
             if (hasFx && fx.Corpse) { knockLead = Vector3.zero; knockCheck = false; }   // the death launch owns a corpse's travel
             Vector3 drawnOff = Anim.HitFeel.ClampOffset((hasFx ? fx.Nudge : Vector3.zero) + Anim.HitFeel.Lunge(w, i, a)) + knockLead;
             drawnOff = ClampDrawn(drawnOff);
+            // fix round 7 (ModelsStandOnTheirGround 0.38-0.47 u): once the knock's first KnockCheckSeconds are over, the cap
+            // counts from the INTERPOLATED spot (where the ring is) again, the current-tick shift included, eased in over
+            // KnockCapEaseSeconds so nothing pops; the 100 ms check (F03) still sees the full lead.
+            if (knockAge > Anim.HitFeelTuning.KnockCheckSeconds) drawnOff = Anim.HitFeelTuning.CapFromInterpolated(drawnOff, SimSpace.ToWorld(x - interpX, 0, z - interpZ), knockAge);
             if (knockCheck) knockDrawn = KnockDrawnNow(i, x, z, drawnOff);
             m.Transform.localPosition = basePos + drawnOff
                 + JumpLift.Offset(w, map, i, a, x, z) // DG-02 jump arc
+                + Vector3.up * B17.MovesPoses.GlideLift(w, i, a) // class moves T2-6 glide apex hold (lane 6, integrator)
                 + B16.JumpRefusedView.Offset(w, i, a); // b16 [11]: the refused-jump stumble
             Material teamMat = CriticalMass.Runtime.Progression.TrimMaterials.ForActor(ArtMaterials.ForTeam(m.Spec, actor.Team), i);   // b15 profile: colour trim (fixed colours only; cached, no allocation)
             m.SetMaterial(hasFx && fx.Flash ? _fx.FlashMaterial(teamMat, fx.FlashOwn) : teamMat);
@@ -554,6 +561,9 @@ namespace CriticalMass.Runtime.View
                     if (!_swingFromPredict) { _swingSeenFrame = Time.frameCount; _swingReported = false; }
                     _swingFromPredict = false;
                 }
+                // fix round 7 (review pass 7 (a): a SwingCommit at +8 with no melee swing): a predicted press that ended
+                // without the sim's swing (TNT, a refusal, a timeout) reports nothing
+                if (_swingFromPredict && !slot.Anim.Predicting && slot.Anim.LastPredictionEnded) { _swingFromPredict = false; _swingReported = true; }
                 if (!_swingReported && (swingTick >= 0 || _swingFromPredict) && Time.frameCount - _swingSeenFrame >= 2)
                 {
                     _swingReported = true;
@@ -580,6 +590,12 @@ namespace CriticalMass.Runtime.View
             {
                 slot.Anim.PredictSwing(m, actor, cfg, simTime);
                 if (slot.Anim.Predicting) _predStartFrame = Time.frameCount;
+            }
+            else if (intent && !_intentWas && actor != null && actor.Alive && actor.AttackCd > 0 && actor.StandUp <= 0)
+            {
+                // fix round 7 (review pass 7 (c)): a press during the cooldown is acknowledged with a short, capped wind-up
+                // that fades by 0.12 s; it never starts the SwingCommit count (no _predStartFrame)
+                slot.Anim.PredictSwing(m, actor, cfg, simTime, true);
             }
             _intentWas = intent;
         }

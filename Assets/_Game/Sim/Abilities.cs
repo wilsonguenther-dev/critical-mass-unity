@@ -112,6 +112,7 @@ namespace CriticalMass.Sim.Core
                 if (a.HitStunTicks > 0 && Phys.On(w, true)) continue; // DG-70: no cast while staggered
                 if (B13Hooks.TakeAbilityPress(w, i)) continue;   // b13-hook
                 if (Dodge.Active(w, i)) continue;   // b13-jd (routed): a dodging actor cannot use its ability
+                if (MovesHooks.CastLocked(w, i)) continue;   // mv-hook: guarding (lane 2), gliding (lane 3)
                 if (a.Cls == ClassId.Warrior) CastWarriorShield(w, i);
                 else if (a.Cls == ClassId.Farmer) CastFarmerRoots(w, i);
                 else if (a.Cls == ClassId.Miner) CastMinerBarricade(w, i);

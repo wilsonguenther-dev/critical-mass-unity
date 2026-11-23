@@ -26,7 +26,7 @@ namespace CriticalMass.Sim.Tests.Net
         }
 
         /// <summary>A room of `humans` people: the host on Azure, the second on the other team, any third on the host's team.</summary>
-        private static Rig Make(int humans, int teamSize, int delayMs, int jitterMs, double loss, LockstepOptions o = null, uint netSeed = 7, int inputDelay = 6)
+        private static Rig Make(int humans, int teamSize, int delayMs, int jitterMs, double loss, LockstepOptions o = null, uint netSeed = 7, int inputDelay = 6, int movesMask = 0)
         {
             var rig = new Rig { Net = new LoopbackNetwork(netSeed, delayMs, jitterMs, loss) };
             var teams = new TeamId[humans];
@@ -35,7 +35,7 @@ namespace CriticalMass.Sim.Tests.Net
             var actors = new int[humans];
             Assert.IsTrue(MatchSetup.AssignActors(teamSize, TeamId.Azure, teams, actors));
             // Pace 1: 30 ticks per wall second, so the millisecond numbers in these tests read as 33 ms ticks.
-            var setup = new MatchSetup { Seed = 4242, TeamSize = teamSize, HostTeam = TeamId.Azure, InputDelay = inputDelay, HashEvery = 30, Pace = 1 };
+            var setup = new MatchSetup { Seed = 4242, TeamSize = teamSize, HostTeam = TeamId.Azure, InputDelay = inputDelay, HashEvery = 30, Pace = 1, MovesMask = movesMask };
             setup.Humans = new HumanSlot[humans];
             var transports = new LoopbackTransport[humans];
             for (int i = 0; i < humans; i++)
@@ -46,9 +46,19 @@ namespace CriticalMass.Sim.Tests.Net
             }
             for (int i = 0; i < humans; i++)
             {
-                var s = new LockstepSession(transports[i], setup, GameConfig.CreateDefault(), o);
+                var s = new LockstepSession(transports[i], setup, setup.BuildConfig(), o);
                 var pilot = new AutoplayPilot((uint)(100 + i));
                 s.Sampler = pilot.Fill;
+                if (movesMask != 0)
+                {
+                    // class moves: the pilot also holds Guard and Jump now and then, so the new held inputs cross the wire
+                    s.Sampler = (w, actor, tick, f) =>
+                    {
+                        pilot.Fill(w, actor, tick, f);
+                        f.Guard = (tick / 17) % 5 == 1;
+                        f.JumpHeld = f.Jump || (tick / 11) % 7 == 3;
+                    };
+                }
                 var log = new Dictionary<int, ulong>();
                 s.HashRecorded = (t, h) => log[t] = h;
                 rig.Sessions.Add(s);
@@ -158,6 +168,56 @@ namespace CriticalMass.Sim.Tests.Net
             // Truncated: refused, never thrown.
             r = new WireReader(buf, 0, 9);
             Assert.IsNull(MatchSetup.Read(ref r, cfg));
+        }
+
+        /// <summary>Class moves (integrator, combine 2026-11-22): START carries the host's switch set; every machine builds the same
+        /// config from it (same ConfigHash as the play build's), a mask outside the 14 switches is refused.</summary>
+        [Test]
+        public void MatchSetupCarriesTheClassMovesSwitches()
+        {
+            int all = MovesConfig.PlayBuildAllOn(new MovesConfig()).Mask();
+            Assert.AreEqual((1 << 14) - 1, all, "14 switches, bits 0..13");
+            var cfg = GameConfig.CreateDefault();
+            var s = new MatchSetup { Seed = 5, TeamSize = 8, HostTeam = TeamId.Azure, InputDelay = 4, HashEvery = 30, MovesMask = all };
+            s.Humans = new[] { new HumanSlot { Peer = 0, Actor = 0, Class = ClassId.Warrior, Name = "A" }, new HumanSlot { Peer = 1, Actor = 8, Class = ClassId.Healer, Name = "B" } };
+            var buf = new byte[512];
+            var w = new WireWriter(buf);
+            s.Write(ref w);
+            var r = new WireReader(buf, 0, w.Pos);
+            MatchSetup back = MatchSetup.Read(ref r, cfg);
+            Assert.IsNotNull(back);
+            Assert.AreEqual(all, back.MovesMask);
+            GameConfig play = GameConfig.CreateDefault();
+            MovesConfig.PlayBuildAllOn(play.Depth.Moves);
+            Assert.AreEqual(ConfigHash.Of(play), ConfigHash.Of(back.BuildConfig()), "a client builds the play build's config from START");
+            Assert.AreNotEqual(ConfigHash.Of(GameConfig.CreateDefault()), ConfigHash.Of(back.BuildConfig()), "and the switches are in the config hash");
+            Assert.AreEqual(ConfigHash.Of(GameConfig.CreateDefault()), ConfigHash.Of(new MatchSetup().BuildConfig()), "mask 0 = today's config");
+            s.MovesMask = 1 << 14;
+            w = new WireWriter(buf);
+            s.Write(ref w);
+            r = new WireReader(buf, 0, w.Pos);
+            Assert.IsNull(MatchSetup.Read(ref r, cfg), "a bit past the 14 switches is refused");
+        }
+
+        /// <summary>Class moves (integrator): two peers with EVERY switch on (guard, heavy, combos, travel, glide...) under 150 ms
+        /// with jitter and 2% loss stay hash-identical for 90 s, and both worlds really run the class moves.</summary>
+        [Test]
+        public void TwoPeersWithEveryClassMoveOnStayIdentical()
+        {
+            int all = MovesConfig.PlayBuildAllOn(new MovesConfig()).Mask();
+            Rig rig = Make(2, 8, 150, 40, 0.02, movesMask: all);
+            Run(rig, 2700, 400_000);
+            foreach (LockstepSession s in rig.Sessions)
+            {
+                Assert.AreEqual(LockstepStatus.Running, s.Status, "no desync, no host loss with moves on: " + s.Status);
+                Assert.GreaterOrEqual(s.Stepped, 2700);
+                Assert.IsNotNull(s.World.Moves, "the class moves run on every machine");
+                Assert.IsTrue(s.World.Config.Depth.Moves.Guard && s.World.Config.Depth.Moves.Travel);
+            }
+            Assert.AreEqual(rig.Sessions[0].MyConfigHash, rig.Sessions[1].MyConfigHash);
+            AssertSameHashes(rig, 0, 1, 80);
+            TestContext.WriteLine($"moves on: guard blocks {rig.Sessions[0].World.Moves.Defence.GuardBlocks}, parries {rig.Sessions[0].World.Moves.Defence.Parries}, " +
+                                  $"heavies {rig.Sessions[0].World.Moves.Offence.Counts[MovesHooks.OffenceCountHeavies]}, dropped {rig.Net.Dropped}");
         }
 
         [Test]

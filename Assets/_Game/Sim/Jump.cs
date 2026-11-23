@@ -91,9 +91,30 @@ namespace CriticalMass.Sim.Core
         {
             Actor a = w.Actors[id];
             if (!a.Alive || a.StandUp > 0 || a.AirLen > 0) return false;
+            if (MovesHooks.JumpLocked(w, id)) return false;   // mv-hook: relock after an evading jump (lane 3)
             if (a.UnsupportedTicks > CoyoteTicks(w.Config)) return false;
-            int k = PlanJump(w, id, w.Vx[id], w.Vz[id], dt);
+            double jvx = w.Vx[id], jvz = w.Vz[id];
+            if (w.Moves != null) MovesHooks.MovementJumpTakeoff(w, id, ref jvx, ref jvz);   // class moves T2-4 (lane 3): travel's extra speed stays on the ground
+            int k = PlanJump(w, id, jvx, jvz, dt);
+            // class moves T2-6 (lane 3): a Healer holding Jump whose plain jump has no full-length landing may take off on a glide plan
+            if (w.Moves != null && k < AirTicks(w.Config) && MovesHooks.MovementGlidePlan(w, id, jvx, jvz, dt, out int gk, out double gx, out double gz))
+            {
+                w.Vx[id] = jvx;
+                w.Vz[id] = jvz;
+                a.AirLen = gk;
+                a.AirTick = 0;
+                a.AirFromX = w.X[id];
+                a.AirFromZ = w.Z[id];
+                a.AirToX = gx;
+                a.AirToZ = gz;
+                return true;
+            }
             if (k == 0) return false;
+            if (w.Moves != null)
+            {
+                w.Vx[id] = jvx;
+                w.Vz[id] = jvz;
+            }
             a.AirLen = k;
             a.AirTick = 0;
             a.AirFromX = w.X[id];
@@ -118,6 +139,7 @@ namespace CriticalMass.Sim.Core
         public static void LandJump(World w, int id)
         {
             Actor a = w.Actors[id];
+            MovesHooks.Landed(w, id);   // mv-hook: landing recovery, glide end (lane 3), lane 2
             ClearJump(a);
             if (Collide.FootprintClear(w, id, w.X[id], w.Z[id])) return;
             w.X[id] = a.AirFromX;

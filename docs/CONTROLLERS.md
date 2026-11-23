@@ -23,16 +23,17 @@ Settings, Controls, with a conflict warning and RESET ALL.
 | Aim | Faces where you move | Faces where you move | Mouse pointer | Right stick (at rest: faces where you move) |
 | Lock facing (hold, strafe) | L | L CTRL | not needed | Right stick |
 | Attack (hold to repeat) | J | Z | Left click (J and Z still work) | RT / R2 |
-| Class ability | K | X | Right click (K and X still work) | LT / L2, or B / circle |
+| Class ability | K | X | Right click (K and X still work) | LT / L2 |
 | Jump | SPACE | C | SPACE | A / cross |
 | Dodge | L SHIFT | R CTRL | L SHIFT | RB / R1 |
+| Guard (hold) / parry (tap at the last moment), class moves | ; | R SHIFT | Q | B / circle |
 | Cancel attack (feint) | P | \\ | Mouse forward side button | LB / L1 inside your own swing window (else LB is Next tool) |
 | Interact / carry / use station | H | V | E | X / square |
 | Dig / place | U | F | F | Y / triangle |
 | Next tool / switch dig and place | I (1-7 pick a Builder tool) | R | Mouse wheel | LB / L1 outside your swing window |
 | Ping | G | G | G or middle click | D-pad left |
 | Look around (hold) | ` | ` | ` | Hold R3 |
-| Show usable terrain (hold; terrain classes) | O | Q | Q | R3 (outside the base ring; inside it R3 opens the station) |
+| Show usable terrain (hold; terrain classes) | O | O | O | R3 (outside the base ring; inside it R3 opens the station) |
 | Scoreboard (hold) | TAB | TAB | TAB | View / Create |
 | Full map | M | M | M | D-pad up |
 | Base station | B | B | B | Click the right stick (R3) inside your base ring |
@@ -165,3 +166,14 @@ base station without panning; L3 no longer changes the camera view (a stick clic
 emote wheel only and the view is picked in Settings, CAMERA. LB stays Cancel inside your own swing window and Next tool
 everywhere else; the HUD reads InputContext.PadLbCancels to name which. Interact taps shorter than one frame now always
 reach the game.
+
+## Class moves (2026-11-22)
+
+Every class-moves verb has its own button or is a state of one button that the HUD names, so no button does two jobs at
+once. GUARD / PARRY is new: Q (keys and mouse), ; (W A S D with J K L), R SHIFT (arrows with Z X C), B / circle on a
+controller. Q stopped being "show usable terrain" (O and R3 keep it) and B stopped being a second class-ability button
+(LT keeps it). LEFT-HANDED moves guard to ' (and to [ and ], so ; stays ping and R SHIFT stays jump). The others use
+existing buttons: hold Attack to charge a heavy (a tap is still the light swing), press Attack again after a landed hit
+for the next combo step, Dodge while TRAVEL is lit is a SLIDE (travel only happens with no enemy within 8 units), and the
+Healer glides by holding Jump after the top of the jump. They are off in the normal build; the play build (scripting
+define CM_MOVES_ON) turns them all on.

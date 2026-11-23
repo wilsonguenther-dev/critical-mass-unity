@@ -118,6 +118,8 @@ namespace CriticalMass.Net
         public int TeamSize = 16;
         /// <summary>The match pace (0 = the game's default speed), the same for everyone in the room.</summary>
         public double Pace;
+        /// <summary>Class moves (integrator): the host's switch set (MovesConfig.Mask), sent in START so every peer builds the same config.</summary>
+        public int MovesMask;
         public RoomPhase Phase { get; private set; } = RoomPhase.Lobby;
         /// <summary>The last thing that happened, as one plain sentence for the room screen.</summary>
         public string Notice { get; private set; } = "";
@@ -495,13 +497,14 @@ namespace CriticalMass.Net
                 InputDelay = StartDelay(worst, tickMs),
                 HashEvery = 30,
                 Humans = new HumanSlot[n],
+                MovesMask = MovesMask,
             };
             for (int i = 0; i < n; i++)
                 setup.Humans[i] = new HumanSlot { Peer = Members[i].Peer, Actor = actors[i], Class = Members[i].Class, Name = Members[i].Name };
             // online-rooms-3: the match is built from the setup and a fresh default config only (never a config object an
             // earlier match or the offline game touched). The host builds first, then sends what it built from: the config
             // fingerprint and its tick 0 world fingerprint ride in the start message, and a client that differs refuses.
-            Session = new LockstepSession(_t, setup, GameConfig.CreateDefault(), options) { Other = InMatch };
+            Session = new LockstepSession(_t, setup, setup.BuildConfig(), options) { Other = InMatch };
             RoomNotices.Hook(Session, Chat);
             setup.ConfigHash = Session.MyConfigHash;
             setup.WorldHash0 = Session.MyWorldHash0;
@@ -761,7 +764,7 @@ namespace CriticalMass.Net
                     MatchSetup setup = MatchSetup.Read(ref r, _cfg);
                     if (setup == null) { Fail("The host sent a match this game cannot play."); return; }
                     if (setup.SlotOfPeer(_t.LocalPeer) <= 0) { Fail("The host did not give your seat back."); return; }
-                    Session = LockstepSession.Rejoining(_t, setup, GameConfig.CreateDefault(), Options);
+                    Session = LockstepSession.Rejoining(_t, setup, setup.BuildConfig(), Options);
                     Session.Other = Chat.Handle;
                     RoomNotices.Hook(Session, Chat);
                     Phase = RoomPhase.InMatch;
@@ -775,7 +778,7 @@ namespace CriticalMass.Net
                     MatchSetup setup = MatchSetup.Read(ref r, _cfg);
                     if (setup == null) { Fail("The host sent a match this game cannot play."); return; }
                     if (setup.SlotOfPeer(_t.LocalPeer) < 0) { Fail("The match started without you."); return; }
-                    Session = new LockstepSession(_t, setup, GameConfig.CreateDefault(), Options) { Other = Chat.Handle };
+                    Session = new LockstepSession(_t, setup, setup.BuildConfig(), Options) { Other = Chat.Handle };
                     RoomNotices.Hook(Session, Chat);
                     Phase = RoomPhase.InMatch;
                     Version++;

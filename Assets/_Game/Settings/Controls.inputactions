@@ -52,6 +52,15 @@
                     "initialStateCheck": false
                 },
                 {
+                    "name": "Guard",
+                    "type": "Button",
+                    "id": "a17e0b2c-6d3f-4e5a-8b1c-2d4e6f8a0b01",
+                    "expectedControlType": "Button",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
+                },
+                {
                     "name": "Attack",
                     "type": "Button",
                     "id": "63b2b4fb-5c32-4f52-a097-f4529b30650d",
@@ -488,17 +497,6 @@
                 },
                 {
                     "name": "",
-                    "id": "b14e0a5e-7c3d-4b21-9f0e-5a1c2d3e4f60",
-                    "path": "<Gamepad>/buttonEast",
-                    "interactions": "",
-                    "processors": "",
-                    "groups": "Gamepad",
-                    "action": "Ability",
-                    "isComposite": false,
-                    "isPartOfComposite": false
-                },
-                {
-                    "name": "",
                     "id": "0ab50077-06df-435c-8690-cf179bd43b62",
                     "path": "<Gamepad>/rightShoulder",
                     "interactions": "",
@@ -571,6 +569,50 @@
                     "processors": "",
                     "groups": "Gamepad",
                     "action": "Cancel",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "a17e0b2c-6d3f-4e5a-8b1c-2d4e6f8a0b02",
+                    "path": "<Keyboard>/q",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "KeyboardMouse",
+                    "action": "Guard",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "WASD",
+                    "id": "a17e0b2c-6d3f-4e5a-8b1c-2d4e6f8a0b03",
+                    "path": "<Keyboard>/semicolon",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "KeyboardMouse",
+                    "action": "Guard",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "Arrows",
+                    "id": "a17e0b2c-6d3f-4e5a-8b1c-2d4e6f8a0b04",
+                    "path": "<Keyboard>/rightShift",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "KeyboardMouse",
+                    "action": "Guard",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "a17e0b2c-6d3f-4e5a-8b1c-2d4e6f8a0b05",
+                    "path": "<Gamepad>/buttonEast",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "Gamepad",
+                    "action": "Guard",
                     "isComposite": false,
                     "isPartOfComposite": false
                 },
@@ -945,17 +987,6 @@
                     "processors": "",
                     "groups": "KeyboardMouse",
                     "action": "LockFacing",
-                    "isComposite": false,
-                    "isPartOfComposite": false
-                },
-                {
-                    "name": "",
-                    "id": "e8990557-65a6-470b-8cc2-30f44fdcb432",
-                    "path": "<Keyboard>/q",
-                    "interactions": "",
-                    "processors": "",
-                    "groups": "KeyboardMouse",
-                    "action": "ShowTerrain",
                     "isComposite": false,
                     "isPartOfComposite": false
                 },

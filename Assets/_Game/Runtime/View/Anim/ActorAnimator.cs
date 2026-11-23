@@ -90,6 +90,11 @@ namespace CriticalMass.Runtime.View.Anim
         float _predFloor;
         double _predFloorT;
         public bool Predicting => _predicting;
+        // fix round 7: a cooldown press's acknowledgement (capped, never handed over); the press's wall clock for the floor
+        bool _predRefused;
+        double _predFloorWall = double.NaN;
+        /// <summary>Fix round 7: the last predicted press ended without the sim's swing (refused, aborted or timed out).</summary>
+        public bool LastPredictionEnded { get; private set; }
         /// <summary>Fix round 6: predicted wind-ups aborted (tests / logs).</summary>
         public int PredictAborts { get; private set; }
 
@@ -99,7 +104,9 @@ namespace CriticalMass.Runtime.View.Anim
         {
             _predicting = false;
             _predFloor = 0f;
+            _predFloorWall = double.NaN;
             PredictAborts++;
+            LastPredictionEnded = true;
             if (_kind == 1 && _actClip != null)
             {
                 if (_lastActW > 0f)
@@ -114,7 +121,11 @@ namespace CriticalMass.Runtime.View.Anim
 
         /// <summary>Fix round 5 (item 4): the local player pressed attack this frame and the sim would accept it next step:
         /// start the attack clip's wind-up now (the sim's AttackStart continues it without a crossfade).</summary>
-        public void PredictSwing(ModelView m, Actor actor, GameConfig cfg, double simTime)
+        public void PredictSwing(ModelView m, Actor actor, GameConfig cfg, double simTime) => PredictSwing(m, actor, cfg, simTime, false);
+
+        /// <summary>Fix round 7: refused = the sim will not take this press (the attack is cooling down): the same wind-up, capped
+        /// at HitFeelTuning.RefusedPressWeight, that fades out by 0.12 s (press acknowledged, never a strike).</summary>
+        public void PredictSwing(ModelView m, Actor actor, GameConfig cfg, double simTime, bool refused)
         {
             if (m == null || actor == null || _predicting || (_kind == 1 && _actClip != null && _lastActW > 0f)) return;
             string clip = AttackTiming.AttackClip(m, actor.Cls);
@@ -141,6 +152,10 @@ namespace CriticalMass.Runtime.View.Anim
             _predWall = Time.unscaledTimeAsDouble;
             _predSwingTick = actor.SwingTick;
             _predFloor = 0f;
+            _predFloorWall = double.NaN;
+            _predRefused = refused;
+            LastPredictionEnded = false;
+            if (refused) { _commitPending = false; _commitReady = false; }   // no SwingCommit for a refused press
         }
 
         public bool TakeSwingCommit(out float weight)
@@ -236,7 +251,9 @@ namespace CriticalMass.Runtime.View.Anim
             Actor actor = w.Actors[i];
             double hz = cfg.SimHz;
             bool corpse = hasFx && fx.Corpse;
-            bool holding = hasFx && fx.Holding;
+            // class moves lane 6: the parry's 80 ms pose hold (both bodies) and a slide (legs held, no running in place) stop
+            // the loops exactly like the hit-stop hold; both are false while World.Moves is null.
+            bool holding = hasFx && fx.Holding || B17.MovesPoses.Holding(i, Time.unscaledTimeAsDouble) || B17.MovesRead.Sliding(w, i);
             CombatFeed feed = combat != null ? combat.Feed : null;
 
             // fix/animation-reds: ActorViews passes dSim = 0 during a hit-stop hold (loops must not advance), and the facing
@@ -417,6 +434,14 @@ namespace CriticalMass.Runtime.View.Anim
             else { _roll = 0f; _pitch = 0f; }
             Quaternion rot = Quaternion.Euler(0f, (float)_yaw + twist + _whiffTwist, 0f) * Quaternion.Euler(_pitch + _whiffPitch, 0f, _roll);
             if (hasFx) rot = fx.Lean * rot;
+            // class moves lane 6 (T2-5): the slide reads as a slide: low, leaning back along the slide, in fast and out over the end
+            float mvSlide = !corpse ? B17.MovesRead.SlidePhase(w, i, alpha) : -1f;
+            if (mvSlide >= 0f)
+            {
+                B17.MovesPoses.Slide(mvSlide, out float mvLean, out float mvSquash);
+                rot = rot * Quaternion.Euler(mvLean, 0f, 0f);
+                scale = new Vector3(scale.x, scale.y * mvSquash, scale.z);
+            }
             m.SetFacing(rot);
             // fix/hit-feel-5: a brief squash along the blow (80 ms, at most 7%), a little lower and wider across it; the
             // model scale owner below still composes and clamps it.
@@ -485,6 +510,11 @@ namespace CriticalMass.Runtime.View.Anim
         }
 
         double _actStart;
+        float _mvGuardW, _mvChargeW, _mvChargeShare, _mvGlideW;   // class moves lane 6: guard, charge and glide pose weights
+        /// <summary>Class moves lane 6 (tests, reviewer): the drawn guard / charge / glide pose weights this frame.</summary>
+        public float MovesGuardWeight => _mvGuardW;
+        public float MovesChargeWeight => _mvChargeW;
+        public float MovesGlideWeight => _mvGlideW;
 
         // ------------------------------------------------------------------ ground: locomotion, heavy hits, gather, idle
 
@@ -685,8 +715,16 @@ namespace CriticalMass.Runtime.View.Anim
                 else
                 {
                     _actAge = actor.AnimAction + alpha / hz;
-                    t = Math.Min(len, _actAge);
-                    actW = AttackTiming.Envelope(_actAge, t, len, windup);
+                    if (_actClip == ArtMapping.Throw)
+                    {
+                        // fix round 7: the throw is over 8 frames after it leaves the hand (HitFeelTuning.ThrowPose)
+                        HitFeelTuning.ThrowPose(_actAge, len, out t, out actW);
+                    }
+                    else
+                    {
+                        t = Math.Min(len, _actAge);
+                        actW = AttackTiming.Envelope(_actAge, t, len, windup);
+                    }
                 }
                 if (_kind == 1 && _commitPending && Time.frameCount - _swingStartFrame >= 2)
                 {
@@ -730,6 +768,35 @@ namespace CriticalMass.Runtime.View.Anim
                 m.PoseUpper(set.AbilityHold, simTime, _holdW, true, 0);
                 sum += _holdW;
                 actW = Math.Max(actW, _holdW);
+            }
+
+            // class moves lane 6: GUARD = the Blocking hold on the upper body, full within two frames of the sim taking the
+            // press; CHARGE = the class attack clip held in its raised wind-up (deeper as the charge grows), handed to the
+            // swing on release; GLIDE (Healer) = arms out (Cast held). Every weight stays 0 while World.Moves is null.
+            {
+                bool mvGuard = !actor.Alive ? false : B17.MovesRead.GuardHeld(w, i) && m.HasClip(ArtMapping.Blocking);
+                _mvGuardW = B17.MovesPoses.Approach(_mvGuardW, mvGuard ? 1f : 0f, dSim, mvGuard ? B17.MovesPoses.GuardRiseSeconds : B17.MovesPoses.GuardFallSeconds);
+                if (_mvGuardW > 0f && m.HasClip(ArtMapping.Blocking))
+                {
+                    float gw = _mvGuardW * (1f - Mathf.Clamp01(_holdW));
+                    if (gw > 0f && m.PoseUpper(ArtMapping.Blocking, simTime, gw, true, 0)) { sum += gw; actW = Math.Max(actW, gw); }
+                }
+                bool mvCharge = B17.MovesRead.Charging(w, i, out float mvShare) && set.Attack != null && m.HasClip(set.Attack);
+                if (mvCharge) _mvChargeShare = mvShare;
+                _mvChargeW = B17.MovesPoses.Approach(_mvChargeW, mvCharge ? 1f : 0f, dSim, B17.MovesPoses.ChargeRiseSeconds);
+                if (_mvChargeW > 0f && set.Attack != null && m.HasClip(set.Attack))
+                {
+                    float cw = _mvChargeW * (mvCharge ? 1f : 1f - Mathf.Clamp01(actW));
+                    double ct = m.ClipLength(set.Attack) * B17.MovesPoses.ChargeClipShare(_mvChargeShare);
+                    if (cw > 0f && m.PoseUpper(set.Attack, ct, cw, false, 0)) { sum += cw; actW = Math.Max(actW, cw); }
+                }
+                bool mvGlide = B17.MovesRead.Gliding(w, i) && m.HasClip(ArtMapping.Cast);
+                _mvGlideW = B17.MovesPoses.Approach(_mvGlideW, mvGlide ? B17.MovesPoses.GlideArmsWeight : 0f, dSim, 0.1);
+                if (_mvGlideW > 0f && m.HasClip(ArtMapping.Cast))
+                {
+                    double gt = m.ClipLength(ArtMapping.Cast) * B17.MovesPoses.GlideArmsShare;
+                    if (m.PoseUpper(ArtMapping.Cast, gt, _mvGlideW, false, 0)) { sum += _mvGlideW; actW = Math.Max(actW, _mvGlideW); }
+                }
             }
 
             // fix/kaiju-alive-1 (nothing-glides audit): a dig or a place had no pose at all (the block just appeared or vanished
@@ -815,13 +882,14 @@ namespace CriticalMass.Runtime.View.Anim
                 if (actor.SwingTick == _predSwingTick && HitFeelTuning.PredictedSwing(Time.unscaledTimeAsDouble - _predWall, cfgWindup, out double pAge, out float pW))
                 {
                     t = AttackTiming.ClipTime(pAge, ViewContact(_actClip, ClipFacts.Contact(_actClip, (float)(len * 0.5))), len, cfgWindup, _actExtreme);
-                    actW = pW;
+                    actW = _predRefused ? Math.Min(pW, HitFeelTuning.RefusedPressWeight) : pW;
                     return true;
                 }
                 if (actor.SwingTick == _predSwingTick && commit)
                 {
                     // the sim refused (cooldown, stun, TNT): fade it out like a feint
                     _predicting = false;
+                    LastPredictionEnded = true;
                     _feinting = true;
                     _feintAt = simTime;
                     _feintFromT = _lastActTime;
@@ -844,8 +912,11 @@ namespace CriticalMass.Runtime.View.Anim
             {
                 // fix round 5 (item 4): after a predicted start the pose never drops below what the press frame drew, and
                 // the clip never steps back before the predicted wind-up time, until the sim's own envelope passes them
-                if (actW >= _predFloor && t >= _predFloorT) _predFloor = 0f;
-                else { actW = Math.Max(actW, _predFloor); t = Math.Max(t, _predFloorT); }
+                // fix round 7: the floor keeps rising on the press's clock (HitFeelTuning.RisingFloor), so the hand-over does
+                // not hold the press frame's 0.56 while the sim's envelope restarts its own rise (pass 7: 0.56 at press + 2)
+                float floor = double.IsNaN(_predFloorWall) ? _predFloor : Math.Max(_predFloor, HitFeelTuning.RisingFloor(Time.unscaledTimeAsDouble - _predFloorWall));
+                if (actW >= floor && t >= _predFloorT) { _predFloor = 0f; _predFloorWall = double.NaN; }
+                else { actW = Math.Max(actW, floor); t = Math.Max(t, _predFloorT); }
             }
             // feint: the sim dropped the wind-up (b16 CANCEL Value 1): rewind to the start and fade out, visibly aborted
             if (feed != null && i < feed.FeintTick.Length && feed.FeintTick[i] >= actor.SwingTick && actor.SwingTick > 0 && feed.FeintTick[i] != _feintSeen)
@@ -982,10 +1053,11 @@ namespace CriticalMass.Runtime.View.Anim
             // a skill cue (not a melee press this tick) plays its own clip on the ability timing
             if (cue != null && !attack && m.HasClip(cue)) { clip = cue; kind = 2; }
             // fix round 5 (item 4): the sim took the predicted press: continue the same clip, no crossfade, the pose never dips
-            bool fromPredict = _predicting && kind == 1 && clip != null && clip == _actClip;
+            bool fromPredict = _predicting && !_predRefused && kind == 1 && clip != null && clip == _actClip;
+            if (_predicting && !fromPredict) LastPredictionEnded = true;
             _predicting = false;
-            if (fromPredict) { _predFloor = _lastActW; _predFloorT = _lastActTime; }
-            else _predFloor = 0f;
+            if (fromPredict) { _predFloor = Math.Max(_lastActW, 0.01f); _predFloorT = _lastActTime; _predFloorWall = _predWall; }
+            else { _predFloor = 0f; _predFloorWall = double.NaN; }
             if (_actClip != null && _lastActW > 0f && !fromPredict)
             {
                 _prevClip = _actClip;

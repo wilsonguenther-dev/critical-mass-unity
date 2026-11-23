@@ -154,10 +154,12 @@ namespace CriticalMass.Sim.Core
         {
             Actor a = w.Actors[id];
             if (!a.Alive || a.AirLen > 0 || a.StandUp > 0) return false;
-            if (a.HitStunTicks > 0 || a.KVx != 0 || a.KVz != 0) return false;
+            if (a.HitStunTicks > 0) return false;
+            if ((a.KVx != 0 || a.KVz != 0) && !MovesHooks.DefenceDodgeOutOfKnock(w, id)) return false;   // class moves T2-3 (integrator): dodge out of a light knock slide
             if (a.SwingPending) return false;
             if (CombatFeel.On(w) && CombatFeel.FeintRecovering(w, id)) return false; // b16: a feint's short recovery holds the dodge too
             if (a.Carry == CarryKind.Corruption) return false;
+            if (MovesHooks.DefenceLocksDodge(w, id)) return false;   // class moves T2-7 (lane 2): the landing recovery after an evading jump
             return w.Tick >= w.Dodges.Ready[id];
         }
 
@@ -180,6 +182,8 @@ namespace CriticalMass.Sim.Core
                 dz = JsMath.Sin(a.Facing);
             }
             int n = dc.DashTicks < s.Stride ? dc.DashTicks : s.Stride - 1;
+            // class moves T1-2 (lane 2, switch DodgeLunge): a dodge-in toward an enemy stops short of it (dc.Distance when off)
+            double dist = MovesHooks.DefenceLungeDash(w, id, dx, dz, dc.Distance);
             int b = id * s.Stride;
             double x = w.X[id], z = w.Z[id];
             s.PathX[b] = x;
@@ -187,7 +191,7 @@ namespace CriticalMass.Sim.Core
             int clear = 0;
             for (int k = 1; k <= n; k++)
             {
-                double step = dc.Distance * Share(k, n);
+                double step = dist * Share(k, n);
                 Collide.SweepActor(w, id, x, z, dx * step, dz * step, false, out double nx, out double nz);
                 nx = JsMath.F32(nx);
                 nz = JsMath.F32(nz);
@@ -206,6 +210,7 @@ namespace CriticalMass.Sim.Core
             s.DirX[id] = dx;
             s.DirZ[id] = dz;
             s.Count++;
+            MovesHooks.DefenceDodgeBegan(w, id, s.Start[id], clear);   // class moves T1-2 (lane 2): the dodge-in's first recover tick
             CriticalMass.Sim.Grid.HillDef hill = w.Map != null ? w.Map.Hill : null;
             if (hill != null)
             {
@@ -360,6 +365,7 @@ namespace CriticalMass.Sim.Core
                     dodged = last >= a.SwingTick - dc.DashTicks && InSwing(s.PathX[b] - ax, s.PathZ[b] - az, fx, fz, reach, halfRad, body, rt);
                 }
                 if (!dodged) continue;
+                MovesHooks.DefenceDodgedSwing(w, j, i);   // class moves T1-3 refund, T2-8 second wind (lane 2; no-op with every switch off)
                 int before = w.Tick - last;
                 bool perfect = before >= 1 && before <= dc.PerfectDodgeTicks;
                 if (report) World.PushEvent(w, SimEventType.HitBlocked, j, i, w.X[j], w.Z[j], PlayerReasons.BlockedDodge, null, DamageCause.None, dmg, 0, 0, 0, perfect ? 1 : 0, 0, 0);

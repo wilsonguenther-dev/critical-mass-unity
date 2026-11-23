@@ -147,7 +147,7 @@ namespace CriticalMass.Runtime.Hud
             s.HealerLantern = a.Cls == ClassId.Healer && (lw != null || CombatFeel.On(c)) && a.Alive
                 && Healer.MendTarget(w, localId, aim ? w.Inputs[localId].AimX : double.NaN, aim ? w.Inputs[localId].AimZ : double.NaN) < 0;
             DemolitionsTntConfig tnt = c.Abilities.DemolitionsTnt;
-            s.DemoTntOnAttack = a.Cls == ClassId.Demolitions && tnt.ThrowOnAttack && !c.Depth.Classic;
+            s.DemoTntOnAttack = a.Cls == ClassId.Demolitions && tnt.ThrowOnAttack && !c.Depth.Classic && !MovesHooks.OffenceConfigTntOnDigOnly(c);   // class moves T1-1 (integrator)
             int tntWait = s.DemoTntOnAttack && w.Demolitions != null ? Demolitions.TntWaitTicks(w, localId) : 0;
             s.DemoTntReady = s.DemoTntOnAttack && tntWait <= 0;
             double tntCdTicks = CombatFeel.TntCooldown(c); // b15: the combat feel TNT cooldown in Full (sim ticks)

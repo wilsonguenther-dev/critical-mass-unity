@@ -49,6 +49,20 @@ namespace CriticalMass.Runtime.Game
         /// <summary>A match-video run: the automation plate stays off and the results screen waits for the recorder.</summary>
         public static bool Active { get; private set; }
 
+        /// <summary>
+        /// Class moves lane 6 (T1-8, REPLAY.md path B): <c>-replayFile PATH</c> with <c>-matchVideo DIR</c> renders a saved replay
+        /// (.cmreplay) of THIS build instead of an autoplay match: it opens the replay through ReplayPlayback.Play from the main
+        /// menu, follows the recorded player with his own gameplay camera, records kick-off to the final whistle plus
+        /// -matchVideoResultsSeconds, then quits. Silent (AudioRenderer takes the mix) and windowless (AutomationWindow honours
+        /// -matchvideo). A replay never records a new replay (ReplayCapture skips IsReplay), so the owner's saved 20 are never
+        /// evicted. video.json adds the replay's recorded score beside the played-back one and the desync verdict.
+        /// </summary>
+        public const string ReplayFlag = "-replayfile";
+        public static string ReplayPath { get; private set; }
+        string _replayProblem;
+        bool _replayDesync;
+        CriticalMass.Net.Replay.ReplayHeader _replayHeader;
+
         static string Arg(string[] args, string flag)
         {
             if (args == null) return null;
@@ -66,6 +80,7 @@ namespace CriticalMass.Runtime.Game
         static void Boot()
         {
             Active = false;
+            ReplayPath = null;
             if (Application.isEditor) return;
             string[] args = Environment.GetCommandLineArgs();
             string scout = Arg(args, ScoutFlag);
@@ -79,6 +94,14 @@ namespace CriticalMass.Runtime.Game
             string dir = Arg(args, Flag);
             if (string.IsNullOrEmpty(dir) || Application.isBatchMode) return;
             Active = true;
+            string replay = Arg(args, ReplayFlag);
+            if (!string.IsNullOrEmpty(replay))
+            {
+                ReplayPath = Path.GetFullPath(replay);
+                GameFlow.ForceEnabled = true;                     // through the menu, as -replayLast does
+                Menus.StoryIntro.PlayOnFirstLaunch = false;
+                CriticalMass.Runtime.Replay.ReplayPlayback.FilmMode = true;
+            }
             var go = new GameObject("CriticalMass MatchVideo") { hideFlags = HideFlags.HideAndDontSave };
             DontDestroyOnLoad(go);
             MatchVideo mv = go.AddComponent<MatchVideo>();
@@ -157,7 +180,37 @@ namespace CriticalMass.Runtime.Game
             }
         }
 
-        void Start() => StartCoroutine(Loop());
+        void Start()
+        {
+            if (ReplayPath != null) StartCoroutine(OpenReplay());
+            StartCoroutine(Loop());
+        }
+
+        /// <summary>T1-8: from the main menu, load and play the replay file (or quit with exit 4 and the plain reason).</summary>
+        IEnumerator OpenReplay()
+        {
+            float until = Time.realtimeSinceStartup + 90f;
+            while (Time.realtimeSinceStartup < until)
+            {
+                FlowDirector d = FlowDirector.Current;
+                if (d != null && !d.Loading && d.MainMenu != null)
+                {
+                    if (GameFlow.State == FlowState.Title) GameFlow.ReturnTo(FlowState.Menu);
+                    else if (d.MainMenu.IsVisible) break;
+                }
+                yield return null;
+            }
+            CriticalMass.Net.Replay.ReplayData data = CriticalMass.Runtime.Replay.ReplayStore.Load(ReplayPath, out string why);
+            if (data == null || !CriticalMass.Runtime.Replay.ReplayPlayback.Play(data, out why))
+            {
+                _replayProblem = why ?? "could not open";
+                Debug.LogError($"{LogTag} replay {ReplayPath}: {_replayProblem}");
+                _done = true;
+                yield break;
+            }
+            _replayHeader = data.Header;
+            Debug.Log($"{LogTag} replay opened: {ReplayPath}, {data.Header.Ticks} ticks, recorded hill {F(data.Header.HillAzure)} / {F(data.Header.HillCrimson)} winner {data.Header.Winner}");
+        }
 
         IEnumerator Loop()
         {
@@ -217,6 +270,19 @@ namespace CriticalMass.Runtime.Game
             }
             if (_resultsFrame < 0 && GameFlow.State == FlowState.Results) Mark(ref _resultsFrame, "results");
 
+            if (ReplayPath != null)
+            {
+                // T1-8: a desync or a damaged stream stops the film (it must never show a different match)
+                var rp = CriticalMass.Runtime.Replay.ReplayPlayback.Current;
+                if (rp != null && rp.Player != null && (rp.Player.Desynced || rp.Player.StreamBroken) && !_replayDesync)
+                {
+                    _replayDesync = true;
+                    Debug.LogWarning($"{LogTag} replay DESYNC at tick {rp.Player.DesyncTick} ({(rp.Player.StreamBroken ? "stream damaged" : "fingerprint mismatch")}): film stopped");
+                    _done = true;
+                    return;
+                }
+                if (rp != null && rp.Player != null && rp.Player.Finished && _endFrame < 0 && w != null && w.Match.Phase != MatchPhase.Ended) Mark(ref _endFrame, "replay-left-early");
+            }
             Capture(_frame);
             _frame++;
             if (_frame % (_fps * 30) == 0)
@@ -248,6 +314,11 @@ namespace CriticalMass.Runtime.Game
             if (_driver == null || _driver.World == null) _driver = FindAnyObjectByType<SimDriverBehaviour>();
             if (_driver == null || _driver.World == null) return false;
             if (_driver.Request != null && _driver.Request.Backdrop) { _driver = null; return false; }
+            if (ReplayPath != null)   // T1-8: only the replay's own world, once its loading screen is gone
+            {
+                if (!_driver.IsReplay) { _driver = null; return false; }
+                if (CriticalMass.Runtime.Replay.ReplayPlayback.Current == null || Menus.LoadingScreen.IsOpen) return false;
+            }
             return !View.Dressing.WorldView.Building;
         }
 
@@ -345,13 +416,27 @@ namespace CriticalMass.Runtime.Game
             sb.Append($"  \"kickoff_frame\": {_kickoffFrame},\n  \"hatch_frame\": {_hatchFrame},\n  \"end_frame\": {_endFrame},\n  \"results_frame\": {_resultsFrame},\n");
             if (w != null)
                 sb.Append($"  \"hill_azure\": {F(w.Match.HillSeconds.Azure)},\n  \"hill_crimson\": {F(w.Match.HillSeconds.Crimson)},\n  \"winner\": \"{w.Match.Winner}\",\n  \"hatched\": {(w.Match.Hatched ? "true" : "false")},\n  \"match_seconds\": {F(w.Match.Time)},\n");
+            if (ReplayPath != null)
+            {
+                var rp = CriticalMass.Runtime.Replay.ReplayPlayback.Current;
+                string esc = ReplayPath.Replace("\\", "/").Replace("\"", "'");
+                sb.Append($"  \"replay\": \"{esc}\",\n  \"replay_problem\": \"{(_replayProblem ?? "").Replace("\"", "'")}\",\n  \"replay_desync\": {(_replayDesync ? "true" : "false")},\n");
+                if (rp != null && rp.Player != null) sb.Append($"  \"replay_fingerprints\": {rp.Player.FingerprintsChecked},\n");
+                if (_replayHeader != null)
+                {
+                    bool same = w != null && Math.Abs(w.Match.HillSeconds.Azure - _replayHeader.HillAzure) < 1e-6 && Math.Abs(w.Match.HillSeconds.Crimson - _replayHeader.HillCrimson) < 1e-6
+                                && w.Match.Winner == _replayHeader.Winner;
+                    sb.Append($"  \"recorded_hill_azure\": {F(_replayHeader.HillAzure)},\n  \"recorded_hill_crimson\": {F(_replayHeader.HillCrimson)},\n  \"recorded_winner\": \"{_replayHeader.Winner}\",\n  \"score_matches_replay\": {(same ? "true" : "false")},\n");
+                    Debug.Log($"{LogTag} replay score {(same ? "MATCHES" : "DIFFERS FROM")} the recording");
+                }
+            }
             sb.Append("  \"marks\": [");
             for (int i = 0; i < _marks.Count; i++) sb.Append((i > 0 ? ", " : "") + "\"" + _marks[i] + "\"");
             sb.Append("]\n}\n");
             File.WriteAllText(Path.Combine(_dir, "video.json"), sb.ToString());
             Debug.Log($"{LogTag} DONE frames={_frame} written={_written} encode_errors={_encodeErrors} readback_errors={_readbackErrors} late={_late} audio_frames={_audioFrames} -> {_dir}/video.json");
             Time.captureFramerate = 0;
-            Application.Quit(_written > 0 ? 0 : 3);
+            Application.Quit(_replayProblem != null ? 4 : _replayDesync ? 5 : _written > 0 ? 0 : 3);
         }
 
         void OnDestroy()

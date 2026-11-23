@@ -646,7 +646,9 @@ namespace CriticalMass.Sim.Core
             Actor a = w.Actors[id];
             if (a == null || !a.Alive || a.Cls != ClassId.Demolitions || a.StandUp > 0) return false;
             if (Dodge.Active(w, id)) return false;   // b13-jd (routed): no TNT throw mid-dodge
-            if (!w.Config.Abilities.DemolitionsTnt.ThrowOnAttack || w.Config.Depth.Classic) return false;
+            // class moves T1-1 (lane 4, switch DemoTntOnDigOnly): a person's Attack is always the pry bar; F / U / pad Y throws.
+            // A bot's attack intent with the TNT ready stays its throw request. One rule for every reader: OffenceAttackMayThrow.
+            if (!MovesHooks.OffenceAttackMayThrow(w, id) || w.Config.Depth.Classic) return false;
             if (!w.Inputs[id].Attack || w.Tick < w.Demolitions.TntReadyTick[id]) return false;
             if (a.AttackCd > 0 || a.SwingPending) return false;
             if (a.HitStunTicks > 0 && Phys.On(w, true)) return false;
@@ -766,6 +768,35 @@ namespace CriticalMass.Sim.Core
             bool hasAim = w.HasAim[id] == 1;
             PlaceMine(w, id, hasAim ? w.Inputs[id].AimX : double.NaN, hasAim ? w.Inputs[id].AimZ : double.NaN);
         }
+
+        /// <summary>
+        /// Class moves T2-2 (lane 4): the Demolitions heavy's FUSE STRIKE. A fuse stuck on a struck body blows MovesConfig
+        /// DemoFuseSeconds later at (x, z): damage to every living enemy of owner within radius (plus its body radius), never to
+        /// her or her team, as an Explosion (B = ExplosionFuse, so the TNT stats and the rig's TNT counts do not read it).
+        /// No self-risk, no wall, cell or Kaiju damage (a small charge, not a TNT). Returns the bodies hurt.
+        /// </summary>
+        public static int FuseBlast(World w, int owner, double x, double z, double radius, double damage)
+        {
+            if (owner < 0 || owner >= w.ActorCount || !(damage > 0)) return 0;
+            TeamId team = w.Actors[owner].Team;
+            bool ownerIsBot = !w.Actors[owner].IsHuman;
+            int hit = 0;
+            for (int j = 0; j < w.ActorCount; j++)
+            {
+                Actor t = w.Actors[j];
+                if (!t.Alive || t.Team == team) continue;
+                if (ownerIsBot && t.IsHuman && w.Match.Time < w.Config.Bots.PassiveSeconds) continue;
+                double r = radius + w.Config.Class(t.Cls).Radius;
+                double dx = w.X[j] - x, dz = w.Z[j] - z;
+                if (dx * dx + dz * dz > r * r) continue;
+                if (Damage.ApplyDamage(w, j, damage, owner, x, z, DamageCause.Explosion) > 0) hit++;
+            }
+            World.PushEvent(w, SimEventType.Explosion, owner, ExplosionFuse, x, z, hit, null, DamageCause.Explosion, radius);
+            return hit;
+        }
+
+        /// <summary>Explosion B code of the fuse strike (class moves T2-2).</summary>
+        public const int ExplosionFuse = 3;
 
         /// <summary>Bots: queue one TNT throw at (x, z) for bot id (BotFsm). BotBrain.FillBotInput turns it into one press.</summary>
         public static void RequestBotTnt(World w, int id, double x, double z)

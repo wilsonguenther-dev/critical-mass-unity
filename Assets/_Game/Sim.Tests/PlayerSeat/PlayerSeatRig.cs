@@ -142,6 +142,15 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
         private int _evHead = -1, _mySwing = -100000, _theirDodge = -100000, _theirSwing = -100000, _landed = -100000, _cancelAt = -100000;
         /// <summary>One-tick buttons for the next frame (the test sets them; the model clears them after one tick).</summary>
         public bool PressAttack, PressAbility, PressDigPlace, PressDodge, PressCancel, PressJump, PressSwitch, HoldInteract;
+        /// <summary>Class moves (integrator, lane 4's request): with the Heavy switch on a held Attack is a CHARGE, so by default the
+        /// hands TAP (one tick down, one up: the light swing starts on the release, as a person taps). HoldAttack = true keeps the
+        /// old held Attack (a test that wants the charge). Switch off: no effect at all.</summary>
+        public bool HoldAttack;
+        private bool _tapPrev;
+        /// <summary>Class moves (integrator, decision 8): with Feints, also cancel the wind-up on SEEING the target bot start a
+        /// step-out (lane 5's BotStepOut), the way a player cancels when the target dodges. Off by default.</summary>
+        public bool FeintOnStepOut;
+        private int _theirStepOut = -100000, _lastStepUntil = int.MinValue;
         /// <summary>Optional move override for the next frame (NaN = the model's own move).</summary>
         public double MoveOverrideX = double.NaN, MoveOverrideZ = double.NaN;
         public int StationBuy;
@@ -269,11 +278,18 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
                     double rx = w.X[t] - w.X[Me], rz = w.Z[t] - w.Z[Me], rd = Math.Sqrt(rx * rx + rz * rz);
                     int wu = w.Dur.AttackWindup[(int)w.Actors[Me].Cls];
                     bool inWind = w.Tick - _mySwing < wu && w.Tick - _mySwing >= 1;
+                    if (FeintOnStepOut && w.Moves != null && t < w.Moves.Bots.StepUntil.Length)
+                    {
+                        int su = w.Moves.Bots.StepUntil[t];
+                        if (su > w.Tick && su != _lastStepUntil) _theirStepOut = w.Tick;
+                        _lastStepUntil = su;
+                    }
                     if (Feints && inWind && _cancelAt < _mySwing)
                     {
                         double gap = Math.Abs(Math.IEEERemainder(Math.Atan2(rz, rx) - w.Actors[Me].SwingFacing, 2 * Math.PI)) * 180 / Math.PI;
                         bool outOfArc = gap > FeintArcDegrees || rd > reach + 0.3;
-                        if (w.Tick - _theirDodge <= 3 || outOfArc) { PressCancel = true; _cancelAt = w.Tick; FeintCount++; want = false; }
+                        bool steppedOut = FeintOnStepOut && w.Tick - _theirStepOut <= 3;
+                        if (w.Tick - _theirDodge <= 3 || steppedOut || outOfArc) { PressCancel = true; _cancelAt = w.Tick; FeintCount++; want = false; }
                     }
                     if (HitCancels && w.Tick - _landed == 1) PressCancel = true;
                     double theirReach = w.Config.Class(w.Actors[t].Cls).AttackRange + cc.Radius;
@@ -303,7 +319,13 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
             f.MoveZ = double.IsNaN(MoveOverrideZ) ? mz : MoveOverrideZ;
             f.AimX = double.IsNaN(AimOverrideX) ? ax : AimOverrideX;
             f.AimZ = double.IsNaN(AimOverrideZ) ? az : AimOverrideZ;
-            f.Attack = want || PressAttack;
+            bool atk = want || PressAttack;
+            if (!HoldAttack && w.Moves != null && MovesHooks.On(w, MovesHooks.Cfg(w).Heavy))
+            {
+                if (atk && _tapPrev) atk = false;   // a tap: one tick down, then up
+                _tapPrev = atk;
+            }
+            f.Attack = atk;
             f.Ability = PressAbility;
             f.Terraform = PressDigPlace;
             f.Dodge = PressDodge;
@@ -523,6 +545,7 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
         {
             GameConfig cfg = Config();
             tweak?.Invoke(cfg);
+            if (tweak != null) MvCombine.ApplyKnobs(cfg.Depth.Moves, Environment.GetEnvironmentVariable("CM_MVI_KNOBS"));   // integrator lever probes (unset: nothing)
             var opts = new WorldOptions { Seed = 4242 + rep, TeamSize = 5, HumanTeam = TeamId.Azure, HumanClass = me, Config = cfg, BotDifficulty = bots };
             int ib0 = 5; // TeamSize 5: the enemy team holds ids 5..9
             if (mode == TargetMode.HumanVsHuman)

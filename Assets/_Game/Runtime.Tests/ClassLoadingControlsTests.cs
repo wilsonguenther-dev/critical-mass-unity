@@ -216,7 +216,8 @@ namespace CriticalMass.Runtime.Tests
                 CollectionAssert.Contains(kb, "Pause menu: ESC");
                 List<string> pad = ControlsCard.Describe(ControlDevice.Gamepad);
                 CollectionAssert.Contains(pad, "Attack: RT");
-                CollectionAssert.Contains(pad, "Class ability: LT / B");
+                CollectionAssert.Contains(pad, "Class ability: LT");   // class moves: B is GUARD / PARRY now
+                CollectionAssert.Contains(pad, "Guard / parry: B");
                 CollectionAssert.Contains(pad, "Move: L STICK");
                 Assert.AreEqual(ControlsCard.LineLabels.Length, kb.Count);
 

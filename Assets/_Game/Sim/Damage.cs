@@ -111,6 +111,7 @@ namespace CriticalMass.Sim.Core
                 if (report && !(dodged && cause == DamageCause.Melee)) Blocked(w, targetId, sourceId, dodged ? PlayerReasons.BlockedDodge : PlayerReasons.BlockedImmune, 0);
                 return 0;
             }
+            if (MovesHooks.HitNegated(w, targetId, sourceId, srcX, srcZ, cause, report)) return 0;   // mv-hook: parry, jump evade (lane 2)
             // The id written to lastAttacker and the events: the actor, KaijuSource, else -1.
             int credit = fromActor || sourceId == KaijuSource ? sourceId : -1;
 
@@ -122,6 +123,7 @@ namespace CriticalMass.Sim.Core
                 dmg *= 1 - w.Config.Abilities.WarriorShield.DamageReduction;
                 shieldSaved = amount - dmg;
             }
+            dmg = MovesHooks.HitCut(w, targetId, sourceId, srcX, srcZ, cause, dmg, report);   // mv-hook: guard cut (lane 2)
 
             // U-066 Ward: soaks the hit (an explosion goes through and breaks it). A fully soaked hit still marks the attacker
             // and still interrupts a delivery wind-up, but costs no HP and raises no Hit event (WardAbsorb instead).
@@ -140,6 +142,7 @@ namespace CriticalMass.Sim.Core
             t.GatherProgress = 0;
             t.LastAttacker = credit;
             t.LastCause = cause;
+            MovesHooks.Damaged(w, targetId, sourceId, cause, dmg);   // mv-hook: every lane hears a landed hit
             double tx = w.X[targetId];
             double tz = w.Z[targetId];
             bool physics = Knocks(w, cause);

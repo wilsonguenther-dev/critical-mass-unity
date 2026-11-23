@@ -117,12 +117,16 @@ namespace CriticalMass.Runtime.Input
             new ControlRow("Attack", new[] { new RebindSlot("Attack", K, 0, column: SlotColumn.Mouse), new RebindSlot("Attack", K, 1, column: SlotColumn.Wasd), new RebindSlot("Attack", K, 2, column: SlotColumn.Arrows) },
                 new[] { new RebindSlot("Attack", G) }),
             new ControlRow("Class ability", new[] { new RebindSlot("Ability", K, 0, column: SlotColumn.Mouse), new RebindSlot("Ability", K, 1, column: SlotColumn.Wasd), new RebindSlot("Ability", K, 2, column: SlotColumn.Arrows) },
-                new[] { new RebindSlot("Ability", G), new RebindSlot("Ability", G, 1) }), // b14: the class ability keeps B (east face) beside LT
+                new[] { new RebindSlot("Ability", G) }), // class moves (owner default, QUESTIONS.md 2): LT only; B (east face) is GUARD now
             new ControlRow("Jump", new[] { new RebindSlot("Jump", K, 0, column: SlotColumn.Wasd), new RebindSlot("Jump", K, 1, column: SlotColumn.Arrows) }, new[] { new RebindSlot("Jump", G) }),
             // CM b13 J: dodge for every class. b14: Left Shift / Right Ctrl / right bumper (HumanInputSource.DodgeDefaults)
             new ControlRow("Dodge", new[] { new RebindSlot("Dodge", K, 0, column: SlotColumn.Wasd), new RebindSlot("Dodge", K, 1, column: SlotColumn.Arrows) }, new[] { new RebindSlot("Dodge", G) }),
             // b16 CANCEL (test feature): mouse forward side button / P by J K L / \ by Enter and the arrows; LB on a controller,
             // shared by context with Next tool (HumanInputState: inside your own swing window LB cancels, else it switches).
+            // class moves T2-1: hold to guard, tap inside the window to parry. Q (mouse column), ; (by J K L), Right Shift (by the
+            // arrows), B on a controller. Its own button on every scheme (no double duty).
+            new ControlRow("Guard / parry", new[] { new RebindSlot("Guard", K, 0, column: SlotColumn.Mouse), new RebindSlot("Guard", K, 1, column: SlotColumn.Wasd), new RebindSlot("Guard", K, 2, column: SlotColumn.Arrows) },
+                new[] { new RebindSlot("Guard", G) }),
             new ControlRow("Cancel attack (feint)", new[] { new RebindSlot("Cancel", K, 0, column: SlotColumn.Mouse), new RebindSlot("Cancel", K, 1, column: SlotColumn.Wasd), new RebindSlot("Cancel", K, 2, column: SlotColumn.Arrows) },
                 new[] { new RebindSlot("Cancel", G) }),
             new ControlRow("Interact / carry", new[] { new RebindSlot("Interact", K, 0, column: SlotColumn.Mouse), new RebindSlot("Interact", K, 2, column: SlotColumn.Wasd), new RebindSlot("Interact", K, 1, column: SlotColumn.Arrows) }, new[] { new RebindSlot("Interact", G) }),
@@ -131,8 +135,9 @@ namespace CriticalMass.Runtime.Input
             new ControlRow("Next tool", new[] { new RebindSlot("SwitchDigPlace", K, 0, rebindable: false, column: SlotColumn.Mouse),
                     new RebindSlot("SwitchDigPlace", K, 1, column: SlotColumn.Wasd), new RebindSlot("SwitchDigPlace", K, 2, column: SlotColumn.Arrows) },
                 new[] { new RebindSlot("SwitchDigPlace", G) }),
-            // feat/terrain-affordances: hold to show everything your class can use nearby (Q, or O by J K L; R3 outside the base ring).
-            new ControlRow("Show usable terrain (hold)", new[] { new RebindSlot("ShowTerrain", K, 0, column: SlotColumn.Mouse), new RebindSlot("ShowTerrain", K, 1, column: SlotColumn.Wasd) },
+            // feat/terrain-affordances: hold to show everything your class can use nearby (O; R3 outside the base ring). Class moves:
+            // Q became GUARD, so O is the one key (shown in the mouse column too: it is the same binding).
+            new ControlRow("Show usable terrain (hold)", new[] { new RebindSlot("ShowTerrain", K, 0, column: SlotColumn.Wasd) },
                 new[] { new RebindSlot("ShowTerrain", G) }),
             new ControlRow("Scoreboard", new[] { new RebindSlot("Scoreboard", K) }, new[] { new RebindSlot("Scoreboard", G) }),
             new ControlRow("Full map", new[] { new RebindSlot("Map", K) }, new[] { new RebindSlot("Map", G) }),

@@ -11,7 +11,8 @@ namespace CriticalMass.Net.Replay
     /// then, for every actor whose bit is set in the presence mask (id order): u8 change bits, then each changed field.
     /// </code>
     /// Change bits: 0 MoveX, 1 MoveZ, 2 AimX, 3 AimZ, 4 buttons (u8: Attack, Ability, Interact, Terraform, Jump,
-    /// TerraformSwitch, Dodge = bit 64 since CM b13, Cancel = bit 128 since b16), 5 picks (i8 ClassPick, u8 StationBuy, u8 PingKind), 6 PingX, 7 PingZ.
+    /// TerraformSwitch, Dodge = bit 64 since CM b13, Cancel = bit 128 since b16), 5 picks (i8 ClassPick, u8 StationBuy, u8 PingKind
+    /// with class moves' JumpHeld = bit 32 and Guard = bit 64 on top since format 2), 6 PingX, 7 PingZ.
     /// A double is written as a varint: even = zig-zag delta of its quantum index (move 1/127, points 1/100, which is
     /// exactly what online frames hold and what keyboards, sticks at rest and ping points mostly hold), odd (1) = the raw
     /// 8 bytes follow. Either way the decoded double has the recorded bits exactly, so playback consumes the same frames.
@@ -26,6 +27,8 @@ namespace CriticalMass.Net.Replay
         public const int OpBotToHuman = 16;
         public const int CMoveX = 1, CMoveZ = 2, CAimX = 4, CAimZ = 8, CButtons = 16, CPicks = 32, CPingX = 64, CPingZ = 128;
         public const double MoveQuantum = 127.0, PointQuantum = 100.0;
+        /// <summary>Class moves (format 2): InputFrame.JumpHeld and InputFrame.Guard on top of the picks group's PingKind byte.</summary>
+        public const int PicksJumpHeld = 32, PicksGuard = 64;   // mv-hook
         /// <summary>Beyond this magnitude a double is always stored raw (no quantum index overflow, no NaN casts).</summary>
         const double QuantLimit = 1e7;
 
@@ -57,7 +60,8 @@ namespace CriticalMass.Net.Replay
             if (!Same(prev.AimX, f.AimX)) c |= CAimX;
             if (!Same(prev.AimZ, f.AimZ)) c |= CAimZ;
             if (Buttons(prev) != Buttons(f)) c |= CButtons;
-            if (prev.ClassPick != f.ClassPick || prev.StationBuy != f.StationBuy || prev.PingKind != f.PingKind) c |= CPicks;
+            if (prev.ClassPick != f.ClassPick || prev.StationBuy != f.StationBuy || prev.PingKind != f.PingKind
+                || prev.Guard != f.Guard || prev.JumpHeld != f.JumpHeld) c |= CPicks;   // mv-hook
             if (!Same(prev.PingX, f.PingX)) c |= CPingX;
             if (!Same(prev.PingZ, f.PingZ)) c |= CPingZ;
             return c;
@@ -129,7 +133,7 @@ namespace CriticalMass.Net.Replay
             {
                 w.U8((byte)(sbyte)Math.Max(-128, Math.Min(127, f.ClassPick)));
                 w.U8(Math.Max(0, Math.Min(255, f.StationBuy)));
-                w.U8(Math.Max(0, Math.Min(255, f.PingKind)));
+                w.U8(Math.Max(0, Math.Min(31, f.PingKind)) | (f.JumpHeld ? PicksJumpHeld : 0) | (f.Guard ? PicksGuard : 0));   // mv-hook
             }
             if ((c & CPingX) != 0) PutDouble(ref w, f.PingX, ref lane.QPingX, PointQuantum);
             if ((c & CPingZ) != 0) PutDouble(ref w, f.PingZ, ref lane.QPingZ, PointQuantum);
@@ -150,7 +154,10 @@ namespace CriticalMass.Net.Replay
             {
                 f.ClassPick = (sbyte)(byte)r.U8();
                 f.StationBuy = r.U8();
-                f.PingKind = r.U8();
+                int pk = r.U8();
+                f.PingKind = pk & 31;   // mv-hook: format 1 never set bits 5 and 6
+                f.JumpHeld = (pk & PicksJumpHeld) != 0;   // mv-hook
+                f.Guard = (pk & PicksGuard) != 0;   // mv-hook
             }
             if ((c & CPingX) != 0) f.PingX = GetDouble(ref r, ref lane.QPingX, PointQuantum);
             if ((c & CPingZ) != 0) f.PingZ = GetDouble(ref r, ref lane.QPingZ, PointQuantum);

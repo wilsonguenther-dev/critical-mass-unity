@@ -69,6 +69,10 @@ namespace CriticalMass.Net
             foreach (FieldInfo f in fields)
             {
                 if (f.FieldType == typeof(RenderConfig)) continue;   // the camera angle and other view settings differ per machine on purpose
+                // class moves (lane 1): the moves block is mixed only while one of its switches is on, so a config with every switch
+                // off fingerprints exactly as before the block existed (older replays and peers still match), and any switch on
+                // (with every knob) is seen.
+                if (f.FieldType == typeof(MovesConfig) && !(f.GetValue(o) is MovesConfig mv && mv.AnyOn)) continue;   // mv-hook
                 if (f.FieldType.IsPointer || typeof(Delegate).IsAssignableFrom(f.FieldType)) continue;
                 Str(ref h, f.Name);
                 Mix(ref h, f.GetValue(o), depth + 1, seen);
