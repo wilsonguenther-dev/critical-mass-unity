@@ -978,6 +978,10 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
                         if (W.Map.Cells[scz * W.Map.Width + scx] != Cell.Floor) continue;
                         Put(0, ClassId.Builder, sx, sz);
                         if (!Terraform.TargetCell(W, 0, ccx, ccz, out int gx, out int gz) || gx != ix || gz != iz) continue;
+                        // mv-6 readability-3 item 8 (pass 3: "Terraform v-14, pop none"): -14 = TerrainHeight.RefusedSomeone, the
+                        // Builder's own body (radius + ActorMargin) touched the cell from the diagonal spots; the game refused the
+                        // dig correctly and the rig measured a refusal. Only spots where the cell is clear of every body count.
+                        if (Terraform.CellOccupied(W, ix, iz)) continue;
                         dx = Math.Cos(a); dz = Math.Sin(a); aimX = ccx; aimZ = ccz; tcx = ix; tcz = iz; found = true;
                     }
                 }

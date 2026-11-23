@@ -473,23 +473,10 @@ namespace CriticalMass.Runtime.View.B17
         /// handed to ActorAnimator through MovesPoses.PredictActor / PredictGuard.</summary>
         float PredictGuard(World w, int me)
         {
-            GuardPredicted01 = 0f;
-            MovesPoses.PredictActor = -1;
-            MovesPoses.PredictGuard = 0f;
-            if (me < 0 || me >= w.ActorCount || !w.Actors[me].Alive || !MovesHelp.SwitchOn(w, MovesHelp.Verb.Guard, w.Actors[me].Cls)) { _guardPressWas = false; return 0f; }
-            if (_human == null && Time.frameCount >= _humanLook)
-            {
-                _human = FindFirstObjectByType<CriticalMass.Runtime.Input.HumanInputSource>();
-                _humanLook = Time.frameCount + 30;
-            }
-            bool pressed = _human != null && _human.isActiveAndEnabled && _human.State != null && _human.State.GuardIntent;
-            float now = Time.unscaledTime;
-            if (pressed && !_guardPressWas) _guardPressAt = now;
-            _guardPressWas = pressed;
-            float g = GuardPrediction(pressed, MovesRead.GuardHeld(w, me), now - _guardPressAt);
+            // readability-3 item 6: computed once per frame by whoever asks first (ActorAnimator poses BEFORE this view runs,
+            // so the press frame's pose used to see the previous frame's prediction: 0.00 on the press frame)
+            float g = MovesPoses.LocalGuard(w, me);
             GuardPredicted01 = g;
-            MovesPoses.PredictActor = me;
-            MovesPoses.PredictGuard = g;
             return g;
         }
 
@@ -647,6 +634,7 @@ namespace CriticalMass.Runtime.View.B17
             p.T.localPosition = SimSpace.ToWorld(x, gy + 0.07, z);
             p.T.localScale = Vector3.one * size * 0.4f;
             Show(p, true);
+            PuffsAlive++;   // counted the frame it is raised (TickPuffs recounts next frame)
         }
 
         void TickPuffs(float now)
@@ -760,6 +748,7 @@ namespace CriticalMass.Runtime.View.B17
                 return;
             }
             if (head - _cursor > World.EventCapacity) _cursor = head - World.EventCapacity;
+            if (_refundsSeen > w.Moves.Defence.Refunds) _refundsSeen = w.Moves.Defence.Refunds;   // a new match
             int me = HudBinder.LocalActor;
             ActionTags tags = PlayerHud.Current != null ? PlayerHud.Current.Tags : null;
             bool reduce = !CriticalMass.Runtime.View.Moments.FlashSafety.IntenseAllowed;
@@ -793,7 +782,7 @@ namespace CriticalMass.Runtime.View.B17
                             // item 2: SPRINT over me the first few times travel lights up (then the speed lines say it)
                             int seen = PlayerPrefs.GetInt(SprintPref, 0);
                             if (tags != null && (seen < SprintWordShows || HintsAlways)
-                                && tags.OnMovesWord(w, SprintWord, 5800, me, false, false, PxPalette.Cream, PxPalette.Brass, 0.9f, 900 + (int)e.Type) != null)
+                                && tags.OnMovesWord(w, SprintWord, 5800, me, true, false, PxPalette.Cream, PxPalette.Brass, 0.9f, 900 + (int)e.Type) != null)   // readability-3 item 7: callout size
                             {
                                 PlayerPrefs.SetInt(SprintPref, seen + 1);
                                 Said(SprintWord);
@@ -809,6 +798,14 @@ namespace CriticalMass.Runtime.View.B17
                         }
                         break;
                     case SimEventType.HitBlocked:
+                        if ((int)System.Math.Round(e.Value) == PlayerReasons.BlockedDodge && e.A == me)
+                        {
+                            // readability-3 item 7: my dodge avoided a swing; lane 2's T1-3 counts a refund (Defence.Refunds) on the
+                            // same tick, so a rise in the count with my dodge is MY refund (the chip's ready-tick watch is the
+                            // second witness: MechanicsHud reads DodgeBackFrame too)
+                            int refunds = w.Moves.Defence.Refunds;
+                            if (refunds > _refundsSeen) { DodgeBackAt = Time.unscaledTime; DodgeBackFrame = Time.frameCount; }
+                        }
                         if ((int)System.Math.Round(e.Value) == PlayerReasons.BlockedParried)
                         {
                             // PARRY: 80 ms pose hold on the parrier (A) and the attacker (B); the words come through
@@ -841,7 +838,7 @@ namespace CriticalMass.Runtime.View.B17
                         }
                         break;
                     case SimEventType.Slide:
-                        if (e.B >= 0 && e.Value > 0)
+                        if (e.B >= 0)   // readability-3 item 8: a trip is the slide event WITH a victim (B), whatever its damage
                         {
                             for (int k = 0; k < 2; k++) Puff(e.X, w.Map != null ? (float)GroundHeight.At(w.Map, e.X, e.Z) : 0f, e.Z, 0.9f, new Color(0.86f, 0.80f, 0.68f, 0.7f));
                             if (tags != null && (e.A == me || e.B == me) && tags.OnMovesWord(w, ActionTags.TrippedWord, 5500 + (e.B & 63), e.B, true, true, PxPalette.StrikeInk, PxPalette.Strike, 0.9f, 900 + (int)e.Type) != null) Said(ActionTags.TrippedWord);
@@ -853,7 +850,13 @@ namespace CriticalMass.Runtime.View.B17
                         break;
                 }
             }
+            _refundsSeen = w.Moves.Defence.Refunds;
         }
+
+        /// <summary>Readability-3 item 7: my last dodge refund (wall time and frame), for the dodge chip's DODGE BACK.</summary>
+        public static float DodgeBackAt = -9f;
+        public static int DodgeBackFrame = -1;
+        int _refundsSeen;
 
         void Said(string word)
         {

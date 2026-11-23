@@ -792,7 +792,9 @@ namespace CriticalMass.Runtime.View.Anim
             {
                 bool mvGuard = !actor.Alive ? false : B17.MovesPoses.GuardShown(w, i) && m.HasClip(ArtMapping.Blocking);   // readability item 1: the local press shows on its own frame
                 if (mvGuard && _mvGuardW < B17.MovesPoses.GuardFirstFrame) _mvGuardW = B17.MovesPoses.GuardFirstFrame;   // readability-2 item 5: 0.8 on the first frame (press frame for the local press)
-                _mvGuardW = B17.MovesPoses.Approach(_mvGuardW, mvGuard ? 1f : 0f, dSim, mvGuard ? B17.MovesPoses.GuardRiseSeconds : B17.MovesPoses.GuardFallSeconds);
+                // readability-3 item 6: the guard is input feedback: it rises on real time, not on the sim's clock (a paused or
+                // slowed sim must not hold the pose at its first-frame weight)
+                _mvGuardW = B17.MovesPoses.Approach(_mvGuardW, mvGuard ? 1f : 0f, Math.Max(dSim, Time.unscaledDeltaTime), mvGuard ? B17.MovesPoses.GuardRiseSeconds : B17.MovesPoses.GuardFallSeconds);
                 if (_mvGuardW > 0f && m.HasClip(ArtMapping.Blocking))
                 {
                     float gw = _mvGuardW * (1f - Mathf.Clamp01(_holdW));
