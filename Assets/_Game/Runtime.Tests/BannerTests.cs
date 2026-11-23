@@ -73,5 +73,37 @@ namespace CriticalMass.Runtime.Tests
             Assert.IsFalse(q.HasCurrent);
             Assert.AreEqual(0, q.WaitingCount);
         }
+        [Test]
+        public void ABannerHeldThroughAFightShowsInFullAfterItInOrderOneAtATime()
+        {
+            // review fix round 2: queued during a fight (Banner.LateUpdate calls HoldBack every frame while PxFight is on),
+            // with the clock jittering back a fraction of a tick and a wall-time cut started; after the fight each banner
+            // enters fresh, holds for its full time, then the next one follows.
+            var q = new BannerQueue();
+            q.Show(Spec("A", 0, 2), 10.0);
+            q.Show(Spec("B", 0, 2), 10.2);
+            q.Hide(10.3);                                          // an exit already started (the wall cut)
+            for (double t = 10.3; t < 13.3; t += 1.0 / 60) { q.HoldBack(t); q.HoldBack(t - 0.01); }
+            double end = 13.3;                                     // the fight is over (3 s after the last hit)
+            q.Update(end);
+            Assert.IsTrue(q.HasCurrent);
+            Assert.AreEqual("A", q.Current.Headline);
+            Assert.AreEqual(1f, q.Alpha(end + BannerQueue.InSeconds + 1.9), 1e-6, "A holds its full 2 s after the fight");
+            q.Update(end + BannerQueue.InSeconds + 1.9);
+            Assert.AreEqual("A", q.Current.Headline);
+            double next = end + BannerQueue.InSeconds + 2 + BannerQueue.OutSeconds + 0.01;
+            q.Update(next);
+            Assert.AreEqual("B", q.Current.Headline, "then B, one at a time");
+            Assert.AreEqual(1f, q.Alpha(next + BannerQueue.InSeconds + 1.9), 1e-6, "B holds its full time too");
+        }
+
+        [Test]
+        public void ASmallStepBackInTheClockKeepsTheBanner()
+        {
+            var q = new BannerQueue();
+            q.Show(Spec("A"), 50.0);
+            q.Update(49.98);                                       // hit-stop jitter, not a new match
+            Assert.IsTrue(q.HasCurrent);
+        }
     }
 }

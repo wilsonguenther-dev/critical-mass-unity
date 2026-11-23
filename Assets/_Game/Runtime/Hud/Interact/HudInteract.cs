@@ -568,7 +568,7 @@ namespace CriticalMass.Runtime.Hud.Interact
                     Pings.Place(w, PingWords.ForKaiju(w.Kaiju.State, w.Actors[Me].Team), egg ? w.Map.Shrine.X : w.Kaiju.X, egg ? w.Map.Shrine.Z : w.Kaiju.Z, Me);
                     break;
                 }
-                case HotClick.KaijuCard: ToggleCard("kaiju", KaijuCard); break;
+                case HotClick.KaijuCard: if (!HudState.NoKaijuIn(Cfg)) ToggleCard("kaiju", KaijuCard); break;   // review fix (lane F): no egg card without a Kaiju
                 case HotClick.CharacterPanel:
                     if (!ItemHooks.OpenCharacterPanel()) ToggleCard("character", CharacterCard);
                     break;

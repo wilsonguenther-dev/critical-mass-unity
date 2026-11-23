@@ -250,6 +250,29 @@ namespace CriticalMass.Sim.Core
         /// <summary>b16 CANCEL: A = the attacker, at its position; Value 1 = a feint (the wind-up was dropped, no hit), 2 = a
         /// hit-cancel (the recovery after a landed hit was cut). View only: the feint flick and its sound.</summary>
         Feint,
+        /// <summary>
+        /// Player-experience wave (2026-11-22), view-only reporting events; appended. A swing or blast reached an enemy body
+        /// and dealt nothing: A = the target, B = the attacker (-1 none, -2 the Kaiju), (X, Z) = the target,
+        /// Value = a PlayerReasons.Blocked* code (spawn protection, dodge, ward, wall between, passive window, immune).
+        /// </summary>
+        HitBlocked,
+        /// <summary>A swing or blast damaged a structure (enemy barricade, built wall, breakable): A = the attacker,
+        /// B = PlayerReasons.Structure* kind, (X, Z) = the structure cell centre, Value = damage dealt, Radius = share of its
+        /// health left (0 = it broke). A swing that raised this is not a whiff.</summary>
+        StructureHit,
+        /// <summary>A button press the sim could not act on (never silent): A = the actor, B = PlayerReasons.Button* code,
+        /// (X, Z) = the actor, Value = a PlayerReasons.Refused* code. Raised at most once per press (edge), never per held tick.</summary>
+        ActionRefused,
+        /// <summary>A world action by an actor that changed the world and has no other event: A = the actor,
+        /// B = PlayerReasons.World* kind, (X, Z) = where, Value = amount (cells, units).</summary>
+        WorldAction,
+        /// <summary>Lane S2: the idle-player autopilot took over (Value 1) or handed back (Value 0) actor A's fighter, on the tick it
+        /// happened: A = the actor, B = -1, (X, Z) = the actor, Value = 1 on / 0 off. The HUD announces both.</summary>
+        AutopilotChanged,
+        /// <summary>px S1 [9] view only: a melee hit was CRITICAL (earned, never rolled): A = the victim, B = the attacker,
+        /// (X, Z) = the victim, Value = kind (1 counter: hit inside his wind-up, 2 punish: hit in the recovery of his whiff,
+        /// 3 back hit: from his rear arc), Radius = the bonus damage dealt. The Hit event of the same strike carries Tier 2.</summary>
+        CriticalHit,
     }
 
     /// <summary>CM b13 [K]: the Kaiju type decided by the biomass mix at the hatch (Elder = today's Kaiju; appended members only).</summary>

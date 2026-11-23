@@ -4,13 +4,13 @@ using CriticalMass.Runtime.Hud;
 using CriticalMass.Runtime.Hud.Style;
 using CriticalMass.Runtime.Input;
 using UnityEngine;
-using UnityEngine.InputSystem;
 using UnityEngine.SceneManagement;
 
 namespace CriticalMass.Runtime.Menu
 {
     /// <summary>
-    /// DG-30 streamer and accessibility options: hide names, clean HUD (H), subtitles, UI scale 80 to 130 %, intense
+    /// DG-30 streamer and accessibility options: hide names, clean HUD (settings only since lane I, 2026-11-22: the H key
+    /// is the J K L layout's Interact and hid the whole HUD on a player's first interact), subtitles, UI scale 80 to 130 %, intense
     /// flashing (b15: OFF by default, so at most 3 flashes per second and no full-screen invert unless a player opts in) and
     /// camera shake 0 to 100 (default 0). Stored in PlayerPrefs like
     /// GameSettings, shown as the ACCESS tab of the settings page (PauseMenu.AddTab, registered before the menu builds).
@@ -35,6 +35,11 @@ namespace CriticalMass.Runtime.Menu
         /// <summary>Batch 12 item P (Travis): fog of war on / off (default on; drawn only in the Full profile, never Classic).</summary>
         public const string FogOfWarKey = "cm.access.fogOfWar";
 
+        /// <summary>Lane I (2026-11-22): set once this version has cleared a clean-HUD flag stored by the old H key, so nobody
+        /// stays stuck with no HUD (a versioned one-shot migration; the value is the migration version).</summary>
+        public const string CleanHudMigrationKey = "cm.access.cleanHudMigrated";
+        public const int CleanHudMigrationVersion = 1;
+
         public static readonly string[] AllKeys = { HideNamesKey, CleanHudKey, SubtitlesKey, UiScaleKey, IntenseFlashingKey, ShakeAmountKey, ReduceMotionKey, View.Moments.BigMomentsSettings.ModeKey, FogOfWarKey };
 
         /// <summary>UI scale choices in percent, screen order.</summary>
@@ -49,7 +54,7 @@ namespace CriticalMass.Runtime.Menu
 
         /// <summary>Hide player and bot names wherever the game shows them (default off).</summary>
         public static bool HideNames { get => GetB(HideNamesKey, false); set => SetB(HideNamesKey, value); }
-        /// <summary>Hide the match HUD for clean footage (default off; H toggles it in a match).</summary>
+        /// <summary>Hide the match HUD for clean footage (default off; this settings row only, no key in a match).</summary>
         public static bool CleanHud { get => GetB(CleanHudKey, false); set => SetB(CleanHudKey, value); }
         /// <summary>Show subtitles for spoken lines (default on).</summary>
         public static bool Subtitles { get => GetB(SubtitlesKey, true); set => SetB(SubtitlesKey, value); }
@@ -104,6 +109,7 @@ namespace CriticalMass.Runtime.Menu
         public static void ResetAll()
         {
             for (int i = 0; i < AllKeys.Length; i++) PlayerPrefs.DeleteKey(AllKeys[i]);
+            AimHelpSettings.ResetAll();
             GameSettings.CameraShake = false;   // also raises GameSettings.Changed, so FeelGate reloads the cleared keys
             Save();
         }
@@ -125,8 +131,26 @@ namespace CriticalMass.Runtime.Menu
 
         static string OnOff(bool b) => b ? "ON" : "OFF";
 
-        /// <summary>The clean-HUD key's name through InputGlyphs (the H key is read directly by AccessibilityApplier).</summary>
-        public static string CleanHudKeyWords => InputGlyphs.ForPath("<Keyboard>/h").Words.ToUpperInvariant();
+        /// <summary>
+        /// Lane I: run once per install of this version (BeforeSceneLoad): a CleanHud flag left ON by the old hard-coded H
+        /// toggle is cleared, then the migration key is stored, so a player who turns CLEAN HUD on from now on keeps it.
+        /// Returns true when it cleared a stored hidden-HUD flag.
+        /// </summary>
+        public static bool MigrateCleanHudOnce()
+        {
+            if (PlayerPrefs.GetInt(CleanHudMigrationKey, 0) >= CleanHudMigrationVersion) return false;
+            bool was = CleanHud;
+            PlayerPrefs.DeleteKey(CleanHudKey);
+            PlayerPrefs.SetInt(CleanHudMigrationKey, CleanHudMigrationVersion);
+            PlayerPrefs.Save();
+            if (was) Changed?.Invoke();
+            return was;
+        }
+
+        /// <summary>Lane I: the keys this page still reads straight from the keyboard in a match (none: CLEAN HUD is settings only).</summary>
+        public static readonly string[] HardCodedMatchKeys = new string[0];
+
+        static string Aim(AimDevice d) => AimHelpSettings.Label(AimHelpSettings.Get(d));
 
         /// <summary>The ACCESS tab (PauseMenu.ExtraTab.Build): six lines, a reset button and a note.</summary>
         public static List<MenuItem> BuildTab(PauseMenu menu, RectTransform tab)
@@ -134,7 +158,7 @@ namespace CriticalMass.Runtime.Menu
             var items = new List<MenuItem>
             {
                 menu.Stepper(tab, 0, "HIDE NAMES", () => OnOff(HideNames), d => HideNames = !HideNames),
-                menu.Stepper(tab, 1, "CLEAN HUD   (" + CleanHudKeyWords + ")", () => OnOff(CleanHud), d => CleanHud = !CleanHud),
+                menu.Stepper(tab, 1, "CLEAN HUD", () => OnOff(CleanHud), d => CleanHud = !CleanHud),
                 menu.Stepper(tab, 2, "SUBTITLES", () => OnOff(Subtitles), d => Subtitles = !Subtitles),
                 menu.Stepper(tab, 3, "UI SCALE", UiScaleText, StepUiScale),
                 // b15 safe defaults: the row names what ON does (more and brighter flashes); OFF is the safe default.
@@ -148,6 +172,10 @@ namespace CriticalMass.Runtime.Menu
                 menu.Stepper(tab, 8, "GORE", () => global::CriticalMass.Runtime.View.Effects.GoreGate.Label(GameSettings.Gore), d => GameSettings.Gore = global::CriticalMass.Runtime.View.Effects.GoreGate.Step(GameSettings.Gore, d)),
                 // Batch 12 item P (Travis): fog of war, ON default (Full profile only; Classic never shows it).
                 menu.Stepper(tab, 9, "FOG OF WAR", () => OnOff(FogOfWar), d => FogOfWar = !FogOfWar),
+                // Lane I (master plan call 8): aim help per device class. Mouse LOW, controller and keys HIGH by default.
+                menu.Stepper(tab, 10, "AIM HELP: MOUSE", () => Aim(AimDevice.Mouse), d => AimHelpSettings.Step(AimDevice.Mouse, d)),
+                menu.Stepper(tab, 11, "AIM HELP: CONTROLLER", () => Aim(AimDevice.Controller), d => AimHelpSettings.Step(AimDevice.Controller, d)),
+                menu.Stepper(tab, 12, "AIM HELP: KEYS ONLY", () => Aim(AimDevice.Keys), d => AimHelpSettings.Step(AimDevice.Keys, d)),
             };
             float y = PauseMenu.ContentY + items.Count * (PauseMenu.LineH + PauseMenu.LineGap) + 10f;
             MenuItem reset = MenuUi.Item(tab, "Reset Access", PauseMenu.ContentX, y, 460f, 56f, "RESET THESE OPTIONS",
@@ -159,7 +187,7 @@ namespace CriticalMass.Runtime.Menu
                 menu.SetStatus("Streamer and accessibility options are back to their defaults.", false);
             };
             items.Add(reset);
-            menu.Note(tab, items.Count, "Press " + CleanHudKeyWords + " in a match to hide or show the HUD. Intense flashing can affect people with photosensitive epilepsy. GORE is also on the Game tab.");
+            menu.Note(tab, items.Count, "CLEAN HUD hides the match HUD until you turn it off here. AIM HELP turns your swing toward the enemy in front of you; it never moves the camera. Intense flashing can affect people with photosensitive epilepsy. GORE is also on the Game tab.");
             return items;
         }
 
@@ -167,6 +195,7 @@ namespace CriticalMass.Runtime.Menu
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
         static void Register()
         {
+            MigrateCleanHudOnce();
             PauseMenu.AddTab(new PauseMenu.ExtraTab { Name = TabName, Build = BuildTab });
         }
 
@@ -224,7 +253,7 @@ namespace CriticalMass.Runtime.Menu
     }
 
     /// <summary>
-    /// Applies the options that need no other system's help: the clean HUD (H, or the settings row) hides the match HUD
+    /// Applies the options that need no other system's help: the clean HUD (the settings row; lane I removed the H key) hides the match HUD
     /// canvas, and the UI scale scales the four HUD clusters about their screen-corner anchors. Runs after the HUD's own
     /// LateUpdate. It only acts on changes it made, so another screen that hides the HUD (title, menus) is not fought.
     /// </summary>
@@ -242,10 +271,7 @@ namespace CriticalMass.Runtime.Menu
             if (_hud == null) _hud = GetComponent<GameHud>();
             if (_input == null) _input = GetComponent<HumanInputSource>();
             bool title = GetComponent<TitleScreen>() != null;
-            bool paused = _input != null && _input.State.Paused;
-
-            Keyboard kb = Keyboard.current;
-            if (!title && !paused && kb != null && kb.hKey.wasPressedThisFrame) SettingsExtras.CleanHud = !SettingsExtras.CleanHud;
+            // Lane I (2026-11-22): no key toggles the clean HUD in a match any more (H is the J K L layout's Interact).
 
             if (_hud == null || _hud.Canvas == null) return;
             if (!title)

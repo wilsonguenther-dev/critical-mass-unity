@@ -1,6 +1,7 @@
 using System;
 using CriticalMass.Runtime.Game;
 using CriticalMass.Runtime.Menu;
+using CriticalMass.Sim.Config;
 using CriticalMass.Sim.Core;
 using CriticalMass.Sim.Grid;
 using UnityEngine;
@@ -56,6 +57,10 @@ namespace CriticalMass.Runtime.Input
         private InputAction _walk;
         private InputAction _lock;
         private bool _keyAimPressed;
+        // Tier F31 / F34: the aiming device follows the most recent real input; untouched frames resend the held raw aim.
+        private readonly AimDeviceArbiter _devices = new AimDeviceArbiter();
+        private readonly AimHold _hold = new AimHold();
+        private bool _touched;
         private bool _wasAlive;
         private double[] _enemyX = new double[64];
         private double[] _enemyZ = new double[64];
@@ -78,12 +83,42 @@ namespace CriticalMass.Runtime.Input
         private readonly Action<InputAction.CallbackContext>[] _started = new Action<InputAction.CallbackContext>[ButtonActions.Length];
         private readonly Action<InputAction.CallbackContext>[] _canceled = new Action<InputAction.CallbackContext>[ButtonActions.Length];
 
+        /// <summary>Fix round 5 (item 9): the actions every seat needs (Dodge / Cancel are added when missing).</summary>
+        public static readonly string[] RequiredActions = { "Move", "Point", "Jump", "Attack", "Ability", "Interact", "DigPlace", "Pause", "Scoreboard" };
+        /// <summary>Errors logged for a missing or empty input-actions asset (one per run; tests).</summary>
+        public static int MissingActionsErrors;
+        static bool _missingLogged;
+
+        /// <summary>Fix round 5 (item 9, pure; tests): null when the asset can drive a seat, else why not.</summary>
+        public static string ActionsProblem(InputActionAsset asset)
+        {
+            if (asset == null) return "no project-wide input actions asset (InputSystem.actions is null)";
+            InputActionMap map = asset.FindActionMap("Player", false);
+            if (map == null) return "the input actions asset '" + asset.name + "' has no Player map";
+            foreach (string a in RequiredActions) if (map.FindAction(a, false) == null) return "the Player map has no '" + a + "' action";
+            return null;
+        }
+
         private void OnEnable()
         {
-            var map = InputSystem.actions.FindActionMap("Player", true);
-            EnsureDodgeAction(map); // CM b13 J: until Settings/Controls.inputactions carries the Dodge action
-            EnsureCancelAction(map); // b16: an older or rebound asset without the Cancel action gets it in memory
-            map.Enable();
+            // fix round 5 (item 9): a missing or empty input-actions asset no longer throws out of the match build: ONE
+            // error, this seat hands itself to the autopilot, and the match goes on.
+            string problem = ActionsProblem(InputSystem.actions);
+            if (problem != null)
+            {
+                if (!_missingLogged) { _missingLogged = true; MissingActionsErrors++; Debug.LogError("[input] " + problem + ": the local seat plays on autopilot this match."); }
+                SimDriverBehaviour driver = GetComponent<SimDriverBehaviour>();
+                if (driver == null) driver = FindFirstObjectByType<SimDriverBehaviour>();
+                if (driver != null) driver.HumanAutopilot = true;
+                _unusable = true;
+                enabled = false;
+                return;
+            }
+            _unusable = false;
+            // Review defect 0: one owner for the map's life. Dodge / Cancel are added (old assets only) with the whole asset
+            // disabled, nothing is re-created that exists, and OnDisable gives the map back (PlayerActionsLifetime).
+            var map = PlayerActionsLifetime.Acquire();
+            if (map == null) map = InputSystem.actions.FindActionMap("Player", true);
             BuilderToolbelt.Local = State.Toolbelt;   // b14: the HUD and the terrain view read the local Builder's wheel
             _map = map;
             _move = map["Move"];
@@ -100,8 +135,12 @@ namespace CriticalMass.Runtime.Input
             ControlScheme scheme = ControlBindings.ActiveScheme;
             Aim.SetMode(scheme == ControlScheme.Gamepad ? AimResolver.Mode.Stick
                 : scheme == ControlScheme.Keyboard ? AimResolver.Mode.Keys : AimResolver.Mode.Pointer);
+            _devices.Reset();
+            _hold.Reset();
+            _touched = false;
             ReadSettings();
             GameSettings.Changed += ReadSettings;
+            AimHelpSettings.Changed += ReadSettings;
             for (int i = 0; i < ButtonActions.Length; i++)
             {
                 B b = Buttons[i];
@@ -122,13 +161,32 @@ namespace CriticalMass.Runtime.Input
                     }
                     else if (ctx.control != null && ctx.control.device is Mouse && (b == B.Attack || b == B.Ability))
                     {
-                        // A click aims with the mouse at once, even when the press lands in a frame Sample does not see.
+                        // The prompts learn the mouse is in the hand; the AIM does not move to a resting cursor on a click
+                        // (tier F31): AimDeviceArbiter hands the aim over only on a real mouse move.
                         ControlBindings.NoteMouseUsed();
-                        Aim.NotePointer();
+                    }
+                    // Lane I item 2: keyboard alone, a Farmer or Healer holds the ability key to choose the distance; the
+                    // press reaches the sim on release (a tap shorter than CastDistance.TapSeconds casts at the default).
+                    if (b == B.Ability && ctx.control != null && ctx.control.device is Keyboard && Aim.Current == AimResolver.Mode.Keys && LocalClassHoldsToCast())
+                    {
+                        _castHolding = true;
+                        _castRelease = false;
+                        _castDownAt = Time.unscaledTimeAsDouble;
+                        return;
                     }
                     State.ButtonDown(b);
                 };
-                _canceled[i] = _ => State.ButtonUp(b);
+                _canceled[i] = _ =>
+                {
+                    if (b == B.Ability && _castHolding)
+                    {
+                        _castHolding = false;
+                        _castHeldFor = Time.unscaledTimeAsDouble - _castDownAt;
+                        _castRelease = true;
+                        State.ButtonDown(B.Ability);
+                    }
+                    State.ButtonUp(b);
+                };
                 a.started += _started[i];
                 a.canceled += _canceled[i];
             }
@@ -173,16 +231,35 @@ namespace CriticalMass.Runtime.Input
             if (was) map.Enable();
         }
 
+        bool LocalClassHoldsToCast()
+        {
+            if (_driver == null) _driver = GetComponent<SimDriverBehaviour>();
+            World w = _driver != null ? _driver.World : null;
+            int me = LocalSeat.Actor;
+            return w != null && me >= 0 && me < w.ActorCount && w.Actors[me].Alive && HoldToCast(w.Actors[me].Cls);
+        }
+
         private void ReadSettings()
         {
+            _levelsRead = false;   // lane I: AIM HELP rows re-read on the next frame
             State.MovementAssist = GameSettings.MovementAssist;
             State.KeysFollowMap = GameSettings.KeysFollowMap;
             State.CancelButton = GameSettings.CancelButton;   // b16
         }
 
+        bool _unusable;
+        /// <summary>Fix round 6: this reader turned itself off on purpose (missing / empty input actions, seat on autopilot);
+        /// the lockout watchdog must not "repair" it (that was a second red error).</summary>
+        public bool ActionsMissing => _unusable;
+
         private void OnDisable()
         {
+            if (_unusable) return;   // fix round 5 (item 9): OnEnable bound nothing
             GameSettings.Changed -= ReadSettings;
+            AimHelpSettings.Changed -= ReadSettings;
+            _castHolding = _castRelease = false;
+            _assist.Reset();
+            AimAssist.Clear();
             State.BindWorld(null);
             if (BuilderToolbelt.Local == State.Toolbelt) BuilderToolbelt.Local = null;
             for (int i = 0; i < _actions.Length; i++)
@@ -195,6 +272,7 @@ namespace CriticalMass.Runtime.Input
                 _started[i] = null;
                 _canceled[i] = null;
             }
+            PlayerActionsLifetime.Release(_map);
             _map = null;
             _move = null;
             _point = null;
@@ -225,7 +303,7 @@ namespace CriticalMass.Runtime.Input
             }
             // b14: number keys 1 to 7 pick a Builder tool directly (BuilderTool order); ignored for every other class.
             Keyboard kbd = Keyboard.current;
-            if (kbd != null && !Online.OnlineChatHud.EatsKeys && InputContext.DigSwitchOwnsWheel(InputContext.Current))
+            if (kbd != null && !Online.OnlineChatHud.EatsKeys && !CriticalMass.Runtime.Hud.Mechanics.StationPanel.IsOpen && InputContext.DigSwitchOwnsWheel(InputContext.Current))
             {
                 if (kbd.digit1Key.wasPressedThisFrame) State.PickBuilderTool(0);
                 else if (kbd.digit2Key.wasPressedThisFrame) State.PickBuilderTool(1);
@@ -257,18 +335,31 @@ namespace CriticalMass.Runtime.Input
             bool keyAim = _keyAimPressed || (_lock != null && _lock.WasPressedThisFrame() && _lock.activeControl != null &&
                                              _lock.activeControl.device is Keyboard && !(_walk != null && _walk.IsPressed() && Aim.Current == AimResolver.Mode.Pointer));
             _keyAimPressed = false;
-            if (stick.sqrMagnitude > 0f || moveByPad) Aim.NoteStick();
-            else if (Mouse.current != null && ControlBindings.MouseUsed(Mouse.current)) Aim.NotePointer();
-            else if ((keyAim || (arrowsMove && Aim.Current == AimResolver.Mode.Pointer)) && ControlBindings.MouseIdleFor >= ControlBindings.MouseIdleSeconds)
+            // Tier F31: the device used most recently aims (a mouse MOVE, a deflected stick, the move keys or a keyboard attack
+            // key); a resting cursor never keeps the aim from a keys player (AimDeviceArbiter.PointerHoldSeconds after its
+            // last move it lets go). A click is not aim input.
+            double nowT = Time.unscaledTimeAsDouble;
+            Mouse mouse = Mouse.current;
+            Vector2 md = mouse != null ? mouse.delta.ReadValue() : Vector2.zero;
+            bool pointerMoved = AimDeviceArbiter.PointerMoved(md.x, md.y) || (_walk != null && _walk.WasPressedThisFrame());
+            bool stickUsed = stick.sqrMagnitude > 0f || moveByPad;
+            if (stickUsed) _devices.NoteStick(nowT);
+            if (pointerMoved) _devices.NotePointerMoved(nowT);
+            if (fromKeys || keyAim) _devices.NoteKeys(nowT, keyAim);
+            AimResolver.Mode aimWas = Aim.Current;
+            AimResolver.Mode aimNow = _devices.Decide(nowT, aimWas);
+            if (aimNow != aimWas)
             {
-                Aim.NoteKeys();
-                ControlBindings.SetKeyboardOnly(true);
+                Aim.SetMode(aimNow);
+                if (aimNow == AimResolver.Mode.Keys) ControlBindings.SetKeyboardOnly(true);
             }
-            else if (fromKeys && Aim.Current == AimResolver.Mode.Stick)
-            {
-                // Back from the controller to the keys: the keyboard scheme the player had before.
-                Aim.SetMode(ControlBindings.KeyboardOnly ? AimResolver.Mode.Keys : AimResolver.Mode.Pointer);
-            }
+            // Tier F34: a frame is "touched" only when the player moved a device or pressed something this frame.
+            Gamepad padNow = Gamepad.current;
+            _touched = pointerMoved || stickUsed || m.sqrMagnitude > 0f
+                       || (kbd != null && kbd.anyKey.wasPressedThisFrame)
+                       || (mouse != null && (mouse.leftButton.wasPressedThisFrame || mouse.rightButton.wasPressedThisFrame
+                           || mouse.middleButton.wasPressedThisFrame || mouse.scroll.ReadValue().sqrMagnitude > 0f))
+                       || (padNow != null && ControlBindings.GamepadUsed(padNow));
 
             // Walk to pointer acts only while the mouse aims; lock facing only while the keys aim (b14: they no longer share a key).
             bool walk = _walk != null && _walk.IsPressed() && Aim.Current == AimResolver.Mode.Pointer;
@@ -278,10 +369,15 @@ namespace CriticalMass.Runtime.Input
             if (_driver == null) _driver = GetComponent<SimDriverBehaviour>();
             World w = _driver != null ? _driver.World : null;
             State.BindWorld(w);
+            int me = LocalSeat.Actor;
+            bool seated = w != null && w.ActorCount > me && me >= 0;
+            if (_castRelease && !State.AbilityIntent) _castRelease = false;
+            // b16 / lane I: tell the HUD which job LB does right now (Cancel inside your own swing window, else Next tool).
+            InputContext.PadLbCancels = seated && State.CancelButton && CombatFeel.On(w) && CombatFeel.CancelWindow(w, me);
             // feat/ground-camera (experimental CAMERA: GROUND): the keys and the left stick move relative to the ground camera,
             // and the aim is the point ahead along its facing at the reticle's ground distance. Same InputFrame fields as
             // ever (a world-space move and a ground aim point): no Sim change, determinism untouched.
-            if (CriticalMass.Runtime.Camera.GroundView.PlayActive && w != null && w.ActorCount > 0)
+            if (CriticalMass.Runtime.Camera.GroundView.PlayActive && seated && w.ActorCount > 0)
             {
                 CriticalMass.Runtime.Camera.GroundCamera.Basis(CriticalMass.Runtime.Camera.GroundView.PlayYaw,
                     out double gux, out double guz, out double grx, out double grz);
@@ -291,6 +387,11 @@ namespace CriticalMass.Runtime.Input
                 FacingLocked = false;
                 if (CriticalMass.Runtime.Camera.GroundView.TryPlayAim(w, out double gax, out double gaz)) State.SetAim(gax, gaz);
                 else State.ClearAim();
+                // Lane I: the auto-follow camera lags the travel, so a keys or one-stick player's intent is the move direction.
+                bool manual = GameSettings.CameraManual;
+                AimDevice dev = Aim.Current == AimResolver.Mode.Stick ? AimDevice.Controller : manual ? AimDevice.Mouse : AimDevice.Keys;
+                State.MoveDirection(out double ix, out double iz);
+                FinishAim(w, dev, true, !manual && State.MoveHeld, ix, iz);
                 return;
             }
             State.ClearCameraBasis();
@@ -301,38 +402,219 @@ namespace CriticalMass.Runtime.Input
             else State.ClearWalkTarget();
             if (Aim.Current == AimResolver.Mode.Keys)
             {
-                if (w != null && w.ActorCount > 0)
+                if (seated && w.ActorCount > 0)
                 {
                     // A respawn faces the hill (Respawn.cs); the keyboard facing starts again from there.
-                    bool alive = w.Actors[LocalSeat.Actor].Alive;
+                    bool alive = w.Actors[me].Alive;
                     if (alive && !_wasAlive) Aim.ForgetKeysDirection();
                     _wasAlive = alive;
                     State.MoveDirection(out double dx, out double dz);
-                    int n = CollectEnemies(w);
-                    Aim.ResolveKeys(dx, dz, w.X[LocalSeat.Actor], w.Z[LocalSeat.Actor], w.Actors[LocalSeat.Actor].Facing, FacingLocked, _enemyX, _enemyZ, n, out double kx, out double kz);
+                    // Lane I: no built-in 30 degree snap any more (it skipped actor 0); AimAssistBrain below does it for every
+                    // device, with the KEYS strength setting.
+                    Aim.ResolveKeys(dx, dz, w.X[me], w.Z[me], w.Actors[me].Facing, FacingLocked, null, null, 0, out double kx, out double kz);
+                    // Item 2: hold the ability key to throw farther (release casts); a tap casts at the default.
+                    if (_castHolding || _castRelease)
+                    {
+                        double held = _castHolding ? Time.unscaledTimeAsDouble - _castDownAt : _castHeldFor;
+                        if (held < CastDistance.TapSeconds) held = 0;
+                        ScaleAim(w.X[me], w.Z[me], ref kx, ref kz, CastDistance.FromHold(held, AbilityMaxRange(w, me)));
+                    }
                     State.SetAim(kx, kz);
                 }
                 else State.ClearAim();
+                FinishAim(w, AimDevice.Keys, false, false, 0, 0);
                 return;
             }
             if (Aim.Current == AimResolver.Mode.Stick)
             {
-                if (w != null && w.ActorCount > 0 && Aim.ResolveStick(stick.x, stick.y, m.x, m.y, w.X[LocalSeat.Actor], w.Z[LocalSeat.Actor], out double ax, out double az))
+                if (seated && w.ActorCount > 0 && Aim.ResolveStick(stick.x, stick.y, m.x, m.y, w.X[me], w.Z[me], out double ax, out double az))
+                {
+                    // Item 2: with the right stick pushed, its deflection picks the cast distance (1 u .. the ability's range).
+                    float mag = stick.magnitude;
+                    if (mag > 0f) ScaleAim(w.X[me], w.Z[me], ref ax, ref az, CastDistance.FromStick(Math.Min(1.0, mag), AbilityMaxRange(w, me)));
                     State.SetAim(ax, az);
+                }
                 else State.ClearAim();
+                FinishAim(w, AimDevice.Controller, false, false, 0, 0);
                 return;
             }
 
             if (Mouse.current == null || cam == null)
             {
                 State.ClearAim();
+                FinishAim(w, AimDevice.Mouse, false, false, 0, 0);
                 return;
             }
             if (PointerGround(cam, w, out double sx, out double sz)) State.SetAim(sx, sz);
             else State.ClearAim();
+            FinishAim(w, AimDevice.Mouse, false, false, 0, 0);
         }
 
-        /// <summary>Living actors of the other team, positions copied for the keyboard target assist (read-only).</summary>
+        // ---- Lane I (player-experience wave 2026-11-22): aim help in every view and device ----
+
+        readonly AimAssistBrain _assist = new AimAssistBrain();
+        AimCandidate[] _cand = new AimCandidate[64];
+        double _lastAssistTime = -1, _lastRawX, _lastRawZ, _lastRawInputAt = -100;
+        bool _levelsRead;
+        readonly AimHelpLevel[] _levels = new AimHelpLevel[3];
+        // Item 2 (keys): the ability key is being held to choose a distance; released and waiting for the next step.
+        bool _castHolding, _castRelease;
+        double _castDownAt, _castHeldFor;
+
+        /// <summary>The assist brain (tests).</summary>
+        public AimAssistBrain Assist => _assist;
+
+        void ReadLevels()
+        {
+            _levels[0] = AimHelpSettings.Get(AimDevice.Mouse);
+            _levels[1] = AimHelpSettings.Get(AimDevice.Controller);
+            _levels[2] = AimHelpSettings.Get(AimDevice.Keys);
+            _levelsRead = true;
+        }
+
+        /// <summary>The aim point (ax, az) moved to dist from (px, pz) along its own direction.</summary>
+        static void ScaleAim(double px, double pz, ref double ax, ref double az, double dist)
+        {
+            double dx = ax - px, dz = az - pz, l = Math.Sqrt(dx * dx + dz * dz);
+            if (l < 1e-9) return;
+            ax = px + dx / l * dist;
+            az = pz + dz / l * dist;
+        }
+
+        /// <summary>The farthest useful aim for the class's aimed ability (roots, pulse, TNT); the stick default otherwise.</summary>
+        public static double AbilityMaxRange(World w, int id)
+        {
+            if (w == null || w.Config == null || id < 0 || id >= w.ActorCount) return AimResolver.StickAimDistance;
+            switch (w.Actors[id].Cls)
+            {
+                case ClassId.Farmer: return w.Config.Abilities.FarmerRoots.CastRange;
+                case ClassId.Healer: return w.Config.Abilities.Healer.PulseCastRange;
+                case ClassId.Demolitions: return w.Config.Abilities.DemolitionsTnt.ThrowRange;
+                default: return AimResolver.StickAimDistance;
+            }
+        }
+
+        /// <summary>Classes whose ability key, on the keyboard alone, is held to choose a distance and cast on release.</summary>
+        public static bool HoldToCast(ClassId c) => c == ClassId.Farmer || c == ClassId.Healer;
+
+        /// <summary>
+        /// Runs after every aim branch: bends State's aim toward the assist candidate (AimAssistBrain) and publishes this
+        /// frame's AimAssist statics for the HUD and the camera. Never moves the camera. Off = State's aim untouched.
+        /// </summary>
+        void FinishAim(World w, AimDevice dev, bool thirdPerson, bool hasIntent, double ix, double iz)
+        {
+            int me = LocalSeat.Actor;
+            // Tier F34: with no device input this frame the raw aim is the held one, relative to the body (a moving camera,
+            // a sliding cursor projection or a push never reads as a player to the sim's idle rule).
+            if (w != null && me >= 0 && me < w.ActorCount)
+            {
+                bool hold = State.HasAim;
+                double hx = State.AimX, hz = State.AimZ;
+                _hold.Apply(_touched, w.X[me], w.Z[me], ref hold, ref hx, ref hz);
+                if (hold) State.SetAim(hx, hz);
+                else State.ClearAim();
+            }
+            AimAssist.RawHasAim = State.HasAim;
+            AimAssist.RawAimX = State.AimX;
+            AimAssist.RawAimZ = State.AimZ;
+            if (w == null || w.Config == null || me < 0 || me >= w.ActorCount || !w.Actors[me].Alive || !State.HasAim || State.Paused)
+            {
+                _assist.Reset();
+                AimAssist.Clear();
+                // Review item 3: Clear drops RawHasAim; the raw aim stays published on this path too (lane C caps the
+                // camera lean with it every frame, in every branch).
+                AimAssist.RawHasAim = State.HasAim;
+                AimAssist.RawAimX = State.AimX;
+                AimAssist.RawAimZ = State.AimZ;
+                AimAssist.HasAim = State.HasAim;
+                AimAssist.AimX = State.AimX;
+                AimAssist.AimZ = State.AimZ;
+                return;
+            }
+            if (!_levelsRead) ReadLevels();
+            AimHelpLevel level = _levels[(int)dev];
+            AimAssistTuning tun = AimAssistTuning.For(level);
+            // The idle pull only follows real input (Idle rule for lane S2: an untouched aim stays constant).
+            double rdx = State.AimX - _lastRawX, rdz = State.AimZ - _lastRawZ;
+            double tnow = Time.unscaledTimeAsDouble;
+            if (State.MoveHeld || rdx * rdx + rdz * rdz > AimAssistTunables.IdleInputMoveUnits * AimAssistTunables.IdleInputMoveUnits) _lastRawInputAt = tnow;
+            _lastRawX = State.AimX;
+            _lastRawZ = State.AimZ;
+            if (tnow - _lastRawInputAt > AimAssistTunables.IdlePullNeedsInputSeconds) tun.IdleBend = 0;
+            GameConfig cfg = w.Config;
+            Actor self = w.Actors[me];
+            double px = w.X[me], pz = w.Z[me];
+            int n = BuildCandidates(w, me, px, pz);
+            LightWeapon lw = LightWeapons.Of(w, self.Cls);
+            ClassConfig cc = cfg.Class(self.Cls);
+            bool tnt = CombatFeel.On(w) && self.Cls == ClassId.Demolitions && cfg.Abilities.DemolitionsTnt.ThrowOnAttack && w.Tick >= w.Demolitions.TntReadyTick[me];
+            bool abilityPress = (State.AbilityIntent || _castHolding || _castRelease) && self.Cls == ClassId.Farmer && !State.AttackIntent;
+            double now = Time.unscaledTimeAsDouble;
+            double dt = _lastAssistTime >= 0 ? Math.Max(0, Math.Min(0.25, now - _lastAssistTime)) : 0;
+            _lastAssistTime = now;
+            var f = new AimAssistFrame
+            {
+                Px = px, Pz = pz, Facing = self.Facing, HasRaw = true, RawX = State.AimX, RawZ = State.AimZ,
+                HasIntent = hasIntent, IntentX = ix, IntentZ = iz,
+                Attacking = State.AttackIntent || self.SwingPending || abilityPress,
+                Dt = dt,
+                Kind = abilityPress ? AimPressKind.Ability : tnt ? AimPressKind.Tnt : self.Cls == ClassId.Healer ? AimPressKind.Healer : AimPressKind.Melee,
+                Reach = abilityPress ? cfg.Abilities.FarmerRoots.CastRange : lw != null ? lw.Range : cc.AttackRange,
+                ArcDeg = lw != null ? lw.ArcDeg : cc.AttackArcDeg,
+                TntRange = cfg.Abilities.DemolitionsTnt.ThrowRange + cfg.Abilities.DemolitionsTnt.BlastRadius,
+                TntLead = Math.Min(cfg.Abilities.DemolitionsTnt.FuseTicks / cfg.SimHz, AimAssistTunables.TntLeadMaxSeconds),
+                MendRange = CombatFeel.MendRange(cfg),
+                ThirdPerson = thirdPerson,
+            };
+            _assist.Step(f, _cand, n, tun, out double fx, out double fz);
+            if (_assist.Lock >= 0) State.SetAim(fx, fz);
+            int lockId = _assist.Lock;
+            AimAssist.LockTarget = lockId >= 0 && !_assist.LockIsAlly ? lockId : -1;
+            AimAssist.AllyTarget = lockId >= 0 && _assist.LockIsAlly ? lockId : -1;
+            AimAssist.HasAim = State.HasAim;
+            AimAssist.AimX = State.AimX;
+            AimAssist.AimZ = State.AimZ;
+            AimAssist.Strength = level == AimHelpLevel.Off ? 0f : level == AimHelpLevel.Low ? 0.5f : 1f;
+            AimAssist.Device = dev;
+            if (_assist.JustEngaged && AimAssist.LockTarget >= 0) PlayerFeedback.Report(FeedbackChannel.AimAssistLock, AimAssist.LockTarget, AimAssist.Strength);
+            // The hittable cue: the nearest enemy a swing along the facing this aim gives would hit (the sim's own test).
+            int hit = -1;
+            if (!tnt && !abilityPress)
+            {
+                double facing = AimHitTest.FacingFor(px, pz, State.AimX, State.AimZ, self.Facing);
+                int k = AimHitTest.Nearest(px, pz, facing, f.Reach, f.ArcDeg, Phys.On(w, cfg.Physics.ArcCoversBody), Phys.On(w, cfg.Physics.WallsBlockHits), _cand, n);
+                hit = k >= 0 ? _cand[k].Id : -1;
+            }
+            AimAssist.HittableTarget = hit;
+        }
+
+        /// <summary>Every other living actor as an assist candidate (enemies and allies; actor 0 included, the local seat
+        /// skipped), with the fog rule and the sim's wall test (read-only).</summary>
+        int BuildCandidates(World w, int me, double px, double pz)
+        {
+            if (_cand.Length < w.ActorCount) _cand = new AimCandidate[w.ActorCount];
+            TeamId team = w.Actors[me].Team;
+            int n = 0;
+            for (int i = 0; i < w.ActorCount; i++)
+            {
+                if (i == me) continue;
+                Actor a = w.Actors[i];
+                if (a == null || !a.Alive) continue;
+                bool enemy = a.Team != team;
+                _cand[n++] = new AimCandidate
+                {
+                    Id = i, X = w.X[i], Z = w.Z[i], Vx = w.Vx[i], Vz = w.Vz[i], Radius = w.Config.Class(a.Cls).Radius,
+                    Enemy = enemy, Alive = true,
+                    Hidden = enemy && CriticalMass.Runtime.View.Fog.FogOfWar.Hides(i),
+                    ClearLine = SegmentClear.Clear(w.Map, px, pz, w.X[i], w.Z[i]),
+                    Hurt = a.Hp < a.MaxHp,
+                };
+            }
+            return n;
+        }
+
+        /// <summary>Living actors of the other team, positions copied (read-only). Lane I: from actor 0, skipping the local seat
+        /// (it used to start at 1, so an enemy in seat 0 was never assisted online).</summary>
         private int CollectEnemies(World w)
         {
             if (_enemyX.Length < w.ActorCount)
@@ -340,12 +622,14 @@ namespace CriticalMass.Runtime.Input
                 _enemyX = new double[w.ActorCount];
                 _enemyZ = new double[w.ActorCount];
             }
-            var me = w.Actors[LocalSeat.Actor].Team;
+            int me = LocalSeat.Actor;
+            var team = w.Actors[me].Team;
             int n = 0;
-            for (int i = 1; i < w.ActorCount; i++)
+            for (int i = 0; i < w.ActorCount; i++)
             {
+                if (i == me) continue;
                 var a = w.Actors[i];
-                if (a == null || !a.Alive || a.Team == me) continue;
+                if (a == null || !a.Alive || a.Team == team) continue;
                 _enemyX[n] = w.X[i];
                 _enemyZ[n] = w.Z[i];
                 n++;
@@ -365,7 +649,7 @@ namespace CriticalMass.Runtime.Input
 
         private void OnApplicationFocus(bool f)
         {
-            if (!f) State.Blur();
+            if (!f) { State.Blur(); _castHolding = _castRelease = false; }
         }
     }
 }

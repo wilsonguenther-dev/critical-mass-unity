@@ -10,7 +10,8 @@ namespace CriticalMass.Runtime.Input
     /// InputFrame once per sim step.
     /// <para>Edge latch (P1): rendering and the sim run at different rates, so Jump, Ability, DigPlace and Attack presses
     /// are latched on the down and cleared only when Fill consumes them (one true frame per press; repeat downs never
-    /// re-latch). A held Attack stays true every step (the sim's cooldown gates repeats). Interact is held.</para>
+    /// re-latch). A held Attack stays true every step (the sim's cooldown gates repeats). Interact is held AND latched
+    /// (player-experience wave, lane I: a tap shorter than one tick still reaches the sim once; a hold still holds).</para>
     /// <para>Pause toggles Paused; while paused every down except Pause is dropped (never replayed) and Fill writes a
     /// neutral frame with no aim.</para>
     /// <para>Input buffer (DG-14): with BufferWorld set (InputBufferBinder does it), an Attack or Ability press the sim
@@ -75,6 +76,8 @@ namespace CriticalMass.Runtime.Input
         bool _paused;
         bool _scoreboardHeld;
         bool _interactHeld;
+        // Lane I (2026-11-22): a tap shorter than a tick is not lost (the audit's rank 15).
+        bool _interactLatch;
         bool _attackHeld;
         // controls-1 (hygiene): a press held through a death is ignored after the respawn until it is let go.
         bool _attackHoldOff;
@@ -206,6 +209,7 @@ namespace CriticalMass.Runtime.Input
             _paused = false;
             _scoreboardHeld = false;
             _interactHeld = false;
+            _interactLatch = false;
             _attackHeld = false;
             _attackHoldOff = false;
             _aliveSeen = false;
@@ -266,6 +270,7 @@ namespace CriticalMass.Runtime.Input
                     break;
                 case HumanButton.Interact:
                     _interactHeld = true;
+                    if (!repeat) _interactLatch = true;
                     break;
                 case HumanButton.DigPlace:
                     if (!repeat) _terraformLatch = true;
@@ -368,6 +373,7 @@ namespace CriticalMass.Runtime.Input
         {
             _scoreboardHeld = false;
             _interactHeld = false;
+            _interactLatch = false;
             _attackHeld = false;
             _attackHoldOff = false;
             _attackLatch = false;
@@ -416,6 +422,13 @@ namespace CriticalMass.Runtime.Input
             _abilityBuffer.Clear();
         }
 
+        /// <summary>Lane I: an attack is wanted now (held, latched for the next step, or buffered): the aim help bends.</summary>
+        public bool AttackIntent => _attackHeld || _attackLatch || _attackBuffer.Pending;
+        /// <summary>Lane I: an ability press waits for the next step (latched or buffered).</summary>
+        public bool AbilityIntent => _abilityLatch || _abilityBuffer.Pending;
+        /// <summary>Lane I: an Interact tap is latched for the next step (tests).</summary>
+        public bool InteractLatched => _interactLatch;
+
         /// <summary>True while a hold from before the respawn is being ignored.</summary>
         public bool AttackHeldOff => _attackHoldOff;
 
@@ -435,6 +448,7 @@ namespace CriticalMass.Runtime.Input
                 _jumpLatch = false;
                 _dodgeLatch = false;
                 _cancelLatch = false;
+                _interactLatch = false;
                 _classPick = -1;
                 _attackBuffer.Clear();
                 _abilityBuffer.Clear();
@@ -459,7 +473,8 @@ namespace CriticalMass.Runtime.Input
 
             World bw = BufferWorld;
             bool canBuffer = bw != null && bw.Config != null;
-            int early = canBuffer ? InputBuffer.MaxEarlyTicks(bw.Config.SimHz) : 0;
+            int early = canBuffer ? InputBuffer.MaxEarlyTicks(bw.Config.SimHz, InputBuffer.AttackWindow(bw)) : 0;
+            int earlyAbility = canBuffer ? InputBuffer.MaxEarlyTicks(bw.Config.SimHz, InputBuffer.AbilityWindowSeconds) : 0;
             if (bw != null && BufferActor >= 0 && BufferActor < bw.ActorCount)
             {
                 bool alive = bw.Actors[BufferActor].Alive;
@@ -493,7 +508,7 @@ namespace CriticalMass.Runtime.Input
             }
             else
             {
-                output.Ability = _abilityBuffer.Step(_abilityLatch, canBuffer, canBuffer && InputReadiness.Ability(bw, BufferActor), early);
+                output.Ability = _abilityBuffer.Step(_abilityLatch, canBuffer, canBuffer && InputReadiness.Ability(bw, BufferActor), earlyAbility);
                 output.Terraform = _terraformLatch;
                 output.TerraformSwitch = _switchLatch;
             }
@@ -502,7 +517,8 @@ namespace CriticalMass.Runtime.Input
             _switchLatch = false;
             _switchDir = 1;
             _pick = -1;
-            output.Interact = _interactHeld;
+            output.Interact = _interactHeld || _interactLatch;
+            _interactLatch = false;
             output.Jump = _jumpLatch;
             _jumpLatch = false;
             output.Dodge = _dodgeLatch; // CM b13 J: one dodge per press

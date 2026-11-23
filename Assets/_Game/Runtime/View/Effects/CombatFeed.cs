@@ -16,6 +16,22 @@ namespace CriticalMass.Runtime.View.Effects
         Splash,
         /// <summary>v2: a landing from a jump (Effects.Land or the CM_HAS_JUMP decode): Value = 1 heavy actor.</summary>
         Land,
+        /// <summary>px lane C: a swing reached its contact tick (AttackContact): A = attacker, Value = bodies hit plus 1 when a
+        /// structure was hit the same tick (0 = a whiff), (X, Z) = the reach point, Dir = the swing facing.</summary>
+        Contact,
+        /// <summary>px lane C: a feint (b16 CANCEL Value 1) or a hit-cancel (2): A = attacker, Value = the sim's code.</summary>
+        Feint,
+        /// <summary>px lane C: SimEventType.HitBlocked: A = target, B = attacker, Value = PlayerReasons.Blocked* code.</summary>
+        Blocked,
+        /// <summary>px lane C: SimEventType.StructureHit: A = attacker, B = PlayerReasons.Structure* kind, (X, Z) = the cell
+        /// centre, Value = damage (0 with StructureSolid: cannot break), Extra = share of health left (0 = it broke).</summary>
+        StructureHit,
+        /// <summary>px lane S3: SimEventType.CriticalHit (lead's call 12): A = victim, B = attacker, Value = kind (1 counter,
+        /// 2 punish, 3 back hit), Extra = the bonus damage. Raised right after the critical Hit of the same tick.</summary>
+        Critical,
+        /// <summary>Lane C fix round (defect 8): SimEventType.Terraform that changed the ground: A = the digger, B = the cell,
+        /// (X, Z) = the cell centre, Value = Terraform.Dug (1) or Placed (2). Refusals are not sent (lane D words them).</summary>
+        Dig,
     }
 
     /// <summary>One decoded effect event. Tick is the sim tick the sim raised it in (exact: decoded once per tick).</summary>
@@ -45,6 +61,8 @@ namespace CriticalMass.Runtime.View.Effects
         public bool Local;
         /// <summary>DG-16: what did the damage, from the sim event (None on events that carry no cause).</summary>
         public DamageCause Cause;
+        /// <summary>px lane C: StructureHit's health share left (the sim event's Radius); 0 elsewhere.</summary>
+        public double Extra;
     }
 
     /// <summary>Receives decoded effect events (FxScene, CombatAudio, the vignette).</summary>
@@ -82,6 +100,28 @@ namespace CriticalMass.Runtime.View.Effects
         /// <summary>v2: last tick actor i landed a hit (weapon blood tint hook); KaijuDealtTick for the Kaiju's fists.</summary>
         public readonly int[] LastDealtTick;
         public int KaijuDealtTick = int.MinValue / 2;
+        /// <summary>px lane C: who dealt actor i's last hit (-1 none, -2 the Kaiju).</summary>
+        public readonly int[] LastHitBy;
+        /// <summary>px lane C: actor i's last sim Knock: tick, distance (u), unit direction (sim) and where it stood (sim).</summary>
+        public readonly int[] KnockTick;
+        public readonly double[] KnockU, KnockDirX, KnockDirZ, KnockX, KnockZ;
+        /// <summary>px lane C: the last feint (b16 CANCEL Value 1) tick of attacker i.</summary>
+        public readonly int[] FeintTick;
+        /// <summary>px lane C: attacker i's last AttackContact tick and what it hit (bodies + 1 for a structure; 0 = whiff).</summary>
+        public readonly int[] ContactTick, ContactHits;
+        /// <summary>Critical hits (lead's call 12; set by CombatFx.OnCritical): the tick actor i TOOK a critical hit
+        /// (CritTick, its kind CritKind: 0 top-tier look, 1 counter, 2 punish, 3 back hit) and the tick it held for one,
+        /// as victim or attacker (CritHoldTick: the longer hit-stop).</summary>
+        public readonly int[] CritTick, CritHoldTick;
+        /// <summary>Lane C fix round (defect 6): the tick actor i's hit was cut by a raised shield (HitBlocked BlockedShield,
+        /// pre-scanned so the Hit of the same tick decodes as a Block) and the tick its last hit decoded as a Block (no flash,
+        /// no hit burst: the block look instead).</summary>
+        public readonly int[] ShieldTick, BlockTick;
+        public readonly byte[] CritKind;
+        /// <summary>px lane C: attacker i's last StructureHit tick (a wall swing is not a whiff).</summary>
+        public readonly int[] StructureTick;
+        /// <summary>px lane C: true once any StructureHit event was decoded this world (polling then stands down).</summary>
+        public bool StructureEventsSeen;
 
         /// <summary>Events decoded since construction (tests).</summary>
         public long Decoded { get; private set; }
@@ -101,11 +141,50 @@ namespace CriticalMass.Runtime.View.Effects
             DeathZ = new double[actorCapacity];
             HoldTier = new byte[actorCapacity];
             LastDealtTick = Filled(actorCapacity, int.MinValue / 2);
+            LastHitBy = Filled(actorCapacity, -1);
+            KnockTick = Filled(actorCapacity, int.MinValue / 2);
+            KnockU = new double[actorCapacity];
+            KnockDirX = new double[actorCapacity];
+            KnockDirZ = new double[actorCapacity];
+            KnockX = new double[actorCapacity];
+            KnockZ = new double[actorCapacity];
+            FeintTick = Filled(actorCapacity, int.MinValue / 2);
+            ContactTick = Filled(actorCapacity, int.MinValue / 2);
+            CritTick = Filled(actorCapacity, int.MinValue / 2);
+            ShieldTick = Filled(actorCapacity, int.MinValue / 2);
+            BlockTick = Filled(actorCapacity, int.MinValue / 2);
+            CritHoldTick = Filled(actorCapacity, int.MinValue / 2);
+            CritKind = new byte[actorCapacity];
+            ContactHits = new int[actorCapacity];
+            StructureTick = Filled(actorCapacity, int.MinValue / 2);
             _airLen = new int[actorCapacity];
         }
         // Jump landings (branch feat/dg-02-jump-bridges adds Actor.AirLen): the tick AirLen goes from > 0 to 0 is a landing.
         // Integration batch 2: DG-02 is in, so the landing decode is always compiled.
         private readonly int[] _airLen;
+
+        // px lane C: AttackContact is sent after the whole tick is decoded, so a StructureHit raised later in the same tick
+        // still turns the swing into a contact (not a whiff). Fixed capacity, no allocation.
+        private const int MaxPendingContacts = 64;
+        private readonly int[] _pcA = new int[MaxPendingContacts], _pcHits = new int[MaxPendingContacts];
+        private readonly double[] _pcX = new double[MaxPendingContacts], _pcZ = new double[MaxPendingContacts],
+            _pcDx = new double[MaxPendingContacts], _pcDz = new double[MaxPendingContacts];
+        private int _pcCount;
+
+        /// <summary>World reset (CombatFx.ResetForNewWorld): forget the lane C per-actor records.</summary>
+        public void ResetPx()
+        {
+            for (int i = 0; i < _capacity; i++)
+            {
+                LastHitBy[i] = -1;
+                KnockTick[i] = FeintTick[i] = ContactTick[i] = StructureTick[i] = CritTick[i] = CritHoldTick[i] = ShieldTick[i] = BlockTick[i] = int.MinValue / 2;
+                CritKind[i] = 0;
+                KnockU[i] = 0;
+                ContactHits[i] = 0;
+            }
+            StructureEventsSeen = false;
+            _pcCount = 0;
+        }
 
         private static int[] Filled(int n, int v)
         {
@@ -124,12 +203,34 @@ namespace CriticalMass.Runtime.View.Effects
                 Lapped += w.EventHead - from - World.EventCapacity;
                 from = w.EventHead - World.EventCapacity;
             }
+            _pcCount = 0;
+            // fix round (defect 6): a shield-cut hit raises HitBlocked(BlockedShield) next to its Hit, in either order: mark
+            // the shielded targets first so their Hit decodes as a Block (the block look, no flash, no hit burst).
+            for (int n = from; n < w.EventHead; n++)
+            {
+                SimEvent pe = w.Events[n % World.EventCapacity];
+                if (pe.Type == SimEventType.HitBlocked && (int)Math.Round(pe.Value) == PlayerReasons.BlockedShield && pe.A >= 0 && pe.A < _capacity)
+                    ShieldTick[pe.A] = w.Tick;
+            }
             for (int n = from; n < w.EventHead; n++)
             {
                 SimEvent ev = w.Events[n % World.EventCapacity];
                 if (Decode(ev, w)) Send(w, a, b, c);
             }
             _head = w.EventHead;
+            // px lane C: the swings that reached contact this tick, now that every StructureHit of the tick is known.
+            for (int k = 0; k < _pcCount; k++)
+            {
+                int s = _pcA[k];
+                int hits = _pcHits[k] + (s < _capacity && StructureTick[s] == w.Tick ? 1 : 0);
+                if (s < _capacity) { ContactTick[s] = w.Tick; ContactHits[s] = hits; }
+                Begin(FxKind.Contact, w, s, -1, _pcX[k], _pcZ[k], hits);
+                _e.DirX = _pcDx[k];
+                _e.DirZ = _pcDz[k];
+                if (s < w.ActorCount) { _e.HasAttacker = true; _e.AttCls = w.Actors[s].Cls; _e.AttFacing = w.Actors[s].SwingFacing; }
+                Send(w, a, b, c);
+            }
+            _pcCount = 0;
 
             // Integration batch 2 (DG-16): swings come from the sim's AttackStart event and Kaiju hits from KaijuDamaged
             // (decoded below with the contact position); nothing is inferred from cooldowns or the Kaiju's health any more.
@@ -177,6 +278,7 @@ namespace CriticalMass.Runtime.View.Effects
             _e.Cls = valid ? w.Actors[a].Cls : ClassId.Warrior;
             _e.Local = a == LocalSeat.Actor || b == LocalSeat.Actor;
             _e.Cause = DamageCause.None;
+            _e.Extra = 0;
         }
 
         private bool Decode(SimEvent ev, World w)
@@ -194,8 +296,9 @@ namespace CriticalMass.Runtime.View.Effects
                     double dx = ev.X - sx, dz = ev.Z - sz, d = Math.Sqrt(dx * dx + dz * dz);
                     if (d > 1e-6) { dx /= d; dz /= d; }
                     else { dx = -JsMath.Cos(w.Actors[t].Facing); dz = -JsMath.Sin(w.Actors[t].Facing); }
-                    bool blocked = !death && w.Actors[t].Cls == ClassId.Warrior && w.Actors[t].AbilityActive > 0 &&
-                                   Damage.IsFrontal(w, t, sx, sz);
+                    bool blocked = !death && ((w.Actors[t].Cls == ClassId.Warrior && w.Actors[t].AbilityActive > 0 &&
+                                   Damage.IsFrontal(w, t, sx, sz)) || ShieldTick[t] == w.Tick);
+                    if (blocked) BlockTick[t] = w.Tick;
                     Begin(death ? FxKind.Death : blocked ? FxKind.Block : FxKind.Hit, w, t, ev.B, ev.X, ev.Z, ev.Value);
                     _e.Cause = ev.Cause;
                     _e.DirX = dx;
@@ -219,6 +322,7 @@ namespace CriticalMass.Runtime.View.Effects
                     else
                     {
                         LastHitTick[t] = w.Tick;
+                        LastHitBy[t] = ev.B;
                         LastHitDmg[t] = ev.Value;
                         HitDirX[t] = dx;
                         HitDirZ[t] = dz;
@@ -229,7 +333,10 @@ namespace CriticalMass.Runtime.View.Effects
                         HoldTick[t] = w.Tick;
                         HoldTier[t] = _e.Tier;
                         // feat/hit-feel-1: the attacker holds on every hit too (hit-stop on both fighters, HitFeel.HoldWallSeconds).
-                        if ((_e.Tier > 0 || ev.Cause == DamageCause.Melee) && ev.B >= 0 && ev.B < _capacity) { HoldTick[ev.B] = w.Tick; HoldTier[ev.B] = _e.Tier; }
+                        // px lane C: every actor-dealt swing hit (melee or a light weapon, cause Melee or None) holds the
+                        // attacker's pose too (the audit: "the attacker never pauses"); blasts and falls do not.
+                        bool swingHit = ev.Cause == DamageCause.Melee || ev.Cause == DamageCause.None;
+                        if ((_e.Tier > 0 || swingHit) && ev.B >= 0 && ev.B < _capacity && ev.B != t) { HoldTick[ev.B] = w.Tick; HoldTier[ev.B] = _e.Tier; }
                     }
                     return true;
                 }
@@ -243,6 +350,85 @@ namespace CriticalMass.Runtime.View.Effects
                     _e.DirZ = JsMath.Sin(ev.Value);
                     return true;
                 }
+                case SimEventType.Knock:
+                {
+                    // px lane C: the sim knock (Impulse = travelled distance after mass and shield), for the drawn lead.
+                    int t = ev.A;
+                    if (t < 0 || t >= _capacity || t >= w.ActorCount || !(ev.Impulse > 0)) return false;
+                    KnockTick[t] = w.Tick;
+                    KnockU[t] = ev.Impulse;
+                    double l = Math.Sqrt(ev.DirX * ev.DirX + ev.DirZ * ev.DirZ);
+                    KnockDirX[t] = l > 1e-6 ? ev.DirX / l : 0;
+                    KnockDirZ[t] = l > 1e-6 ? ev.DirZ / l : 0;
+                    KnockX[t] = ev.X;
+                    KnockZ[t] = ev.Z;
+                    return false;
+                }
+                case SimEventType.AttackContact:
+                {
+                    int s = ev.A;
+                    if (s < 0 || s >= w.ActorCount || _pcCount >= MaxPendingContacts) return false;
+                    _pcA[_pcCount] = s;
+                    _pcHits[_pcCount] = (int)Math.Round(ev.Value);
+                    _pcX[_pcCount] = ev.X;
+                    _pcZ[_pcCount] = ev.Z;
+                    _pcDx[_pcCount] = ev.DirX;
+                    _pcDz[_pcCount] = ev.DirZ;
+                    _pcCount++;
+                    return false;
+                }
+                case SimEventType.Feint:
+                {
+                    int s = ev.A;
+                    if (s < 0 || s >= w.ActorCount) return false;
+                    if (ev.Value == 1 && s < _capacity) FeintTick[s] = w.Tick;
+                    Begin(FxKind.Feint, w, s, -1, w.X[s], w.Z[s], ev.Value);
+                    return true;
+                }
+                case SimEventType.HitBlocked:
+                {
+                    int t = ev.A;
+                    if (t < 0 || t >= w.ActorCount) return false;
+                    double sx, sz;
+                    Source(w, ev.B, w.X[t], w.Z[t], out sx, out sz);
+                    double dx = w.X[t] - sx, dz = w.Z[t] - sz, d = Math.Sqrt(dx * dx + dz * dz);
+                    if (d > 1e-6) { dx /= d; dz /= d; } else { dx = 0; dz = 0; }
+                    Begin(FxKind.Blocked, w, t, ev.B, w.X[t], w.Z[t], ev.Value);
+                    _e.DirX = dx;
+                    _e.DirZ = dz;
+                    if (ev.B >= 0 && ev.B < w.ActorCount) { _e.HasAttacker = true; _e.AttCls = w.Actors[ev.B].Cls; _e.AttFacing = w.Actors[ev.B].SwingFacing; }
+                    return true;
+                }
+                case SimEventType.StructureHit:
+                {
+                    int s = ev.A;
+                    StructureEventsSeen = true;
+                    if (s >= 0 && s < _capacity) StructureTick[s] = w.Tick;
+                    Begin(FxKind.StructureHit, w, s, ev.B, ev.X, ev.Z, ev.Value);
+                    _e.Extra = ev.Radius;
+                    if (s >= 0 && s < w.ActorCount)
+                    {
+                        double dx = ev.X - w.X[s], dz = ev.Z - w.Z[s], d = Math.Sqrt(dx * dx + dz * dz);
+                        if (d > 1e-6) { _e.DirX = dx / d; _e.DirZ = dz / d; }
+                        _e.HasAttacker = true;
+                        _e.AttCls = w.Actors[s].Cls;
+                        _e.AttFacing = w.Actors[s].SwingFacing;
+                    }
+                    return true;
+                }
+                case SimEventType.Terraform:
+                {
+                    int code = (int)Math.Round(ev.Value);
+                    if (ev.B < 0 || (code != 1 && code != 2)) return false;   // Terraform.Dug / Placed only
+                    Begin(FxKind.Dig, w, ev.A, ev.B, ev.X, ev.Z, code);
+                    if (ev.A >= 0 && ev.A < w.ActorCount) { _e.HasAttacker = true; _e.AttCls = w.Actors[ev.A].Cls; }
+                    return true;
+                }
+                case SimEventType.CriticalHit:
+                    if (ev.A < 0 || ev.A >= w.ActorCount) return false;
+                    Begin(FxKind.Critical, w, ev.A, ev.B, w.X[ev.A], w.Z[ev.A], ev.Value);
+                    _e.Extra = ev.Radius;
+                    return true;
                 case SimEventType.KaijuDamaged:
                     // (X, Z) = the contact point on the Kaiju toward the attacker (A), Value = damage dealt.
                     Begin(FxKind.KaijuHit, w, -1, -1, ev.X, ev.Z, ev.Value);

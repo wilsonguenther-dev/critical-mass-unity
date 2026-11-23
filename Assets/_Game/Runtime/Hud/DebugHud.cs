@@ -50,7 +50,8 @@ namespace CriticalMass.Runtime.Hud
 
         void OnGUI()
         {
-            if (Event.current != null && Event.current.type == EventType.KeyDown && Event.current.keyCode == KeyCode.F1) Visible = !Visible;
+            // player-experience lane D: F1 only in the Editor, development builds or with -debugHud (Player/DebugGate.cs)
+            if (CriticalMass.Runtime.Hud.Player.DebugGate.Allowed && Event.current != null && Event.current.type == EventType.KeyDown && Event.current.keyCode == KeyCode.F1) Visible = !Visible;
             if (!Visible || _content.text.Length == 0) return;
             if (_style == null)
             {

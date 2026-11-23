@@ -44,7 +44,7 @@ if has repo; then
   if [ -d "$C/repo/.git" ]; then git -C "$C/repo" fetch -q --depth 1 origin main && git -C "$C/repo" reset -q --hard FETCH_HEAD || rc=1
   else  # sparse: only what the no-Unity Sim tests read (no art, no LFS)
     GIT_LFS_SKIP_SMUDGE=1 git clone -q --depth 1 --filter=blob:none --sparse https://github.com/wilsonguenther-dev/critical-mass-unity.git "$C/repo" \
-      && git -C "$C/repo" sparse-checkout set Assets/_Game/Sim Assets/_Game/Sim.Tests tools/ci tools/golden ProjectSettings || rc=1; fi
+      && git -C "$C/repo" sparse-checkout set Assets/_Game/Sim Assets/_Game/Sim.Tests Assets/_Game/Net tools/ci tools/golden tools/balance docs/balance ProjectSettings || rc=1; fi
   echo "repo: $(git -C "$C/repo" log -1 --format='%h %s' 2>/dev/null)"
 fi
 echo "disk: $(df -g "$HOME" | awk 'NR==2{print $4}') GB free; ~/cm-remote $(du -sh "$C" 2>/dev/null | cut -f1)"

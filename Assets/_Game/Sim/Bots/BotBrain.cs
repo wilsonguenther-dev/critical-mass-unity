@@ -51,6 +51,7 @@ namespace CriticalMass.Sim.Bots
         {
             BotsState st = GetBotsState(w);
             if (w.Match.Phase == MatchPhase.Ended) return;
+            if (BotAim.On(w)) BotAim.Record(w, st);   // px S1 [2]: the aim ring (human-limit aim)
             BotFields.MaintainFields(st.Fields, w);
             BotDirector.DirectorTick(w, st);
             TeamBrain.Tick(w, st);   // b15 bot brain: hill bodies and the group-up (no-op with the switch off)

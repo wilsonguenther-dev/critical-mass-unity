@@ -101,17 +101,14 @@ namespace CriticalMass.Runtime.Tests
         }
 
         [Test]
-        public void TheCameraViewHasItsOwnPadButtonApartFromTheScoreboard()
+        public void TheCameraViewHasNoPadButtonAndNeverTheScoreboards()
         {
-            // b16 finish (Editor review: View was both the scoreboard hold and the camera double tap)
+            // player-experience combine (lane I): the controller's left-stick double tap left the camera view (it fired on
+            // sprint presses); the view switch is F5 on the keyboard only, and never the scoreboard's Select
             const string G = "Gamepad";
-            CollectionAssert.AreEqual(new[] { "<Gamepad>/leftStickPress" }, Paths(A("CameraView"), G));
-            Assert.IsTrue(ControlSchemes.IsDoubleTap(A("CameraView").bindings.First(b => b.path == "<Gamepad>/leftStickPress")));
+            CollectionAssert.IsEmpty(Paths(A("CameraView"), G), "no controller binding for the camera view");
             CollectionAssert.DoesNotContain(Paths(A("CameraView"), G), "<Gamepad>/select");
-            InputAction view = A("CameraView");
-            int idx = -1;
-            for (int i = 0; i < view.bindings.Count; i++) if (view.bindings[i].path == "<Gamepad>/leftStickPress") idx = i;
-            StringAssert.StartsWith("DOUBLE-TAP ", ControlBindings.Display(view, idx), "the controls screen reads the binding");
+            Assert.IsTrue(A("CameraView").bindings.Any(b => b.path == "<Keyboard>/f5"), "F5 switches the view on the keyboard");
         }
 
         [Test]

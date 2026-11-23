@@ -65,6 +65,92 @@ namespace CriticalMass.Runtime.View.Anim
         float _lastActW;
         float _holdW;
 
+        // px lane C (2026-11-22): the committed swing (legs commit standing still, whiff over-rotation, feint abort) and the
+        // SwingCommit ledger value 2 frames after the press.
+        float _legActW;
+        double _legActT;
+        float _whiffTwist, _whiffPitch;
+        int _feintSeen = int.MinValue;
+        bool _feinting;
+        double _feintAt, _feintFromT;
+        float _feintFromW;
+        int _swingStartFrame = int.MinValue;
+        bool _commitPending, _commitReady;
+        float _commitW;
+
+        /// <summary>px lane C: true once per swing, 2 rendered frames after it began, with the attack pose weight then (the
+        /// SwingCommit ledger value; ActorViews reports it while the model is drawn).</summary>
+        /// <summary>Fix round 2: the attack pose weight drawn this frame when a swing clip is playing (0 otherwise).</summary>
+        public float SwingWeightNow => _kind == 1 && _actClip != null ? _lastActW : 0f;
+
+        // fix round 5 (item 4): a local press shown before the sim's tick takes it (presentation only).
+        bool _predicting;
+        double _predWall;
+        int _predSwingTick;
+        float _predFloor;
+        double _predFloorT;
+        public bool Predicting => _predicting;
+        /// <summary>Fix round 6: predicted wind-ups aborted (tests / logs).</summary>
+        public int PredictAborts { get; private set; }
+
+        /// <summary>Fix round 6 (item 1): the predicted clip becomes the fading previous clip (0.06 s re-trigger fade) and
+        /// leaves the action slot free for whatever the sim started (its own pose) or for nothing.</summary>
+        void AbortPrediction(double simTime)
+        {
+            _predicting = false;
+            _predFloor = 0f;
+            PredictAborts++;
+            if (_kind == 1 && _actClip != null)
+            {
+                if (_lastActW > 0f)
+                {
+                    _prevClip = _actClip; _prevTime = _lastActTime; _prevW = _lastActW; _prevLoop = false; _prevAt = simTime; _slot = 1 - _slot;
+                }
+                _actClip = null;
+                _lastActW = 0f;
+                _commitPending = _commitReady = false;
+            }
+        }
+
+        /// <summary>Fix round 5 (item 4): the local player pressed attack this frame and the sim would accept it next step:
+        /// start the attack clip's wind-up now (the sim's AttackStart continues it without a crossfade).</summary>
+        public void PredictSwing(ModelView m, Actor actor, GameConfig cfg, double simTime)
+        {
+            if (m == null || actor == null || _predicting || (_kind == 1 && _actClip != null && _lastActW > 0f)) return;
+            string clip = AttackTiming.AttackClip(m, actor.Cls);
+            if (clip == null || !m.HasClip(clip)) return;
+            if (_actClip != null && _lastActW > 0f)
+            {
+                _prevClip = _actClip; _prevTime = _lastActTime; _prevW = _lastActW; _prevLoop = false; _prevAt = simTime; _slot = 1 - _slot;
+            }
+            _feinting = false;
+            _whiffTwist = _whiffPitch = 0f;
+            _kind = 1;
+            _actClip = clip;
+            if (!_reachMeasured || _tipModel != m || _vcClip != clip) MeasureReach(m, actor, clip);
+            if (_exModel != m || _exClip != clip)
+            {
+                _exModel = m;
+                _exClip = clip;
+                _exTime = AttackTiming.ExtremeNow(m, clip, ViewContact(clip, ClipFacts.Contact(clip, m.ClipLength(clip) * 0.5f)));
+            }
+            _actExtreme = _exTime;
+            _swingStartFrame = Time.frameCount; _commitPending = true; _commitReady = false;
+            _lastActW = 0f;
+            _predicting = true;
+            _predWall = Time.unscaledTimeAsDouble;
+            _predSwingTick = actor.SwingTick;
+            _predFloor = 0f;
+        }
+
+        public bool TakeSwingCommit(out float weight)
+        {
+            weight = _commitW;
+            if (!_commitReady) return false;
+            _commitReady = false;
+            return true;
+        }
+
         // Hits.
         int _lastHitTick = int.MinValue;
         HitReaction _react;
@@ -217,6 +303,13 @@ namespace CriticalMass.Runtime.View.Anim
             // feat/skill-effects-1: TNT and Purify reset AnimAction without the cooldowns above, so they played no clip; the
             // skill lane's cue (Throw, Cast, set on the skill's event tick) starts one. Root Seeds' cue swaps Cast for Throw.
             string cue = CriticalMass.Runtime.View.Skills.SkillAnimCues.FreshClip(i, w.Tick);
+            // fix round 6 (item 1): a predicted wind-up hands over to the sim's swing, or fades when anything else started
+            if (_predicting)
+            {
+                bool other = (aa + 1e-9 < _lastAnimAction || cue != null) && actor.SwingTick == _predSwingTick;
+                HitFeelTuning.PredictStep step = HitFeelTuning.StepPrediction(actor.SwingTick != _predSwingTick, other, Time.unscaledTimeAsDouble - _predWall);
+                if (step == HitFeelTuning.PredictStep.Abort) AbortPrediction(simTime);
+            }
             if (!corpse && aa + 1e-9 < _lastAnimAction && (actor.AttackCd > 0 || actor.AbilityCd > 0 || cue != null)) BeginAction(m, actor, cfg, simTime, cue, w.Tick);
             _lastAnimAction = aa;
 
@@ -295,11 +388,20 @@ namespace CriticalMass.Runtime.View.Anim
             }
             else
             {
+                // px lane C: standing still, the hips and legs commit to the swing too (base layer); running keeps the legs.
+                _legActW = 0f;
+                if (_kind == 1 && _actClip != null && m.OnUpperLayer(_actClip) && SampleSwing(m, w, actor, i, alpha, simTime, combat, hasFx, fx, out double lt, out float lw, false))
+                {
+                    float still = Mathf.Clamp01(1f - Locomotion.MoveWeight(_speed) / 0.35f);
+                    _legActW = lw * still * HitFeelTuning.LegCommit;
+                    _legActT = lt;
+                }
                 idleW = PoseGround(m, actor, cfg, simTime, loopDt, air, ref scale);
             }
 
             // ---- upper body (DG-73, DG-74, DG-88, DG-71)
             float upperSum = 0f;
+            if (_actClip == null || _kind != 1 || !upperAllowed) _whiffTwist = _whiffPitch = 0f;   // px lane C
             if (upperAllowed) upperSum = PoseUpper(m, w, actor, cfg, i, alpha, simTime, dSim, combat, hasFx, fx, ref twist);
             m.UpperWeight = Mathf.Clamp01(upperSum);
 
@@ -313,7 +415,7 @@ namespace CriticalMass.Runtime.View.Anim
                 _pitch += (float)((pitch - _pitch) * kk);
             }
             else { _roll = 0f; _pitch = 0f; }
-            Quaternion rot = Quaternion.Euler(0f, (float)_yaw + twist, 0f) * Quaternion.Euler(_pitch, 0f, _roll);
+            Quaternion rot = Quaternion.Euler(0f, (float)_yaw + twist + _whiffTwist, 0f) * Quaternion.Euler(_pitch + _whiffPitch, 0f, _roll);
             if (hasFx) rot = fx.Lean * rot;
             m.SetFacing(rot);
             // fix/hit-feel-5: a brief squash along the blow (80 ms, at most 7%), a little lower and wider across it; the
@@ -506,6 +608,7 @@ namespace CriticalMass.Runtime.View.Anim
             if (_gather > 0f) m.Pose(gatherClip, _gatherT, _gather * (1f - heavy) * (1f - land), true);
             if (heavy > 0f) m.Pose(_react.Clip, hitT, heavy, false);
             if (land > 0f) m.Pose(ArtMapping.JumpLand, 0.1 + since * 1.8, land * (1f - heavy), false);
+            if (_legActW > 0f && _actClip != null) m.Pose(_actClip, _legActT, _legActW * (1f - heavy), false);   // px lane C: legs commit
             return idleW;
         }
 
@@ -577,20 +680,22 @@ namespace CriticalMass.Runtime.View.Anim
                 double windup = 0;
                 if (_kind == 1)
                 {
-                    windup = AttackTiming.SwingWindupSeconds(actor, hz);   // the sim's own swing: contact on SwingTick + SwingWindup
-                    double age = AttackTiming.SwingAge(actor, w.Tick, alpha, hz);
-                    if (combat != null && hasFx) age = combat.AttackTime(i, age, fx); // the attacker freezes on contact during the hold
-                    t = AttackTiming.ClipTime(age, ViewContact(_actClip, ClipFacts.Contact(_actClip, (float)(len * 0.5))), len, windup, _actExtreme);
-                    _actAge = age;
+                    SampleSwing(m, w, actor, i, alpha, simTime, combat, hasFx, fx, out t, out actW, true);
                 }
                 else
                 {
                     _actAge = actor.AnimAction + alpha / hz;
                     t = Math.Min(len, _actAge);
+                    actW = AttackTiming.Envelope(_actAge, t, len, windup);
                 }
-                actW = AttackTiming.Envelope(_actAge, t, len, windup);
+                if (_kind == 1 && _commitPending && Time.frameCount - _swingStartFrame >= 2)
+                {
+                    _commitPending = false;
+                    _commitReady = true;
+                    _commitW = actW;
+                }
                 if (_kind == 2 && actor.Cls == ClassId.Warrior) actW *= 1f - _holdW;
-                if (actW <= 0f && t >= len - 1e-4) _actClip = null;
+                if ((actW <= 0f && t >= len - 1e-4) || (_kind == 1 && _feinting && actW <= 0f)) { _actClip = null; _feinting = false; }
                 else
                 {
                     // fix/hit-feel-4 (FacingSanityPlayTests, Demolitions): an action clip that is not on the upper layer
@@ -688,6 +793,90 @@ namespace CriticalMass.Runtime.View.Anim
             return sum;
         }
 
+        /// <summary>
+        /// px lane C: the attack clip's time and weight now: the committed envelope (HitFeelTuning.CommitWeight, local
+        /// faster), the craft wind-up (anticipation, hold, a 4-6 frame strike ending on the sim's contact tick read LIVE from
+        /// SwingTick + SwingWindup), the follow-through held through the hit-stop on a hit (CombatFx.AttackTime) and played
+        /// faster with an over-rotation on a whiff (AttackContact with nothing hit), and a feint that rewinds and fades the
+        /// swing out (SimEventType.Feint). commit = true updates the per-swing state (whiff twist, feint latch).
+        /// </summary>
+        bool SampleSwing(ModelView m, World w, Actor actor, int i, double alpha, double simTime, CombatFx combat, bool hasFx, in ActorPoseFx fx,
+            out double t, out float actW, bool commit)
+        {
+            t = 0; actW = 0f;
+            if (_actClip == null) return false;
+            double hz = w.Config.SimHz;
+            double len = m.ClipLength(_actClip);
+            double windup = AttackTiming.SwingWindupSeconds(actor, hz);   // the sim's own swing: contact on SwingTick + SwingWindup
+            if (_predicting)
+            {
+                // fix round 5 (item 4): before the sim's tick: the wind-up from the press, held short of the strike
+                double cfgWindup = (double)w.Dur.AttackWindup[(int)actor.Cls] / hz;
+                if (actor.SwingTick == _predSwingTick && HitFeelTuning.PredictedSwing(Time.unscaledTimeAsDouble - _predWall, cfgWindup, out double pAge, out float pW))
+                {
+                    t = AttackTiming.ClipTime(pAge, ViewContact(_actClip, ClipFacts.Contact(_actClip, (float)(len * 0.5))), len, cfgWindup, _actExtreme);
+                    actW = pW;
+                    return true;
+                }
+                if (actor.SwingTick == _predSwingTick && commit)
+                {
+                    // the sim refused (cooldown, stun, TNT): fade it out like a feint
+                    _predicting = false;
+                    _feinting = true;
+                    _feintAt = simTime;
+                    _feintFromT = _lastActTime;
+                    _feintFromW = Math.Max(_lastActW, 0.01f);
+                }
+                else if (actor.SwingTick != _predSwingTick) _predicting = false;
+            }
+            double age = AttackTiming.SwingAge(actor, w.Tick, alpha, hz);
+            double rawAge = age;
+            if (combat != null && hasFx) age = combat.AttackTime(i, age, fx); // the attacker freezes on contact during the hold
+            CombatFeed feed = combat != null ? combat.Feed : null;
+            bool whiff = false;
+            if (feed != null && i < feed.ContactTick.Length && feed.ContactTick[i] >= actor.SwingTick && actor.SwingTick > 0 && feed.ContactHits[i] == 0)
+                whiff = true;
+            double contactAge = age;
+            if (whiff && age > windup) contactAge = windup + (age - windup) * HitFeelTuning.WhiffRate;   // swing through
+            t = AttackTiming.ClipTime(contactAge, ViewContact(_actClip, ClipFacts.Contact(_actClip, (float)(len * 0.5))), len, windup, _actExtreme);
+            actW = AttackTiming.Envelope(age, t, len, windup, i == LocalSeat.Actor);
+            if (_predFloor > 0f)
+            {
+                // fix round 5 (item 4): after a predicted start the pose never drops below what the press frame drew, and
+                // the clip never steps back before the predicted wind-up time, until the sim's own envelope passes them
+                if (actW >= _predFloor && t >= _predFloorT) _predFloor = 0f;
+                else { actW = Math.Max(actW, _predFloor); t = Math.Max(t, _predFloorT); }
+            }
+            // feint: the sim dropped the wind-up (b16 CANCEL Value 1): rewind to the start and fade out, visibly aborted
+            if (feed != null && i < feed.FeintTick.Length && feed.FeintTick[i] >= actor.SwingTick && actor.SwingTick > 0 && feed.FeintTick[i] != _feintSeen)
+            {
+                if (commit)
+                {
+                    _feintSeen = feed.FeintTick[i];
+                    _feinting = true;
+                    _feintAt = simTime;
+                    _feintFromT = _lastActTime;
+                    _feintFromW = Math.Max(_lastActW, 0.01f);
+                }
+            }
+            if (_feinting)
+            {
+                double u = Math.Min(1, Math.Max(0, (simTime - _feintAt) / HitFeelTuning.FeintAbortSeconds));
+                t = _feintFromT * (1 - u);
+                actW = (float)(_feintFromW * (1 - u));
+            }
+            if (commit)
+            {
+                _actAge = age;
+                double since = rawAge - windup;
+                double ws = whiff && !_feinting ? HitFeelTuning.WhiffShape(since) : 0;
+                float sign = actor.Cls == ClassId.Farmer ? -1f : 1f;
+                _whiffTwist = (float)(sign * HitFeelTuning.WhiffOverRotateDeg * ws);
+                _whiffPitch = (float)(HitFeelTuning.WhiffLeanDeg * ws);
+            }
+            return true;
+        }
+
         double _actAge;
         // fix/hit-feel-5: the weapon tip (hand-local) and whether this fighter's contact reach has been measured.
         bool _reachMeasured;
@@ -771,6 +960,8 @@ namespace CriticalMass.Runtime.View.Anim
 
         void BeginAction(ModelView m, Actor actor, GameConfig cfg, double simTime, string cue = null, int tick = int.MinValue)
         {
+            _feinting = false;
+            _whiffTwist = _whiffPitch = 0f;
             ClassConfig cc = cfg.Class(actor.Cls);
             double aa = actor.AnimAction;
             // feat/light-weapons-1: a light-weapon swing sets its own cooldown; the Healer's lantern swing (not her mend) is
@@ -790,7 +981,12 @@ namespace CriticalMass.Runtime.View.Anim
             if (clip != null && !m.HasClip(clip)) clip = null;
             // a skill cue (not a melee press this tick) plays its own clip on the ability timing
             if (cue != null && !attack && m.HasClip(cue)) { clip = cue; kind = 2; }
-            if (_actClip != null && _lastActW > 0f)
+            // fix round 5 (item 4): the sim took the predicted press: continue the same clip, no crossfade, the pose never dips
+            bool fromPredict = _predicting && kind == 1 && clip != null && clip == _actClip;
+            _predicting = false;
+            if (fromPredict) { _predFloor = _lastActW; _predFloorT = _lastActTime; }
+            else _predFloor = 0f;
+            if (_actClip != null && _lastActW > 0f && !fromPredict)
             {
                 _prevClip = _actClip;
                 _prevTime = _lastActTime;
@@ -811,8 +1007,10 @@ namespace CriticalMass.Runtime.View.Anim
                 _exTime = AttackTiming.ExtremeNow(m, clip, ViewContact(clip, ClipFacts.Contact(clip, m.ClipLength(clip) * 0.5f)));
             }
             _actExtreme = kind == 1 && clip != null ? _exTime : -1;
+            if (kind == 1 && clip != null) { _swingStartFrame = Time.frameCount; _commitPending = true; _commitReady = false; }
             _actStart = simTime - aa;
-            _lastActW = 0f;
+            if (fromPredict) { _commitPending = false; _commitReady = false; }   // the press frame already committed
+            _lastActW = fromPredict ? _predFloor : 0f;
             _breakAt = -1;
             _idleT = 0;
         }
@@ -824,6 +1022,13 @@ namespace CriticalMass.Runtime.View.Anim
             HitSide side = HitReactions.Side(Math.Sin(yr), Math.Cos(yr), d.x, d.z);
             bool blocked = actor.Cls == ClassId.Warrior && actor.AbilityActive > 0 && side == HitSide.Front;
             _react = HitReactions.Pick(feed.LastHitDmg[i], !actor.Alive, blocked, side);
+            // px lane C: the stagger pose at full weight when the local player is the attacker or the victim (own-hit emphasis).
+            bool own = i == LocalSeat.Actor || (i < feed.LastHitBy.Length && feed.LastHitBy[i] == LocalSeat.Actor);
+            if (own && !blocked && _react.Weight < HitFeelTuning.ReactionWeightOwn)
+                _react = new HitReaction(_react.Clip, _react.Layer, HitFeelTuning.ReactionWeightOwn, _react.Tier, _react.Side, _react.TwistDeg);
+            // lead's call 12: a critical hit on/by the local player is the full-body Hit_B at full weight, twisted harder.
+            if (actor.Alive && !blocked && i < feed.CritTick.Length && feed.CritTick[i] == feed.LastHitTick[i])
+                _react = new HitReaction(ArtMapping.HitHeavy, ReactionLayer.FullBody, 1f, HitTier.Critical, side, _react.TwistDeg * 1.4f);
             _hasReact = true;
         }
 

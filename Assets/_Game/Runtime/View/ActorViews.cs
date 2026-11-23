@@ -300,6 +300,10 @@ namespace CriticalMass.Runtime.View
             models += SyncBarricades(w, cfg, map);
 
             HillDef hill = map.Hill;
+            // px lane F (pass 3): no hill zone, no hill plate. The practice range sets the world's Hill.Radius to 0 (nothing
+            // scores); the map's HillDef may still carry the authored radius, so the world's config decides.
+            bool noHill = w.Config == null || w.Config.Hill == null || w.Config.Hill.Radius <= 0;
+            if (_hill.gameObject.activeSelf == noHill) _hill.gameObject.SetActive(!noHill);
             double hh = GroundHeight(map, hill.X, hill.Z);
             float d = (float)(2 * hill.R);
             _hill.localPosition = SimSpace.ToWorld(hill.X, hh + HillThickness / 2.0, hill.Z);
@@ -380,6 +384,12 @@ namespace CriticalMass.Runtime.View
             double x = hasFx && fx.Corpse ? fx.CorpseX : Lerp(w.PrevX[i], w.X[i], a);
             double z = hasFx && fx.Corpse ? fx.CorpseZ : Lerp(w.PrevZ[i], w.Z[i], a);
             if (_stressHill) StressPlace(map.Hill, i, ref x, ref z);
+            // fix round 5 (item 7): a fresh knock is drawn at the current tick, not up to a tick behind it (HitFeelTuning.KnockAlphaLead)
+            if (!(hasFx && fx.Corpse) && _fx != null && _fx.Knock(i, out double kAge, out _, out _, out _, out _, out _))
+            {
+                double share = Anim.HitFeelTuning.KnockAlphaLead(kAge);
+                if (share > 0) { x += (w.X[i] - x) * share; z += (w.Z[i] - z) * share; }
+            }
             double h = CriticalMass.Runtime.GroundHeight.Body(map, x, z);   // b15: on the pit floor / on top of a stack (+ b14 bridge deck)
             // b12-jz / b14 ladder fix: up the near ladder, along the rock top, down the far ladder; on the rungs the fighter
             // faces the ladder (the wall), going up and coming down
@@ -448,14 +458,23 @@ namespace CriticalMass.Runtime.View
             if (i == _lodSelf) SelfRim(m, _lowView && CriticalMass.Runtime.Camera.GroundView.ActiveView == CriticalMass.Runtime.Camera.CameraView.ThirdPerson);
             Vector3 basePos = SimSpace.ToWorld(x, h, z);
             // feat/hit-feel-1 step-in plus the reaction shift, horizontally capped (fix/hit-feel-3: HitFeel.MaxViewOffset).
-            m.Transform.localPosition = basePos + Anim.HitFeel.ClampOffset((hasFx ? fx.Nudge : Vector3.zero) + Anim.HitFeel.Lunge(w, i, a))
+            // px lane C: plus the KNOCK LEAD (the drawn victim travels >= 0.8 x the sim knock by 100 ms, overshoots and settles;
+            // tiny knocks recoil at least 0.3 u), all capped at HitFeelTuning.MaxDrawnOffset off the interpolated sim spot.
+            Vector3 knockLead = KnockLead(i, x, z, out float knockDrawn, out bool knockCheck);
+            if (hasFx && fx.Corpse) { knockLead = Vector3.zero; knockCheck = false; }   // the death launch owns a corpse's travel
+            Vector3 drawnOff = Anim.HitFeel.ClampOffset((hasFx ? fx.Nudge : Vector3.zero) + Anim.HitFeel.Lunge(w, i, a)) + knockLead;
+            drawnOff = ClampDrawn(drawnOff);
+            if (knockCheck) knockDrawn = KnockDrawnNow(i, x, z, drawnOff);
+            m.Transform.localPosition = basePos + drawnOff
                 + JumpLift.Offset(w, map, i, a, x, z) // DG-02 jump arc
                 + B16.JumpRefusedView.Offset(w, i, a); // b16 [11]: the refused-jump stumble
             Material teamMat = CriticalMass.Runtime.Progression.TrimMaterials.ForActor(ArtMaterials.ForTeam(m.Spec, actor.Team), i);   // b15 profile: colour trim (fixed colours only; cached, no allocation)
-            m.SetMaterial(hasFx && fx.Flash ? _fx.FlashMaterial(teamMat) : teamMat);
+            m.SetMaterial(hasFx && fx.Flash ? _fx.FlashMaterial(teamMat, fx.FlashOwn) : teamMat);
+            if (i == LocalSeat.Actor) PredictPress(i, w, cfg, m, slot, actor, simTime);
             // Animation pass: clips, timing, facing spring, squash and the level of detail live in Anim.ActorAnimator.
             slot.Anim.Pose(m, w, cfg, i, a, simTime, dSim, basePos, _fx, hasFx, in fx, ref _poseState);
             PostPose(i, m, in _poseState);
+            ReportCues(i, m, slot, hasFx, in fx, knockDrawn, knockCheck, actor.SwingTick);
             CriticalMass.Runtime.Camera.ViewCull.FightersDrawn++;
             if (CriticalMass.Runtime.Camera.ViewCull.SampleFrame) CriticalMass.Runtime.Camera.ViewCull.FighterTriangles += CriticalMass.Runtime.Camera.ViewCull.Triangles(m.Renderers);
             return true;
@@ -463,6 +482,137 @@ namespace CriticalMass.Runtime.View
 
         private float _lodCut = float.PositiveInfinity;
         private bool _lowView;
+
+        // ---- px lane C (2026-11-22): the knock lead and the PlayerFeedback ledger for the victim stack and the swing
+        private int[] _knockReported;
+
+        /// <summary>The drawn knock lead (Unity world offset) for actor i standing at the interpolated sim (x, z); drawn = the
+        /// travel along the blow the eye sees (sim body + lead); check = true once when the knock reaches its check age.</summary>
+        private Vector3 KnockLead(int i, double x, double z, out float drawn, out bool check)
+        {
+            drawn = 0f; check = false;
+            if (_fx == null || !_fx.Knock(i, out double age, out double k, out double x0, out double z0, out double dx, out double dz)) return Vector3.zero;
+            double travelled = (x - x0) * dx + (z - z0) * dz;
+            bool crit = _fx.Feed.CritTick[i] == _fx.Feed.KnockTick[i];   // lead's call 12: a critical recoils harder
+            double lead = Anim.HitFeelTuning.KnockLead(age, k, travelled, crit ? Anim.HitFeelTuning.CritMinVisualKnock : Anim.HitFeelTuning.MinVisualKnock);
+            drawn = (float)(Math.Max(0, travelled) + lead);
+            if (_knockReported == null || _knockReported.Length < _actors.Length) { _knockReported = new int[_actors.Length]; for (int n = 0; n < _knockReported.Length; n++) _knockReported[n] = int.MinValue; }
+            int kt = _fx.Feed.KnockTick[i];
+            if (age >= Anim.HitFeelTuning.KnockCheckSeconds && _knockReported[i] != kt) { _knockReported[i] = kt; check = true; }
+            return lead > 0 ? SimSpace.ToWorld(dx * lead, 0, dz * lead) : Vector3.zero;
+        }
+
+        /// <summary>The travel along the blow the eye sees now: the sim body's own plus the (clamped) drawn offset along it.</summary>
+        private float KnockDrawnNow(int i, double x, double z, Vector3 drawnOff)
+        {
+            if (_fx == null || !_fx.Knock(i, out _, out _, out double x0, out double z0, out double dx, out double dz)) return 0f;
+            Vector3 d = SimSpace.ToWorld(dx, 0, dz);
+            return (float)(Math.Max(0, (x - x0) * dx + (z - z0) * dz) + Vector3.Dot(drawnOff, d));
+        }
+
+        private static Vector3 ClampDrawn(Vector3 v)
+        {
+            float hl = Mathf.Sqrt(v.x * v.x + v.z * v.z), cap = Anim.HitFeelTuning.MaxDrawnOffset;
+            if (hl <= cap) return v;
+            float k = cap / hl;
+            return new Vector3(v.x * k, v.y, v.z * k);
+        }
+
+        /// <summary>
+        /// Reports, at the frame each cue is really drawn on this (visible) model, the cues the local player sees from his
+        /// own hits and the hits on him: HitFlash (peak strength), HitStop (ms, victim and attacker), KnockVisual (u drawn
+        /// along the blow at 100 ms), SwingCommit (pose weight 2 frames after the press, local swings). Never a cue a setting
+        /// suppressed (reduce motion: no hold reported; the flash strength is the variant actually shown).
+        /// </summary>
+        private void ReportCues(int i, ModelView m, CharSlot slot, bool hasFx, in Effects.ActorPoseFx fx, float knockDrawn, bool knockCheck, int swingTick)
+        {
+            UnityEngine.Object src = DrawnRenderer(m);
+            int me = LocalSeat.Actor;
+            // round 3: each cue is reported ONCE per occurrence, keyed on its own start (flash start, hold tick, knock tick),
+            // on any frame it is drawn, never on a one-frame latch another caller may already have taken.
+            if (_cues == null || _cues.Length < _actors.Length) _cues = Anim.ImpactCueLedger.Make(_actors.Length);
+            int hk = int.MinValue; float hms = 0f; bool hown = false;
+            bool holding = hasFx && fx.Holding && _fx.HoldOf(i, out hk, out hms, out hown);
+            Anim.ImpactCueLedger.Frame(ref _cues[i], i, src,
+                hasFx && fx.Flash, hasFx && fx.FlashOwn, hasFx ? _fx.FlashStartOf(i) : double.NegativeInfinity, fx.FlashStrength,
+                holding, hown, hk, hms, knockCheck, hasFx && fx.Own, knockDrawn);
+            // fix round 2 (gate F30): SwingCommit for MY swing, once, 2 rendered frames after the press tick's swing appears,
+            // with the pose weight actually drawn then (keyed on the sim's SwingTick, not on the animator's own latch,
+            // which the gate never saw report). The animator's latch is drained so it never doubles.
+            slot.Anim.TakeSwingCommit(out _);
+            if (i == me)
+            {
+                // fix round 6 (F30 rig): the local fighter's drawn swing weight this frame and the frame it was drawn on
+                LocalSwingWeightDrawn = slot.Anim.SwingWeightNow;
+                LocalSwingWeightFrame = Time.frameCount;
+                // fix round 5 (item 4): a predicted press starts the 2-frame count on the press frame; the sim's SwingTick
+                // that follows it does not restart the count (one report per press)
+                if (_predStartFrame == Time.frameCount) { _swingSeenFrame = Time.frameCount; _swingReported = false; _swingFromPredict = true; }
+                if (swingTick != _swingSeenTick)
+                {
+                    _swingSeenTick = swingTick;
+                    if (!_swingFromPredict) { _swingSeenFrame = Time.frameCount; _swingReported = false; }
+                    _swingFromPredict = false;
+                }
+                if (!_swingReported && (swingTick >= 0 || _swingFromPredict) && Time.frameCount - _swingSeenFrame >= 2)
+                {
+                    _swingReported = true;
+                    PlayerFeedback.Report(FeedbackChannel.SwingCommit, i, slot.Anim.SwingWeightNow, src);
+                }
+            }
+        }
+
+        // fix round 5 (item 4): the press seen on the frame it happens (HumanInputSource's latch, read only), so the wind-up
+        // pose starts on that frame instead of after the sim's next tick plus the commit rise (5-6 frames in the Editor).
+        CriticalMass.Runtime.Input.HumanInputSource _human;
+        int _humanLookFrame = int.MinValue, _predStartFrame = int.MinValue;
+        bool _intentWas, _swingFromPredict;
+
+        private void PredictPress(int i, World w, GameConfig cfg, ModelView m, CharSlot slot, Actor actor, double simTime)
+        {
+            if (_human == null && Time.frameCount >= _humanLookFrame)
+            {
+                _human = FindFirstObjectByType<CriticalMass.Runtime.Input.HumanInputSource>();
+                _humanLookFrame = Time.frameCount + 30;
+            }
+            bool intent = _human != null && _human.isActiveAndEnabled && _human.State.AttackIntent;
+            if (intent && !_intentWas && actor != null && actor.Alive && Combat.AttackReady(w, i))
+            {
+                slot.Anim.PredictSwing(m, actor, cfg, simTime);
+                if (slot.Anim.Predicting) _predStartFrame = Time.frameCount;
+            }
+            _intentWas = intent;
+        }
+
+        /// <summary>Fix round 6 (tests): the local fighter's swing pose weight as drawn on frame LocalSwingWeightFrame.</summary>
+        public static float LocalSwingWeightDrawn;
+        public static int LocalSwingWeightFrame = -1;
+
+        Anim.ImpactCueLedger.Seen[] _cues;
+        int _swingSeenTick = int.MinValue, _swingSeenFrame;
+        bool _swingReported = true;
+
+        /// <summary>Fix round 2 (gate F03): the renderer that is really drawn (active, enabled, not culled away), so the
+        /// ledger's Source is a visible component; the views component itself when none is.</summary>
+        private UnityEngine.Object DrawnRenderer(ModelView m)
+        {
+            Renderer[] rs = m.Renderers;
+            if (rs != null)
+            {
+                Renderer any = null;
+                for (int k = 0; k < rs.Length; k++)
+                {
+                    Renderer r = rs[k];
+                    if (r == null || !r.enabled || !r.gameObject.activeInHierarchy) continue;
+                    if (r.isVisible) return r;
+                    if (any == null) any = r;
+                }
+                if (any != null) return any;
+                // round 3: never skip and never an inactive source when the model has any renderer at all
+                for (int k = 0; k < rs.Length; k++) if (rs[k] != null) return rs[k];
+            }
+            return this;
+        }
 
         // follow-camera-3: a light rim on your own fighter in third person, so you read in a crowd. One shared property
         // block on that model's renderers (outline colour and width); cleared when the view changes back. No new material,

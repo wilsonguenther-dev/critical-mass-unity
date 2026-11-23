@@ -63,11 +63,23 @@ namespace CriticalMass.Sim.Bots
         }
 
         /// <summary>True when actor id holds its melee swing this tick (Easy hesitation); false always for Normal and Hard.</summary>
-        public static bool HoldsSwing(World w, int id)
+        /// <remarks>target: the bot's target this tick (an actor id, BotsState.TargetKaiju, or -1 = not known). px DM (slow
+        /// triage R1): with CombatFeelConfig.BotSwingHesitationHumansOnly the S3 human-limit hesitation holds only a swing at a
+        /// human seat (what it is for); against the Kaiju, structures and other bots the bot swings at its old speed.</remarks>
+        public static bool HoldsSwing(World w, int id, int target = -1)
         {
             BotSkillConfig sk = Profile(w, id);
-            if (sk == null || !(sk.SwingHesitation > 0)) return false;
-            return Roll(w, id, SaltSwing, w.Tick / SwingWindowTicks) < sk.SwingHesitation;
+            double h = sk != null ? sk.SwingHesitation : 0;
+            // px S3: bots by human limits (Full rules) also hesitate by difficulty (CombatFeelConfig.BotSwingHesitation).
+            bool atHuman = target == -1 || (target >= 0 && target < w.ActorCount && w.Actors[target].IsHuman);
+            if (BotAim.On(w) && (atHuman || !w.Config.Depth.CombatFeel.BotSwingHesitationHumansOnly))
+            {
+                double[] mh = w.Config.Depth.CombatFeel.BotSwingHesitation;
+                int k = (int)Of(w, id);
+                if (mh != null && k < mh.Length && mh[k] > h) h = mh[k];
+            }
+            if (!(h > 0)) return false;
+            return Roll(w, id, SaltSwing, w.Tick / SwingWindowTicks) < h;
         }
 
         /// <summary>False when this think's ability decision is held back (AbilityChance); true always for Normal.</summary>

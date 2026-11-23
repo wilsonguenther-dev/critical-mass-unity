@@ -141,8 +141,11 @@ namespace CriticalMass.Sim.Core
                 int buy = inp.StationBuy;
                 if (buy == 0) continue;
                 inp.StationBuy = 0; // one-shot
-                if (Blacksmith.On(w)) continue; // CM b13 [H]: no class ladder while the hut is on (class switching is unchanged)
-                if (on && w.Actors[i].Alive && w.Actors[i].StandUp <= 0) TryUpgrade(w, i, buy - 1);
+                // lane S2: a player's buy that does nothing says why (ActionRefused; a press TryUpgrade takes answers with Upgrade)
+                if (Blacksmith.On(w) || !on) { PlayerSeat.Refuse(w, i, PlayerReasons.ButtonStationBuy, PlayerReasons.RefusedRuleOff); continue; } // CM b13 [H]: no class ladder while the hut is on
+                if (!w.Actors[i].Alive) continue;
+                if (w.Actors[i].StandUp > 0) { PlayerSeat.Refuse(w, i, PlayerReasons.ButtonStationBuy, PlayerReasons.RefusedStaggered); continue; }
+                TryUpgrade(w, i, buy - 1);
             }
         }
 

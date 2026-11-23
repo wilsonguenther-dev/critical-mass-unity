@@ -96,8 +96,31 @@ namespace CriticalMass.Runtime.Hud.Mechanics
         }
     }
 
+    /// <summary>Fix round 5 (item 6, review pass 4: the enemy's name dropped off his health bar on the impact frame): the
+    /// name tags were placed here at the default order 0, BEFORE CameraShake (150) adds the hit kick, the bars by GameHud
+    /// (200) AFTER it. Fix round 6: moving this whole HUD to order 210 (round 5) broke the player-seat bar tests (F02 / F23 /
+    /// D4), so DepthHud is back at the default order and only the tag POSITIONS are re-projected late, by DepthHudTagsLate
+    /// (order 210), through the camera as it renders.</summary>
     public sealed class DepthHud : MonoBehaviour
     {
+        /// <summary>The late tag pass: after CameraShake (150) and GameHud (200), before LowViewTags (1100).</summary>
+        public const int LateOrder = 210;
+        readonly Vector3[] _tagHead = new Vector3[Tags];
+
+        /// <summary>Fix round 6: put every shown name tag back on its fighter's head through the camera as it renders now
+        /// (after the kick), the same projection the health bars use. Positions only; what shows was decided earlier.</summary>
+        public void ReprojectTags()
+        {
+            UnityEngine.Camera cam = UnityEngine.Camera.main;
+            if (cam == null || _canvas == null || !_canvas.enabled) return;
+            for (int i = 0; i < Tags; i++)
+            {
+                RectTransform rt = _tag[i];
+                if (rt == null || _tagActor[i] < 0 || !rt.gameObject.activeSelf) continue;
+                if (ToLocal(cam, _tagHead[i], out Vector2 at)) rt.anchoredPosition = at;
+            }
+        }
+
         public const int SortingOrder = 14;
         public const int Tags = 20, Bubbles = 8, Floats = 10, Coins = 8, MaxSources = 12, MaxPowers = 6;
         /// <summary>Bot name tags show within this many sim units of the local player.</summary>
@@ -206,6 +229,9 @@ namespace CriticalMass.Runtime.Hud.Mechanics
         {
             Instance = this;
             _driver = GetComponent<SimDriverBehaviour>();
+            DepthHudTagsLate late = GetComponent<DepthHudTagsLate>();
+            if (late == null) late = gameObject.AddComponent<DepthHudTagsLate>();
+            late.Hud = this;
             DepthWords.Ensure();
             Build();
             _onLine = OnLine;
@@ -478,7 +504,13 @@ namespace CriticalMass.Runtime.Hud.Mechanics
             if (cam == null) return false;
             Vector3 sp = cam.WorldToScreenPoint(world);
             if (sp.z < 0f) return false;
-            return RectTransformUtility.ScreenPointToLocalPointInRectangle(_space, new Vector2(sp.x, sp.y), cam, out local);
+            // review fix round 2 (pass-2 defect 4b, the name 120-200 px off its health bar during a hit): the canvas plane
+            // sits 0.42 u in front of the camera and only follows it when the canvas syncs, so a ray cast against it while
+            // the camera kicks or swings (fight framing) lands far off. Screen pixels / scale, the same math as the health
+            // bar (Hud/Player UnitStack), keeps the name and the bar on one anchor. _space fills the screen, centre pivot.
+            float sf = _canvas != null && _canvas.scaleFactor > 0f ? _canvas.scaleFactor : 1f;
+            local = (new Vector2(sp.x, sp.y) - cam.pixelRect.center) / sf;
+            return true;
         }
 
         static Vector3 Head(World w, int id, double alpha, float lift)
@@ -519,7 +551,9 @@ namespace CriticalMass.Runtime.Hud.Mechanics
             Objective = id;
             // Integration batch 4: the job line sits on the top of the centre lane; it steps back while the autopilot banner or a
             // big-moment takeover holds the lane (HudZones), and comes back the frame after.
-            bool show = id != ObjectiveId.None && w.Match.Phase != MatchPhase.Ended && !HudZones.Blocked(HudZone.Callout, HudPriority.Tip);   // owner walk 1: lane resident, steps back for any banner
+            // review fix round 2 (pass-2 N4): no carriers-and-hill job line in Duel or the Practice Range (no Kaiju)
+            bool show = id != ObjectiveId.None && w.Match.Phase != MatchPhase.Ended && !HudZones.Blocked(HudZone.Callout, HudPriority.Tip) &&
+                        !HudState.NoKaijuIn(w.Config);   // owner walk 1: lane resident, steps back for any banner
             bool want = show;
             show = StackFade(_obj, want, !HudZones.Blocked(HudZone.Callout, HudPriority.Tip));
             if (show && want) HudText.Set(_objText, View.Mechanics.Objective.Words(id, f.Cls));
@@ -746,7 +780,7 @@ namespace CriticalMass.Runtime.Hud.Mechanics
         void TickB13(World w, int me)
         {
             TeamId team = w.Actors[me].Team;
-            bool hut = Blacksmith.On(w);
+            bool hut = Blacksmith.On(w) && !HudState.NoHillIn(w.Config);   // review fix round 3: no "HUT 0 ore 0/6" in the range
             if (_hut.gameObject.activeSelf != hut) _hut.gameObject.SetActive(hut);
             if (hut)
             {
@@ -832,6 +866,7 @@ namespace CriticalMass.Runtime.Hud.Mechanics
                     if (HudKeepOut.Contains(new Vector2(hp.x, hp.y), 40f * _canvas.scaleFactor)) continue;
                     RectTransform rt = _tag[used];
                     rt.anchoredPosition = at;
+                    _tagHead[used] = head;
                     // fix/hud-containment-4 (by eye: JUNO over the build bank box): no tag over a HUD panel (tested before
                     // it shows, so a hidden tag does not flick on and off every frame)
                     if (HudZones.OverPanel(rt, _canvas)) { if (rt.gameObject.activeSelf) rt.gameObject.SetActive(false); _tagActor[used] = -1; continue; }

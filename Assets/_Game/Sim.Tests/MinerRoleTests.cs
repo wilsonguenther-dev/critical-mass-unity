@@ -72,18 +72,32 @@ namespace CriticalMass.Sim.Tests
             Assert.AreEqual(-1, Blacksmith.ChannelVein(w, 0), "a full Miner stops channelling");
 
             World h = AtVein(ClassId.Miner, out _);
+            h.Actors[0].IsHuman = false; // lane S3 (lead's call): a player's tapped channel ENDS on a hit; a bot's restarts
             h.Inputs[0].Terraform = true;
             int hitAt = TicksToOre(h, 200, t => { if (t == 21) h.Actors[0].Hp -= 1; });
             Line("ticks to the first ore with a hit before tick 21", hitAt, (21 + need) + " (20 + the hit + " + need + ")");
             Assert.AreEqual(21 + need, hitAt);
 
             World r = AtVein(ClassId.Miner, out _);
+            r.Actors[0].IsHuman = false; // lane S2 (gate S15): only a bot still needs F held; a player's tap runs the channel
             r.Inputs[0].Terraform = true;
             DepthKit.Steps(r, 15);
             r.Inputs[0].Terraform = false;
             DepthKit.Steps(r, 1);
-            Line("releasing F cancels the channel (vein / progress)", Blacksmith.ChannelVein(r, 0) + " / " + Blacksmith.ChannelPhase(r, 0), "-1 / -1");
+            Line("releasing F cancels a bot's channel (vein / progress)", Blacksmith.ChannelVein(r, 0) + " / " + Blacksmith.ChannelPhase(r, 0), "-1 / -1");
             Assert.AreEqual(-1, Blacksmith.ChannelVein(r, 0));
+
+            World t = AtVein(ClassId.Miner, out _);   // lane S2: a player's one-tick tap mines one unit
+            t.Inputs[0].Terraform = true;
+            int tapAt = TicksToOre(t, need + 10, k => { if (k == 2) t.Inputs[0].Terraform = false; });
+            Line("a player's one-tick F tap at a vein: ticks to the ore", tapAt, need + " or so");
+            Assert.Greater(tapAt, 0, "a tap mines one unit");
+            Assert.AreEqual(1, t.Actors[0].CarryAmount);
+            // lane S3 (lead's call, PlayerSeatConfig.MinerTapMinesToFull): the tap keeps mining to a full cargo
+            Assert.AreNotEqual(-1, Blacksmith.ChannelVein(t, 0), "the tap's channel runs on to the next unit");
+            t.Actors[0].Hp -= 1;
+            DepthKit.Steps(t, 1);
+            Assert.AreEqual(-1, Blacksmith.ChannelVein(t, 0), "a hit ends a player's tapped channel");
         }
 
         [Test]
@@ -113,6 +127,7 @@ namespace CriticalMass.Sim.Tests
             Assert.AreEqual(CarryKind.Wood, m.Actors[0].Carry);
 
             World far = DepthKit.Field(Cfg, ClassId.Miner, 56, 40);
+            far.Actors[0].IsHuman = false; // lane S2: a HUMAN Miner digs away from a vein (PxClassRepairTests); a bot never does
             head = far.EventHead;
             far.Inputs[0].Terraform = true;
             DepthKit.Steps(far, 3);
@@ -140,7 +155,8 @@ namespace CriticalMass.Sim.Tests
             double s149 = Blacksmith.SpeedScale(w, 0);
             DepthKit.Steps(w, 1);
             double s150 = Blacksmith.SpeedScale(w, 0);
-            int bar = DepthKit.Since(w, head, SimEventType.BarricadePlaced).Count + DepthKit.Since(w, head, SimEventType.Ability).Count;
+            // lane S2: HAUL now raises its own cast Ability event (Value 1); a barricade or a barricade refusal is still never one
+            int bar = DepthKit.Since(w, head, SimEventType.BarricadePlaced).Count + DepthKit.Since(w, head, SimEventType.Ability).FindAll(e => e.Value != 1).Count;
             double row = w.Config.Class(ClassId.Miner).AbilityCooldown;
             Line("HAUL (" + haul + " ticks) speed after 1 / " + (haul - 1) + " / " + haul + " ticks, cooldown after the press, barricade or ability events", s1 + " / " + s149 + " / " + s150 + " / " + cd.ToString("0.000") + " / " + bar,
                 "1.2 / 1.2 / 1 / " + row + " minus one tick / 0");

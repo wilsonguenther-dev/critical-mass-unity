@@ -145,8 +145,12 @@ namespace CriticalMass.Runtime.Input
             new ControlRow("Emote wheel", new[] { new RebindSlot("Emote", K) }, new[] { new RebindSlot("Emote", G) }),
             new ControlRow("HUD cursor", new[] { new RebindSlot("HudCursor", K) }, new[] { new RebindSlot("HudCursor", G) }),
             new ControlRow("Minimap zoom", new[] { new RebindSlot("MinimapZoom", K) }, new[] { new RebindSlot("MinimapZoom", G) }),
-            // feat/ground-camera: high view / ground view (F5, double-tap View); playing, it flips Settings, Game, CAMERA.
-            new ControlRow("Camera view", new[] { new RebindSlot("CameraView", K) }, new[] { new RebindSlot("CameraView", G) }),
+            // feat/ground-camera: high view / ground view (F5); playing, it flips Settings, Game, CAMERA. Lane I (2026-11-22, one
+            // job per button): no controller default any more (the L3 double tap changed the view mid-sprint); controller players
+            // pick the view in Settings (CAMERA), Start opens it.
+            new ControlRow("Camera view", new[] { new RebindSlot("CameraView", K) }, None),
+            // Lane I: hold to look around (pan toward the pointer). Was the middle mouse button, which is Ping; R3 held on a controller.
+            new ControlRow("Look around (hold)", new[] { new RebindSlot("Look", K) }, None),
             new ControlRow("Pause menu", new[] { new RebindSlot("Pause", K) }, new[] { new RebindSlot("Pause", G) }),
         };
 
@@ -428,8 +432,12 @@ namespace CriticalMass.Runtime.Input
         public static void LoadJson(InputActionAsset asset, string json)
         {
             if (asset == null) return;
-            asset.RemoveAllBindingOverrides();
-            if (!string.IsNullOrEmpty(json)) asset.LoadBindingOverridesFromJson(json);
+            // Review defect 0: overrides change only while the asset is disabled (PlayerActionsLifetime).
+            PlayerActionsLifetime.ChangeWhileDisabled(asset, () =>
+            {
+                asset.RemoveAllBindingOverrides();
+                if (!string.IsNullOrEmpty(json)) asset.LoadBindingOverridesFromJson(json);
+            });
             BindingsChanged?.Invoke();
         }
 
@@ -451,7 +459,7 @@ namespace CriticalMass.Runtime.Input
             catch (Exception e)
             {
                 // DG-53: a corrupt or foreign cm.bindings must never stop the game: drop it once and keep the defaults.
-                if (asset != null) asset.RemoveAllBindingOverrides();
+                if (asset != null) PlayerActionsLifetime.ChangeWhileDisabled(asset, asset.RemoveAllBindingOverrides);
                 PlayerPrefs.DeleteKey(PrefsKey);
                 Debug.LogWarning($"[CM.Controls] saved bindings could not be read ({e.GetType().Name}); using the defaults");
                 BindingsChanged?.Invoke();
@@ -461,7 +469,7 @@ namespace CriticalMass.Runtime.Input
         /// <summary>Every binding back to Controls.inputactions and the saved overrides deleted.</summary>
         public static void ResetAll(InputActionAsset asset)
         {
-            if (asset != null) asset.RemoveAllBindingOverrides();
+            if (asset != null) PlayerActionsLifetime.ChangeWhileDisabled(asset, asset.RemoveAllBindingOverrides);
             PlayerPrefs.DeleteKey(PrefsKey);
             ControlPresets.Forget();
             PlayerPrefs.Save();

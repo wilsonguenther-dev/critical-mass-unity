@@ -21,6 +21,21 @@ namespace CriticalMass.Runtime.Flow
         Practice = 4,
         Spectate = 5,
         Demo = 6,
+        /// <summary>px lane F: one on one against a bot: both classes and its difficulty chosen (VersusSetup), a 3:00 clock.</summary>
+        Duel = 7,
+        /// <summary>px lane F: the practice range: one dummy (stands, moves, or fights back), no clock pressure, no idle autopilot.</summary>
+        Range = 8,
+    }
+
+    /// <summary>px lane F: what the practice range's dummy does (closest existing bot behaviour; see PlayModes.RangeRules).</summary>
+    public enum RangeDummy
+    {
+        /// <summary>Never attacks you (passive for the whole match), Easy: it walks to the hill and mostly stands there.</summary>
+        Standing = 0,
+        /// <summary>Never attacks you, Hard: it keeps moving and dodges (Hard reflexes).</summary>
+        Moving = 1,
+        /// <summary>A real bot at the chosen difficulty: it fights back.</summary>
+        Fighting = 2,
     }
 
     /// <summary>
@@ -35,8 +50,19 @@ namespace CriticalMass.Runtime.Flow
         public double MatchSeconds;
         public double HatchSeconds;
         public double PassiveBotSeconds;
+        /// <summary>px lane F: the bot roster's only class, + 1 (0 = the config's own mix). Duel and range: the enemy's class.</summary>
+        public int OnlyClassPlusOne;
+        /// <summary>px lane F fix round: the egg never hatches (duel and range): HatchSeconds goes an hour past the final
+        /// whistle, so Kaiju.Ai's "time + eps >= hatch" can never fire on the last tick.</summary>
+        public bool NoKaiju;
+        /// <summary>px lane F pass 2: the hill scores nothing (range): Hill.Radius 0, and Hill.HillSystem counts bodies
+        /// strictly inside the radius, so nobody is ever on it: no hill points, no hill owner, no hill time.</summary>
+        public bool NoHill;
 
-        public bool IsDefault => MatchSeconds <= 0 && HatchSeconds <= 0 && PassiveBotSeconds <= 0;
+        /// <summary>How far past the final whistle a NoKaiju match puts the hatch.</summary>
+        public const double NoKaijuMargin = 3600;
+
+        public bool IsDefault => MatchSeconds <= 0 && HatchSeconds <= 0 && PassiveBotSeconds <= 0 && OnlyClassPlusOne <= 0 && !NoKaiju && !NoHill;
 
         /// <summary>Writes the non-zero fields into cfg (the hatch never lands after the final whistle).</summary>
         public void ApplyTo(GameConfig cfg)
@@ -45,6 +71,28 @@ namespace CriticalMass.Runtime.Flow
             if (MatchSeconds > 0) cfg.MatchSeconds = MatchSeconds;
             if (HatchSeconds > 0) cfg.HatchSeconds = Math.Min(HatchSeconds, cfg.MatchSeconds);
             if (PassiveBotSeconds > 0 && cfg.Bots != null) cfg.Bots.PassiveSeconds = PassiveBotSeconds;
+            if (OnlyClassPlusOne > 0) OnlyClass(cfg, (ClassId)(OnlyClassPlusOne - 1));
+            if (NoKaiju) cfg.HatchSeconds = cfg.MatchSeconds + NoKaijuMargin;
+            if (NoHill && cfg.Hill != null) cfg.Hill.Radius = 0;
+        }
+
+        /// <summary>px lane F: every bot-filled roster slot takes class c (all three class-mix tables the sim reads, one-hot).
+        /// The human's own class is still forced by WorldOptions.HumanClass; at team size 1 this is exactly "the enemy is c".</summary>
+        public static void OnlyClass(GameConfig cfg, ClassId c)
+        {
+            int k = (int)c;
+            OneHot(cfg.Bots != null ? cfg.Bots.ClassMix : null, k);
+            if (cfg.Depth != null && cfg.Depth.Roles != null)
+            {
+                OneHot(cfg.Depth.Roles.ClassMix, k);
+                OneHot(cfg.Depth.Roles.SmallTeamClassMix, k);
+            }
+        }
+
+        static void OneHot(double[] mix, int k)
+        {
+            if (mix == null || k < 0 || k >= mix.Length) return;
+            for (int i = 0; i < mix.Length; i++) mix[i] = i == k ? 1.0 : 0.0;
         }
     }
 
@@ -84,7 +132,14 @@ namespace CriticalMass.Runtime.Flow
 
         /// <summary>Quick match sizes (players per team).</summary>
         public static readonly int[] QuickSizes = { 5, 8 };
-        public const int FullBattleSize = 16, PracticeSize = 5, DemoSize = 5, TrainingSize = 5, SpectateSize = 16;
+        public const int FullBattleSize = 16, PracticeSize = 5, DemoSize = 5, TrainingSize = 5, SpectateSize = 16, DuelSize = 1, RangeSize = 1;
+
+        /// <summary>px lane F: a duel is a 3:00 clock (the sim has no knock-out limit: first to 3 needs a sim rule), the egg
+        /// never hatches inside it (the Kaiju is a 16 v 16 story, not a duel's).</summary>
+        public const double DuelMatchSeconds = 180;
+        /// <summary>px lane F: the range runs an hour (no shorter clock to beat; the sim has no "no clock" option) with the egg
+        /// held back for all of it; Standing and Moving dummies are passive for the whole hour.</summary>
+        public const double RangeMatchSeconds = 3600;
 
         /// <summary>Quick match: 4:00 at Standard, the egg at 2:00 (half of the full clock, so the match keeps its shape).</summary>
         public const double QuickMatchSeconds = 240, QuickHatchSeconds = 120;
@@ -115,6 +170,8 @@ namespace CriticalMass.Runtime.Flow
             _hasAbandoned = false;
             _abandoned = default;
             _abandonedSeed = 0;
+            if (_idleSuppressed) CriticalMass.Runtime.Game.HumanControlGuard.IdleAutopilotEnabled = _idleSaved;
+            _idleSuppressed = false;
         }
 
         // ---- cards ----
@@ -135,6 +192,10 @@ namespace CriticalMass.Runtime.Flow
                     return new ModeInfo { Mode = m, Title = "SPECTATE", Line = "Watch a full bot match with the free camera. You are not playing.", Difficulty = 0, Watching = true, SkipsClassSelect = true };
                 case MatchMode.Demo:
                     return new ModeInfo { Mode = m, Title = "QUICK DEMO", Line = "A guided minute: move, hit, the hill and the Kaiju.", Difficulty = 1 };
+                case MatchMode.Duel:
+                    return new ModeInfo { Mode = m, Title = "DUEL", Line = "One on one against a bot. Pick both classes and how hard it fights.", Difficulty = 2, SkipsClassSelect = true };
+                case MatchMode.Range:
+                    return new ModeInfo { Mode = m, Title = "PRACTICE RANGE", Line = "A dummy that never hits back (unless you ask). Switch class any time.", Difficulty = 1, SkipsClassSelect = true };
                 default:
                     return new ModeInfo { Mode = MatchMode.Custom, Title = "CUSTOM", Line = "Your rules: team, size, speed, enemy bots and class.", Difficulty = 2, SkipsClassSelect = true };
             }
@@ -156,6 +217,8 @@ namespace CriticalMass.Runtime.Flow
                 case MatchMode.Practice: return PracticeSize;
                 case MatchMode.Spectate: return SpectateSize;
                 case MatchMode.Demo: return DemoSize;
+                case MatchMode.Duel: return DuelSize;
+                case MatchMode.Range: return RangeSize;
                 default: return basis.TeamSize <= 5 ? 5 : 16;
             }
         }
@@ -171,8 +234,71 @@ namespace CriticalMass.Runtime.Flow
                 case MatchMode.Practice: return new MatchRules { MatchSeconds = PracticeMatchSeconds, PassiveBotSeconds = PracticeMatchSeconds };
                 case MatchMode.Demo:
                     return new MatchRules { MatchSeconds = DemoMatchSeconds, HatchSeconds = DemoHatchSeconds, PassiveBotSeconds = DemoPassiveSeconds };
+                case MatchMode.Duel: return new MatchRules { MatchSeconds = DuelMatchSeconds, HatchSeconds = DuelMatchSeconds, NoKaiju = true };
+                case MatchMode.Range: return new MatchRules { MatchSeconds = RangeMatchSeconds, HatchSeconds = RangeMatchSeconds, NoKaiju = true, NoHill = true };
                 default: return default;
             }
+        }
+
+        /// <summary>
+        /// px lane F: the rules for a whole choice: the mode's, plus the duel's enemy class and the range's dummy (its class,
+        /// and passive for the whole match unless it fights back). Every other mode: Rules(c.Mode) exactly.
+        /// </summary>
+        public static MatchRules Rules(MatchSetupChoice c)
+        {
+            MatchRules r = Rules(c.Mode);
+            if (c.Mode == MatchMode.Duel || c.Mode == MatchMode.Range)
+                r.OnlyClassPlusOne = MatchSetup.Playable.Contains(c.EnemyClass) ? (int)c.EnemyClass + 1 : (int)ClassId.Warrior + 1;
+            if (c.Mode == MatchMode.Range && c.Dummy != RangeDummy.Fighting) r.PassiveBotSeconds = RangeMatchSeconds;
+            return r;
+        }
+
+        /// <summary>
+        /// px lane F fix round (Editor review: "QueueMatch with Mode = Range / Duel produced a 16 v 16 world"): a choice that
+        /// names Duel or Range is a duel or the range whoever built it. Team size 1 always; the range dummy's difficulty
+        /// follows its kind (Standing Easy, Moving Hard). Every other mode is returned unchanged. MatchRequest.From and
+        /// GameFlow.PrepareMatch both pass through here, so a script that sets only Mode gets the real mode.
+        /// </summary>
+        public static MatchSetupChoice Normalize(MatchSetupChoice c)
+        {
+            if (c.Mode != MatchMode.Duel && c.Mode != MatchMode.Range) return c;
+            c.TeamSize = c.Mode == MatchMode.Duel ? DuelSize : RangeSize;
+            if (!MatchSetup.Playable.Contains(c.EnemyClass)) c.EnemyClass = ClassId.Warrior;
+            if (c.Mode == MatchMode.Range)
+            {
+                if (c.Dummy == RangeDummy.Standing) c.BotDifficulty = CriticalMass.Sim.Core.BotDifficulty.Easy;
+                else if (c.Dummy == RangeDummy.Moving) c.BotDifficulty = CriticalMass.Sim.Core.BotDifficulty.Hard;
+            }
+            return c;
+        }
+
+        /// <summary>px lane F: a duel setup (team size 1, my class, the enemy's class, its difficulty).</summary>
+        public static MatchSetupChoice DuelChoice(MatchSetupChoice basis, ClassId mine, ClassId enemy, CriticalMass.Sim.Core.BotDifficulty bots)
+        {
+            basis.Class = mine;
+            basis.EnemyClass = enemy;
+            basis.BotDifficulty = bots;
+            return ToChoice(MatchMode.Duel, basis, 0);
+        }
+
+        /// <summary>px lane F: a range setup. Standing = Easy, Moving = Hard (its reflexes keep it moving), Fighting = bots.</summary>
+        public static MatchSetupChoice RangeChoice(MatchSetupChoice basis, ClassId mine, ClassId dummy, RangeDummy kind, CriticalMass.Sim.Core.BotDifficulty fightBots)
+        {
+            basis.Class = mine;
+            basis.EnemyClass = dummy;
+            basis.Dummy = kind;
+            basis.BotDifficulty = kind == RangeDummy.Standing ? CriticalMass.Sim.Core.BotDifficulty.Easy
+                : kind == RangeDummy.Moving ? CriticalMass.Sim.Core.BotDifficulty.Hard : fightBots;
+            return ToChoice(MatchMode.Range, basis, 0);
+        }
+
+        /// <summary>px lane F: SWAP CLASSES on a duel's results: my class and the enemy's change places.</summary>
+        public static MatchSetupChoice Swapped(MatchSetupChoice c)
+        {
+            ClassId t = c.Class;
+            c.Class = c.EnemyClass;
+            c.EnemyClass = t;
+            return c;
         }
 
         /// <summary>
@@ -197,6 +323,7 @@ namespace CriticalMass.Runtime.Flow
                     break;
             }
             if (m == MatchMode.Demo) c.BotDifficulty = CriticalMass.Sim.Core.BotDifficulty.Easy;
+            if ((m == MatchMode.Duel || m == MatchMode.Range) && !MatchSetup.Playable.Contains(c.EnemyClass)) c.EnemyClass = ClassId.Warrior;
             if (m == MatchMode.Spectate) c.Team = TeamId.Azure;
             if (!MatchSetup.Playable.Contains(c.Class)) c.Class = ClassId.Warrior;
             return c;
@@ -223,6 +350,7 @@ namespace CriticalMass.Runtime.Flow
         public static string LengthLabel(MatchMode m, double pace)
         {
             if (m == MatchMode.Training) return "AT YOUR PACE";
+            if (m == MatchMode.Range) return "NO CLOCK TO BEAT";
             double real = MatchSeconds(m) / (pace > 0 ? pace : 1);
             if (real < 120) return Mathf.RoundToInt((float)real) + " SECONDS";
             int min = Mathf.Max(1, Mathf.RoundToInt((float)(real / 60.0)));
@@ -248,7 +376,30 @@ namespace CriticalMass.Runtime.Flow
             _sessionLast = s;
             _sessionMode = mode;
             _hasAbandoned = false;
+            SuppressIdleAutopilot(mode == MatchMode.Range);
         }
+
+        static bool _idleSuppressed, _idleSaved = true;
+
+        /// <summary>px lane F: the idle autopilot never takes the player's fighter on the practice range (standing still to
+        /// read a tooltip there is the point); every other mode gets back whatever it was before.</summary>
+        static void SuppressIdleAutopilot(bool range)
+        {
+            if (range && !_idleSuppressed)
+            {
+                _idleSaved = CriticalMass.Runtime.Game.HumanControlGuard.IdleAutopilotEnabled;
+                CriticalMass.Runtime.Game.HumanControlGuard.IdleAutopilotEnabled = false;
+                _idleSuppressed = true;
+            }
+            else if (!range && _idleSuppressed)
+            {
+                CriticalMass.Runtime.Game.HumanControlGuard.IdleAutopilotEnabled = _idleSaved;
+                _idleSuppressed = false;
+            }
+        }
+
+        /// <summary>px lane F (tests): the range turned the idle autopilot off.</summary>
+        public static bool IdleAutopilotSuppressed => _idleSuppressed;
 
         /// <summary>The player left a match through pause (Quit to title) before the end. Demo and Training are not offered back.</summary>
         public static void NoteAbandoned(MatchSetupChoice s, int seed)
@@ -287,7 +438,7 @@ namespace CriticalMass.Runtime.Flow
 
         public static void Save(MatchMode m, int quickSize)
         {
-            if (m != MatchMode.Training && m != MatchMode.Demo && Array.IndexOf(SelectOrder, m) >= 0) PlayerPrefs.SetInt(LastModeKey, (int)m);
+            if (m != MatchMode.Training && m != MatchMode.Demo && Array.IndexOf(SelectOrder, m) >= 0) PlayerPrefs.SetInt(LastModeKey, (int)m);   // Duel / Range: not cards (saved by VersusSetup)
             PlayerPrefs.SetInt(QuickSizeKey, ValidQuickSize(quickSize));
             PlayerPrefs.Save();
         }
@@ -344,7 +495,7 @@ namespace CriticalMass.Runtime.Flow
     }
 
     /// <summary>The lobby's screens (the navigation graph the tests walk).</summary>
-    public enum LobbyScreen { Title, Home, ModeSelect, ClassSelect, Ready, CustomSetup, Barracks, Codex, HowTo, Settings, Match, Results }
+    public enum LobbyScreen { Title, Home, ModeSelect, ClassSelect, Ready, CustomSetup, Barracks, Codex, HowTo, Settings, Match, Results, Versus, StarterPick }
 
     /// <summary>
     /// The lobby's navigation graph: where each screen's actions lead and where Back goes. The screens implement it; the
@@ -354,14 +505,16 @@ namespace CriticalMass.Runtime.Flow
     {
         public static readonly Dictionary<LobbyScreen, LobbyScreen[]> Forward = new Dictionary<LobbyScreen, LobbyScreen[]>
         {
-            { LobbyScreen.Title, new[] { LobbyScreen.Home, LobbyScreen.Match } },   // HOME; PLAY NOW and QUICK DEMO start a match
+            { LobbyScreen.Title, new[] { LobbyScreen.Home, LobbyScreen.Match, LobbyScreen.StarterPick } },   // HOME; PLAY NOW and QUICK DEMO start a match; the first PLAY NOW picks a class
             { LobbyScreen.Home, new[] { LobbyScreen.ModeSelect, LobbyScreen.Ready, LobbyScreen.Barracks, LobbyScreen.Codex, LobbyScreen.HowTo, LobbyScreen.Settings } },
-            { LobbyScreen.ModeSelect, new[] { LobbyScreen.ClassSelect, LobbyScreen.Ready, LobbyScreen.CustomSetup, LobbyScreen.Match } },
+            { LobbyScreen.ModeSelect, new[] { LobbyScreen.ClassSelect, LobbyScreen.Ready, LobbyScreen.CustomSetup, LobbyScreen.Match, LobbyScreen.Versus } },
+            { LobbyScreen.Versus, new[] { LobbyScreen.Ready } },   // px lane F: DUEL / PRACTICE RANGE setup
+            { LobbyScreen.StarterPick, new[] { LobbyScreen.Match, LobbyScreen.Ready } },   // a class starts PLAY NOW; PRACTICE FIRST the range
             { LobbyScreen.ClassSelect, new[] { LobbyScreen.Ready } },
             { LobbyScreen.Ready, new[] { LobbyScreen.Match } },
             { LobbyScreen.CustomSetup, new[] { LobbyScreen.Match } },
             { LobbyScreen.Match, new[] { LobbyScreen.Results, LobbyScreen.Title, LobbyScreen.Home } },   // results; pause quit; the demo lands home
-            { LobbyScreen.Results, new[] { LobbyScreen.Home, LobbyScreen.Match, LobbyScreen.CustomSetup } },
+            { LobbyScreen.Results, new[] { LobbyScreen.Home, LobbyScreen.Match, LobbyScreen.CustomSetup } },   // a duel: REMATCH and SWAP CLASSES are Match
             { LobbyScreen.Barracks, new LobbyScreen[0] },
             { LobbyScreen.Codex, new LobbyScreen[0] },
             { LobbyScreen.HowTo, new[] { LobbyScreen.Match } },
@@ -383,6 +536,8 @@ namespace CriticalMass.Runtime.Flow
             { LobbyScreen.Settings, LobbyScreen.Home },
             { LobbyScreen.Match, LobbyScreen.Match },      // pause menu (resume); its Quit goes to the title
             { LobbyScreen.Results, LobbyScreen.Home },
+            { LobbyScreen.Versus, LobbyScreen.ModeSelect },
+            { LobbyScreen.StarterPick, LobbyScreen.Title },
         };
     }
 
@@ -441,6 +596,10 @@ namespace CriticalMass.Runtime.Flow
                     return;
                 case MatchMode.Spectate:
                     d.ShowReady(new PlayLaunch { Choice = ChoiceFor(m), BackTo = LobbyScreen.ModeSelect });
+                    return;
+                case MatchMode.Duel:
+                case MatchMode.Range:
+                    d.ShowVersus(m);
                     return;
                 default:
                     PickClass(d, m);

@@ -48,6 +48,20 @@ namespace CriticalMass.Runtime.Camera
         public const string ActionName = "CameraView";
         /// <summary>Camera shake share kept in ground view (a 0.32 u shake at 3 u from the pivot is a lot).</summary>
         public const float ShakeLimit = 0.3f;
+        /// <summary>px lane C: fight framing weight 0..1 (eased in HitFeelTuning.StepFight) and the pivot lift at full (u).</summary>
+        double _fightW;
+        // lane C fix round (defect 2): the side-on duel framing (FightFrame): weight, kept side, target, yaw offset now
+        double _duelW, _duelYawOff, _duelYaw, _duelEnemyYaw;
+        bool _duelOn, _duelActive;
+        int _duelSide, _duelTarget = -1;
+        Vector3 _duelChest;
+        /// <summary>The duel framing weight 0..1, the target it frames (-1 none) and the yaw it adds this frame (tests, captures).</summary>
+        public static double DuelFraming => Current != null ? Current._duelW : 0;
+        public static int DuelTarget => Current != null ? Current._duelTarget : -1;
+        public static double DuelYawOffset => Current != null ? Current._duelYawOff : 0;
+        public const double FightLift = 0.15;
+        public static double FightFraming => Current != null ? Current._fightW : 0;
+        static double Smooth01(double x) => x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3 - 2 * x);
         /// <summary>Mouse look degrees per pixel and right stick degrees per second (yaw, pitch).</summary>
         public const float MouseDegPerPx = 0.14f, StickYawDegPerSec = 160f, StickPitchDegPerSec = 90f;
         /// <summary>Off-screen threat ring: enemies within this many u outside the view get a pointer.</summary>
@@ -322,9 +336,19 @@ namespace CriticalMass.Runtime.Camera
                 CameraView v = ChosenView();
                 if (v != _view) { _view = v; snap = true; }
                 rig = _view == CameraView.FirstPerson ? FollowCamera.FirstRig : FollowCamera.ThirdRig;
+                StepDuel(w, target, rig, paused ? 0 : dt, snap);
+                if (!rig.FirstPerson) rig.Shoulder += FightFrame.Shoulder(_duelSide) * Smooth01(_duelW);
                 PlayFollow(w, target, facing, paused ? 0 : dt, snap, orbitYaw, orbitPitch, rig, ref tx, ref tz);
                 orbitYaw = orbitPitch = 0;   // PlayFollow owns the yaw and pitch
+                // px lane C: fight framing (third person): an enemy close in front or a hit in the last 2 s eases the camera back
+                // 12% and a little up, FOV +3, over 0.4 s; home over 1 s. Never under reduce motion, never in first person.
+                bool fight = !rig.FirstPerson && !CriticalMass.Runtime.View.Effects.FeelGate.ReduceMotion && FightState.InFight;
+                _fightW = snap ? (fight ? 1 : 0) : CriticalMass.Runtime.View.Anim.HitFeelTuning.StepFight(_fightW, fight, paused ? 0 : dt);
+                double fw = Smooth01(_fightW);
+                extra += rig.Distance * CriticalMass.Runtime.View.Anim.HitFeelTuning.FightDistanceShare * fw;
+                lift += FightLift * fw;
             }
+            else _fightW = 0;
 
             GatherCylinders(w, tx, tz, target);
             var f = new GroundFollowInput
@@ -363,6 +387,39 @@ namespace CriticalMass.Runtime.Camera
         /// RecenterSeconds without look input, or a middle click, it re-centres behind. Third person also looks a little
         /// ahead along the travel (none under reduce motion).
         /// </summary>
+        /// <summary>
+        /// Lane C fix round (review defect 2: third person hid the enemy you are hitting): with a fight target close by, swing
+        /// the view side-on (FightFrame) so the enemy is drawn beside the own fighter, not behind him. The offset is computed
+        /// against the follow yaw so the player's own steering stays his; manual look within RecenterSeconds turns it off.
+        /// </summary>
+        void StepDuel(World w, int me, GroundRig rig, double dt, bool snap)
+        {
+            bool reduce = CriticalMass.Runtime.View.Effects.FeelGate.ReduceMotion;
+            bool steering = _manual && _sinceLook < FollowCamera.RecenterSeconds;
+            // fix round 2: only a LIVE target inside TargetRange engages; a dead or knocked-away one releases at once
+            // (the camera eases back and is never steered by it again).
+            int t = rig.FirstPerson || reduce || steering ? -1 : FightState.Target(w, me, FightFrame.TargetRange);
+            _duelOn = t >= 0;
+            _duelTarget = t;
+            _duelW = snap ? (_duelOn ? 1 : 0) : FightFrame.Step(_duelW, _duelOn, dt);
+            if (_duelOn) _duelActive = true;
+            if (!_duelOn) return;
+            double a = Driver.Alpha;
+            double mx = w.PrevX[me] + (w.X[me] - w.PrevX[me]) * a, mz = w.PrevZ[me] + (w.Z[me] - w.PrevZ[me]) * a;
+            double ex = w.PrevX[t] + (w.X[t] - w.PrevX[t]) * a, ez = w.PrevZ[t] + (w.Z[t] - w.PrevZ[t]) * a;
+            _duelEnemyYaw = GroundCamera.YawToward(mx, mz, ex, ez, _yawFollow.Yaw);
+            _duelChest = SimSpace.ToWorld(ex, GroundHeight.At(w.Map, ex, ez) + 1.1, ez);
+        }
+
+        /// <summary>Fix round 2: the drawn yaw for this frame (FightFrame.StepYaw), after the follow yaw has stepped.</summary>
+        double DuelYaw(double follow, double dt)
+        {
+            if (!_duelActive) { _duelYaw = follow; _duelYawOff = 0; _duelSide = 0; return follow; }
+            _duelYaw = FightFrame.StepYaw(_duelYaw, follow, _duelOn, _duelEnemyYaw, ref _duelSide, dt, out _duelYawOff);
+            if (!_duelOn && Math.Abs(_duelYawOff) < 1e-6) { _duelActive = false; _duelSide = 0; }
+            return _duelYaw;
+        }
+
         void PlayFollow(World w, int id, double facing, double dt, bool snap, double orbitYaw, double orbitPitch, GroundRig rig, ref double tx, ref double tz)
         {
             double hz = w.Config.SimHz > 0 ? w.Config.SimHz : 30;
@@ -406,7 +463,7 @@ namespace CriticalMass.Runtime.Camera
                     if (dt > 0) _follow.SetPitch(_follow.Pitch + (defPitch - _follow.Pitch) * (1 - Math.Exp(-dt / 0.4)), rig.MinPitch, rig.MaxPitch);
                 }
             }
-            _follow.SetYaw(_yawFollow.Yaw);
+            _follow.SetYaw(DuelYaw(_yawFollow.Yaw, dt));
             bool held = _input != null && _input.State.MoveHeld;
             _inputYaw = snap ? _follow.Yaw : _latch.Step(held, looked, _follow.Yaw);
             if (!rig.FirstPerson)
@@ -606,7 +663,12 @@ namespace CriticalMass.Runtime.Camera
             {
                 Shader.SetGlobalVector(FadeCamId, new Vector4(camPos.x, camPos.y, camPos.z, 1f));
                 // follow-camera-3: aim the see-through at head and shoulders (chest + 0.35), not the belly.
-                Shader.SetGlobalVector(FadeTargetId, new Vector4(_chest.x, _chest.y + 0.35f, _chest.z, ViewCull.FadeRadius));
+                // lane C fix round: in a framed fight the see-through line runs to the TARGET's chest, so whatever still
+                // covers him (the own fighter's ladder or shoulder, a wall in front) dithers instead of hiding the hit.
+                if (_duelW > 0.5 && _duelTarget >= 0)
+                    Shader.SetGlobalVector(FadeTargetId, new Vector4(_duelChest.x, _duelChest.y, _duelChest.z, FightFrame.FadeRadius));
+                else
+                    Shader.SetGlobalVector(FadeTargetId, new Vector4(_chest.x, _chest.y + 0.35f, _chest.z, ViewCull.FadeRadius));
                 _fadeSet = true;
                 SetHitKeep();
             }
@@ -687,7 +749,7 @@ namespace CriticalMass.Runtime.Camera
             }
             Vector3 pos = SimSpace.ToWorld(_follow.CamX, _follow.CamY, _follow.CamZ);
             _cam.transform.SetPositionAndRotation(pos, Quaternion.Euler((float)_follow.Pitch, (float)_follow.Yaw, 0f));
-            float fov = Mode == GroundViewMode.Play ? _fov : GroundCamera.FovDeg;
+            float fov = Mode == GroundViewMode.Play ? _fov + (float)(CriticalMass.Runtime.View.Anim.HitFeelTuning.FightFovAdd * Smooth01(_fightW)) : GroundCamera.FovDeg;
             if (_cam.fieldOfView != fov) _cam.fieldOfView = fov;
             if (_cam.nearClipPlane != GroundCamera.NearClip) _cam.nearClipPlane = GroundCamera.NearClip;
             if (_cam.farClipPlane != GroundCamera.FarClip) _cam.farClipPlane = GroundCamera.FarClip;

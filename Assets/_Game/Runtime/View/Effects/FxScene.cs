@@ -110,7 +110,47 @@ namespace CriticalMass.Runtime.View.Effects
         private struct Droplet { public double Born; public Vector3 P0, V; public float Size, TLand, GroundY; public bool Landed, Pool; public double DirX, DirZ; }
         private struct Decal { public double Born, Life; public Vector3 P; public float Size, Rot, Grow; public uint Seed; public byte Kind, Shape; public float DirA; }
         private struct Ring { public double Born, Life; public Vector3 P; public float R0, R1, Width, Facing; public Color32 Col; public byte Kind; }
-        private struct Trail { public double Born; public Vector3 P; public float Facing, Arc, Radius; public Color32 Team; public byte Kind; }
+        private struct Trail { public double Born; public Vector3 P; public float Facing, Arc, Radius; public Color32 Team; public byte Kind; public int Actor, SwingTick; public bool Local, Crit; }
+        /// <summary>px lane C: trail kinds past the classes: a whiff's wind streak, a dodger's after-image streak.</summary>
+        private const byte TrailWhiff = 100, TrailDodge = 101;
+
+        /// <summary>px lane C: the world size (u) of the burst the last own hit spawned (0 when the last hit was not own):
+        /// CombatFx reports it to the ledger as ImpactBurst.</summary>
+        public float LastBurstSize { get; private set; }
+
+        // the last hit SpawnHit drew (OnCritical adds to it the same tick)
+        double _lastHitAt, _lastHitDirX, _lastHitDirZ;
+        Vector3 _lastHitP, _lastHitTan;
+        uint _lastHitSeed;
+        bool _lastHitThird;
+
+        /// <summary>
+        /// Critical hits (lead's call 12): on top of the hit SpawnHit just drew, a two-stage burst (the cracked impact frame,
+        /// then a bigger star 50 ms later), radial spark lines, and the attacker's swing trail recoloured hot gold for its
+        /// follow-through. Sets LastBurstSize to the stage-2 size (the ledger's ImpactBurst). Returns that size.
+        /// </summary>
+        public float SpawnCritical(int attacker)
+        {
+            double t = _lastHitAt;
+            float k3 = _lastHitThird ? Anim.HitFeelTuning.Burst3PShare : 1f;   // fix round 2: behind and smaller in third person
+            AddBurst(t, _lastHitP, Anim.HitFeelTuning.BurstCritStage1 * k3, 4, _lastHitSeed + 11, _lastHitTan, S(Anim.HitFeelTuning.BurstCritLife));
+            AddBurst(t + S(Anim.HitFeelTuning.BurstCritStage2Delay), _lastHitP, Anim.HitFeelTuning.BurstCritStage2 * k3, 1, _lastHitSeed + 12, _lastHitTan,
+                S(Anim.HitFeelTuning.BurstCritLife));
+            int n = Anim.HitFeelTuning.CritRadialLines;
+            for (int k = 0; k < n; k++)
+            {
+                double a = k * Math.PI * 2 / n;
+                AddSpark(t, _lastHitP, Math.Cos(a), Math.Sin(a), _lastHitSeed + 13, (uint)(k + 120), 1);
+            }
+            AddRing(t, _lastHitP, 0.3f, 1.2f, 0.12f, S(0.22), SparkWhite, 5);
+            // the swing's follow-through in the critical colour
+            int best = -1; double born = double.NegativeInfinity;
+            for (int i = 0; i < MaxTrails; i++)
+                if (_trails[i].Actor == attacker && _trails[i].Kind < TrailWhiff && _trails[i].Born > born) { born = _trails[i].Born; best = i; }
+            if (best >= 0) { _trails[best].Team = Anim.HitFeelTuning.CritTrail; _trails[best].Crit = true; }
+            LastBurstSize = Anim.HitFeelTuning.BurstCritStage2 * k3;
+            return LastBurstSize;
+        }
         private struct Puff { public double Born, Life; public Vector3 P0, V; public float Size; public Color32 Col; public byte Kind; }
 
         private readonly Burst[] _bursts = new Burst[MaxBursts];
@@ -257,6 +297,8 @@ namespace CriticalMass.Runtime.View.Effects
         // Lifetimes (sim seconds).
         private double DecalLife => S(20.0);
         private double TrailLife => S(0.2);
+        /// <summary>Lane C fix round: the dodge after-image and the whiff streak live longer than a slash (s wall).</summary>
+        public const double DodgeTrailSeconds = 0.36, WhiffTrailSeconds = 0.3;
         private double PuffLife => S(0.42);
         private double SparkLife => S(0.24);
         private const float G = 22f; // gravity, units per sim second squared
@@ -358,7 +400,7 @@ namespace CriticalMass.Runtime.View.Effects
                                       MaxMarks + MaxDrips + MaxGibs + MaxExplosions + MaxMotes + MaxBubbles + MaxLeaves;
 
         // ---- worst-case vertex cost per element and layer (the draw code below stays inside these) ----
-        public const int CostBurst = 270, CostDroplet = 30, CostDecal = 130, CostRingGround = 390, CostRingAir = 52, CostTrail = 100;
+        public const int CostBurst = 270, CostDroplet = 30, CostDecal = 130, CostRingGround = 390, CostRingAir = 52, CostTrail = 160;   // px lane C: + the 2 x 30-vert reach arc (Warrior 150, Demolitions 158)
         public const int CostChunk = 48, CostPuff = 40, CostSpark = 27, CostMark = 240, CostDrip = 14, CostGib = 144;
         public const int CostExplosionAir = 520, CostExplosionGround = 21, CostMote = 36, CostBubble = 74, CostLeaf = 14;
         public const int CostShield = 66, CostKaijuGround = 600, CostKaijuAir = 108;
@@ -395,14 +437,31 @@ namespace CriticalMass.Runtime.View.Effects
                     double facing = e.A >= 0 && e.A < w.ActorCount ? w.Actors[e.A].Facing : Math.Atan2(-e.DirZ, -e.DirX);
                     double fx = JsMath.Cos(facing), fz = JsMath.Sin(facing);
                     Vector3 p = W(e.X + fx * 0.7, h + 0.95, e.Z + fz * 0.7);
-                    AddBurst(t, p, 0.5f, 2, seed, Vector3.zero, S(0.16));
-                    for (int k = 0; k < 7; k++) AddSpark(t, p, -e.DirX, -e.DirZ, seed, (uint)k, 2);
+                    // lane C fix round (defect 6): a block must read as a BLOCK in both cameras: a steel clang star, a wide
+                    // shield-face ripple and a camera-facing steel ring, 0.3 s or longer (bigger when it is my block or my hit).
+                    bool own = e.Local;
+                    AddBurst(t, p, own ? 1.0f : 0.7f, 2, seed, Vector3.zero, S(own ? 0.32 : 0.26));
+                    for (int k = 0; k < (own ? 12 : 8); k++) AddSpark(t, p, -e.DirX, -e.DirZ, seed, (uint)k, 2);
                     // Ring ripple across the shield face: an expanding arc on the real +-60 degree cone.
-                    AddRing(t, W(e.X, h + 0.9, e.Z), 0.84f, 1.45f, 0.16f, S(0.24), Steel, 3, (float)-facing);
+                    AddRing(t, W(e.X, h + 0.9, e.Z), 0.84f, own ? 2.1f : 1.7f, own ? 0.26f : 0.2f, S(0.34), Steel, 3, (float)-facing);
+                    AddRing(t, p, 0.35f, own ? 1.3f : 1.0f, 0.14f, S(0.3), Steel, 5);
+                    LastBurstSize = 0f;
                     break;
                 }
                 case FxKind.Swing:
                     AddTrail(t, e, w);
+                    break;
+                case FxKind.Contact:
+                    if (e.Value <= 0) AddWhiffStreak(t, e, w);   // px lane C: a miss LOOKS like a miss
+                    break;
+                case FxKind.Blocked:
+                    SpawnBlocked(ref e, w, t, seed);
+                    break;
+                case FxKind.StructureHit:
+                    SpawnStructureHit(ref e, w, t, seed);
+                    break;
+                case FxKind.Dig:
+                    SpawnDig(ref e, w, t, seed);
                     break;
                 case FxKind.KaijuHit:
                 {
@@ -525,19 +584,55 @@ namespace CriticalMass.Runtime.View.Effects
             float dmg01 = Mathf.Clamp01((float)(e.Value / 45.0));
             byte tier = death ? (byte)2 : e.Tier;
             Vector3 tan = SwingTangent(ref e);
+            // fix round 2 (review pass 2, 1a): in third person my own hit burst covered 30-60% of the enemy at impact. There
+            // it is drawn behind him (his far side from the lens, so his body sits in front of it), smaller and shorter; his
+            // flash and recoil stay the main read.
+            bool third = (e.A == LocalSeat.Actor || e.B == LocalSeat.Actor) && CriticalMass.Runtime.Camera.GroundView.PlayActive;
+            if (third)
+            {
+                UnityEngine.Camera lens = UnityEngine.Camera.main;
+                Vector3 vc = W(e.X, h + 0.95, e.Z);
+                Vector3 away = lens != null ? vc - lens.transform.position : Vector3.zero;
+                away.y = 0f;
+                if (away.sqrMagnitude > 1e-4f)
+                {
+                    // fix round 5 (impact pop): the burst on his NEAR side beside his body centre, toward the attacker's
+                    // weapon side (HitFeelTuning.ContactSpark3P), 0.8 of the own size: it pops on the impact frame, touches
+                    // his edge and never covers his centre. Short spark lines fly off it.
+                    float size3 = CriticalMass.Runtime.View.Anim.HitFeelTuning.BurstSize(death ? (byte)2 : e.Tier, e.Local, e.Value) * CriticalMass.Runtime.View.Anim.HitFeelTuning.Burst3PShare;
+                    contact = CriticalMass.Runtime.View.Anim.HitFeelTuning.ContactSpark3P(vc, lens.transform.position, SimSpace.ToWorld(e.DirX, 0, e.DirZ), (float)r, size3);
+                    for (int k = 0; k < CriticalMass.Runtime.View.Anim.HitFeelTuning.NearSpark3PLines; k++)
+                        AddSpark(t, contact, e.DirX, e.DirZ, seed + 7, (uint)(k + 150), 1);
+                }
+            }
+            _lastHitThird = third;
+            _lastHitAt = t; _lastHitP = contact; _lastHitTan = tan; _lastHitSeed = seed; _lastHitDirX = e.DirX; _lastHitDirZ = e.DirZ;
             // Shape language per tier: light = star burst; heavy = star + slash arc along the swing; critical or finishing =
             // the big cracked impact frame. Kaiju melee adds three claw rakes.
-            if (tier == 0) AddBurst(t, contact, 0.34f + 0.4f * dmg01, 0, seed, tan, S(0.16));
-            else if (tier == 1) AddBurst(t, contact, 0.52f + 0.4f * dmg01, 1, seed, tan, S(0.2));
-            else AddBurst(t, contact, 0.95f + (death ? 0.15f : 0f), 4, seed, tan, S(0.3));
+            // px lane C (2026-11-22): sized for the shipped cameras and tiered, own hits (the local player is the attacker or
+            // the victim) bigger and longer (light >= 0.9 u, heavy >= 1.3 u, >= 0.22 s) with the slash along the swing at
+            // every tier; everyone else's hits stay modest (threat hierarchy: a 16v16 brawl is not fireworks).
+            bool own = e.Local;
+            float size = CriticalMass.Runtime.View.Anim.HitFeelTuning.BurstSize(tier, own, e.Value) + (death ? 0.1f : 0f);
+            double life = S(CriticalMass.Runtime.View.Anim.HitFeelTuning.BurstLife(tier, own));
+            if (third)
+            {
+                size *= CriticalMass.Runtime.View.Anim.HitFeelTuning.Burst3PShare;
+                life = Math.Min(life, S(CriticalMass.Runtime.View.Anim.HitFeelTuning.Burst3PLife));
+            }
+            byte kind = tier >= 2 ? (byte)4 : own || tier == 1 ? (byte)1 : (byte)0;
+            AddBurst(t, contact, size, kind, seed, tan, life);
+            LastBurstSize = own ? size : 0f;
             if (e.B == Damage.KaijuSource) AddBurst(t, contact + Vector3.up * 0.2f, 1.05f, 5, seed + 1, tan, S(0.24));
 
             // Knock-back dust at the feet, blown along the hit.
             // feat/light-weapons-2: a light-weapon hit shoves, so it gets the same dust (two puffs) to read as a push-back.
-            if (tier >= 1 || CriticalMass.Runtime.View.Anim.LightWeaponView.Shoves(_cfg, e.HasAttacker, e.AttCls))
+            // px lane C: own hits kick dust at every tier.
+            if (tier >= 1 || own || CriticalMass.Runtime.View.Anim.LightWeaponView.Shoves(_cfg, e.HasAttacker, e.AttCls))
             {
                 Vector3 feet = W(e.X, h + 0.12, e.Z);
-                for (int k = 0; k < 2 + tier; k++) AddPuff(t, feet, seed, (uint)(k + 60), 0.3f + 0.06f * tier, DustMid, 2, e.DirX, e.DirZ);
+                int puffs = Math.Max(2 + tier, own ? CriticalMass.Runtime.View.Anim.HitFeelTuning.OwnDustPuffs + tier : 0);
+                for (int k = 0; k < puffs; k++) AddPuff(t, feet, seed, (uint)(k + 60), (own ? 0.36f : 0.3f) + 0.06f * tier, DustMid, 2, e.DirX, e.DirZ);
                 RustleArea(e.X, e.Z, 0.9 + 0.5 * tier, t, seed);
             }
 
@@ -632,10 +727,133 @@ namespace CriticalMass.Runtime.View.Effects
             tr.P = W(e.X, h, e.Z);
             tr.Facing = (float)Math.Atan2(e.DirZ, e.DirX);
             // feat/light-weapons-2: a light weapon draws its own short arc (its reach and width, not the class row's).
-            tr.Arc = (float)(CriticalMass.Runtime.View.Anim.LightWeaponView.ArcDeg(_cfg, e.Cls) * Math.PI / 180);
-            tr.Radius = (float)CriticalMass.Runtime.View.Anim.LightWeaponView.Range(_cfg, e.Cls) * 0.82f;
+            // px lane C: the picture matches the rule: the slash sweeps the TRUE reach (range + body widening) and the
+            // widened arc the sim tests, along the LIVE SwingFacing until contact (lane S1 tracks the aim in the wind-up).
+            tr.Arc = (float)(CriticalMass.Runtime.View.Anim.HitFeelTuning.DrawnHalfArc(_cfg, e.Cls) * 2);
+            tr.Radius = (float)CriticalMass.Runtime.View.Anim.HitFeelTuning.SimReach(_cfg, e.Cls);
             tr.Team = e.Team == TeamId.Azure ? AzureC : CrimsonC;
             tr.Kind = (byte)e.Cls;
+            tr.Actor = e.A;
+            tr.SwingTick = e.A >= 0 && e.A < w.ActorCount ? w.Actors[e.A].SwingTick : -1;
+            tr.Local = e.A == LocalSeat.Actor;
+            tr.Crit = false;
+        }
+
+        /// <summary>px lane C: a whiff's thin wind streak, past the arc's end at the true reach (over-rotation), pale.</summary>
+        private void AddWhiffStreak(double t, FxEvent e, World w)
+        {
+            if (e.A < 0 || e.A >= w.ActorCount) return;
+            ref Trail tr = ref _trails[_nt++ % MaxTrails];
+            double x = w.X[e.A], z = w.Z[e.A];
+            tr.Born = t;
+            tr.P = W(x, Ground(x, z), z);
+            tr.Facing = (float)Math.Atan2(e.DirZ, e.DirX);
+            tr.Arc = (float)(CriticalMass.Runtime.View.Anim.HitFeelTuning.DrawnHalfArc(_cfg, w.Actors[e.A].Cls) * 2);
+            tr.Radius = (float)CriticalMass.Runtime.View.Anim.HitFeelTuning.SimReach(_cfg, w.Actors[e.A].Cls);
+            tr.Team = SparkWhite;
+            tr.Kind = TrailWhiff;
+            tr.Actor = -1;
+            tr.SwingTick = -1;
+            tr.Local = e.A == LocalSeat.Actor;
+            tr.Crit = false;
+        }
+
+        /// <summary>
+        /// px lane C: a blocked hit LOOKS blocked (no victim flash, no hit burst): a dodge draws an after-image streak on the
+        /// dodger; a ward, shield, spawn protection or immunity a short camera-facing shimmer ring at the contact point; a
+        /// wall between a small grit spark on the wall side. Lane D shows the word.
+        /// </summary>
+        private void SpawnBlocked(ref FxEvent e, World w, double t, uint seed)
+        {
+            if (e.A < 0 || e.A >= w.ActorCount) return;
+            double h = Ground(e.X, e.Z);
+            double r = _cfg.Class(e.Cls).Radius;
+            int why = (int)Math.Round(e.Value);
+            Vector3 contact = W(e.X - e.DirX * r, h + 0.95, e.Z - e.DirZ * r);
+            if (why == PlayerReasons.BlockedDodge)
+            {
+                ref Trail tr = ref _trails[_nt++ % MaxTrails];
+                tr.Born = t;
+                tr.P = W(e.X, h, e.Z);
+                tr.Facing = (float)Math.Atan2(e.DirZ, e.DirX);
+                tr.Arc = 0;
+                tr.Radius = (float)r;
+                tr.Team = e.Team == TeamId.Azure ? AzureC : CrimsonC;
+                tr.Kind = TrailDodge;
+                tr.Actor = e.A;
+                tr.SwingTick = -1;
+                tr.Local = e.Local;
+                tr.Crit = false;
+                for (int k = 0; k < 4; k++) AddPuff(t, W(e.X, h + 0.1, e.Z), seed, (uint)(k + 90), 0.34f, DustLight, 2, -e.DirZ, e.DirX);
+                // fix round (defect 6): plus a white camera-facing ring round the dodger's body: the dodge reads at a glance
+                AddRing(t, W(e.X, h + 1.0, e.Z), 0.5f, e.Local ? 1.5f : 1.2f, 0.12f, S(0.32), SparkWhite, 5);
+            }
+            else if (why == PlayerReasons.BlockedWall)
+            {
+                for (int k = 0; k < 4; k++) AddSpark(t, contact, -e.DirX, -e.DirZ, seed, (uint)k, 7);
+            }
+            else if (why == PlayerReasons.BlockedShield) { /* the Hit decoded as a Block draws the block look */ }
+            else if (why == PlayerReasons.BlockedGlancing)
+            {
+                for (int k = 0; k < 3; k++) AddSpark(t, contact, -e.DirX, -e.DirZ, seed, (uint)k, 2);
+            }
+            else if (why != PlayerReasons.BlockedPassive)
+            {
+                AddRing(t, contact, 0.35f, e.Local ? 0.95f : 0.75f, 0.1f, S(0.24), Steel, 5);
+                for (int k = 0; k < 4; k++) AddSpark(t, contact, -e.DirX, -e.DirZ, seed, (uint)k, 2);
+            }
+        }
+
+        /// <summary>
+        /// px lane C: a structure answers a swing (StructureHit): chips and sparks burst at the cell face toward the
+        /// attacker (wood for barricades and pieces, stone for walls and breakables); cannot-break rock (StructureSolid,
+        /// Value 0) gives a dull grit spark and a small dust puff only. The wall shake and crack step come from StructureHits.
+        /// </summary>
+        /// <summary>
+        /// Lane C fix round (defect 8: the dig read as a 20 px puff, the hole not visible): a dig hits the CELL: earth chips
+        /// thrown up, a dust burst, a dark fresh-earth patch over the cell with a light rim for DigMarkSeconds; a placed block
+        /// gets a pale rim and a puff. (X, Z) = the cell centre.
+        /// </summary>
+        private void SpawnDig(ref FxEvent e, World w, double t, uint seed)
+        {
+            double h = Ground(e.X, e.Z);
+            Vector3 c = W(e.X, h + 0.05, e.Z);
+            bool own = e.A == LocalSeat.Actor;
+            if ((int)e.Value == 1)
+            {
+                for (int k = 0; k < (own ? 8 : 5); k++) AddChunk(t, c + Vector3.up * 0.2f, 0.35f, seed, (uint)k, 0, 0.55f, 1f);
+                for (int k = 0; k < 4; k++) AddPuff(t, c + Vector3.up * 0.15f, seed, (uint)(k + 40), own ? 0.55f : 0.42f, DustMid, 1);
+                AddBurst(t, c + Vector3.up * 0.3f, own ? 0.85f : 0.6f, 0, seed, Vector3.zero, S(0.2));
+                AddRing(t, c, 0.5f, 0.5f, 0.08f, S(DigMarkSeconds), DigEarth, 6);
+            }
+            else
+            {
+                for (int k = 0; k < 3; k++) AddPuff(t, c + Vector3.up * 0.4f, seed, (uint)(k + 40), 0.4f, DustLight, 1);
+                AddRing(t, c + Vector3.up * 1.0f, 0.5f, 0.5f, 0.08f, S(0.6), DigRim, 6);
+            }
+        }
+
+        /// <summary>Lane C fix round: how long the fresh-earth patch stays on a dug cell (s wall), and its colours.</summary>
+        public const double DigMarkSeconds = 1.1;
+        public static readonly Color32 DigEarth = new Color32(46, 30, 20, 255), DigRim = new Color32(236, 214, 170, 255);
+
+        private void SpawnStructureHit(ref FxEvent e, World w, double t, uint seed)
+        {
+            double h = Ground(e.X, e.Z);
+            Vector3 face = W(e.X - e.DirX * 0.5, h + 0.85, e.Z - e.DirZ * 0.5);
+            if (e.B == PlayerReasons.StructureSolid || e.Value <= 0)
+            {
+                for (int k = 0; k < 3; k++) AddSpark(t, face, -e.DirX, -e.DirZ, seed, (uint)k, 7);
+                AddPuff(t, face, seed, 33, 0.3f, DustMid, 1);
+                return;
+            }
+            bool wood = e.B == PlayerReasons.StructureBarricade || e.B == PlayerReasons.StructurePiece;
+            bool own = e.A == LocalSeat.Actor;
+            int n = own ? 6 : 4;
+            for (int k = 0; k < n; k++) AddChunk(t, face, 0.3f, seed, (uint)k, wood ? (byte)1 : (byte)0, 0.5f, 0.8f);
+            for (int k = 0; k < n; k++) AddSpark(t, face, -e.DirX, -e.DirZ, seed, (uint)(k + 10), wood ? (byte)7 : (byte)1);
+            AddPuff(t, face, seed, 34, 0.38f, DustMid, 1);
+            if (own) AddBurst(t, face, 0.6f, 0, seed, Vector3.down, S(0.16));
         }
 
         private void AddPuff(double t, Vector3 p, uint seed, uint k, float size, Color32 col, byte kind, double dirX = 0, double dirZ = 0)
@@ -749,6 +967,29 @@ namespace CriticalMass.Runtime.View.Effects
                 float rad = Mathf.Lerp(r.R0, r.R1, e);
                 float wd = r.Width * (1f - 0.6f * t);
                 float fade = 1f - t * t;
+                if (r.Kind == 6)
+                {
+                    // lane C fix round: a dug (or placed) cell: a flat square over the cell (dark fresh earth, or none for a
+                    // placed block) with a light rim, holding then fading over the last 40% of its life.
+                    float hf = t < 0.6f ? 1f : 1f - (t - 0.6f) / 0.4f;
+                    Vector3 cc = r.P + Vector3.up * lift;
+                    float half = r.R0;
+                    if (r.Col.r < 128) ground.Quad(cc, gr * half, gu * half, A(r.Col, hf * 0.85f), A(r.Col, hf * 0.85f));
+                    Color32 rim = r.Col.r < 128 ? DigRim : r.Col;
+                    float b = 0.07f;
+                    ground.Quad(cc + gu * (half - b), gr * half, gu * b, A(rim, hf), A(rim, hf));
+                    ground.Quad(cc - gu * (half - b), gr * half, gu * b, A(rim, hf), A(rim, hf));
+                    ground.Quad(cc + gr * (half - b), gr * b, gu * half, A(rim, hf), A(rim, hf));
+                    ground.Quad(cc - gr * (half - b), gr * b, gu * half, A(rim, hf), A(rim, hf));
+                    continue;
+                }
+                if (r.Kind == 5)
+                {
+                    // px lane C: blocked-hit shimmer: a camera-facing ring at the contact point, steel then white.
+                    air.Ring(r.P, camRight, camUp, rad - wd * 0.5f - 0.03f, rad + wd * 0.5f + 0.03f, 0, Mathf.PI * 2f, 12, A(Navy, fade * 0.7f));
+                    air.Ring(r.P, camRight, camUp, rad - wd * 0.5f, rad + wd * 0.5f, 0, Mathf.PI * 2f, 12, A(t < 0.35f ? SparkWhite : r.Col, fade));
+                    continue;
+                }
                 if (r.Kind == 3)
                 {
                     // Shield ripple: the struck arc pushed outward, navy then steel-white.
@@ -769,7 +1010,7 @@ namespace CriticalMass.Runtime.View.Effects
             DrawShields(w, air, now);
             BuildBoomGround(now, ground);
 
-            BuildTrails(now, air, gr, gu);
+            BuildTrails(now, w, air, gr, gu);
             BuildBursts(now, air, camRight, camUp);
 
             // Blood droplets in flight: teardrops stretched along their own velocity, navy rims (GORE Full and Reduced).
@@ -943,18 +1184,72 @@ namespace CriticalMass.Runtime.View.Effects
 
         // ---- per-class weapon trails ----
 
-        private void BuildTrails(double now, FxMeshBuilder air, Vector3 gr, Vector3 gu)
+        private void BuildTrails(double now, World w, FxMeshBuilder air, Vector3 gr, Vector3 gu)
         {
             for (int i = 0; i < MaxTrails; i++)
             {
                 ref Trail tr = ref _trails[i];
+                // px lane C: until the contact the slash follows the LIVE SwingFacing and the swinger's body (lane S1's tracking)
+                if (w != null && tr.Kind < TrailWhiff && tr.Actor >= 0 && tr.Actor < w.ActorCount)
+                {
+                    Actor sa = w.Actors[tr.Actor];
+                    if (sa.SwingTick == tr.SwingTick && sa.SwingPending)
+                    {
+                        tr.Facing = (float)sa.SwingFacing;
+                        double sx = w.PrevX[tr.Actor] + (w.X[tr.Actor] - w.PrevX[tr.Actor]) * Alpha, sz = w.PrevZ[tr.Actor] + (w.Z[tr.Actor] - w.PrevZ[tr.Actor]) * Alpha;
+                        tr.P = W(sx, Ground(sx, sz), sz);
+                    }
+                }
                 double age = now - tr.Born;
-                if (age < 0 || age >= TrailLife) continue;
-                float t = (float)(age / TrailLife);
+                double life = tr.Kind == TrailDodge ? S(DodgeTrailSeconds) : tr.Kind == TrailWhiff ? S(WhiffTrailSeconds) : TrailLife;
+                if (age < 0 || age >= life) continue;
+                float t = (float)(age / life);
                 float sweep = Mathf.Clamp01(t / 0.55f);
                 sweep = 1f - (1f - sweep) * (1f - sweep);
                 float fade = t < 0.55f ? 1f : 1f - (t - 0.55f) / 0.45f;
                 Vector3 fwd = W(Math.Cos(tr.Facing), 0, Math.Sin(tr.Facing)).normalized;
+                if (tr.Kind == TrailWhiff)
+                {
+                    // a miss: a thin pale wind streak at the true reach that runs PAST the arc's end (over-rotation)
+                    float centre = -tr.Facing, half = tr.Arc * 0.5f;
+                    float a0 = centre + half, a1 = centre - half * 1.45f;
+                    float head = Mathf.Lerp(a0, a1, sweep), tail = Mathf.Lerp(a0, head, Mathf.Clamp01(t * 1.3f));
+                    // fix round (item 5): the streak was too faint: navy rim + full white, 2.5x wider, an inner second band
+                    float k = tr.Local ? 1f : 0.6f;
+                    Vector3 cw = tr.P + Vector3.up * 0.9f;
+                    air.Crescent(cw, gr, gu, tr.Radius, 0.22f, tail, head, 14, A(Navy, 0), A(Navy, fade * k * 0.75f));
+                    air.Crescent(cw, gr, gu, tr.Radius, 0.17f, tail, head, 14, A(SparkWhite, 0), A(SparkWhite, fade * k));
+                    air.Crescent(cw + Vector3.up * 0.22f, gr, gu, tr.Radius * 0.84f, 0.1f, tail, head, 12, A(SparkWhite, 0), A(SparkWhite, fade * k * 0.8f));
+                    continue;
+                }
+                if (tr.Kind == TrailDodge)
+                {
+                    // a dodge: five after-image speed lines through the dodger, across the attack line, navy-rimmed team colour
+                    // with a white core (fix round: 0.36 s, about 2x longer and 2x thicker; the old lines were never seen)
+                    Vector3 across = Vector3.Cross(Vector3.up, fwd).normalized;
+                    float dfade = 1f - t * t;
+                    for (int k = 0; k < 5; k++)
+                    {
+                        Vector3 mid = tr.P + Vector3.up * (0.35f + 0.42f * k) - across * (0.3f + 0.7f * t);
+                        float len = 0.9f * (1f - 0.35f * t);
+                        air.Quad(mid, across * (len + 0.06f), Vector3.up * 0.11f, A(Navy, dfade * 0.7f), A(Navy, 0));
+                        air.Quad(mid, across * len, Vector3.up * 0.08f, A(tr.Team, dfade), A(tr.Team, 0));
+                        air.Quad(mid, across * (len * 0.8f), Vector3.up * 0.03f, A(SparkWhite, dfade), A(SparkWhite, 0));
+                    }
+                    continue;
+                }
+                // px lane C: the weapon-coloured reach arc at chest height across the widened arc: where the hit really lands
+                {
+                    float centre = -tr.Facing, half = tr.Arc * 0.5f;
+                    float head = Mathf.Lerp(centre + half, centre - half, sweep), tail = Mathf.Lerp(centre + half, head, Mathf.Clamp01(t * 1.4f));
+                    Color32 wc = tr.Crit ? tr.Team : ClassTrailColour((ClassId)tr.Kind, tr.Team);
+                    Vector3 cr = tr.P + Vector3.up * 0.95f;
+                    float k = tr.Local ? 1f : 0.7f;
+                    air.Crescent(cr, gr, gu, tr.Radius, 0.1f, tail, head, 14, A(Navy, 0), A(Navy, fade * 0.7f * k));
+                    air.Crescent(cr, gr, gu, tr.Radius, 0.06f, tail, head, 14, A(wc, 0), A(wc, fade * k));
+                }
+                // the class chops (Miner, Builder, Demolitions) come down AT the true reach: their arc centre moves forward
+                float chopShift = Mathf.Max(0f, tr.Radius - 0.95f);
                 switch ((ClassId)tr.Kind)
                 {
                     case ClassId.Warrior:
@@ -987,7 +1282,7 @@ namespace CriticalMass.Runtime.View.Effects
                     {
                         // Heavy diagonal haymaker in hot orange, with a puff of smoke where it ends.
                         Vector3 up = (Vector3.up + Vector3.Cross(Vector3.up, fwd)).normalized;
-                        Vector3 c = tr.P + Vector3.up * 0.8f;
+                        Vector3 c = tr.P + Vector3.up * 0.8f + fwd * chopShift;
                         float a0 = 2.1f, a1 = -0.5f;
                         float head = Mathf.Lerp(a0, a1, sweep);
                         float tail = Mathf.Lerp(a0, head, Mathf.Clamp01(t * 1.4f));
@@ -1006,7 +1301,7 @@ namespace CriticalMass.Runtime.View.Effects
                     case ClassId.Builder:
                     {
                         // Hammer: a short, tight overhead arc in wood tones with a white edge.
-                        Vector3 c = tr.P + Vector3.up * 0.7f;
+                        Vector3 c = tr.P + Vector3.up * 0.7f + fwd * Mathf.Max(0f, tr.Radius - 0.72f);
                         float a0 = 1.7f, a1 = -0.2f;
                         float head = Mathf.Lerp(a0, a1, sweep);
                         float tail = Mathf.Lerp(a0, head, Mathf.Clamp01(t * 1.5f));
@@ -1018,7 +1313,7 @@ namespace CriticalMass.Runtime.View.Effects
                     default:
                     {
                         // Miner pick: a vertical chop arc, overhead behind to low in front, yellow and white.
-                        Vector3 c = tr.P + Vector3.up * 0.75f;
+                        Vector3 c = tr.P + Vector3.up * 0.75f + fwd * chopShift;
                         float a0 = 1.9f, a1 = -0.35f;
                         float head = Mathf.Lerp(a0, a1, sweep);
                         float tail = Mathf.Lerp(a0, head, Mathf.Clamp01(t * 1.4f));
@@ -1028,6 +1323,19 @@ namespace CriticalMass.Runtime.View.Effects
                         break;
                     }
                 }
+            }
+        }
+
+        /// <summary>px lane C: the weapon colour of a class's slash (the class trail's own tone).</summary>
+        private static Color32 ClassTrailColour(ClassId c, Color32 team)
+        {
+            switch (c)
+            {
+                case ClassId.Farmer: return HarvestGold;
+                case ClassId.Demolitions: return WarnHot;
+                case ClassId.Builder: return WoodLight;
+                case ClassId.Warrior: return team;
+                default: return SparkYellow;
             }
         }
 
@@ -1113,7 +1421,9 @@ namespace CriticalMass.Runtime.View.Effects
                 int left = a.SwingTick + a.SwingWindup - w.Tick;
                 if (left <= 0) continue;
                 ClassConfig cc = _cfg.Class(a.Cls);
-                float reach = (float)cc.AttackRange, half = (float)(cc.AttackArcDeg * 0.5 * Math.PI / 180);
+                // px lane C: the wedge is the TRUE hit shape: a body whose centre (its ground ring) is inside it is hit
+                // (range + body widening, the arc widened by asin(r / d) at the edge), along the LIVE SwingFacing.
+                float reach = (float)CriticalMass.Runtime.View.Anim.HitFeelTuning.SimReach(_cfg, a.Cls), half = (float)CriticalMass.Runtime.View.Anim.HitFeelTuning.DrawnHalfArc(_cfg, a.Cls);
                 float p = Mathf.Clamp01((float)((a.SwingWindup - left + Alpha) / a.SwingWindup));
                 double x = w.PrevX[i] + (w.X[i] - w.PrevX[i]) * Alpha, z = w.PrevZ[i] + (w.Z[i] - w.PrevZ[i]) * Alpha;
                 // b15 view polish r2: (c) the wedge is secondary and sits on the local walking surface (over the hill
@@ -1126,7 +1436,7 @@ namespace CriticalMass.Runtime.View.Effects
                 {
                     double dx = w.X[me] - w.X[i], dz = w.Z[me] - w.Z[i], d = Math.Sqrt(dx * dx + dz * dz);
                     double off = Math.Abs(Math.IEEERemainder(Math.Atan2(dz, dx) - a.SwingFacing, Math.PI * 2));
-                    atMe = d <= reach + _cfg.Class(w.Actors[me].Cls).Radius && off <= half;
+                    atMe = d <= reach && off <= half;
                 }
                 // b15 view polish (Editor review item 3): invisible at the gameplay camera (team-tinted fill at 0.07..0.16 x
                 // 0.55). Now neutral (ImpactPalette sand / cream, never a team hue), about three times as opaque, from closer

@@ -578,6 +578,34 @@ namespace CriticalMass.Runtime.Hud.Mechanics
 
         // ------------------------------------------------------------------ stun, dodge, jump hint
 
+        /// <summary>
+        /// Review fix round 2 (pass-2: STUNNED drawn over my own fighter in top-down): the pill sits in MY word row above my
+        /// head (second row, over a BLOCKED / DODGED word in the first), clear of the body; screen-fixed only without a
+        /// camera. Same anchor math as the player HUD (screen px / scale, Hud/Player/UnitStack).
+        /// </summary>
+        void PlaceStun(World w, int me)
+        {
+            UnityEngine.Camera cam = UnityEngine.Camera.main;
+            float sf = _canvas != null && _canvas.scaleFactor > 0f ? _canvas.scaleFactor : 1f;
+            if (_stun.anchorMin != new Vector2(0.5f, 0.5f)) { _stun.anchorMin = _stun.anchorMax = _stun.pivot = new Vector2(0.5f, 0.5f); }
+            Vector2 at = new Vector2(0f, -(600f + 26f - HudLayout.RefH * 0.5f));
+            double alpha = _driver != null ? _driver.Alpha : 1.0;
+            Vector3 head = CriticalMass.Runtime.Hud.Player.PxProject.Actor(w, me, alpha, CriticalMass.Runtime.Hud.Player.HealthBars.Lift);
+            if (cam != null)
+            {
+                Vector3 sp = cam.WorldToScreenPoint(head);
+                if (sp.z > 0f)
+                {
+                    float tag = CriticalMass.Runtime.Hud.Player.PxProject.ThirdPerson ? CriticalMass.Runtime.Camera.TagLens.Scale((head - cam.transform.position).magnitude) : 1f;
+                    Vector2 local = (new Vector2(sp.x, sp.y) - cam.pixelRect.center) / sf;
+                    float up = CriticalMass.Runtime.Hud.Player.UnitStack.TagRowUp(tag, 1) + (52f - CriticalMass.Runtime.Hud.Player.UnitStack.PillH) * 0.5f;
+                    float halfW = HudLayout.RefW * 0.5f - 130f, halfH = HudLayout.RefH * 0.5f - 40f;
+                    at = new Vector2(Mathf.Clamp(local.x, -halfW, halfW), Mathf.Clamp(local.y + up, -halfH, halfH));
+                }
+            }
+            _stun.anchoredPosition = at;
+        }
+
         void TickStatus(World w, MechanicsWorldView view, int me, float realNow)
         {
             MechFeed f = view.Feed;
@@ -590,8 +618,18 @@ namespace CriticalMass.Runtime.Hud.Mechanics
                 stunned = alive;   // the sim's own stun (CM_SIM_PHYSICS): exact, frame for frame
                 stunLeft = (float)(ticksLeft / ticksLen);
             }
+            // review fix round (defect 13): the Miner's hit stun is the plain HitStun counter (no MechPhysics stun, no feed
+            // entry): read it too, so every class shows STUNNED when staggered
+            else if (!stunned && alive && w.Actors[me].HitStunTicks > 0 && w.Actors[me].HitStunLen > 0)
+            {
+                stunned = true;
+                stunLeft = Mathf.Clamp01(w.Actors[me].HitStunTicks / (float)w.Actors[me].HitStunLen);
+            }
+            // review fix round (defect 6): a hit my shield or dodge took says BLOCKED / DODGED in my word row, not STUNNED
+            CriticalMass.Runtime.Hud.Player.PlayerHud px = CriticalMass.Runtime.Hud.Player.PlayerHud.Current;
+            if (stunned && px != null && px.DefendedRecently) stunned = false;
             if (_stun.gameObject.activeSelf != stunned) _stun.gameObject.SetActive(stunned);
-            if (stunned) _stunPie.Fill01 = stunLeft;
+            if (stunned) { _stunPie.Fill01 = stunLeft; PlaceStun(w, me); }
 
             if (f.Dodges != _seenDodges)
             {

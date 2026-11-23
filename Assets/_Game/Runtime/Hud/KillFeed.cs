@@ -404,6 +404,9 @@ namespace CriticalMass.Runtime.Hud
         public void Push(CombatEvent e, int localActor, KaijuState kaiju)
         {
             if (Canvas == null) Build();
+            // player-experience lane D (agency audit A7): MY line is pinned: it never waits in (or is dropped from) the
+            // queue; it shows at once and takes the oldest line that is not mine.
+            if (e.Actor == localActor || e.Other == localActor) { Show(e, localActor, kaiju); return; }
             if (_queueCount > 0 || !RowFree())
             {
                 if (_queueCount == QueueCap) { _queueHead = (_queueHead + 1) % QueueCap; _queueCount--; }
@@ -419,8 +422,16 @@ namespace CriticalMass.Runtime.Hud
 
         void Show(CombatEvent e, int localActor, KaijuState kaiju)
         {
-            int slotIx = _order[Lines - 1];
-            for (int r = Lines - 1; r > 0; r--) _order[r] = _order[r - 1];
+            // player-experience lane D: the line recycled is the oldest one that is not the player's own (own lines are
+            // pinned for their LineSeconds); only when all five are own does the oldest own line go.
+            int from = Lines - 1;
+            for (int r = Lines - 1; r >= 0; r--)
+            {
+                Slot o = _slots[_order[r]];
+                if (!o.Active || !o.Own) { from = r; break; }
+            }
+            int slotIx = _order[from];
+            for (int r = from; r > 0; r--) _order[r] = _order[r - 1];
             _order[0] = slotIx;
             Slot s = _slots[slotIx];
             bool own = e.Actor == localActor || e.Other == localActor;

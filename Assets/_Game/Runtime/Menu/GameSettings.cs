@@ -54,6 +54,10 @@ namespace CriticalMass.Runtime.Menu
         /// <summary>Reduce motion (1 on, default 0): no camera shake, no combat zoom, no Kaiju spotlight.</summary>
         public const string ReduceMotionKey = "cm.reducedMotion";   // one key: StoryIntro, AttractMode, big moments and world reactions read it too
         public const string DamageNumbersKey = "cm.damagenumbers";
+        /// <summary>px lane C (2026-11-22): the directional hit kick's scale (0 off .. 1.5; default 1). Separate from the
+        /// accessibility CAMERA SHAKE slider; REDUCE MOTION zeroes the kick whatever this says.</summary>
+        public const string HitKickKey = "cm.access.hitKick";
+        public const float HitKickMax = 1.5f, HitKickDefault = 1f;
         public const string BloodKey = "cm.blood";
         /// <summary>GORE intensity (2 Full, the default; 1 Reduced; 0 Off).</summary>
         public const string GoreKey = "cm.gore";
@@ -84,7 +88,7 @@ namespace CriticalMass.Runtime.Menu
         {
             MasterKey, MusicKey, EffectsKey, MuteMusicKey, MuteEffectsKey, MuteInBackgroundKey, AnnouncerKey, LessSoundKey, ColourBlindTeamsKey, WidthKey, HeightKey, FullScreenKey, VSyncKey, QualityKey, ShakeKey,
             DamageNumbersKey, BloodKey, GoreKey, FpsCapKey, BgThrottleKey, MoveAssistKey, KeysFollowMapKey, CancelButtonKey, GroundCameraKey, "cm.camera.heading", CameraViewKey, CameraManualKey, CameraSensKey, CameraFovKey, CameraInvertYKey, PrefsVersionKey,
-            ShakeScaleKey, ReduceFlashingKey, IntenseFlashingKey, ReduceMotionKey, IntroAtLaunchKey, IntroSubtitlesKey,
+            ShakeScaleKey, ReduceFlashingKey, IntenseFlashingKey, ReduceMotionKey, IntroAtLaunchKey, IntroSubtitlesKey, HitKickKey,
         };
 
         public const string MixerResource = "Audio/CMMixer";
@@ -186,6 +190,13 @@ namespace CriticalMass.Runtime.Menu
         public static bool ReducedMotion { get => ReduceMotion; set => ReduceMotion = value; }
         /// <summary>Floating damage numbers shown.</summary>
         public static bool DamageNumbers { get => GetB(DamageNumbersKey, true); set => SetB(DamageNumbersKey, value); }
+        /// <summary>px lane C: the hit kick scale (HitKickKey), clamped 0..HitKickMax; tests may pin it with HitKickOverride.</summary>
+        public static float HitKickScale
+        {
+            get => HitKickOverride ?? Mathf.Clamp(GetF(HitKickKey, HitKickDefault), 0f, HitKickMax);
+            set => SetF(HitKickKey, Mathf.Clamp(value, 0f, HitKickMax));
+        }
+        public static float? HitKickOverride;
         /// <summary>Blood effects on: any GORE level but Off (older callers; setting it picks GORE Full or Off).</summary>
         public static bool Blood
         {
@@ -243,6 +254,10 @@ namespace CriticalMass.Runtime.Menu
             }
             set
             {
+                // lane C fix round (review defect 12, the owner's ruling: first person is hidden): with the switch off the
+                // setter refuses FirstPerson and stores THIRD PERSON, so nothing can ask for a view the game does not give.
+                if (value == CriticalMass.Runtime.Camera.CameraView.FirstPerson && !CriticalMass.Runtime.Camera.FollowCamera.FirstPersonEnabled)
+                    value = CriticalMass.Runtime.Camera.CameraView.ThirdPerson;
                 if (value != CriticalMass.Runtime.Camera.CameraView.TopDown) PlayerPrefs.SetInt(CameraViewKey, (int)value);
                 SetB(GroundCameraKey, value != CriticalMass.Runtime.Camera.CameraView.TopDown);
             }

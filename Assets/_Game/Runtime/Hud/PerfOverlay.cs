@@ -115,7 +115,8 @@ namespace CriticalMass.Runtime.Hud
             }
 
             Keyboard kb = Keyboard.current;
-            if (kb != null && kb.f3Key.wasPressedThisFrame)
+            // player-experience lane D: F3 only in the Editor, development builds or with -debugHud (Player/DebugGate.cs)
+            if (kb != null && kb.f3Key.wasPressedThisFrame && CriticalMass.Runtime.Hud.Player.DebugGate.Allowed)
             {
                 Visible = !Visible;
                 if (Visible) StartRecorders(false);

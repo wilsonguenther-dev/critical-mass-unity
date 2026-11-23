@@ -313,7 +313,8 @@ namespace CriticalMass.Runtime.View.Moments
             DebugKeys();
             if (_galleryAt >= 0) StepGallery(now);
 
-            _queue.Held = FullPanelUp(paused);   // fix/hud-containment-4: never over the recap, results, pause or settings
+            // review fix round 2: a takeover never starts while the local player fights (PxFight); it waits, then plays
+            _queue.Held = FullPanelUp(paused) || (CriticalMass.Runtime.Hud.Player.PxFight.Active && !_queue.Playing);   // fix/hud-containment-4: never over the recap, results, pause or settings
             _queue.Update(now, Banner.IsOpen);
             if (_seen != _queue.Version)
             {

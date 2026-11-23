@@ -528,7 +528,7 @@ namespace CriticalMass.Sim.Tests.Net
             {
                 { RulesProfile.Classic, 0x5C912AEED16BC302UL },
                 { RulesProfile.PhysicsOnly, 0x0836DA5FD21C4854UL },
-                { RulesProfile.Full, 0x0B1E594CAC2A34E0UL },   // batch 16 combined (sim run 44953083481); chat alone matched the base 0x48A817A4B2B3F068
+                { RulesProfile.Full, 0x2873C138B069629AUL },   // player-experience combine 2026-11-22 (was 0x0B1E594CAC2A34E0): batch 16 combined (sim run 44953083481); chat alone matched the base 0x48A817A4B2B3F068
             };
             foreach (KeyValuePair<RulesProfile, ulong> kv in pins)
             {
@@ -546,7 +546,7 @@ namespace CriticalMass.Sim.Tests.Net
             {
                 { RulesProfile.Classic, 0x2980068FA0457CC2UL },
                 { RulesProfile.PhysicsOnly, 0x780B92B03E6FFEAEUL },
-                { RulesProfile.Full, 0xC01D547484A56516UL },   // batch 16 combined (sim run 44955919924; the merge alone 0xF41666EAD7BC9994); chat alone matched the base 0x1978E881F4005F28
+                { RulesProfile.Full, 0x98AFF3A3316ED55FUL },   // batch 16 combined (sim run 44955919924; the merge alone 0xF41666EAD7BC9994); chat alone matched the base 0x1978E881F4005F28
             };
             foreach (KeyValuePair<RulesProfile, ulong> kv in pins)
             {

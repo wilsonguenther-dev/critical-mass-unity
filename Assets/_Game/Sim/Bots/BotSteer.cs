@@ -391,7 +391,7 @@ namespace CriticalMass.Sim.Bots
             double d2 = dx * dx + dz * dz;
             if (d2 < 1e-12) return true;
             double f = w.Actors[id].Facing;
-            return (dx * JsMath.Cos(f) + dz * JsMath.Sin(f)) / Math.Sqrt(d2) >= AttackCos - 1e-9;
+            return (dx * JsMath.Cos(f) + dz * JsMath.Sin(f)) / Math.Sqrt(d2) >= BotAim.PressCos(w, id, AttackCos) - 1e-9;   // px S1 [2]: class arc
         }
 
         /// <summary>
@@ -625,7 +625,9 @@ namespace CriticalMass.Sim.Bots
                         reach = CombatFeel.BotReach(w, a.Cls, cc.AttackRange) + AttackSlack; // b15: the Healer keeps her stand-off
                         // DG-69: with a wind-up the bot swings at where the target will be on the contact tick.
                         int windup = w.Dur.AttackWindup[(int)a.Cls];
-                        if (windup > 0)
+                        // px S1 [2]: human limits: the target where it was BotMeleeAimDelayTicks ago, its lead and aim error.
+                        if (BotAim.On(w) && (!w.Config.Depth.CombatFeel.BotAimHumansOnly || BotAim.IsHumanSeat(w, t))) BotAim.Perceive(w, st, id, t, windup, out tx, out tz);
+                        else if (windup > 0)
                         {
                             // b15 combat feel: the lead is capped at BotLeadSeconds. A 0.40 s wind-up led the whole way swung the
                             // chase point across a knocked or strafing target, so the bot walked back and forth (shiver gate run
@@ -1102,7 +1104,7 @@ namespace CriticalMass.Sim.Bots
             // that would mend is kept); every other class, and the rule off, is unchanged.
             if (output.Attack && !LightWeapons.BotKeepsPress(w, id, aimX, aimZ)) output.Attack = false;
             // DG-21 hesitation: an Easy bot holds its swing in SwingHesitation of 1/3-second windows (never for Normal).
-            if (output.Attack && BotSkill.HoldsSwing(w, id)) output.Attack = false;
+            if (output.Attack && BotSkill.HoldsSwing(w, id, st.Target[id])) output.Attack = false;
             // Sim-physics lane (DG-84 / DG-85): a Hard bot steps out of a telegraphed claw cone or slam ring, and jumps a slam.
             BotSkillConfig dsk = BotSkill.Profile(w, id);
             // b15 bot brain: a kiter uses the dodge step and the slam jump at every skill level.

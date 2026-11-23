@@ -129,6 +129,13 @@ namespace CriticalMass.Runtime.View.Effects
             { FxKind.Explosion, FeelGating.Flashing | FeelGating.Shake },   // effects v2 / DG-22 blasts
             { FxKind.Splash, FeelGating.None },
             { FxKind.Land, FeelGating.None },
+            // px lane C (2026-11-22): the swing's contact (whiff streak / follow-through), feints, blocked hits and structure hits
+            { FxKind.Contact, FeelGating.None },
+            { FxKind.Feint, FeelGating.None },
+            { FxKind.Blocked, FeelGating.None },
+            { FxKind.StructureHit, FeelGating.None },
+            { FxKind.Critical, FeelGating.None },
+            { FxKind.Dig, FeelGating.None },
         };
 
         static readonly Dictionary<FeelEffect, FeelGating> EffectTable = new Dictionary<FeelEffect, FeelGating>

@@ -118,7 +118,9 @@ namespace CriticalMass.Runtime.Menus
             if (launch == null) return;
             MatchSetupChoice c = launch.Choice;
             ModeInfo info = PlayModes.Info(c.Mode);
-            if (_cfg == null) _cfg = GameConfig.CreateDefault();
+            // px lane F: the rows show the real roster, so the mode's rules (a duel's enemy class) go on the preview config too.
+            _cfg = GameConfig.CreateDefault();
+            PlayModes.Rules(c).ApplyTo(_cfg);
             int n = World.ClampTeamSize(_cfg, c.TeamSize);
             if (n > MaxRows) n = MaxRows;
             _rowsPerSide = n;
@@ -218,6 +220,8 @@ namespace CriticalMass.Runtime.Menus
                 case MatchMode.Spectate: return "Watch both teams fight for the hill. Most hill time at the final whistle wins.";
                 case MatchMode.Practice: return "No pressure: the bots never target you. Learn the hill, the egg and your class.";
                 case MatchMode.Training: return "Follow " + Hud.MascotGuide.MascotName + ". One step at a time, then a real fight.";
+                case MatchMode.Duel: return "One on one on the real map. Knock them off the hill: most hill time at 3:00 wins.";
+                case MatchMode.Range: return "Hit the dummy, try every button, switch class at respawn. Nothing scores and nothing here can make you lose.";
                 default: return "Hold the hill with more fighters than they have. Feed the egg and the Kaiju fights for you.";
             }
         }
@@ -294,6 +298,11 @@ namespace CriticalMass.Runtime.Menus
             if (l.BackTo == LobbyScreen.ClassSelect)
             {
                 PlayFlow.PickClass(Director, l.Choice.Mode);
+                return;
+            }
+            if (l.BackTo == LobbyScreen.Versus)
+            {
+                Director.ShowVersus(l.Choice.Mode);
                 return;
             }
             Director.ShowModes(l.Choice.Mode);

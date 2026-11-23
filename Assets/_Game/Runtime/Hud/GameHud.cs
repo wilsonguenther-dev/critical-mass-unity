@@ -97,6 +97,8 @@ namespace CriticalMass.Runtime.Hud
             LoadTimer.Part("hud minimap", t0);
             t0 = LoadTimer.Now();
             BuildDeath();
+            // player-experience lane D: the local player's combat HUD (bars, hit marker, direction, kills, tags, tally)
+            PlayerHud = new CriticalMass.Runtime.Hud.Player.PlayerHud(Root, _world, Clusters[(int)HudCluster.Player]);
             UpdateScale();
             LoadTimer.Part("hud death and scale", t0);
         }
@@ -410,7 +412,7 @@ namespace CriticalMass.Runtime.Hud
                 };
             }
             _hpNumber = Label(c, "HP Number", CMTokens.Mono, UiScale.TypeBody, Cream, TextAnchor.MiddleRight, 284f, 30f, 82f, 32f, "160", 2f);
-            _hpGhost = Shape(c, "HP Ghost", ShapeKind.RoundRect, 136f, 72f, 228f, 28f, Cream, -1f);
+            _hpGhost = Shape(c, "HP Ghost", ShapeKind.RoundRect, 136f, 72f, 228f, 28f, CriticalMass.Runtime.Hud.Player.PxPalette.Chunk, -1f);
             _hpGhost.EmptyColor = Empty;
             _hpBar = Shape(c, "HP Bar", ShapeKind.RoundRect, 136f, 72f, 228f, 28f, CMTokens.Azure.Color, -1f);
 
@@ -574,23 +576,13 @@ namespace CriticalMass.Runtime.Hud
 
         // ---------------------------------------------------------------- world layer
 
-        const int HeartRows = 24;
-        const int DamageNumbers = 12;
         const int Pointers = 2;
         RectTransform _world;
         VectorShape _hillMarker;
         Text _hillMarkerWord;
-        readonly RectTransform[] _heartRows = new RectTransform[HeartRows];
-        readonly VectorShape[,] _rowHearts = new VectorShape[HeartRows, Hearts];
-        readonly Text[] _dmg = new Text[DamageNumbers];
-        readonly float[] _dmgAge = new float[DamageNumbers];
-        readonly Vector3[] _dmgPos = new Vector3[DamageNumbers];
-        int _dmgNext;
         readonly RectTransform[] _ptr = new RectTransform[Pointers];
         readonly RectTransform[] _ptrArrow = new RectTransform[Pointers];
         readonly Text[] _ptrDist = new Text[Pointers];
-        double[] _lastHit = new double[64];
-        int _eventCursor = -1;
 
         void BuildWorldLayer()
         {
@@ -608,32 +600,7 @@ namespace CriticalMass.Runtime.Hud
             Icon(_hillMarker.transform, "Crown", UiIcons.Crown, 4f, 4f, 36f, 36f);
             _hillMarkerWord = Label(marker, "Word", CMTokens.Ui, UiScale.TypeMin, Cream, TextAnchor.MiddleCenter, 0f, 46f, 120f, 22f, "NEUTRAL", 2.5f);
 
-            for (int r = 0; r < HeartRows; r++)
-            {
-                RectTransform row = Rt(_world, "Hearts " + r);
-                Center(row, Hearts * 16f, 14f);
-                for (int i = 0; i < Hearts; i++)
-                {
-                    VectorShape h = Shape(row, "H" + i, ShapeKind.Heart, i * 16f, 0f, 14f, 13f, CMTokens.Azure.Color);
-                    h.OutlinePx = 2f;
-                    h.RimPx = 0f;
-                    h.EmptyColor = Empty;
-                    _rowHearts[r, i] = h;
-                }
-                row.gameObject.SetActive(false);
-                _heartRows[r] = row;
-            }
-            for (int i = 0; i < DamageNumbers; i++)
-            {
-                Text t = HudText.Make(_world, "Damage " + i, CMTokens.Mono, UiScale.TypeHeading, Cream, TextAnchor.MiddleCenter, 3f);
-                Center(t.rectTransform, 80f, 32f);
-                t.gameObject.SetActive(false);
-                _dmg[i] = t;
-                // M5: fade through the group alpha (no text mesh or 12-direction outline rebuild per frame).
-                _dmgFade[i] = t.gameObject.AddComponent<CanvasGroup>();
-                _dmgFade[i].interactable = false;
-                _dmgFade[i].blocksRaycasts = false;
-            }
+            // player-experience lane D: the overhead hearts became always-on health bars (Hud/Player/HealthBars.cs)
             for (int i = 0; i < Pointers; i++)
             {
                 RectTransform p = Rt(_world, "Pointer " + i);
@@ -654,10 +621,12 @@ namespace CriticalMass.Runtime.Hud
             }
         }
 
+        /// <summary>Player-experience lane D: the local player's combat HUD (Hud/Player/PlayerHud.cs).</summary>
+        public CriticalMass.Runtime.Hud.Player.PlayerHud PlayerHud { get; private set; }
+
         /// <summary>The nested canvases of the M5 split (tests read them).</summary>
         public Canvas WorldCanvas { get; private set; }
         public Canvas MinimapCanvas { get; private set; }
-        readonly CanvasGroup[] _dmgFade = new CanvasGroup[DamageNumbers];
 
         /// <summary>A nested canvas on rt: inherits the root's camera, sorting and scale; no raycaster (nothing to click).</summary>
         static Canvas NestedCanvas(RectTransform rt)
@@ -811,8 +780,9 @@ namespace CriticalMass.Runtime.Hud
         {
             HudText.Set(_clock, NumberCache.Mmss(s.ClockRemaining));
             _clock.color = s.ClockRemaining <= 60 ? CMTokens.ToolBrass.Color : Cream;
-            HudText.Set(_scoreA, NumberCache.Int(s.ScoreAzure));
-            HudText.Set(_scoreC, NumberCache.Int(s.ScoreCrimson));
+            // review fix round 3 (pass-3: "0 59:31 0" in the range): no score digits where nothing can score (no hill)
+            HudText.Set(_scoreA, s.NoHill ? string.Empty : NumberCache.Int(s.ScoreAzure));
+            HudText.Set(_scoreC, s.NoHill ? string.Empty : NumberCache.Int(s.ScoreCrimson));
             if (s.HillCap > 0)
             {
                 // b16 the hill count: "7/10 ON HILL" (weighted, a Warrior counts 2), brass at the cap so players learn it
@@ -834,13 +804,24 @@ namespace CriticalMass.Runtime.Hud
             _hillBar.SetFill(anyHeld ? CMTokens.Azure.Color : CMTokens.Stone.Color);
             _hillBar.SetEmpty(anyHeld ? CMTokens.Crimson.Color : CMTokens.Stone.Color);
             _hillBar.Fill01 = s.HillShareAzure;
-            _medallionHalf.gameObject.SetActive(s.Hill == HillState.Contested);
+            _medallionHalf.gameObject.SetActive(s.Hill == HillState.Contested && !s.NoHill);
+            // review fix round 3: the hill meter and its medallion (the painted hill ring of the top band) only where a hill is
+            if (_hillBar.gameObject.activeSelf == s.NoHill) _hillBar.gameObject.SetActive(!s.NoHill);
+            if (_medallion.gameObject.activeSelf == s.NoHill) _medallion.gameObject.SetActive(!s.NoHill);
             _medallion.SetFill(HillColour(s.Hill));
             // b15 D0: the owner's own Kaiju stands on the hill, so the owner scores nothing; the word says so from each side's
             // point of view (words, not colour alone: brass ink is a second cue)
             // b15 view polish (item 8): that state is now the pill under the hill meter (ApplyKaijuPill); the word stays the hill's.
-            HudText.Set(_hillWord, HillWord(s.Hill));
+            HudText.Set(_hillWord, s.NoHill ? string.Empty : HillWord(s.Hill));
             _hillWord.color = Cream;
+            if (s.NoHill)
+            {
+                // review fix round 2 (pass-2 N4): the range has no hill: no "HILL n/10", no on-hill counts, no pips
+                HudText.Set(_onHillA, string.Empty);
+                HudText.Set(_onHillC, string.Empty);
+                ApplyPips(_pipsA, 0, 0, false, CMTokens.Azure.Color);
+                ApplyPips(_pipsC, 0, 0, false, CMTokens.Crimson.Color);
+            }
             ApplyKaijuPill(s);
         }
 
@@ -872,6 +853,10 @@ namespace CriticalMass.Runtime.Hud
 
         void ApplyKaiju(HudState s)
         {
+            // review fix (lane F): no Kaiju in this mode (Duel, Practice Range): no egg countdown, no meter, no panel
+            RectTransform kc = Clusters[(int)HudCluster.Kaiju];
+            if (kc != null && kc.gameObject.activeSelf == s.NoKaiju) kc.gameObject.SetActive(!s.NoKaiju);
+            if (s.NoKaiju) return;
             bool egg = !s.Hatched || s.Kaiju == KaijuState.Egg;
             Color state = KaijuColour(s.Kaiju);
             _eggFrame.SetRim(egg ? CMTokens.EggSeam.Color : state);
@@ -914,12 +899,10 @@ namespace CriticalMass.Runtime.Hud
             // health: shown value drains toward the target, the cream ghost holds 0.4 s then follows
             float target = s.Alive ? s.Hp01 : 0f;
             if (_hpShown < 0) _hpShown = _hpGhostShown = target;
-            if (target < _hpGhostShown - 1e-4f && _ghostHold <= 0 && _hpShown - target > 1e-4f) _ghostHold = 0.4f;
-            _hpShown = Approach(_hpShown, target, dt * 2.5f);
-            _ghostHold -= dt;
-            if (_ghostHold <= 0) _hpGhostShown = Approach(_hpGhostShown, _hpShown, dt * 0.8f);
-            if (_hpGhostShown < _hpShown) _hpGhostShown = _hpShown;
-            _hpBar.SetFill(tc);
+            // player-experience lane D: the same chunk rule as the overhead bars (the fill drops at once, a white chunk holds
+            // 0.25 s, then drains); below 30% the bar takes the low-health colour and pulse (Hud/Player/HurtEdge.cs)
+            CriticalMass.Runtime.Hud.Player.HealthBars.Step(ref _hpShown, ref _hpGhostShown, ref _ghostHold, target, dt);
+            _hpBar.SetFill(PlayerHud != null && PlayerHud.Hurt.Low ? PlayerHud.Hurt.LowBarColour : tc);
             _hpBar.Fill01 = _hpShown;
             _hpGhost.Fill01 = _hpGhostShown;
             HudText.Set(_hpNumber, NumberCache.Int(Mathf.CeilToInt(s.Alive ? s.Hp : 0f)));
@@ -1099,6 +1082,9 @@ namespace CriticalMass.Runtime.Hud
             _ground.Watch(w.Map, w.GridVersion);
             if (_mapFog != null) _mapFog.Sync();
             _mapHill.SetFill(s.Hill == HillState.Neutral ? Navy : HillColour(s.Hill));
+            // review fix round 2 (pass-2 N4): no KAIJU on the minimap in a mode without one, no hill where there is none
+            if (_mapEgg.Rt.gameObject.activeSelf == s.NoKaiju) _mapEgg.Rt.gameObject.SetActive(!s.NoKaiju);
+            if (_mapHill.gameObject.activeSelf == s.NoHill) _mapHill.gameObject.SetActive(!s.NoHill);
             bool eggOnMap = !s.Hatched || s.Kaiju == KaijuState.Egg;
             _mapEgg.Set(eggOnMap ? UiIcons.MapEgg : KaijuIcon(s, false), _tier);
             if (s.Hatched) PlaceOnMap(_mapEgg.Rt, w.Kaiju.X, w.Kaiju.Z);
@@ -1184,63 +1170,12 @@ namespace CriticalMass.Runtime.Hud
             bool kOn = Project(cam, kWorld, out _);
             Pointer(1, cam, kWorld, kOn, s, w.Kaiju.X, w.Kaiju.Z, scale, sw, sh);
 
-            // events: damage numbers (local player's hits only) and the last-hit time for overhead hearts
-            if (_lastHit.Length < w.ActorCount) _lastHit = new double[w.ActorCount];
-            if (_eventCursor < 0 || _eventCursor > w.EventHead) _eventCursor = w.EventHead;
-            if (w.EventHead - _eventCursor > World.EventCapacity)
-            {
-                CriticalMass.Runtime.Game.RuntimeCounters.HudEventsDropped += w.EventHead - World.EventCapacity - _eventCursor;   // DG-60
-                _eventCursor = w.EventHead - World.EventCapacity;
-            }
-            for (; _eventCursor < w.EventHead; _eventCursor++)
-            {
-                SimEvent e = w.Events[_eventCursor % World.EventCapacity];
-                if (e.Type != SimEventType.Hit) continue;
-                if (e.A >= 0 && e.A < _lastHit.Length) _lastHit[e.A] = w.Match.Time;
-                if (e.B == HudBinder.LocalActor && e.A != HudBinder.LocalActor)
-                {
-                    int k = _dmgNext;
-                    _dmgNext = (_dmgNext + 1) % DamageNumbers;
-                    _dmgAge[k] = 0f;
-                    _dmgPos[k] = SimSpace.ToWorld(e.X, GroundHeight.At(w.Map, e.X, e.Z) + 2.2, e.Z);
-                    HudText.Set(_dmg[k], NumberCache.Int(Mathf.RoundToInt((float)e.Value)));
-                    SetAlpha(_dmgFade[k], 1f);
-                    _dmg[k].gameObject.SetActive(true);
-                }
-            }
-            for (int k = 0; k < DamageNumbers; k++)
-            {
-                if (!_dmg[k].gameObject.activeSelf) continue;
-                _dmgAge[k] += dt;
-                if (_dmgAge[k] >= 0.7f && !SnapAnimations) { _dmg[k].gameObject.SetActive(false); continue; }
-                float t = SnapAnimations ? 0.25f : _dmgAge[k] / 0.7f;
-                if (!Project(cam, _dmgPos[k] + Vector3.up * (0.6f * t), out Vector2 dp)) { _dmg[k].gameObject.SetActive(false); continue; }
-                _dmg[k].rectTransform.anchoredPosition = dp / scale;
-                SetAlpha(_dmgFade[k], 1f - t * t);
-            }
-
-            // overhead hearts: other units, 3 s after damage, never at full health
-            int row = 0;
-            for (int i = 0; i < w.ActorCount && row < HeartRows; i++)
-            {
-                Actor a = w.Actors[i];
-                // Batch 12 item P: an enemy the fog hides shows no hearts either
-                if (i == HudBinder.LocalActor || !a.Alive || global::CriticalMass.Runtime.View.Fog.FogOfWar.Hides(i) || a.Hp >= a.MaxHp || w.Match.Time - _lastHit[i] > 3.0 || _lastHit[i] <= 0) continue;
-                Vector3 head = SimSpace.ToWorld(w.X[i], GroundHeight.At(w.Map, w.X[i], w.Z[i]) + 2.8, w.Z[i]);
-                if (!Project(cam, head, out Vector2 p)) continue;
-                RectTransform r = _heartRows[row];
-                if (!r.gameObject.activeSelf) r.gameObject.SetActive(true);
-                r.anchoredPosition = p / scale;
-                float hp01 = (float)(a.Hp / a.MaxHp);
-                Color tc = CMTokens.Team(a.Team);
-                for (int h = 0; h < Hearts; h++)
-                {
-                    _rowHearts[row, h].SetFill(tc);
-                    _rowHearts[row, h].Fill01 = Mathf.Clamp01(hp01 * Hearts - h);
-                }
-                row++;
-            }
-            for (; row < HeartRows; row++) if (_heartRows[row].gameObject.activeSelf) _heartRows[row].gameObject.SetActive(false);
+            // player-experience lane D: damage numbers moved to Hud/Player/DamageNumbers.cs (setting honoured, stacked,
+            // sized per camera, heal / Kaiju / wall numbers)
+            // player-experience lane D: health bars over every unit in view, hit marker, damage direction, kill confirm,
+            // tags and pops (Hud/Player); replaces the 3-second overhead hearts
+            PlayerFeedback.CurrentTick = w.Tick;   // review fix round 2 (gate tier F): ledger entries carry the sim tick
+            PlayerHud?.Tick(w, s, Driver != null ? Driver.Alpha : 1.0, cam, scale, dt, w.EventHead);   // GameHud is the allowed event reader
         }
 
         static readonly string[] Metres = BuildMetres();

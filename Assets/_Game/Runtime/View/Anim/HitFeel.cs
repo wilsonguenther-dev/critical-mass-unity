@@ -47,8 +47,9 @@ namespace CriticalMass.Runtime.View.Anim
             float k = MaxViewOffset / h;
             return new Vector3(v.x * k, v.y, v.z * k);
         }
-        /// <summary>Hit-stop in wall seconds per tier (light, heavy, critical or finishing).</summary>
-        public const double HoldLight = 0.045, HoldHeavy = 0.06, HoldCritical = 0.07;
+        /// <summary>Hit-stop in wall seconds per tier (light, heavy, critical or finishing). px lane C: 60 / 80 / 110 ms
+        /// (HitFeelTuning; was 45 / 60 / 70, measured 35 ms on the victim only).</summary>
+        public const double HoldLight = HitFeelTuning.HoldLight, HoldHeavy = HitFeelTuning.HoldHeavy, HoldCritical = HitFeelTuning.HoldCritical;
         /// <summary>Camera nudge (trauma before the shake setting's scale) for a hit on, and by, the local player.</summary>
         public const float NudgeOnLocal = 0.45f, NudgeByLocal = 0.3f;   // feat/hit-feel-2: trauma is squared (0.45 at scale 0.7 = 0.032 u)
 
@@ -111,7 +112,7 @@ namespace CriticalMass.Runtime.View.Anim
         }
 
         /// <summary>Sim seconds after the press at which the weapon smear starts: with the strike, AttackTiming.StrikeSeconds before contact.</summary>
-        public static double SmearDelay(double windupSeconds) => Math.Max(0, windupSeconds - AttackTiming.StrikeSeconds);
+        public static double SmearDelay(double windupSeconds) => Math.Max(0, windupSeconds - AttackTiming.StrikeFor(windupSeconds));
 
         /// <summary>Damage share 0..1 for reactions (30 damage = full).</summary>
         static double Dmg01(double dmg) => Math.Max(0, Math.Min(1, dmg / 30));
@@ -140,8 +141,7 @@ namespace CriticalMass.Runtime.View.Anim
         }
 
         /// <summary>Hit-stop for a tier, wall seconds; 0 under reduce motion.</summary>
-        public static double HoldWallSeconds(byte tier, bool reduceMotion) =>
-            reduceMotion ? 0 : tier == 0 ? HoldLight : tier == 1 ? HoldHeavy : HoldCritical;
+        public static double HoldWallSeconds(byte tier, bool reduceMotion) => HitFeelTuning.HoldWallSeconds(tier, reduceMotion);
 
         /// <summary>Camera nudge for a hit: on the local player, by the local player, else 0.</summary>
         public static float Nudge(bool onLocal, bool byLocal) => onLocal ? NudgeOnLocal : byLocal ? NudgeByLocal : 0f;
@@ -188,19 +188,24 @@ namespace CriticalMass.Runtime.View.Anim
         {
             if (w == null || i < 0 || i >= w.ActorCount) return -1;
             Actor a = w.Actors[i];
-            double reach = LightWeaponView.Range(w.Config, a.Cls) + FaceReachSlack;
-            double half = (LightWeaponView.ArcDeg(w.Config, a.Cls) * 0.5 + FaceArcSlackDeg) * Math.PI / 180;
-            double fx = Math.Cos(a.SwingFacing), fz = Math.Sin(a.SwingFacing), cosHalf = Math.Cos(Math.Min(Math.PI, half));
+            // px lane C (2026-11-22): the sim's own hit shape (ResolveSwing: centre distance <= reach + target radius, angle off
+            // the LIVE SwingFacing <= arc / 2 + asin(r / d)), no view slack: the body never steps or leans at an enemy the
+            // swing will miss (was reach + 0.6 u and arc + 25 degrees: "turns toward an enemy it will miss").
+            double range = LightWeaponView.Range(w.Config, a.Cls);
+            double halfArc = LightWeaponView.ArcDeg(w.Config, a.Cls) * 0.5 * Math.PI / 180;
+            double fx = Math.Cos(a.SwingFacing), fz = Math.Sin(a.SwingFacing);
             int best = -1;
-            double bestD2 = reach * reach;
+            double bestD2 = double.MaxValue;
             for (int j = 0; j < w.ActorCount; j++)
             {
                 Actor b = w.Actors[j];
                 if (j == i || !b.Alive || b.Team == a.Team) continue;
+                double r = w.Config.Class(b.Cls).Radius, reach = range + r;
                 double dx = w.X[j] - w.X[i], dz = w.Z[j] - w.Z[i], d2 = dx * dx + dz * dz;
-                if (d2 >= bestD2 || d2 < 1e-9) continue;
+                if (d2 > reach * reach || d2 >= bestD2 || d2 < 1e-9) continue;
                 double d = Math.Sqrt(d2);
-                if ((dx * fx + dz * fz) / d < cosHalf) continue;
+                double half = Math.Min(Math.PI, halfArc + Math.Asin(Math.Min(1, r / d)));
+                if ((dx * fx + dz * fz) / d < Math.Cos(half) - 1e-9) continue;
                 best = j;
                 bestD2 = d2;
             }
@@ -218,14 +223,16 @@ namespace CriticalMass.Runtime.View.Anim
             double age = SwingAge(a, w.Tick, alpha, hz);
             double windup = Math.Max(0, a.SwingWindup) / hz;
             if (!a.Alive || age < 0 || age > windup + FacingHold) return a.Facing;
-            // fix/hit-feel-3: turn only toward a target inside FaceConeDeg of the sim facing (the facing test allows 30), and
-            // otherwise keep the sim facing (hit-feel-1 fell back to SwingFacing, which fought the movement facing).
-            int t = SwingTarget(w, i);
-            if (t < 0) return a.Facing;
-            double want = Math.Atan2(w.Z[t] - w.Z[i], w.X[t] - w.X[i]);
-            double d = want - a.Facing;
+            // px lane C (2026-11-22): through the swing the drawn body faces the sim's LIVE SwingFacing (lane S1 lets it track
+            // the aim during the wind-up), never a view-chosen target: the picture turns where the rule swings. Kept inside
+            // FaceConeDeg of the sim facing so the legs (which run along Facing) never twist against it.
+            double sf = a.SwingFacing;
+            double d = sf - a.Facing;
             d = Math.Atan2(Math.Sin(d), Math.Cos(d));
-            return Math.Abs(d) <= FaceConeDeg * Math.PI / 180 ? want : a.Facing;
+            double cone = FaceConeDeg * Math.PI / 180;
+            if (Math.Abs(d) <= cone) return sf;
+            // swinging back over the shoulder while backing off: the movement facing rules (never turned around)
+            return Math.Abs(d) >= Math.PI * 0.5 ? a.Facing : a.Facing + Math.Sign(d) * cone;
         }
 
         /// <summary>
@@ -247,8 +254,8 @@ namespace CriticalMass.Runtime.View.Anim
             int t = SwingTarget(w, i);
             if (t >= 0)
             {
+                // px lane C: the step runs along the live swing (the body faces it); the honest target sets only its length.
                 double dx = w.X[t] - w.X[i], dz = w.Z[t] - w.Z[i], d = Math.Sqrt(dx * dx + dz * dz);
-                if (d > 1e-6) { dirX = dx / d; dirZ = dz / d; }
                 // feat/hit-feel-2: step in far enough that the weapon reaches the target's body (ViewReach), never into it.
                 peak = StepPeak(d, ViewReach(a.Cls), w.Config.Class(a.Cls).Radius, w.Config.Class(w.Actors[t].Cls).Radius);
             }

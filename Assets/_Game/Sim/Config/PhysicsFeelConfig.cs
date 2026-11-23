@@ -9,6 +9,14 @@ namespace CriticalMass.Sim.Config
     public sealed class PhysicsFeelConfig
     {
         public bool Enabled = true;
+        /// <summary>px DM (two-minute walking shiver): a grounded walker touching the hatched solid Kaiju walks ALONG its body
+        /// (the into-body share of its step is removed before the step), instead of stepping in and being pushed back out by
+        /// Collide.KaijuBody every tick (a 3-position cycle 5 cm wide against a wall corner, MovementShiver seed 7).
+        /// OFF: measured on the shiver gate's match it re-plays the fight and raises the hard flags 2 -> 8 (fighting bots on the
+        /// hill reversing; data/dm-defence/shiver-slide.txt), a trade, so it stays off (lane DM, 2026-11-22).</summary>
+        public bool KaijuWalkSlide = false;
+        /// <summary>Contact slack (u) beyond body + actor radius inside which the walk slides round the Kaiju.</summary>
+        public double KaijuWalkSlideSlack = 0.05;
 
         // ---- [4] corner grazes
         /// <summary>Largest overlap with a corner cell that is slid round (u; PhysicsConfig.CornerNudgeMax 0.1 otherwise). An
