@@ -344,7 +344,7 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
             AssertAtControls("the end");
             string f30diag = "moves " + (W.Moves != null) + ", graphics " + SystemInfo.graphicsDeviceType + ": press frame " + pressFrame + ", PredictPress saw a press at frame "
                 + CriticalMass.Runtime.View.ActorViews.PressSeenFrame + " (human found " + CriticalMass.Runtime.View.ActorViews.PressSeenHuman + ", ready "
-                + CriticalMass.Runtime.View.ActorViews.PressSeenReady + ", cd " + CriticalMass.Runtime.View.ActorViews.PressSeenCd.ToString("0.000") + ", predicted "
+                + CriticalMass.Runtime.View.ActorViews.PressSeenReady + ", sim already took it " + CriticalMass.Runtime.View.ActorViews.PressSeenTaken + ", cd " + CriticalMass.Runtime.View.ActorViews.PressSeenCd.ToString("0.000") + ", predicted "
                 + CriticalMass.Runtime.View.ActorViews.PressSeenPredicted + "), drawn " + drawnBest.ToString("0.00") + " over " + drawnFrames + " frames";
             UnityEngine.Debug.Log("[px-f30] " + Tag(ClassId.Warrior, v) + " " + f30diag);
             Check("F30 SwingPose", Tag(ClassId.Warrior, v), "[" + f30diag + "] sim accepted " + started + ", drawn pose weight by press + 2 " + drawnBest.ToString("0.00") + "; SwingCommit ledger weight " + best.ToString("0.00") + " at " + framesAfterPress + " frames after the press [" + LedgerDump(cursor) + "]", ">= 0.8 drawn within 2 frames of the press", started && Math.Max(drawnBest, best) >= T.SwingPoseWeight && reported && framesAfterPress >= 0 && framesAfterPress <= 2);

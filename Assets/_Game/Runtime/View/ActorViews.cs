@@ -590,15 +590,20 @@ namespace CriticalMass.Runtime.View
             if (intent && !_intentWas)
             {   // fix/px-base-seat-reds (F30 diagnosis, read by tests only): what the press frame saw
                 PressSeenFrame = Time.frameCount; PressSeenReady = actor != null && actor.Alive && Combat.AttackReady(w, i);
+                PressSeenTaken = actor != null && actor.Alive && actor.SwingPending && w.Tick - actor.SwingTick <= 1 && w.Tick >= actor.SwingTick;
                 PressSeenCd = actor != null ? actor.AttackCd : -1; PressSeenPredicted = false;
             }
             PressSeenHuman = _human != null;
             // mv-6 readability-2 item 1 (gated on the class moves so every switch off draws exactly as before; the third-person
             // late rise is not a class-moves bug, so the integrator may drop the gate)
             if (intent && !_intentWas && actor != null && actor.Alive && w.Moves != null) slot.Anim.NotePress();
-            if (intent && !_intentWas && actor != null && actor.Alive && Combat.AttackReady(w, i))
+            // fix/px-base-seat-reds (pass 5 F30, switches off: the press frame's sim step ran BEFORE this view, took the swing and
+            // set the cooldown, so the press read as refused and nothing was predicted; drawn 0.00 at press + 2): a swing the sim
+            // started on the latest tick IS this press's swing: predict it (the animator hands it over without a dip)
+            bool tookIt = intent && !_intentWas && actor != null && actor.Alive && actor.SwingPending && w.Tick - actor.SwingTick <= 1 && w.Tick >= actor.SwingTick;
+            if (intent && !_intentWas && actor != null && actor.Alive && (tookIt || Combat.AttackReady(w, i)))
             {
-                slot.Anim.PredictSwing(m, actor, cfg, simTime);
+                slot.Anim.PredictSwing(m, actor, cfg, simTime, false, tookIt && !Combat.AttackReady(w, i));
                 if (slot.Anim.Predicting) _predStartFrame = Time.frameCount;
                 PressSeenPredicted = slot.Anim.Predicting;
             }
@@ -617,7 +622,7 @@ namespace CriticalMass.Runtime.View
         /// whether the sim would take it (Combat.AttackReady), the attack cooldown then, whether the wind-up was predicted, and
         /// whether a HumanInputSource was found at all.</summary>
         public static int PressSeenFrame = -1;
-        public static bool PressSeenReady, PressSeenPredicted, PressSeenHuman;
+        public static bool PressSeenReady, PressSeenPredicted, PressSeenHuman, PressSeenTaken;
         public static double PressSeenCd;
         public static int LocalSwingWeightFrame = -1;
         /// <summary>fix/px-view-2 (tests): the local fighter's upper-body action clip and its drawn weight (any action, the TNT throw too).</summary>
