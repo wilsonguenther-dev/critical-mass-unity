@@ -1021,6 +1021,9 @@ namespace CriticalMass.Runtime.Camera
             {
                 WorldPlacement p = ps[i];
                 if (!SolidScenery(p)) continue;
+                // breakable states come and go with the match; the grid (SolidTop) already stands them up like walls
+                if (p.Piece != null && (p.Piece.IndexOf("intact", StringComparison.Ordinal) >= 0 || p.Piece.IndexOf("cracked", StringComparison.Ordinal) >= 0
+                                        || p.Piece.IndexOf("destroyed", StringComparison.Ordinal) >= 0)) continue;
                 Vector3[] corners = PieceCorners(cat, p.Piece);
                 if (corners.Length > 0) { AddScenery(p, corners); continue; }
                 double r, h;

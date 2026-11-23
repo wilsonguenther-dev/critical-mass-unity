@@ -1129,6 +1129,25 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
             return Rect.MinMaxRect(x0, y0, x1, y1);
         }
 
+        /// <summary>fix/px-combat-camera-2: where fighter i's head tag projects in the live camera (GroundView.TagPoint at the
+        /// HUD's 2.65 u lift) against his drawn head top; ok = within the gap above the head and under the top HUD rows.</summary>
+        string TagReport(int i, out bool ok)
+        {
+            ok = false;
+            UnityEngine.Camera cam = UnityEngine.Camera.main;
+            if (cam == null) return "no camera";
+            double g = S.Ground(W.X[i], W.Z[i]);
+            CriticalMass.Runtime.Camera.FightFrame.Silhouette(W.Actors[i].Cls, 0, out _, out double h);
+            Vector3 head = SimSpace.ToWorld(W.X[i], g + 2.65, W.Z[i]);
+            Vector3 tag = cam.WorldToScreenPoint(CriticalMass.Runtime.Camera.GroundView.TagPoint(W, i, head, 2.65f));
+            Vector3 top = cam.WorldToScreenPoint(SimSpace.ToWorld(W.X[i], g + h, W.Z[i]));
+            Vector3 raw = cam.WorldToScreenPoint(head);
+            float H = cam.pixelHeight, gap = (float)(CriticalMass.Runtime.Camera.CombatFrame.TagGapShare * H) + 2f;
+            float ceiling = (float)((1 - CriticalMass.Runtime.Camera.CombatFrame.TagTopShare) * H) + 1f;
+            ok = tag.z > 0 && tag.y <= ceiling && (tag.y - top.y <= gap || top.y >= ceiling - 1f);
+            return (i == 0 ? "my" : "his") + " tag y " + tag.y.ToString("0") + " px (raw lift " + raw.y.ToString("0") + "), head top " + top.y.ToString("0") + ", ceiling " + ceiling.ToString("0");
+        }
+
         /// <summary>A fighter's class silhouette (FightFrame.Silhouette) on screen.</summary>
         Rect FighterSilhouette(int i)
         {
@@ -1234,6 +1253,10 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
                 bool inside = CameraInsideGeometry();
                 CriticalMass.Runtime.Camera.CombatFramer fr = CriticalMass.Runtime.Camera.GroundView.Framer;
                 string side = fr != null ? "side " + fr.Turn + ", yaw +" + fr.YawOffset.ToString("0.0") + " deg, wall keep " + fr.WallKeep.ToString("0.00") : "no framer";
+                // fix/px-combat-camera-2: the framed tags (his and mine) sit just above the head, below the top HUD rows;
+                // both fighters pose every frame (the throttle's focus is the followed body, not the 8 deg ground hit).
+                string tags = TagReport(0, out bool myTag) + "; " + TagReport(e, out bool hisTag);
+                bool pinned = CriticalMass.Runtime.View.Anim.AnimLod.Pinned(0) && CriticalMass.Runtime.View.Anim.AnimLod.Pinned(e);
                 Paced(false);
                 AssertAtControls("the end");
                 Check("D2b CombatCamera", x + " third person, enemy at " + share + " x range ahead of my own view, switch off then on",
@@ -1242,6 +1265,10 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
                     ", enemy height x" + gain.ToString("0.00") + ", me on screen " + meOnScreen + ", lens inside the grid " + inside,
                     "clear share >= " + T.EnemyVisibleShareMin + ", height >= x" + T.CombatHeightGainMin + ", me on screen, lens clear, framing settled (>= 0.95)",
                     offK < 0.01 && k >= 0.95 && visible >= T.EnemyVisibleShareMin && gain >= T.CombatHeightGainMin && meOnScreen && !inside);
+                Check("D2b FramedTags", x + " third person, framed at " + share + " x range", tags,
+                    "name/bar anchor <= " + CriticalMass.Runtime.Camera.CombatFrame.TagGapShare + " x screen above the head top and below the top " + CriticalMass.Runtime.Camera.CombatFrame.TagTopShare + " of the screen",
+                    k >= 0.95 && myTag && hisTag);
+                Check("D2b FullRatePose", x + " third person, framed", "me pinned and the framed enemy pinned: " + pinned, "both every frame", pinned);
             }
             finally
             {
