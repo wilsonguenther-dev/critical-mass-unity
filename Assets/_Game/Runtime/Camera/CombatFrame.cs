@@ -19,7 +19,51 @@ namespace CriticalMass.Runtime.Camera
     public static class CombatFrame
     {
         /// <summary>The framed pose at full weight and strength 1 (third person: distance 4.4, pivot 2.2, pitch 14).</summary>
-        public const double Distance = 3.2, FocusHeight = 1.3, FocusShare = 0.25, PitchDeg = 8, YawDeg = 48, ShoulderU = 0.8;
+        /// <remarks>fix/px-rough-spots (owner, 2026-11-23: "how do we get the person we're fighting perfectly framed"; film 4:02 my
+        /// fighter half cut off at the left edge, 0:08 / 7:30 the camera pressed right behind him): the framing no longer comes in
+        /// closer than the plain camera (it was 3.2 u, which drew my fighter at half the screen height and cut him at the
+        /// bottom and the side); the look point sits further toward the enemy and a little higher, and <see cref="FitDistance"/>
+        /// pulls the lens back until BOTH whole bodies fit inside the safe frame.</remarks>
+        public const double Distance = 4.4, FocusHeight = 1.6, FocusShare = 0.4, PitchDeg = 12, YawDeg = 48, ShoulderU = 0.8;
+
+        /// <summary>fix/px-rough-spots: the two-shot fit. Both fighters (upright cylinders FitBodyRadius x FitBodyTall over their
+        /// ground) must project inside this safe frame (normalised device units, -1..1): FitHalfX either side, above FitBottom
+        /// (the ability bar and the health panel) and below FitTop (the score, objective and resource rows). The lens moves
+        /// back in FitStep steps, never past FitMaxDistance.</summary>
+        public const double FitHalfX = 0.82, FitTop = 0.62, FitBottom = -0.78, FitBodyRadius = 0.5, FitBodyTall = 2.2, FitStep = 0.1, FitMaxDistance = 6.5;
+
+        /// <summary>fix/px-rough-spots (pure; GroundView and the tests): the smallest boom length from start up to FitMaxDistance at
+        /// which every body (x, ground y, z: sim) projects inside the safe frame for a lens looking along (yawDeg, pitchDeg) at the
+        /// pivot (px, py, pz). FitMaxDistance when none fits.</summary>
+        public static double FitDistance(double px, double py, double pz, double yawDeg, double pitchDeg, double vfovDeg, double aspect, double start,
+            double[] bx, double[] by, double[] bz, int n)
+        {
+            GroundCamera.Basis(yawDeg, out double ux, out double uz, out double rx, out double rz);
+            double pr = pitchDeg * Math.PI / 180, cp = Math.Cos(pr), sp = Math.Sin(pr);
+            double fx = ux * cp, fy = -sp, fz = uz * cp;            // forward
+            double upx = ux * sp, upy = cp, upz = uz * sp;          // up (perpendicular to forward, in the yaw plane)
+            double f = 1 / Math.Tan(Math.Max(10, vfovDeg) * Math.PI / 360), asp = aspect > 0.1 ? aspect : 16.0 / 9.0;
+            for (double dist = Math.Max(0.5, start); dist <= FitMaxDistance + 1e-9; dist += FitStep)
+            {
+                double cx = px - fx * dist, cy = py - fy * dist, cz = pz - fz * dist;
+                bool fits = true;
+                for (int b = 0; b < n && fits; b++)
+                    for (int k = 0; k < 8 && fits; k++)
+                    {
+                        double a = k * Math.PI / 4, qx = bx[b] + FitBodyRadius * Math.Cos(a), qz = bz[b] + FitBodyRadius * Math.Sin(a);
+                        for (int j = 0; j < 2 && fits; j++)
+                        {
+                            double dx = qx - cx, dy = by[b] + j * FitBodyTall - cy, dz = qz - cz;
+                            double depth = dx * fx + dy * fy + dz * fz;
+                            if (depth < 0.3) { fits = false; break; }
+                            double sx = (dx * rx + dz * rz) / depth * f / asp, sy = (dx * upx + dy * upy + dz * upz) / depth * f;
+                            if (Math.Abs(sx) > FitHalfX || sy > FitTop || sy < FitBottom) fits = false;
+                        }
+                    }
+                if (fits) return dist;
+            }
+            return FitMaxDistance;
+        }
         /// <summary>Ease in (s), hold after the fight ends (s), ease out (s).</summary>
         public const double InSeconds = 0.3, HoldSeconds = 1.0, OutSeconds = 0.6;
         /// <summary>Engage: an enemy within ReachShare x my attack range; or, while I swing, guard, am staggered or traded a hit

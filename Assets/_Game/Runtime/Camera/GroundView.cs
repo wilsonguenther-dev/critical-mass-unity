@@ -115,8 +115,11 @@ namespace CriticalMass.Runtime.Camera
         /// <summary>fix/px-camera-in-editor: true while the robust third-person play camera runs (trees fade, SeeThrough
         /// leaves them out).</summary>
         public static bool RobustThirdPerson { get; private set; }
-        double _extraSm;
-        const double ExtraInTau = 0.1, ExtraOutTau = 1.1;
+        double _extraSm, _extraInFor;
+        /// <summary>fix/px-rough-spots: the framing distance: out on ExtraOutTau (s); in only after ExtraHold s of wanting it by more
+        /// than ExtraDeadband u, on ExtraInTau. The two-shot fit looks at an unframed enemy within FitRange u too.</summary>
+        const double ExtraInTau = 1.4, ExtraOutTau = 0.3, ExtraHold = 2.0, ExtraDeadband = 0.5, FitRange = 3.0, FitOvershoot = 0.35;
+        readonly double[] _fitX = new double[2], _fitY = new double[2], _fitZ = new double[2];
         /// <summary>fix/px-camera-in-editor: Editor diagnostics only (A/B against the old follow, SessionState key
         /// cm.camera.robustOff, gone when the Editor quits); always false in a player.</summary>
         public static bool RobustOffForDiagnostics
@@ -423,11 +426,40 @@ namespace CriticalMass.Runtime.Camera
             RobustThirdPerson = robust;
             _hardCount = 0;
             for (int i = 0; i < _folCount; i++) if (!robust || !_fol[i].Soft) _hard[_hardCount++] = _fol[i];
-            // fix/px-camera-in-editor (no pumping): the framing's distance change goes in fast and comes out slowly, so a
-            // framing that flickers on and off never pumps the lens
+            // fix/px-rough-spots (item 1): the two-shot fit. With an enemy framed (or, unframed, one within FitRange) the lens
+            // moves back until both whole bodies sit inside the safe frame, at this frame's drawn yaw and pitch.
+            if (robust && !paused)
+            {
+                int foe = _duelTarget >= 0 && _combat.K > 0.01 ? _duelTarget : NearestEnemy(w, target, FitRange);
+                if (foe >= 0 && foe < w.ActorCount && w.Actors[foe].Alive)
+                {
+                    double ex = w.PrevX[foe] + (w.X[foe] - w.PrevX[foe]) * a, ez = w.PrevZ[foe] + (w.Z[foe] - w.PrevZ[foe]) * a;
+                    _fitX[0] = tx0; _fitY[0] = gy0; _fitZ[0] = tz0;
+                    _fitX[1] = ex; _fitY[1] = GroundHeight.At(map, ex, ez); _fitZ[1] = ez;
+                    GroundCamera.Basis(_follow.Yaw, out _, out _, out double frx, out double frz);
+                    double piv = gy + rig.PivotHeight + lift;
+                    double fitD = CombatFrame.FitDistance(tx + frx * rig.Shoulder, piv, tz + frz * rig.Shoulder, _follow.Yaw, _follow.Pitch,
+                        _cam != null ? _cam.fieldOfView : FollowCamera.FovDefault, _cam != null ? _cam.aspect : 16.0 / 9.0, rig.Distance + extra, _fitX, _fitY, _fitZ, 2);
+                    // going out, overshoot a little so the next small step of the fight needs no new move (item 3: reversals)
+                    double fx2 = fitD - rig.Distance;
+                    if (fx2 > _extraSm + 0.05) fx2 += FitOvershoot;
+                    extra = Math.Max(extra, fx2);
+                }
+            }
+            // fix/px-camera-in-editor (no pumping) + fix/px-rough-spots (item 3, the hill's 17 reversals a minute): the framing's
+            // wanted distance goes OUT promptly (ExtraOutTau: both fighters must fit) and comes back IN only after it has wanted
+            // to for ExtraHold seconds by more than ExtraDeadband, then slowly (ExtraInTau): a fight that flickers never pumps.
             if (robust && !snap && !paused && dt > 0)
-                _extraSm += (extra - _extraSm) * (1 - Math.Exp(-dt / (extra < _extraSm ? ExtraInTau : ExtraOutTau)));
-            else _extraSm = extra;
+            {
+                if (extra > _extraSm) { _extraSm += (extra - _extraSm) * (1 - Math.Exp(-dt / ExtraOutTau)); _extraInFor = 0; }
+                else if (_extraSm - extra > (_extraInFor >= ExtraHold ? 0.02 : ExtraDeadband))
+                {
+                    _extraInFor += dt;
+                    if (_extraInFor >= ExtraHold) _extraSm += (extra - _extraSm) * (1 - Math.Exp(-dt / ExtraInTau));
+                }
+                else _extraInFor = 0;
+            }
+            else { _extraSm = extra; _extraInFor = 0; }
             var f = new GroundFollowInput
             {
                 Dt = paused ? 0 : dt,
@@ -1222,8 +1254,13 @@ namespace CriticalMass.Runtime.Camera
         /// <summary>fix/px-camera-in-editor: only buildings, landmarks and big rocks stop the third-person boom; trees,
         /// crystals and props fade instead (fewer collisions: no pumping, no steep views over a crystal).</summary>
         /// <summary>pass 5: a prop narrower than this (u from its centre) never moves the third-person boom; it fades.</summary>
-        const double HardPropExtent = 0.8;
+        const double HardPropExtent = 1.0;
+        /// <summary>fix/px-rough-spots: a mesh box longer than this x its width is split into a row of cylinders (AddScenery).</summary>
+        const double SplitAspect = 1.4;
         static bool SoftScenery(string cat) => !(cat == "base" || cat == "struct" || cat == "landmark" || cat == "rock_big");
+        /// <summary>fix/px-rough-spots (items 2 and 4: the hill rim and the stuck spot by the hill brazier, 53.4:49.6): the hill's
+        /// open arches and the horns that stand over them fade like props; they never push the lens in.</summary>
+        static bool SoftPiece(string piece) => piece != null && (piece.IndexOf("hill_arc", StringComparison.Ordinal) >= 0 || piece.IndexOf("hill_horn", StringComparison.Ordinal) >= 0);
 
         /// <summary>A kit piece's mesh boxes (8 corners per mesh, its own frame), from Mesh.bounds (readable or not).</summary>
         static Vector3[] PieceCorners(WorldKitCatalog cat, string piece)
@@ -1263,6 +1300,28 @@ namespace CriticalMass.Runtime.Camera
                 double cx = (x0 + x1) * 0.5, cz = (z0 + z1) * 0.5, r = 0;
                 for (int k = 0; k < 8; k++) r = Math.Max(r, Math.Sqrt((pts[k].x - cx) * (pts[k].x - cx) + (-pts[k].z - cz) * (-pts[k].z - cz)));
                 if (r > 8) continue;   // a slab or an island piece, not a prop
+                // fix/px-rough-spots (item 2: the lens pressed 1.6 u behind him by the hill rim): one cylinder round a long box (an
+                // arc, a horn, a wall run) covered open ground up to 2.6 u from the real mesh. A box longer than SplitAspect x its
+                // width becomes a row of cylinders along its own long axis, each just wide enough for its slice.
+                Vector3 ea = pts[1] - pts[0], eb = pts[4] - pts[0];
+                double la = Math.Sqrt(ea.x * ea.x + ea.z * ea.z), lb = Math.Sqrt(eb.x * eb.x + eb.z * eb.z);
+                double lLong = Math.Max(la, lb), lShort = Math.Min(la, lb);
+                // fix/px-rough-spots: a small mesh inside a big layout piece (a brazier, a barrel stack, a post) fades like a prop
+                if (!soft && r < HardPropExtent + 0.2) soft = true;
+                if (!soft && lShort > 0.05 && lLong > SplitAspect * lShort && _sceneryCount + 8 < MaxScenery)
+                {
+                    Vector3 ax = la >= lb ? ea : eb;
+                    double axx = ax.x / lLong, axz = -ax.z / lLong;   // sim space (z flipped)
+                    int nseg = Math.Min(6, (int)Math.Ceiling(lLong / lShort));
+                    double seg = lLong / nseg, rs = Math.Sqrt(lShort * lShort * 0.25 + seg * seg * 0.25);
+                    for (int q = 0; q < nseg; q++)
+                    {
+                        double o = -lLong * 0.5 + seg * (q + 0.5);
+                        _scenery[_sceneryCount] = new SeeThroughCylinder { X = cx + axx * o, Z = cz + axz * o, R = rs, Y0 = y0, Y1 = y1, Soft = soft, Id = _sceneryCount + 1 };
+                        _sceneryCount++;
+                    }
+                    continue;
+                }
                 _scenery[_sceneryCount] = new SeeThroughCylinder { X = cx, Z = cz, R = r, Y0 = y0, Y1 = y1, Soft = soft, Id = _sceneryCount + 1 };
                 _sceneryCount++;
             }
@@ -1295,7 +1354,7 @@ namespace CriticalMass.Runtime.Camera
                     // pass 5: small props (barrels, banners, lamps, stakes) fade like trees; only big ones move the boom
                     double ext = 0;
                     for (int c = 0; c < corners.Length; c++) ext = Math.Max(ext, Math.Sqrt(corners[c].x * corners[c].x + corners[c].z * corners[c].z));
-                    AddScenery(p, corners, SoftScenery(p.Cat) || ext < HardPropExtent);
+                    AddScenery(p, corners, SoftScenery(p.Cat) || ext < HardPropExtent || SoftPiece(p.Piece));
                     continue;
                 }
                 double r, h;

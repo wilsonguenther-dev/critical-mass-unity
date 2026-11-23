@@ -481,13 +481,18 @@ namespace CriticalMass.Runtime.Camera
         /// ground RobustFloor under it (the HUD planes at 0.4-0.6 m never meet geometry); never steeper than RobustMaxSteep
         /// (deg) looking at the chest; the chest stays RobustFrameMargin (deg) inside the frame.</summary>
         /// <summary>The boom length the wall rise tries to give back (u).</summary>
-        public const double RobustGood = 2.8, RobustRiseBelow = 2.0;
+        /// <remarks>fix/px-rough-spots (item 2, film 0:08 / 2:25 / 7:30 / 8:00, the lens pressed 1.6 u behind him at walls, the hill
+        /// rim and island edges): a boom cut below RobustRiseBelow now RISES (looks down over the obstacle) to win back RobustGood
+        /// rather than shortening first: at 2.0 / 2.8 the fighter filled half the screen before the rise even started.</remarks>
+        public const double RobustGood = 3.8, RobustRiseBelow = 3.4;
         public const double RobustMin = 1.6, RobustRadius = 0.6, RobustFloor = 0.7, RobustMaxSteep = 55, RobustFrameMargin = 5;
         /// <summary>The fighter for the frame rule: the sight point (chest) is RobustChestUp over his feet, he is RobustBodyTall.</summary>
         public const double RobustChestUp = 1.2, RobustBodyTall = 2.1;
         /// <summary>Distance: in at once (a wall), out only after RobustHold s clear, then on RobustOutTau (no pumping).
         /// Wall rise: up on RobustRiseTau, down after RobustHold on RobustFallTau.</summary>
-        public const double RobustHold = 1.0, RobustOutTau = 1.3, RobustRiseTau = 0.08, RobustFallTau = 0.9;
+        public const double RobustHold = 1.6, RobustOutTau = 1.3, RobustRiseTau = 0.08, RobustFallTau = 0.9;
+        /// <summary>fix/px-rough-spots (item 3): the boom only counts as clear to move out when it may grow by more than this (u).</summary>
+        public const double RobustOutDeadband = 0.35;
 
         double _rise, _riseClear, _outClear;
         /// <summary>fix/px-camera-in-editor: even at RobustMin and the steepest rise the boom touches hard geometry (the
@@ -585,7 +590,7 @@ namespace CriticalMass.Runtime.Camera
             if (snap || allowed < Dist) { Dist = allowed; _outClear = 0; }
             else if (dt > 0)
             {
-                _outClear = allowed > Dist + 0.05 ? _outClear + dt : 0;
+                _outClear = allowed > Dist + (_outClear >= RobustHold ? 0.05 : RobustOutDeadband) ? _outClear + dt : 0;
                 if (_outClear >= RobustHold) Dist += (allowed - Dist) * (1 - Math.Exp(-dt / RobustOutTau));
             }
             Dist = Math.Max(RobustMin, Math.Min(Dist, want));
