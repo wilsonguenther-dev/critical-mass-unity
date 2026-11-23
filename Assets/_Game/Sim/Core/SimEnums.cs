@@ -273,6 +273,32 @@ namespace CriticalMass.Sim.Core
         /// (X, Z) = the victim, Value = kind (1 counter: hit inside his wind-up, 2 punish: hit in the recovery of his whiff,
         /// 3 back hit: from his rear arc), Radius = the bonus damage dealt. The Hit event of the same strike carries Tier 2.</summary>
         CriticalHit,
+        // ---- Class moves (2026-11-22, lane 1; appended, view only: no rule reads them). Each is pushed only while its switch
+        // is on, so with every switch off the event stream (and EventHead) is the base branch's. A/B/X/Z/Value as listed.
+        /// <summary>T2-1: a guard broke (its meter emptied): A = the guard, B = the attacker, (X, Z) = the guard, Value = the
+        /// stagger ticks. The break's own Hit follows or precedes it in the same tick.</summary>
+        GuardBreak,
+        /// <summary>T1-4a: a feint baited the victim: A = the feinter, B = the victim, (X, Z) = the victim, Value = the victim's
+        /// answer (1 dodge, 2 guard, 3 parry attempt).</summary>
+        FeintBaited,
+        /// <summary>T1-2: a dodge-in became a LUNGE: A = the attacker, B = the target (-1 none yet), (X, Z) = the attacker,
+        /// Value = the lunge swing's wind-up ticks.</summary>
+        Lunge,
+        /// <summary>T2-2: a heavy swing was released: A = the attacker, B = -1, (X, Z) = the attacker, Value = the charge share
+        /// 0..1 (1 = CHARGED), Radius = the heavy reach, Impulse = its arc in degrees.</summary>
+        HeavyRelease,
+        /// <summary>T2-3: a combo step started: A = the attacker, B = -1, (X, Z) = the attacker, Value = the step (2, 3),
+        /// Tier = 1 on the finisher.</summary>
+        ComboStep,
+        /// <summary>T2-4: TRAVEL lit (Value 1) or ended (Value 0): A = the actor, (X, Z) = the actor.</summary>
+        TravelChanged,
+        /// <summary>T2-5: a slide started (B = -1, Value 0) or tripped an enemy (B = the victim, Value = the damage):
+        /// A = the slider, (X, Z) = the slider.</summary>
+        Slide,
+        /// <summary>T2-6: a glide started (Value 1) or ended (Value 0; Radius 1 = a hit ended it): A = the Healer.</summary>
+        Glide,
+        /// <summary>T2-8: SECOND WIND: A = the actor, (X, Z) = the actor, Value = HP restored.</summary>
+        SecondWind,
     }
 
     /// <summary>CM b13 [K]: the Kaiju type decided by the biomass mix at the hatch (Elder = today's Kaiju; appended members only).</summary>

@@ -633,6 +633,7 @@ namespace CriticalMass.Sim.Core
             world.Dodges.Reset(world);   // b13-hook
             world.KaijuKind.Reset(world);   // b13-hook
             world.Corrupt.Reset(world);   // b13-hook
+            world.Moves?.Reset(world);   // mv-hook: class moves (null with every switch off)
 
             SpatialHash.Rebuild(world.Hash, world.X, world.Z, world.Actors, world.ActorCount);
         }
@@ -713,6 +714,8 @@ namespace CriticalMass.Sim.Core
             f.PingKind = 0;
             f.Dodge = false;   // b13-hook
             f.Cancel = false;   // b16 cancel
+            f.Guard = false;   // mv-hook
+            f.JumpHeld = false;   // mv-hook
         }
 
         /// <summary>Build a world for opts: a fresh Skybreak Basin map and every buffer allocated at capacity.</summary>
@@ -869,6 +872,7 @@ namespace CriticalMass.Sim.Core
                 Dodges = new DodgeState(),   // b13-hook
                 KaijuKind = new KaijuTypeState(),   // b13-hook
                 Corrupt = new CorruptionState(),   // b13-hook
+                Moves = MovesState.Create(cfg),   // mv-hook: null unless the Full rules and a class-moves switch are on
             };
             // CM b13: the item states allocate once here, after the actor arrays exist (no per-tick allocation).
             world.Hut.Init(world);   // b13-hook
@@ -879,6 +883,7 @@ namespace CriticalMass.Sim.Core
             world.Dodges.Init(world);   // b13-hook
             world.KaijuKind.Init(world);   // b13-hook
             world.Corrupt.Init(world);   // b13-hook
+            world.Moves?.Init(world);   // mv-hook
             InitWorld(world, opts);
             // b14-c: the Kaiju clearance build state exists from the start, so the route guard's first pre-hatch refresh allocates nothing.
             Kaiju.WarmClearanceBuild(world);
@@ -1025,6 +1030,9 @@ namespace CriticalMass.Sim.Core
         public KaijuTypeState KaijuKind;   // b13-hook
         /// <summary>CM b13 [C]: the corruption pool and rolls (Sim/B13/Corruption.cs).</summary>
         public CorruptionState Corrupt;   // b13-hook
+        /// <summary>Class moves (2026-11-22, Sim/B17/MovesState.cs): null unless the world was built with the Full rules and a
+        /// MovesConfig switch on. Fingerprinted only when not null (StateHashCoverageTests.HashedWhenSet).</summary>
+        public MovesState Moves;   // mv-hook
         /// <summary>Mechanics depth (U-063 onward): roles, sources, stations, pickups, pings and map events (DepthState.cs).</summary>
         public DepthState Depth;
     }

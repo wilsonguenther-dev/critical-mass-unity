@@ -365,6 +365,7 @@ namespace CriticalMass.Sim.Core
             if (f.StrikeStaggers != null && (int)src.Cls < f.StrikeStaggers.Length && !f.StrikeStaggers[(int)src.Cls]) stun = 0; // b16: this class's hits do not stagger
             // px DM (review defect 6): a hit the Warrior's raised shield cuts (frontal) is BLOCKED, not a stagger
             if (stun > 0 && t.Cls == ClassId.Warrior && t.AbilityActive > 0 && PlayerSeat.On(w) && PlayerSeat.Cfg(w).ShieldStopsStagger && Damage.IsFrontal(w, target, srcX, srcZ)) stun = 0;
+            double knock = f.Strikes[(int)src.Cls].Knock; MovesHooks.StrikeKnock(w, source, target, ref knock, ref stun);   // mv-hook (lane 1's line in lane 2's file)
             bool locked = InLock(s, target, w.Tick);
             bool clipped = locked && !immune && w.Tick + stun >= s.LockStart[target] + Ticks(w, f.StaggerMaxLockSeconds);
             if (stun > 0)
@@ -374,7 +375,7 @@ namespace CriticalMass.Sim.Core
             }
             bool onLadder = OnLadder(w, target);
             int head0 = w.EventHead;
-            double dealt = Damage.ApplyHit(w, target, amount, source, srcX, srcZ, DamageCause.Melee, dx, dz, f.Strikes[(int)src.Cls].Knock, stun);
+            double dealt = Damage.ApplyHit(w, target, amount, source, srcX, srcZ, DamageCause.Melee, dx, dz, knock, stun);   // mv-hook: knock (was the class row's Knock, unchanged when off)
             if (dealt > 0 && s.CritTick[target] == w.Tick && s.CritFrom[target] == source && s.CritKind[target] > 0)
             {
                 // px S1 [9]: the strike's Hit event reads critical (Tier 2) and one CriticalHit follows it.
@@ -549,6 +550,7 @@ namespace CriticalMass.Sim.Core
                 s.BufferTick[i] = NoTick;
                 s.Feints++;
                 World.PushEvent(w, SimEventType.Feint, i, -1, w.X[i], w.Z[i], 1);
+                MovesHooks.Feinted(w, i);   // mv-hook (lane 1's line in lane 2's file): FeintBaited
                 return 1;
             }
             if (!a.SwingPending && s.LandedSwing[i] == a.SwingTick && w.Tick > contact)

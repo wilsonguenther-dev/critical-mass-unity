@@ -84,6 +84,7 @@ namespace CriticalMass.Sim.Bots
             output.TerraformSwitch = false; // DG-09: bots never switch the dig / place mode (they never dig: oracle CM-30)
             output.Dodge = false;   // b13-hook: the shared scratch frame never carries a human dodge to a bot (BotReflex sets it)
             output.Cancel = false;   // b16: bots never press CANCEL (UsesCancel is off; the shared frame never carries a human press)
+            output.Guard = false; output.JumpHeld = false;   // mv-hook: the shared frame never carries a human guard / held jump to a bot (lane 5 sets bot guards in MovesHooks.BotsFillInput)
             BotSteer.SteerBot(w, st, id, output);
             // DG-22 (CM-38): a Demolitions bot's queued TNT throw (BotFsm.DecideDemolitions) is its one press, aimed at the throw point.
             Demolitions.TakeBotTnt(w, id, output);
@@ -92,6 +93,7 @@ namespace CriticalMass.Sim.Bots
             // U-065: a Builder bot in its station buys a class upgrade the team stock can pay.
             Stations.TakeBotBuy(w, id, output);
             BotReflex.Fill(w, st, id, output);   // b13-hook: J's jump and dodge reflexes, after the steer and the press overrides
+            MovesHooks.BotsFillInput(w, id, output);   // mv-hook: lane 5's bot use of the class moves (identity with every switch off)
         }
     }
 }

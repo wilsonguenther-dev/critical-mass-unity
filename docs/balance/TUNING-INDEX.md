@@ -4,7 +4,7 @@ Every tuning field the sim reads from `GameConfig`, found by reflection (`Assets
 
 Regenerate: `tools/balance/balance-report.sh tuning-index (or the balance-report workflow, mode tuning-index)`. `TuningIndexTests` fails when a field has no row here. Paths work as `--set Path=Value` switches for the balance report.
 
-899 fields.
+1016 fields.
 
 ## (top level)
 
@@ -646,11 +646,11 @@ Regenerate: `tools/balance/balance-report.sh tuning-index (or the balance-report
 | `Depth.Dodge.CooldownTicks` | 90 | int | `Assets/_Game/Sim/Config/DodgeConfig.cs` | From the press to the next dodge (3.0 s). |
 | `Depth.Dodge.MinMoveInput` | 0.2 | double | `Assets/_Game/Sim/Config/DodgeConfig.cs` | The move input decides the direction when its length is over this; else the facing. |
 | `Depth.Dodge.MinClearTicks` | 2 | int | `Assets/_Game/Sim/Config/DodgeConfig.cs` | A planned path with fewer clear ticks than this is refused. |
-| `Depth.Dodge.DodgeReward` | true | bool | `Assets/_Game/Sim/Config/DodgeConfig.cs` | px DM timed-dodge reward: a dodged whiff stays open to a PUNISH critical for DodgePunishSeconds; a PERFECT dodge refunds PerfectDodgeCooldownRefund. The DODGED event is raised either way. |
-| `Depth.Dodge.DodgePunishSeconds` | 0.8 | double | `Assets/_Game/Sim/Config/DodgeConfig.cs` | Seconds after a dodged whiff's contact in which a melee hit on the attacker is a PUNISH critical (dodge-then-hit lands a critical 0.64 -> 0.83 vs Normal bots). |
-| `Depth.Dodge.DodgeRewardHumansOnly` | true | bool | `Assets/_Game/Sim/Config/DodgeConfig.cs` | px DM (call 18): the punish window only when the dodger is a human seat; a bot's dodge leaves the attacker its own whiff recovery. |
-| `Depth.Dodge.PerfectDodgeTicks` | 2 | int | `Assets/_Game/Sim/Config/DodgeConfig.cs` | A dodge started this many ticks or fewer before contact is PERFECT (HitBlocked Tier 1). |
-| `Depth.Dodge.PerfectDodgeCooldownRefund` | 0 | double | `Assets/_Game/Sim/Config/DodgeConfig.cs` | Share of the dodge cooldown a PERFECT dodge gives back (0.5 measured: +1 duel of 288, not worth a rule). |
+| `Depth.Dodge.DodgeReward` | true | bool | `Assets/_Game/Sim/Config/DodgeConfig.cs` | The reward rule's own switch: a melee swing dodged by an enemy (it started its dodge during the wind-up from a spot the swing would have hit, or took the contact inside its i-frames) leaves the WHIFFING attacker open ... |
+| `Depth.Dodge.DodgePunishSeconds` | 0.8 | double | `Assets/_Game/Sim/Config/DodgeConfig.cs` | Real seconds after a dodged whiff's contact tick in which a melee hit on the attacker is a PUNISH critical (CombatFeel crit kind 2). |
+| `Depth.Dodge.DodgeRewardHumansOnly` | true | bool | `Assets/_Game/Sim/Config/DodgeConfig.cs` | px DM (lead's call 18): the DodgePunishSeconds window only when the dodger is a human seat; a bot's dodge leaves the attacker its own whiff recovery (batch 16). |
+| `Depth.Dodge.PerfectDodgeTicks` | 2 | int | `Assets/_Game/Sim/Config/DodgeConfig.cs` | A dodge started this many ticks or fewer before the contact tick is PERFECT (HitBlocked Tier 1). |
+| `Depth.Dodge.PerfectDodgeCooldownRefund` | 0 | double | `Assets/_Game/Sim/Config/DodgeConfig.cs` | Share of the dodge cooldown a PERFECT dodge gives back (0 = none). |
 | `Depth.Dodge.ReactionTicks` | [12, 8, 5] | int[] | `Assets/_Game/Sim/Config/DodgeConfig.cs` | A bot reacts to a threat only once it has existed this many ticks (the ORDER's numbers). |
 | `Depth.Dodge.DodgeChance` | [0.15, 0.35, 0.6] | double[] | `Assets/_Game/Sim/Config/DodgeConfig.cs` | Chance a bot dodges a slam, claw or melee threat (one decision per threat per bot, a stateless hash of seed, tick and id). |
 | `Depth.Dodge.TntChance` | [0.1, 0.25, 0.4] | double[] | `Assets/_Game/Sim/Config/DodgeConfig.cs` | b13 r3: chance a bot dodges an enemy TNT it stands next to (its own roll, lower than the others). |
@@ -879,13 +879,13 @@ Regenerate: `tools/balance/balance-report.sh tuning-index (or the balance-report
 | `Depth.CombatFeel.CritDamageMul` | 1.25 | double | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` | [9] Damage of a critical hit, applied after every other multiplier (kinds do not stack). Start value of the ask. |
 | `Depth.CombatFeel.CritBackArcDeg` | 120 | double | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` | [9] The rear arc (degrees, centred on the back) a back hit comes from: 120 = more than 120 deg off his facing. |
 | `Depth.CombatFeel.BotHumanLimits` | true | bool | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` | [2] Bots fight by human limits (BotAim): aim delay, aim error and a class-arc press cone. False = b16 bots. |
+| `Depth.CombatFeel.BotSwingHesitation` | [0.3, 0.85, 0] | double[] | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` | px S3: share of 1/3-s windows in which a bot holds a ready swing, by BotDifficulty (Normal, Easy, Hard); the larger of this and the BotSkillConfig.SwingHesitation profile wins (Easy's profile is 0.4). |
+| `Depth.CombatFeel.BotSwingHesitationHumansOnly` | true | bool | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` | px DM (slow triage R1): BotSwingHesitation holds only a swing at a HUMAN seat. |
+| `Depth.CombatFeel.BotAimHumansOnly` | true | bool | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` | px DM (lead's call 18): the human-limit aim (BotAim.Perceive: aim delay, lead, aim error) only when the bot's melee target is a human seat; at other bots it aims as on batch 16. |
+| `Depth.CombatFeel.BotSwingTrackHumansOnly` | true | bool | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` | px DM (call 18): BotSwingTrackScale only while the bot's target is a human seat. |
+| `Depth.CombatFeel.BotMeleeDodgeHumansOnly` | true | bool | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` | px DM (call 18): BotMeleeDodgeChance only against a human attacker; a bot's swing is dodged at DodgeConfig.DodgeChance. |
 | `Depth.CombatFeel.BotMeleeAimDelayTicks` | [5, 12, 2] | int[] | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` | [2] Melee aim delay (ticks at 30 Hz) by BotDifficulty (Normal, Easy, Hard): the bot aims at where its target was this long ago (a 0.2 s human = 6). |
 | `Depth.CombatFeel.BotMeleeAimErrorDeg` | [20, 45, 5] | double[] | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` | [2] Melee aim error (degrees, uniform +-) by BotDifficulty, redrawn every 1/3 s. |
-| `Depth.CombatFeel.BotSwingHesitation` | [0.3, 0.85, 0] | double[] | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` | px S3: share of 1/3-s windows in which a bot holds a ready swing, by BotDifficulty (Normal, Easy, Hard); the larger of this and the BotSkillConfig.SwingHesitation profile wins. Full rules only. |
-| `Depth.CombatFeel.BotSwingHesitationHumansOnly` | true | bool | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` | px DM (slow triage R1): the human-limit swing hesitation holds only a swing at a human seat; off = every bot swing (own-Kaiju blocking 13.8 -> 42.9 s). |
-| `Depth.CombatFeel.BotAimHumansOnly` | true | bool | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` | px DM (call 18): the human-limit aim (delay, lead, error) only when the bot's melee target is a human seat. |
-| `Depth.CombatFeel.BotSwingTrackHumansOnly` | true | bool | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` | px DM (call 18): BotSwingTrackScale only while the bot's target is a human seat. |
-| `Depth.CombatFeel.BotMeleeDodgeHumansOnly` | true | bool | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` | px DM (call 18): BotMeleeDodgeChance only against a human attacker; a bot's swing is dodged at Dodge.DodgeChance. |
 | `Depth.CombatFeel.BotSwingTrackScale` | [0.1, 0, 0.5] | double[] | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` | [2] A bot's swing tracks at this share of SwingTrackDegPerSecond, by BotDifficulty (Normal, Easy, Hard). Measured: with full tracking a Normal bot landed 95% on an evasive circle-strafing human (target 40-75%). |
 | `Depth.CombatFeel.BotMeleeDodgeChance` | [0.05, 0.1, 0.6] | double[] | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` | [3] Melee dodge chance of a bot (Easy, Normal, Hard: DodgeConfig order) while BotHumanLimits is on; null = DodgeConfig.DodgeChance (0.15 / 0.35 / 0.60). |
 | `Depth.CombatFeel.BotPressConeIsClassArc` | true | bool | `Assets/_Game/Sim/Config/CombatFeelConfig.cs` | [2] The bot presses only with the target inside its own class arc (b16: a flat 60 degrees each side for all). |
@@ -950,8 +950,8 @@ Regenerate: `tools/balance/balance-report.sh tuning-index (or the balance-report
 | `Depth.HutChoices.SwiftFeetScale` | 1.1 | double | `Assets/_Game/Sim/Config/HutChoicesConfig.cs` | SWIFT FEET: the team moves this much faster while off the hill (beyond the hill radius + SwiftHillMargin). |
 | `Depth.HutChoices.SwiftHillMargin` | 2 | double | `Assets/_Game/Sim/Config/HutChoicesConfig.cs` |  |
 | `Depth.PhysicsFeel.Enabled` | true | bool | `Assets/_Game/Sim/Config/PhysicsFeelConfig.cs` |  |
-| `Depth.PhysicsFeel.KaijuWalkSlide` | false | bool | `Assets/_Game/Sim/Config/PhysicsFeelConfig.cs` | px DM: a walker touching the Kaiju walks round its body instead of into it. OFF: shiver gate hard flags 2 -> 8 (a trade). |
-| `Depth.PhysicsFeel.KaijuWalkSlideSlack` | 0.05 | double | `Assets/_Game/Sim/Config/PhysicsFeelConfig.cs` | Contact slack (u) for KaijuWalkSlide. |
+| `Depth.PhysicsFeel.KaijuWalkSlide` | false | bool | `Assets/_Game/Sim/Config/PhysicsFeelConfig.cs` | px DM (two-minute walking shiver): a grounded walker touching the hatched solid Kaiju walks ALONG its body (the into-body share of its step is removed before the step), instead of stepping in and being pushed back out... |
+| `Depth.PhysicsFeel.KaijuWalkSlideSlack` | 0.05 | double | `Assets/_Game/Sim/Config/PhysicsFeelConfig.cs` | Contact slack (u) beyond body + actor radius inside which the walk slides round the Kaiju. |
 | `Depth.PhysicsFeel.CornerNudgeMax` | 0.35 | double | `Assets/_Game/Sim/Config/PhysicsFeelConfig.cs` | Largest overlap with a corner cell that is slid round (u; PhysicsConfig.CornerNudgeMax 0.1 otherwise). |
 | `Depth.PhysicsFeel.WallSlideKeep` | 0.92 | double | `Assets/_Game/Sim/Config/PhysicsFeelConfig.cs` | Share of the step kept along a wall when one axis is blocked and the input is within WallSlideFullDeg of the wall (pure projection keeps cos(angle): 71 percent at 45 degrees). |
 | `Depth.PhysicsFeel.WallSlideFullDeg` | 45 | double | `Assets/_Game/Sim/Config/PhysicsFeelConfig.cs` |  |
@@ -978,21 +978,8 @@ Regenerate: `tools/balance/balance-report.sh tuning-index (or the balance-report
 | `Depth.Mech.KaijuIdleMargin` | 1 | double | `Assets/_Game/Sim/Config/MechRulesConfig.cs` | Extra distance outside the scoring ring (u). |
 | `Depth.Mech.KaijuIdleStop` | 0.75 | double | `Assets/_Game/Sim/Config/MechRulesConfig.cs` | The idle point is reached when the body is this close to it (u); it then stands and faces the hill. |
 | `Depth.Mech.AfkAutopilot` | true | bool | `Assets/_Game/Sim/Config/MechRulesConfig.cs` | A human whose frames carry no input for AfkSeconds is played by the autopilot (the same bot input a dropped player gets) until his next input, which hands the fighter back on that tick. |
-| `Depth.Mech.AfkSeconds` | 30 | double | `Assets/_Game/Sim/Config/MechRulesConfig.cs` | Lane S2 (2026-11-22): 15 -> 30; aim, Cancel and class picks count as input too (MechRules.HasInput(w, id, f)). |
-| `Depth.Seat.On` | true | bool | `Assets/_Game/Sim/Config/PlayerSeatConfig.cs` | Lane S2 switch: never-silent presses (ActionRefused), HitBlocked / StructureHit / WorldAction / AutopilotChanged reporting and the class repairs. Full rules only. |
-| `Depth.Seat.RefuseRepeatSeconds` | 1 | double | `Assets/_Game/Sim/Config/PlayerSeatConfig.cs` | A held or mashed button raises at most one ActionRefused per this many seconds, per actor and button. |
-| `Depth.Seat.InteractSlack` | 0 | double | `Assets/_Game/Sim/Config/PlayerSeatConfig.cs` | Slack (u) on the interact reaches when deciding an E press has nothing in reach (0 = the systems' exact reaches). |
-| `Depth.Seat.PointBlankRange` | 1.7 | double | `Assets/_Game/Sim/Config/PlayerSeatConfig.cs` | Human Demolitions with TNT ready: an enemy within this (centre to centre) inside her pry-bar arc gets the pry bar; the TNT stays ready. 0 = off. |
-| `Depth.Seat.PointBlankStructures` | true | bool | `Assets/_Game/Sim/Config/PlayerSeatConfig.cs` | px DM (review defect 9): an enemy barricade or wall cell inside her pry-bar reach and arc also takes the pry bar instead of a throw. |
-| `Depth.Seat.ShieldStopsStagger` | true | bool | `Assets/_Game/Sim/Config/PlayerSeatConfig.cs` | px DM (review defect 6): a frontal hit cut by the Warrior's raised shield does not stagger him; it still lands reduced and says BLOCKED. |
-| `Depth.Seat.HealerFightAimRadius` | 1.2 | double | `Assets/_Game/Sim/Config/PlayerSeatConfig.cs` | Human Healer: an attack press aimed within this of an enemy inside her lantern reach swings the lantern even with hurt allies near. 0 = off. |
-| `Depth.Seat.HealerAimPickRadius` | 2 | double | `Assets/_Game/Sim/Config/PlayerSeatConfig.cs` | Human Healer mend target: the hurt ally nearest the aim when within this of it, else the most hurt ally in range. |
-| `Depth.Seat.MinerDigsAwayFromVein` | true | bool | `Assets/_Game/Sim/Config/PlayerSeatConfig.cs` | A human Miner's F away from an ore vein digs the cell ahead with the Builder's dig rule (no carry, no place). Bots never dig. |
-| `Depth.Seat.IdleAimUnits` | 0.5 | double | `Assets/_Game/Sim/Config/PlayerSeatConfig.cs` | Idle rule: an aim (relative to the body) that moved this far since input last counted is input. |
-| `Depth.Seat.IdleAimDegrees` | 2 | double | `Assets/_Game/Sim/Config/PlayerSeatConfig.cs` | Idle rule: an aim direction that turned this many degrees since input last counted is input. |
-| `Depth.Seat.MinerTapMinesToFull` | true | bool | `Assets/_Game/Sim/Config/PlayerSeatConfig.cs` | Lane S3 (lead's call): one tap of F at an ore vein keeps a human Miner mining until the cargo is full or the vein is out; moving, attacking, Cancel, a hit or a get-up stops it. False = one unit per tap. Bots unchanged. |
-| `Depth.Seat.MinerTapStopMoveShare` | 0.25 | double | `Assets/_Game/Sim/Config/PlayerSeatConfig.cs` | Lane S3: move input share above which a tapped mining channel stops (under it is stick drift). |
-| `Depth.Mech.FeedExtrasShare` | false | bool | `Assets/_Game/Sim/Config/MechRulesConfig.cs` | The director's two extra Kaiju feeders (ahead, or 10 s behind) become a share of the team: ceil(FeedExtraShare x team size) = 2 at 16, 1 at 8, 1 at 5 (before: 2 at every size, 3 of 5 bots off the hill at 5v5). |
+| `Depth.Mech.AfkSeconds` | 30 | double | `Assets/_Game/Sim/Config/MechRulesConfig.cs` | lane S2 (2026-11-22): 15 -> 30, a player holding a spot or reading the vote card is not idle |
+| `Depth.Mech.FeedExtrasShare` | false | bool | `Assets/_Game/Sim/Config/MechRulesConfig.cs` |  |
 | `Depth.Mech.FeedExtraShare` | 0.12 | double | `Assets/_Game/Sim/Config/MechRulesConfig.cs` |  |
 | `Depth.Mech.HutBotsWaitForHumans` | true | bool | `Assets/_Game/Sim/Config/MechRulesConfig.cs` | On a team with at least one human at the controls, bots hold their votes until HutBotLastSeconds are left in the window or every such human has voted, whichever is first, and then follow the humans' majority; when the... |
 | `Depth.Mech.HutBotLastSeconds` | 3 | double | `Assets/_Game/Sim/Config/MechRulesConfig.cs` |  |
@@ -1006,3 +993,111 @@ Regenerate: `tools/balance/balance-report.sh tuning-index (or the balance-report
 | `Depth.Mech.HillCapWalkInSlack` | 1 | int | `Assets/_Game/Sim/Config/MechRulesConfig.cs` | Off-disc hill bots still walk in while the team's counted bodies plus this are under the cap. |
 | `Depth.Mech.HealerTieBreak` | false | bool | `Assets/_Game/Sim/Config/MechRulesConfig.cs` | true: bots score a Healer like any other target minus HealerTieBonus (a tie-breaker) instead of as if she stood at 1 % of her distance (an override that made her die 18 times a match). |
 | `Depth.Mech.HealerTieBonus` | 2 | double | `Assets/_Game/Sim/Config/MechRulesConfig.cs` |  |
+| `Depth.Seat.On` | true | bool | `Assets/_Game/Sim/Config/PlayerSeatConfig.cs` | The whole lane: reporting events (HitBlocked, StructureHit, ActionRefused, WorldAction, AutopilotChanged) and the class repairs below. Runs only with the Full rules (CombatFeel.On and not Depth.Classic). |
+| `Depth.Seat.RefuseRepeatSeconds` | 1 | double | `Assets/_Game/Sim/Config/PlayerSeatConfig.cs` | A held or mashed button raises at most one ActionRefused per this many seconds, per actor and button. |
+| `Depth.Seat.InteractSlack` | 0 | double | `Assets/_Game/Sim/Config/PlayerSeatConfig.cs` | Interact: slack (u) added to the interact reaches when deciding "nothing in reach" (0 = the systems' exact reaches; a positive slack trades a missed refusal for never refusing a press a system might still take). |
+| `Depth.Seat.PointBlankRange` | 1.7 | double | `Assets/_Game/Sim/Config/PlayerSeatConfig.cs` | With TNT ready, an Attack press with an enemy within this centre-to-centre distance inside her pry-bar arc swings the pry bar (the TNT stays ready). 0 = off (always throw). |
+| `Depth.Seat.PointBlankStructures` | true | bool | `Assets/_Game/Sim/Config/PlayerSeatConfig.cs` | px DM (review defect 9): an enemy barricade or wall cell inside her pry-bar reach and arc (and within PointBlankRange) also takes the pry bar instead of a throw. False = only enemy bodies count (lane S2). |
+| `Depth.Seat.ShieldStopsStagger` | true | bool | `Assets/_Game/Sim/Config/PlayerSeatConfig.cs` | px DM (review defect 6): a frontal hit cut by the Warrior's raised shield does not stagger him (the hit still lands reduced and knocks; HitBlocked BlockedShield says BLOCKED). False = it staggers like any hit. |
+| `Depth.Seat.HealerFightAimRadius` | 1.2 | double | `Assets/_Game/Sim/Config/PlayerSeatConfig.cs` | An Attack press whose aim point is within this of an enemy inside her lantern reach swings the lantern, even with hurt allies near (human seat only). 0 = off. |
+| `Depth.Seat.HealerAimPickRadius` | 2 | double | `Assets/_Game/Sim/Config/PlayerSeatConfig.cs` | Human mend target: the hurt ally nearest the aim point when the aim is within this of that ally; else the MOST hurt ally in range (the bots' rule). |
+| `Depth.Seat.MinerDigsAwayFromVein` | true | bool | `Assets/_Game/Sim/Config/PlayerSeatConfig.cs` | A human Miner's DigPlace away from an ore vein digs the cell ahead with the Builder's DIG rule (no carry, no place). Bots never dig. |
+| `Depth.Seat.IdleAimUnits` | 0.5 | double | `Assets/_Game/Sim/Config/PlayerSeatConfig.cs` | An aim point that moved this far (u) from where it was when input was last counted is input. |
+| `Depth.Seat.IdleAimDegrees` | 2 | double | `Assets/_Game/Sim/Config/PlayerSeatConfig.cs` | An aim DIRECTION from the body that turned this far (degrees) is input (third person: fighter + camera yaw). |
+| `Depth.Seat.MinerTapMinesToFull` | true | bool | `Assets/_Game/Sim/Config/PlayerSeatConfig.cs` | Lane S3 (lead's call): one tap of F at an ore vein keeps a human Miner mining unit after unit until his cargo is full or the vein is out; moving, attacking, Cancel, a hit or a get-up stops it (no need to hold F). |
+| `Depth.Seat.MinerTapStopMoveShare` | 0.25 | double | `Assets/_Game/Sim/Config/PlayerSeatConfig.cs` | Lane S3: move input (stick share, 0..1) above which a tapped mining channel stops ("he moves"); under it is stick drift. 0.25 = a deliberate push on a pad, any WASD key. |
+| `Depth.Moves.DemoTntOnDigOnly` | false | bool | `Assets/_Game/Sim/Config/MovesConfig.cs` | T1-1 (lane 4): Demolitions' Attack is always the pry bar; F / U / pad Y throws TNT (the DemolitionsTntConfig.ThrowOnAttack = false path). Bots that threw through the Attack bit request it on DigPlace. |
+| `Depth.Moves.DodgeLunge` | false | bool | `Assets/_Game/Sim/Config/MovesConfig.cs` | T1-2 (lane 2): a dodge toward an enemy stops short at LungeStopShare x reach and an Attack buffered in the dash fires on the first recover tick with the wind-up x LungeWindupMul (LUNGE). |
+| `Depth.Moves.DodgeAvoidRefund` | false | bool | `Assets/_Game/Sim/Config/MovesConfig.cs` | T1-3 (lane 2): any dodge that produces HitBlocked BlockedDodge gives back AvoidRefundShare of the cooldown left. |
+| `Depth.Moves.FeintBait` | false | bool | `Assets/_Game/Sim/Config/MovesConfig.cs` | T1-4a (sim side lane 2, words lane 6): FeintBaited event when the victim started a dodge, guard or parry attempt FeintBaitBeforeTicks before the feint or FeintBaitAfterTicks after it. Event only. |
+| `Depth.Moves.BotStepOut` | false | bool | `Assets/_Game/Sim/Config/MovesConfig.cs` | T1-4b (lane 5): on a read human wind-up a bot steps out of reach (no dodge) with BotStepOutChance. |
+| `Depth.Moves.BuilderQuickWall` | false | bool | `Assets/_Game/Sim/Config/MovesConfig.cs` | T1-5 (lane 5): the wheel's SHORT WALL becomes the QUICK WALL (QuickWall* knobs). |
+| `Depth.Moves.Guard` | false | bool | `Assets/_Game/Sim/Config/MovesConfig.cs` | T2-1 (lane 2): GUARD (hold InputFrame.Guard) and PARRY (a Guard press edge inside the window), every class; the Warrior parries only (his SHIELD stays his block). Bots guard / parry with the Bot* chances (lane 5). |
+| `Depth.Moves.Heavy` | false | bool | `Assets/_Game/Sim/Config/MovesConfig.cs` | T2-2 (lane 4): hold Attack to charge a heavy (tap stays light; a held Attack no longer auto-repeats). |
+| `Depth.Moves.Combos` | false | bool | `Assets/_Game/Sim/Config/MovesConfig.cs` | T2-3 (lane 4): light chains in the hit-cancel window (ComboSteps per class, finisher on the last step). |
+| `Depth.Moves.Travel` | false | bool | `Assets/_Game/Sim/Config/MovesConfig.cs` | T2-4 (lane 3): TRAVEL, the automatic sprint out of combat. |
+| `Depth.Moves.Slide` | false | bool | `Assets/_Game/Sim/Config/MovesConfig.cs` | T2-5 (lane 3): SLIDE, the dodge while travelling (a SLIDE TRIP on an enemy body). Needs Travel to ever fire. |
+| `Depth.Moves.Glide` | false | bool | `Assets/_Game/Sim/Config/MovesConfig.cs` | T2-6 (lane 3): GLIDE, Healer only (GlideClasses): hold Jump after the apex (InputFrame.JumpHeld). |
+| `Depth.Moves.JumpEvade` | false | bool | `Assets/_Game/Sim/Config/MovesConfig.cs` | T2-7 (lanes 2 + 3): ground melee misses an airborne body on air ticks JumpEvadeFrom..JumpEvadeTo (lane 2's hit test, BlockedAir), then the landing recovery and the jump lock (lane 3). |
+| `Depth.Moves.SecondWind` | false | bool | `Assets/_Game/Sim/Config/MovesConfig.cs` | T2-8 (lane 2): once per life below SecondWindBelowShare, the next dodge / parry / guard block heals. |
+| `Depth.Moves.LungeConeDeg` | 35 | double | `Assets/_Game/Sim/Config/MovesConfig.cs` | A dodge within this many degrees of an enemy direction is a dodge-in. |
+| `Depth.Moves.LungeStopShare` | 0.85 | double | `Assets/_Game/Sim/Config/MovesConfig.cs` | The dash is clipped to end at this share of the dodger's reach from the enemy body. |
+| `Depth.Moves.LungeWindupMul` | 0.75 | double | `Assets/_Game/Sim/Config/MovesConfig.cs` | The lunge swing's wind-up multiplier (Warrior 12 to 9 ticks). |
+| `Depth.Moves.AvoidRefundShare` | 0.4 | double | `Assets/_Game/Sim/Config/MovesConfig.cs` | Share of the dodge cooldown LEFT given back by a dodge that avoided a hit (BlockedDodge). |
+| `Depth.Moves.FeintBaitBeforeTicks` | 6 | int | `Assets/_Game/Sim/Config/MovesConfig.cs` |  |
+| `Depth.Moves.FeintBaitAfterTicks` | 3 | int | `Assets/_Game/Sim/Config/MovesConfig.cs` |  |
+| `Depth.Moves.BotStepOutChance` | [0.3, 0.15, 0.45] | double[] | `Assets/_Game/Sim/Config/MovesConfig.cs` | Bot step-out chance on a read human wind-up: Normal, Easy, Hard (BotDifficulty order). |
+| `Depth.Moves.QuickWallCells` | 3 | int | `Assets/_Game/Sim/Config/MovesConfig.cs` |  |
+| `Depth.Moves.QuickWallDistance` | 1.5 | double | `Assets/_Game/Sim/Config/MovesConfig.cs` |  |
+| `Depth.Moves.QuickWallWood` | 1 | int | `Assets/_Game/Sim/Config/MovesConfig.cs` |  |
+| `Depth.Moves.QuickWallSeconds` | 8 | double | `Assets/_Game/Sim/Config/MovesConfig.cs` |  |
+| `Depth.Moves.QuickWallHp` | 60 | double | `Assets/_Game/Sim/Config/MovesConfig.cs` |  |
+| `Depth.Moves.QuickWallHillKeepOut` | 3 | double | `Assets/_Game/Sim/Config/MovesConfig.cs` |  |
+| `Depth.Moves.QuickWallMaxPerBuilder` | 1 | int | `Assets/_Game/Sim/Config/MovesConfig.cs` |  |
+| `Depth.Moves.GuardCut` | [0, 0.4, 0.45, 0.35, 0.55, 0.35] | double[] | `Assets/_Game/Sim/Config/MovesConfig.cs` | Damage share a frontal guard cuts (Warrior 0 = no guard). |
+| `Depth.Moves.GuardMeter` | [0, 40, 50, 35, 60, 35] | double[] | `Assets/_Game/Sim/Config/MovesConfig.cs` | Damage the guard absorbs before it breaks. |
+| `Depth.Moves.GuardMoveMul` | [1, 0.6, 0.6, 0.6, 0.5, 0.6] | double[] | `Assets/_Game/Sim/Config/MovesConfig.cs` | Move speed multiplier while guarding. |
+| `Depth.Moves.ParryWindowTicks` | [3, 4, 4, 4, 3, 5] | int[] | `Assets/_Game/Sim/Config/MovesConfig.cs` | Parry window: ticks before an enemy melee contact in which a Guard press edge parries. |
+| `Depth.Moves.WarriorParryWindowShieldDown` | 2 | int | `Assets/_Game/Sim/Config/MovesConfig.cs` | The Warrior's parry window while his shield is down (3 with it up is ParryWindowTicks[0]). |
+| `Depth.Moves.GuardFrontalDeg` | 60 | double | `Assets/_Game/Sim/Config/MovesConfig.cs` |  |
+| `Depth.Moves.GuardRaiseTicks` | 3 | int | `Assets/_Game/Sim/Config/MovesConfig.cs` |  |
+| `Depth.Moves.GuardReleaseTicks` | 2 | int | `Assets/_Game/Sim/Config/MovesConfig.cs` |  |
+| `Depth.Moves.GuardRefillPerSecond` | 15 | double | `Assets/_Game/Sim/Config/MovesConfig.cs` |  |
+| `Depth.Moves.GuardRefillDelaySeconds` | 1 | double | `Assets/_Game/Sim/Config/MovesConfig.cs` |  |
+| `Depth.Moves.GuardBreakStaggerTicks` | 15 | int | `Assets/_Game/Sim/Config/MovesConfig.cs` |  |
+| `Depth.Moves.GuardDrainWarriorCleave` | 1.5 | double | `Assets/_Game/Sim/Config/MovesConfig.cs` |  |
+| `Depth.Moves.GuardDrainMinerPick` | 2 | double | `Assets/_Game/Sim/Config/MovesConfig.cs` |  |
+| `Depth.Moves.GuardBlastCutShare` | 0.5 | double | `Assets/_Game/Sim/Config/MovesConfig.cs` | TNT and mines are cut by this share of the class cut; the Kaiju is never cut. |
+| `Depth.Moves.ParryStaggerTicks` | 12 | int | `Assets/_Game/Sim/Config/MovesConfig.cs` |  |
+| `Depth.Moves.ParryPunishSeconds` | 0.8 | double | `Assets/_Game/Sim/Config/MovesConfig.cs` | The parrier's next melee hit inside this is the existing PUNISH critical (no new crit kind). |
+| `Depth.Moves.ParryWhiffHoldTicks` | 9 | int | `Assets/_Game/Sim/Config/MovesConfig.cs` | A Guard press outside the window holds the guard at least this many ticks (a whiffed parry). |
+| `Depth.Moves.ParryLockoutSeconds` | 1 | double | `Assets/_Game/Sim/Config/MovesConfig.cs` |  |
+| `Depth.Moves.BotGuardChance` | [0.15, 0, 0.4] | double[] | `Assets/_Game/Sim/Config/MovesConfig.cs` | Bot guard chance on a read human wind-up (Normal, Easy, Hard) and bot parry chance (Hard only). |
+| `Depth.Moves.BotParryChance` | [0, 0, 0.1] | double[] | `Assets/_Game/Sim/Config/MovesConfig.cs` |  |
+| `Depth.Moves.ChargeStartTick` | 8 | int | `Assets/_Game/Sim/Config/MovesConfig.cs` |  |
+| `Depth.Moves.ChargeFullTick` | 24 | int | `Assets/_Game/Sim/Config/MovesConfig.cs` |  |
+| `Depth.Moves.ChargeAutoReleaseTick` | 36 | int | `Assets/_Game/Sim/Config/MovesConfig.cs` |  |
+| `Depth.Moves.ChargeDamageMulMax` | 1.6 | double | `Assets/_Game/Sim/Config/MovesConfig.cs` |  |
+| `Depth.Moves.ChargeKnockMulMax` | 1.6 | double | `Assets/_Game/Sim/Config/MovesConfig.cs` |  |
+| `Depth.Moves.ChargeMoveMul` | 0.5 | double | `Assets/_Game/Sim/Config/MovesConfig.cs` |  |
+| `Depth.Moves.HeavyWhiffExtraRecoveryTicks` | 8 | int | `Assets/_Game/Sim/Config/MovesConfig.cs` |  |
+| `Depth.Moves.ChargeCancelRefund` | 0.7 | double | `Assets/_Game/Sim/Config/MovesConfig.cs` | Cancel during the charge is a feint with this cooldown refund (as today). |
+| `Depth.Moves.HeavyReach` | [1.8, 2.9, 1.5, 1.4, 1.8, 1.6] | double[] | `Assets/_Game/Sim/Config/MovesConfig.cs` | Heavy shape per class: reach, arc in degrees (the Builder's slam is a 360 radius). |
+| `Depth.Moves.HeavyArcDeg` | [70, 30, 90, 90, 360, 180] | double[] | `Assets/_Game/Sim/Config/MovesConfig.cs` |  |
+| `Depth.Moves.HeavyKnockMul` | [1, 2, 1, 1, 1.5, 1.4] | double[] | `Assets/_Game/Sim/Config/MovesConfig.cs` | Extra knock multiplier per class on top of the charge (Farmer x2.0, Builder 1.5 radial, Healer x1.4). |
+| `Depth.Moves.HeavyDamageBonus` | [true, true, true, true, true, false] | bool[] | `Assets/_Game/Sim/Config/MovesConfig.cs` | False = the heavy has no damage bonus (the Healer's flare is a disengage). |
+| `Depth.Moves.MinerSunderSeconds` | 5 | double | `Assets/_Game/Sim/Config/MovesConfig.cs` |  |
+| `Depth.Moves.MinerHeavyGuardDrain` | 3 | double | `Assets/_Game/Sim/Config/MovesConfig.cs` |  |
+| `Depth.Moves.DemoFuseDamage` | 12 | double | `Assets/_Game/Sim/Config/MovesConfig.cs` |  |
+| `Depth.Moves.DemoFuseSeconds` | 1 | double | `Assets/_Game/Sim/Config/MovesConfig.cs` |  |
+| `Depth.Moves.DemoFuseRadius` | 1 | double | `Assets/_Game/Sim/Config/MovesConfig.cs` |  |
+| `Depth.Moves.ComboSteps` | [2, 3, 3, 3, 2, 2] | int[] | `Assets/_Game/Sim/Config/MovesConfig.cs` | Steps per class (the last step is the finisher). |
+| `Depth.Moves.ComboStepWindupMul` | 0.7 | double | `Assets/_Game/Sim/Config/MovesConfig.cs` |  |
+| `Depth.Moves.ComboStepDamageMul` | 1.1 | double | `Assets/_Game/Sim/Config/MovesConfig.cs` |  |
+| `Depth.Moves.FinisherDamageMul` | 1.35 | double | `Assets/_Game/Sim/Config/MovesConfig.cs` |  |
+| `Depth.Moves.FinisherKnockMul` | 1.8 | double | `Assets/_Game/Sim/Config/MovesConfig.cs` |  |
+| `Depth.Moves.FinisherExtraRecoveryTicks` | 6 | int | `Assets/_Game/Sim/Config/MovesConfig.cs` |  |
+| `Depth.Moves.ComboResetSeconds` | 1 | double | `Assets/_Game/Sim/Config/MovesConfig.cs` |  |
+| `Depth.Moves.TravelAfterMoveTicks` | 30 | int | `Assets/_Game/Sim/Config/MovesConfig.cs` |  |
+| `Depth.Moves.TravelEnemyRadius` | 8 | double | `Assets/_Game/Sim/Config/MovesConfig.cs` |  |
+| `Depth.Moves.TravelNoCombatSeconds` | 3 | double | `Assets/_Game/Sim/Config/MovesConfig.cs` |  |
+| `Depth.Moves.TravelSpeedMul` | 1.3 | double | `Assets/_Game/Sim/Config/MovesConfig.cs` |  |
+| `Depth.Moves.TravelRampTicks` | 9 | int | `Assets/_Game/Sim/Config/MovesConfig.cs` |  |
+| `Depth.Moves.SlideDistance` | 4.5 | double | `Assets/_Game/Sim/Config/MovesConfig.cs` |  |
+| `Depth.Moves.SlideTicks` | 10 | int | `Assets/_Game/Sim/Config/MovesConfig.cs` |  |
+| `Depth.Moves.SlideTripDamage` | 8 | double | `Assets/_Game/Sim/Config/MovesConfig.cs` |  |
+| `Depth.Moves.SlideTripStaggerTicks` | 10 | int | `Assets/_Game/Sim/Config/MovesConfig.cs` |  |
+| `Depth.Moves.SlideTripKnock` | 0.5 | double | `Assets/_Game/Sim/Config/MovesConfig.cs` |  |
+| `Depth.Moves.SlideTripRecoveryTicks` | 6 | int | `Assets/_Game/Sim/Config/MovesConfig.cs` |  |
+| `Depth.Moves.GlideClasses` | [false, false, false, false, false, true] | bool[] | `Assets/_Game/Sim/Config/MovesConfig.cs` | Classes that glide (Healer only by default; adding the Farmer later is one entry). |
+| `Depth.Moves.GlideFromAirTick` | 9 | int | `Assets/_Game/Sim/Config/MovesConfig.cs` |  |
+| `Depth.Moves.GlideExtraTicks` | 24 | int | `Assets/_Game/Sim/Config/MovesConfig.cs` |  |
+| `Depth.Moves.GlideSpeedMul` | 0.9 | double | `Assets/_Game/Sim/Config/MovesConfig.cs` |  |
+| `Depth.Moves.GlideMaxVoidCells` | 3 | int | `Assets/_Game/Sim/Config/MovesConfig.cs` |  |
+| `Depth.Moves.GlideCooldownSeconds` | 4 | double | `Assets/_Game/Sim/Config/MovesConfig.cs` |  |
+| `Depth.Moves.JumpEvadeFromAirTick` | 5 | int | `Assets/_Game/Sim/Config/MovesConfig.cs` |  |
+| `Depth.Moves.JumpEvadeToAirTick` | 12 | int | `Assets/_Game/Sim/Config/MovesConfig.cs` |  |
+| `Depth.Moves.JumpEvadeLandingTicks` | 4 | int | `Assets/_Game/Sim/Config/MovesConfig.cs` |  |
+| `Depth.Moves.JumpEvadeRelockSeconds` | 1 | double | `Assets/_Game/Sim/Config/MovesConfig.cs` |  |
+| `Depth.Moves.SecondWindBelowShare` | 0.25 | double | `Assets/_Game/Sim/Config/MovesConfig.cs` |  |
+| `Depth.Moves.SecondWindHealShare` | 0.15 | double | `Assets/_Game/Sim/Config/MovesConfig.cs` |  |

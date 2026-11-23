@@ -17,6 +17,11 @@ namespace CriticalMass.Sim.Core
         public const int BlockedShield = 7;         // a raised shield cut the hit (the hit still landed; informational)
         public const int BlockedGlancing = 8;       // lane S2: the hit landed reduced (the Farmer's staff inside her close range,
                                                     // "TOO CLOSE"); Radius = the damage lost; informational like BlockedShield
+        // class moves (2026-11-22, lane 1; pushed only while their switch is on)
+        public const int BlockedGuard = 9;          // T2-1: a frontal guard cut the hit (it landed reduced); Radius = damage saved
+        public const int BlockedParried = 10;       // T2-1: a parry negated the hit (0 damage); B = the attacker, now staggered
+                                                    // unless it was the Warrior's armoured cleave
+        public const int BlockedAir = 11;           // T2-7: ground melee passed under an airborne body ("AIRBORNE")
 
         // ---- StructureHit.B
         public const int StructureBarricade = 1;
@@ -34,6 +39,7 @@ namespace CriticalMass.Sim.Core
         public const int ButtonCancel = 6;
         public const int ButtonJump = 7;
         public const int ButtonStationBuy = 8;  // lane S2: InputFrame.StationBuy (a HUD click, not a held key)
+        public const int ButtonGuard = 9;       // class moves T2-1: InputFrame.Guard (its press edge)
 
         // ---- ActionRefused.Value (why)
         public const int RefusedCooldown = 1;       // still cooling down
@@ -49,6 +55,10 @@ namespace CriticalMass.Sim.Core
         public const int RefusedCarrying = 11;      // lane S2: the load you carry forbids it (a corruption carrier cannot dodge)
         public const int RefusedInAir = 12;         // lane S2: already in the air (a jump pressed mid-flight that will not land in time)
         public const int RefusedRuleOff = 13;       // lane S2: this match's rules retired the action (the hut replaced the station ladder)
+        public const int RefusedGuarding = 14;      // class moves: guarding (no attack or cast while the guard is held)
+        public const int RefusedGliding = 15;       // class moves: gliding (no attack or cast in the air)
+        public const int RefusedLanding = 16;       // class moves T2-7: the landing recovery after an evading jump
+        public const int RefusedParryLockout = 17;  // class moves T2-1: parry attempts lock out for ParryLockoutSeconds
 
         // ---- WorldAction.B
         public const int WorldDig = 1;

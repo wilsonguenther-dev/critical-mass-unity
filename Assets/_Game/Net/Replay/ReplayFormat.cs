@@ -160,7 +160,9 @@ namespace CriticalMass.Net.Replay
     /// </summary>
     public static class ReplayFile
     {
-        public const int FormatVersion = 1;
+        /// <summary>1 = b13-replay; 2 = class moves (2026-11-22): the input stream's picks byte carries InputFrame.JumpHeld (bit 32)
+        /// and InputFrame.Guard (bit 64). A format 1 file reads the same (it never set those bits).</summary>
+        public const int FormatVersion = 2;   // mv-hook
         public static readonly byte[] Magic = { (byte)'C', (byte)'M', (byte)'R', (byte)'P' };
         /// <summary>Guards against a hostile length field (a 10-minute 16v16 is far below this).</summary>
         public const int MaxSection = 64 * 1024 * 1024;

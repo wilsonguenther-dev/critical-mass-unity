@@ -57,6 +57,18 @@ namespace CriticalMass.Sim.Tests.Net
             ["TerrainHeightState.MemoNext"] = "KeepsRoutes' memo ring (see MemoKey)",
         };
 
+        /// <summary>
+        /// Class moves (2026-11-22, lane 1): state that is mixed only while it is set, so a world that never uses it fingerprints
+        /// exactly as before the field existed (the rules digest and every replay fingerprint stay put with every class-moves
+        /// switch off). A class field is mixed when not null, a bool when true (a change either way still moves the hash).
+        /// </summary>
+        public static readonly Dictionary<string, string> HashedWhenSet = new Dictionary<string, string>
+        {
+            ["World.Moves"] = "class moves state: allocated only when a MovesConfig switch is on (Full rules)",
+            ["InputFrame.Guard"] = "class moves GUARD held: false unless the player holds it",
+            ["InputFrame.JumpHeld"] = "class moves JUMP held: false unless the player holds it",
+        };
+
         // ------------------------------------------------------------------ the generator
 
         /// <summary>The member name code would use: the field, or the public property behind an auto-property's backing field.</summary>
@@ -154,6 +166,19 @@ namespace CriticalMass.Sim.Tests.Net
                 if (f.FieldType == typeof(World)) { Line(ind, $"// {m}: a reference back to the world"); return; }
                 if (!ok) { Problems.Add($"{key}: not public (make it public, or exclude it with a reason)"); return; }
                 Members++;
+                if (HashedWhenSet.ContainsKey(key))
+                {
+                    // class moves: mixed only while set (see HashedWhenSet)
+                    if (f.FieldType == typeof(bool)) { Line(ind, $"if ({obj}.{m}) M(ref h, 1);"); return; }
+                    if (f.FieldType.IsClass && f.FieldType.IsSealed && f.FieldType.IsVisible)
+                    {
+                        Want(f.FieldType);
+                        Line(ind, $"if ({obj}.{m} != null) {Fn(f.FieldType)}(ref h, {obj}.{m});");
+                        return;
+                    }
+                    Problems.Add($"{key}: HashedWhenSet supports a bool or a public sealed class only");
+                    return;
+                }
                 Value(f.FieldType, obj + "." + m, ind, key);
             }
 

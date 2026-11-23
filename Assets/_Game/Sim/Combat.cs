@@ -74,8 +74,10 @@ namespace CriticalMass.Sim.Core
                 }
                 // b15 combat feel: a press up to BufferSeconds before the swing could start is kept (input buffering).
                 bool wants = feel ? CombatFeel.WantsAttack(w, i, w.Inputs[i].Attack) : w.Inputs[i].Attack;
+                wants = MovesHooks.WantsAttack(w, i, wants);   // mv-hook: lane 4 (charge hold, heavy release, combo press)
                 if (!a.Alive || a.StandUp > 0 || !wants || a.AttackCd > 0 || a.SwingPending) continue;
                 if (Dodge.Active(w, i)) continue; // CM b13 J: a dodging actor cannot attack (rule off: never active)
+                if (MovesHooks.AttackLocked(w, i)) continue;   // mv-hook: guarding, landing recovery (lane 2), gliding, sliding (lane 3)
                 if (lane && a.HitStunTicks > 0) continue; // DG-70: a staggered actor cannot start a swing
                 // feat/light-weapons-1: with LightWeapons on, the Demolitions Expert swings her pry bar and the Healer her
                 // lantern; off (or Classic) it is DG-22 (CM-38: no regular attack, Travis 2026-11-06) and DG-40 exactly.
@@ -106,6 +108,7 @@ namespace CriticalMass.Sim.Core
                 a.AnimAction = 0;
                 a.SpawnProtect = 0; // attacking drops protection
                 int windup = lw != null ? w.Dur.LightWindup[(int)a.Cls] : w.Dur.AttackWindup[(int)a.Cls];
+                windup = MovesHooks.SwingWindup(w, i, windup);   // mv-hook: LUNGE (lane 2), combo step / heavy (lane 4)
                 a.SwingTick = w.Tick;
                 a.SwingWindup = windup;
                 a.SwingRecovery = lw != null ? w.Dur.LightRecovery[(int)a.Cls] : w.Dur.Recovery[(int)a.Cls];
@@ -168,6 +171,7 @@ namespace CriticalMass.Sim.Core
             double range = lw != null ? lw.Range : cc.AttackRange;
             double arcDeg = lw != null ? lw.ArcDeg : cc.AttackArcDeg;
             double dmg = baseDmg * Pickups.DamageScale(w, i); // U-066 Might (x 1 without it)
+            MovesHooks.SwingShape(w, i, ref range, ref arcDeg, ref dmg);   // mv-hook: lane 4's heavy shape, charge and combo damage
             double ax = w.X[i];
             double az = w.Z[i];
             double fx = JsMath.Cos(facing);
@@ -250,6 +254,7 @@ namespace CriticalMass.Sim.Core
             }
             bool answered = w.EventHead != evBefore; // b15: a structure (or Kaiju) answered: not a whiff (lane S2: StructureHit counts)
             if (feel) CombatFeel.AfterContact(w, i, hits + (answered ? 1 : 0));
+            MovesHooks.AfterContact(w, i, hits + (answered ? 1 : 0));   // mv-hook: lunge done (lane 2), combo / whiff recovery (lane 4)
             // px DM: every enemy that dodged this swing says DODGED once (PERFECT when late); a dodged whiff stays punishable.
             Dodge.SwingDodges(w, i, ax, az, fx, fz, range, halfRad, body, hits + (answered ? 1 : 0), dmg, report);
             // lane S2: a human's swing whose arc and reach held only what no swing can break (rock, the hill ring, own walls,
