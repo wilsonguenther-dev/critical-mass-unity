@@ -30,6 +30,11 @@ namespace CriticalMass.Runtime.Input
         }
 
         public void NotePointerMoved(double now) => _pointerAt = now;
+        /// <summary>Fix round 7 (owner's call): a mouse BUTTON press (attack, ability, any mouse-bound verb) is aim input too:
+        /// it hands the aim to the cursor for that press and after it, with no move needed and whatever PointerHoldSeconds
+        /// says, so a mouse player who walks with W A S D and leaves the cursor resting still swings AT the cursor. The keys
+        /// take the aim back only by their own rules (a keyboard attack key, or walking past the hold after this press).</summary>
+        public void NotePointerPressed(double now) => _pointerAt = now;
         public void NoteStick(double now) => _stickAt = now;
         /// <summary>The move keys were used (attack: a keyboard attack or ability key was pressed).</summary>
         public void NoteKeys(double now, bool attack = false)

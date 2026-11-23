@@ -395,6 +395,66 @@ namespace CriticalMass.Runtime.Tests
             Assert.Greater(HitFeelTuning.PredictTimeout, 1.0 / 30.0, "longer than one sim tick, so an accepted press is not aborted");
         }
 
+        /// <summary>Fix round 7 (review pass 7: Warrior 0.56 at press + 2): after the hand-over the floor keeps rising on the
+        /// press's clock, so two 60 fps frames after the press the drawn weight is >= 0.8 whatever tick the sim started on.</summary>
+        [Test]
+        public void TheHandedOverSwingReachesPoint8TwoFramesAfterThePress()
+        {
+            float atPlus2 = HitFeelTuning.RisingFloor(2.0 / 60.0 - 1.0 / 60.0);   // the press frame is +0 and already drew one frame
+            Assert.GreaterOrEqual(atPlus2, HitFeelTuning.CommitAtCheck, "press + 2: " + atPlus2);
+            Assert.GreaterOrEqual(HitFeelTuning.RisingFloor(2.0 / 60.0), HitFeelTuning.CommitAtCheck, "press + 2, press seen a frame early");
+            Assert.AreEqual(0f, HitFeelTuning.RisingFloor(HitFeelTuning.FloorSeconds + 0.01), "the floor ends (never holds the pose)");
+            Assert.AreEqual(0f, HitFeelTuning.RisingFloor(-1), "no floor before the press");
+        }
+
+        /// <summary>Fix round 7 (ModelsStandOnTheirGround): inside the 100 ms check the knock lead is untouched (F03); from
+        /// KnockCheckSeconds + KnockCapEaseSeconds the model is within MaxDrawnOffset of the interpolated spot (its ring).</summary>
+        [Test]
+        public void AfterTheFirstTenthTheKnockStaysWithinTheRingTolerance()
+        {
+            var off = new UnityEngine.Vector3(0.34f, 0.1f, 0f);
+            var shift = new UnityEngine.Vector3(0.13f, 0f, 0f);   // the current-tick shift (0.47 u in all, the measured worst)
+            UnityEngine.Vector3 at100 = HitFeelTuning.CapFromInterpolated(off, shift, HitFeelTuning.KnockCheckSeconds);
+            Assert.AreEqual(off, at100, "the 100 ms frame keeps the full lead");
+            UnityEngine.Vector3 late = HitFeelTuning.CapFromInterpolated(off, shift, HitFeelTuning.KnockCheckSeconds + HitFeelTuning.KnockCapEaseSeconds);
+            float total = new UnityEngine.Vector2(late.x + shift.x, late.z + shift.z).magnitude;
+            Assert.LessOrEqual(total, HitFeelTuning.MaxDrawnOffset + 1e-5f, "capped from the interpolated spot");
+            Assert.AreEqual(0.1f, late.y, 1e-6f, "the height is not touched");
+            UnityEngine.Vector3 mid = HitFeelTuning.CapFromInterpolated(off, shift, HitFeelTuning.KnockCheckSeconds + HitFeelTuning.KnockCapEaseSeconds * 0.5);
+            float midTotal = new UnityEngine.Vector2(mid.x + shift.x, mid.z + shift.z).magnitude;
+            Assert.That(midTotal, Is.InRange(HitFeelTuning.MaxDrawnOffset, 0.47f), "eased, no pop");
+            Assert.LessOrEqual(HitFeelTuning.MaxDrawnOffset, 0.35f, "inside the grounding test's 0.35 u");
+        }
+
+        /// <summary>Fix round 7 (review pass 7 (a): the TNT throw pose held to +24 frames): the throw cue is down to 0 by 8 frames
+        /// after the throw, full for the first 3, and its clip has played to the end by then (the pose is released).</summary>
+        [Test]
+        public void TheThrowPoseIsReleasedEightFramesAfterTheThrow()
+        {
+            HitFeelTuning.ThrowPose(0, 0.9, out double t0, out float w0);
+            Assert.AreEqual(1f, w0, "full on the throw frame");
+            HitFeelTuning.ThrowPose(2.0 / 60.0, 0.9, out _, out float w2);
+            Assert.AreEqual(1f, w2, "full 2 frames on");
+            HitFeelTuning.ThrowPose(6.0 / 60.0, 0.9, out _, out float w6);
+            Assert.Less(w6, 0.5f, "mostly down by +6: " + w6);
+            HitFeelTuning.ThrowPose(8.0 / 60.0, 0.9, out double t8, out float w8);
+            Assert.AreEqual(0f, w8, "released by +8");
+            Assert.AreEqual(0.9, t8, 1e-9, "the clip has played out by +8 (the animator drops it)");
+            Assert.AreEqual(0.0, t0, 1e-9);
+        }
+
+        /// <summary>Fix round 7 (review pass 7 (c)): a press during the cooldown is acknowledged by a capped wind-up that fades by
+        /// 0.12 s: visible (>= 0.3) but clearly not a swing (<= 0.5), and on the predicted-press timing (gone by 0.12 s).</summary>
+        [Test]
+        public void ACooldownPressShowsAShortCappedWindup()
+        {
+            Assert.That(HitFeelTuning.RefusedPressWeight, Is.InRange(0.3f, 0.5f));
+            Assert.IsTrue(HitFeelTuning.PredictedSwing(1.0 / 60.0, 0.4, out double age, out float w));
+            Assert.Greater(Math.Min(w, HitFeelTuning.RefusedPressWeight), 0.3f, "seen one frame after the press");
+            Assert.LessOrEqual(age, 0.4 * HitFeelTuning.PredictHoldShare + 1e-9, "held short of the strike");
+            Assert.IsFalse(HitFeelTuning.PredictedSwing(HitFeelTuning.PredictTimeout + 0.001, 0.4, out _, out _), "ends at the timeout");
+        }
+
         /// <summary>Fix round 6 (advisory 4): the reduce-flashing flash (the default) is clearly gentler than the intense one
         /// (at most 30% of its unshaded share, 60% of its length) and still visible (share >= 0.2, >= 4 frames at 60 fps).</summary>
         [Test]

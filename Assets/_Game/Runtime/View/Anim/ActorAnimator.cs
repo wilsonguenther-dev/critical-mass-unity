@@ -90,6 +90,11 @@ namespace CriticalMass.Runtime.View.Anim
         float _predFloor;
         double _predFloorT;
         public bool Predicting => _predicting;
+        // fix round 7: a cooldown press's acknowledgement (capped, never handed over); the press's wall clock for the floor
+        bool _predRefused;
+        double _predFloorWall = double.NaN;
+        /// <summary>Fix round 7: the last predicted press ended without the sim's swing (refused, aborted or timed out).</summary>
+        public bool LastPredictionEnded { get; private set; }
         /// <summary>Fix round 6: predicted wind-ups aborted (tests / logs).</summary>
         public int PredictAborts { get; private set; }
 
@@ -99,7 +104,9 @@ namespace CriticalMass.Runtime.View.Anim
         {
             _predicting = false;
             _predFloor = 0f;
+            _predFloorWall = double.NaN;
             PredictAborts++;
+            LastPredictionEnded = true;
             if (_kind == 1 && _actClip != null)
             {
                 if (_lastActW > 0f)
@@ -114,7 +121,11 @@ namespace CriticalMass.Runtime.View.Anim
 
         /// <summary>Fix round 5 (item 4): the local player pressed attack this frame and the sim would accept it next step:
         /// start the attack clip's wind-up now (the sim's AttackStart continues it without a crossfade).</summary>
-        public void PredictSwing(ModelView m, Actor actor, GameConfig cfg, double simTime)
+        public void PredictSwing(ModelView m, Actor actor, GameConfig cfg, double simTime) => PredictSwing(m, actor, cfg, simTime, false);
+
+        /// <summary>Fix round 7: refused = the sim will not take this press (the attack is cooling down): the same wind-up, capped
+        /// at HitFeelTuning.RefusedPressWeight, that fades out by 0.12 s (press acknowledged, never a strike).</summary>
+        public void PredictSwing(ModelView m, Actor actor, GameConfig cfg, double simTime, bool refused)
         {
             if (m == null || actor == null || _predicting || (_kind == 1 && _actClip != null && _lastActW > 0f)) return;
             string clip = AttackTiming.AttackClip(m, actor.Cls);
@@ -141,6 +152,10 @@ namespace CriticalMass.Runtime.View.Anim
             _predWall = Time.unscaledTimeAsDouble;
             _predSwingTick = actor.SwingTick;
             _predFloor = 0f;
+            _predFloorWall = double.NaN;
+            _predRefused = refused;
+            LastPredictionEnded = false;
+            if (refused) { _commitPending = false; _commitReady = false; }   // no SwingCommit for a refused press
         }
 
         public bool TakeSwingCommit(out float weight)
@@ -685,8 +700,16 @@ namespace CriticalMass.Runtime.View.Anim
                 else
                 {
                     _actAge = actor.AnimAction + alpha / hz;
-                    t = Math.Min(len, _actAge);
-                    actW = AttackTiming.Envelope(_actAge, t, len, windup);
+                    if (_actClip == ArtMapping.Throw)
+                    {
+                        // fix round 7: the throw is over 8 frames after it leaves the hand (HitFeelTuning.ThrowPose)
+                        HitFeelTuning.ThrowPose(_actAge, len, out t, out actW);
+                    }
+                    else
+                    {
+                        t = Math.Min(len, _actAge);
+                        actW = AttackTiming.Envelope(_actAge, t, len, windup);
+                    }
                 }
                 if (_kind == 1 && _commitPending && Time.frameCount - _swingStartFrame >= 2)
                 {
@@ -815,13 +838,14 @@ namespace CriticalMass.Runtime.View.Anim
                 if (actor.SwingTick == _predSwingTick && HitFeelTuning.PredictedSwing(Time.unscaledTimeAsDouble - _predWall, cfgWindup, out double pAge, out float pW))
                 {
                     t = AttackTiming.ClipTime(pAge, ViewContact(_actClip, ClipFacts.Contact(_actClip, (float)(len * 0.5))), len, cfgWindup, _actExtreme);
-                    actW = pW;
+                    actW = _predRefused ? Math.Min(pW, HitFeelTuning.RefusedPressWeight) : pW;
                     return true;
                 }
                 if (actor.SwingTick == _predSwingTick && commit)
                 {
                     // the sim refused (cooldown, stun, TNT): fade it out like a feint
                     _predicting = false;
+                    LastPredictionEnded = true;
                     _feinting = true;
                     _feintAt = simTime;
                     _feintFromT = _lastActTime;
@@ -844,8 +868,11 @@ namespace CriticalMass.Runtime.View.Anim
             {
                 // fix round 5 (item 4): after a predicted start the pose never drops below what the press frame drew, and
                 // the clip never steps back before the predicted wind-up time, until the sim's own envelope passes them
-                if (actW >= _predFloor && t >= _predFloorT) _predFloor = 0f;
-                else { actW = Math.Max(actW, _predFloor); t = Math.Max(t, _predFloorT); }
+                // fix round 7: the floor keeps rising on the press's clock (HitFeelTuning.RisingFloor), so the hand-over does
+                // not hold the press frame's 0.56 while the sim's envelope restarts its own rise (pass 7: 0.56 at press + 2)
+                float floor = double.IsNaN(_predFloorWall) ? _predFloor : Math.Max(_predFloor, HitFeelTuning.RisingFloor(Time.unscaledTimeAsDouble - _predFloorWall));
+                if (actW >= floor && t >= _predFloorT) { _predFloor = 0f; _predFloorWall = double.NaN; }
+                else { actW = Math.Max(actW, floor); t = Math.Max(t, _predFloorT); }
             }
             // feint: the sim dropped the wind-up (b16 CANCEL Value 1): rewind to the start and fade out, visibly aborted
             if (feed != null && i < feed.FeintTick.Length && feed.FeintTick[i] >= actor.SwingTick && actor.SwingTick > 0 && feed.FeintTick[i] != _feintSeen)
@@ -982,10 +1009,11 @@ namespace CriticalMass.Runtime.View.Anim
             // a skill cue (not a melee press this tick) plays its own clip on the ability timing
             if (cue != null && !attack && m.HasClip(cue)) { clip = cue; kind = 2; }
             // fix round 5 (item 4): the sim took the predicted press: continue the same clip, no crossfade, the pose never dips
-            bool fromPredict = _predicting && kind == 1 && clip != null && clip == _actClip;
+            bool fromPredict = _predicting && !_predRefused && kind == 1 && clip != null && clip == _actClip;
+            if (_predicting && !fromPredict) LastPredictionEnded = true;
             _predicting = false;
-            if (fromPredict) { _predFloor = _lastActW; _predFloorT = _lastActTime; }
-            else _predFloor = 0f;
+            if (fromPredict) { _predFloor = Math.Max(_lastActW, 0.01f); _predFloorT = _lastActTime; _predFloorWall = _predWall; }
+            else { _predFloor = 0f; _predFloorWall = double.NaN; }
             if (_actClip != null && _lastActW > 0f && !fromPredict)
             {
                 _prevClip = _actClip;

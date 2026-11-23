@@ -79,9 +79,51 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
         [OneTimeTearDown]
         public void RestoreActionsAtFixtureEnd() => RestoreActions();
 
+        // fix round 7: the Editor is not batch mode, so FogConfig.Pin is null there and the player's fog setting (on) applies:
+        // an enemy the rig puts 0.8 reach in front of me stays fogged for ~0.25 s (10 Hz map + 0.3 s fade, FogConfig), and
+        // FogOfWar.Hides drops its model, bar, aim candidate and hittable cue (Editor 79/42 vs GitHub 107/13, where batch
+        // mode pins the fog off). The seat tests pin it off in both places; the fog has its own tests.
+        bool? _fogWas;
+        int _targetFpsWas, _vsyncWas;
+        /// <summary>Fix round 7: every rendered frame of a seat test is a real 60 fps frame (16.7 ms of wall and game time), so
+        /// the view's unscaled-time cues (commit rise, kick, fades) advance per frame as they do for a player at 60 fps; the
+        /// Editor otherwise renders test frames ~1-5 ms apart and the GitHub runner at whatever pace it has.</summary>
+        public const int SeatFps = 60;
+
+        /// <summary>Fix round 7: pace rendered frames at SeatFps (on) or give the pace back (off). Only the measured windows
+        /// are paced (a whole tier at 60 fps would add minutes on the runner).</summary>
+        protected void Paced(bool on)
+        {
+            if (on) { QualitySettings.vSyncCount = 0; Application.targetFrameRate = SeatFps; }
+            else { Application.targetFrameRate = _targetFpsWas; QualitySettings.vSyncCount = _vsyncWas; }
+        }
+
+        /// <summary>Fix round 7 (the shard-3 hang: GitHub runs 45081444538, 45081447225, 45103924574 all stopped right after
+        /// D2(Healer), in D3, the first test that reached HitAndWatch's end-of-frame sample): WaitForEndOfFrame never resumes
+        /// in a -batchmode -nographics player (nothing is rendered, so there is no end of frame). With no graphics device this
+        /// waits one frame instead (the views' LateUpdate of the frame has run by then); with graphics, the real end of frame.</summary>
+        protected static object EndOfFrame() =>
+            SystemInfo.graphicsDeviceType == UnityEngine.Rendering.GraphicsDeviceType.Null ? null : new WaitForEndOfFrame();
+
+        /// <summary>Fix round 7: tick until `until` is true, at most maxTicks, else fail with what was waited for (no rig
+        /// wait without a hard limit).</summary>
+        protected IEnumerator TickUntil(Func<bool> until, int maxTicks, string what, Action beforeTick = null)
+        {
+            for (int t = 0; t < maxTicks; t++)
+            {
+                if (until()) yield break;
+                yield return TickFrame(beforeTick);
+            }
+            if (!until()) Assert.Fail("[px-f] rig wait timed out after " + maxTicks + " ticks: " + what);
+        }
+
         public override void Setup()
         {
             CaptureActions();
+            _fogWas = CriticalMass.Runtime.View.Fog.FogConfig.CaptureOverride;
+            CriticalMass.Runtime.View.Fog.FogConfig.CaptureOverride = false;
+            _targetFpsWas = Application.targetFrameRate;
+            _vsyncWas = QualitySettings.vSyncCount;
             try { base.Setup(); }
             catch { RestoreActions(); throw; }
             foreach (string k in SavedKeys) _saved[k] = PlayerPrefs.HasKey(k) ? PlayerPrefs.GetInt(k) : (int?)null;
@@ -102,6 +144,8 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
                 else PlayerPrefs.DeleteKey(kv.Key);
             }
             PlayerPrefs.Save();
+            CriticalMass.Runtime.View.Fog.FogConfig.CaptureOverride = _fogWas;
+            Paced(false);
             try
             {
                 SanityWorld.Reset();

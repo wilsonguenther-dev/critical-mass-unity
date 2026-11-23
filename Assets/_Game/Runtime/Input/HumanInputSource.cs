@@ -356,7 +356,7 @@ namespace CriticalMass.Runtime.Input
             _keyAimPressed = false;
             // Tier F31: the device used most recently aims (a mouse MOVE, a deflected stick, the move keys or a keyboard attack
             // key); a resting cursor never keeps the aim from a keys player (AimDeviceArbiter.PointerHoldSeconds after its
-            // last move it lets go). A click is not aim input.
+            // last move it lets go). Fix round 7: a mouse BUTTON press is aim input (it aims at the cursor, see below).
             double nowT = Time.unscaledTimeAsDouble;
             Mouse mouse = Mouse.current;
             Vector2 md = mouse != null ? mouse.delta.ReadValue() : Vector2.zero;
@@ -364,6 +364,10 @@ namespace CriticalMass.Runtime.Input
             bool stickUsed = stick.sqrMagnitude > 0f || moveByPad;
             if (stickUsed) _devices.NoteStick(nowT);
             if (pointerMoved) _devices.NotePointerMoved(nowT);
+            // fix round 7: a mouse button press aims at the cursor for that press (noted before the keys, so a tie goes to it)
+            bool mousePressed = mouse != null && (mouse.leftButton.wasPressedThisFrame || mouse.rightButton.wasPressedThisFrame
+                || mouse.middleButton.wasPressedThisFrame || mouse.forwardButton.wasPressedThisFrame || mouse.backButton.wasPressedThisFrame);
+            if (mousePressed) _devices.NotePointerPressed(nowT);
             if (fromKeys || keyAim) _devices.NoteKeys(nowT, keyAim);
             AimResolver.Mode aimWas = Aim.Current;
             AimResolver.Mode aimNow = _devices.Decide(nowT, aimWas);
