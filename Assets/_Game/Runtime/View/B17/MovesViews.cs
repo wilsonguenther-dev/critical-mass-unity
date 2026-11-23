@@ -43,6 +43,14 @@ namespace CriticalMass.Runtime.View.B17
         int _cursor = -1, _epoch = -1;
         World _world;
         readonly int[] _lastVictimOfMe = { -1 };
+        // first-use hints (MovesHelp): shown this match, wall time of the last one, my airborne edge
+        readonly bool[] _hinted = new bool[(int)MovesHelp.Verb.Count];
+        float _hintAt = -100f;
+        bool _wasAir;
+        /// <summary>Tests: hints shown this match, by verb.</summary>
+        public bool Hinted(MovesHelp.Verb v) => _hinted[(int)v];
+        /// <summary>Tests and the reviewer: ignore the PlayerPrefs "seen twice" memory.</summary>
+        public static bool HintsAlways;
 
         // ---- tests / reviewer: what is on screen this frame
         public int GuardArcsShown { get; private set; }
@@ -295,6 +303,35 @@ namespace CriticalMass.Runtime.View.B17
             for (int k = ring; k < Rings; k++) if (_rings[k].Born < 0) Show(_rings[k], false);
             GuardArcsShown = arc;
             ChargeShapesShown = shape;
+            int mine = HudBinder.LocalActor;
+            if (mine >= 0 && mine < n && w.Actors[mine].Alive)
+            {
+                if (w.Actors[mine].Cls == ClassId.Demolitions) Hint(w, mine, MovesHelp.Verb.Tnt);
+                bool air = w.Actors[mine].AirLen > 0;
+                if (air && !_wasAir) Hint(w, mine, MovesHelp.Verb.Glide);
+                _wasAir = air;
+            }
+        }
+
+        /// <summary>A first-use hint over my fighter: once per verb per match, at most MovesHelp.HintShows times ever, one
+        /// every 4 s at most, only while that verb's switch is on.</summary>
+        void Hint(World w, int me, MovesHelp.Verb v)
+        {
+            if (me < 0 || me >= w.ActorCount || _hinted[(int)v]) return;
+            if (!MovesHelp.SwitchOn(w, v, w.Actors[me].Cls)) return;
+            if (Time.unscaledTime - _hintAt < 4f) return;
+            ActionTags tags = PlayerHud.Current != null ? PlayerHud.Current.Tags : null;
+            if (tags == null) return;
+            string pref = MovesHelp.PrefKey(v);
+            int seen = PlayerPrefs.GetInt(pref, 0);
+            _hinted[(int)v] = true;
+            if (seen >= MovesHelp.HintShows && !HintsAlways) return;
+            string key = CriticalMass.Runtime.Input.InputGlyphs.Words(MovesHelp.HintAction(v));
+            string text = MovesHelp.HintText(v, key);
+            if (tags.OnMovesWord(w, text, 5700 + (int)v, me, false, false, PxPalette.Cream, PxPalette.Brass, MovesHelp.HintSeconds, 950 + (int)v) == null) return;
+            _hintAt = Time.unscaledTime;
+            PlayerPrefs.SetInt(pref, seen + 1);
+            Said(text);
         }
 
         void Grow(int n)
@@ -397,6 +434,7 @@ namespace CriticalMass.Runtime.View.B17
                 _epoch = w.Epoch;
                 _cursor = head;
                 _lastVictimOfMe[0] = -1;
+                for (int k = 0; k < _hinted.Length; k++) _hinted[k] = false;
                 return;
             }
             if (head - _cursor > World.EventCapacity) _cursor = head - World.EventCapacity;
@@ -410,7 +448,19 @@ namespace CriticalMass.Runtime.View.B17
                 switch (e.Type)
                 {
                     case SimEventType.Hit:
-                        if (e.B == me && e.A != me) _lastVictimOfMe[0] = e.A;
+                        if (e.B == me && e.A != me) { _lastVictimOfMe[0] = e.A; Hint(w, me, MovesHelp.Verb.Combo); }
+                        break;
+                    case SimEventType.AttackStart:
+                        if (e.A == me && e.B == Combat.KindAttack) Hint(w, me, MovesHelp.Verb.Heavy);
+                        else if (me >= 0 && me < w.ActorCount && e.A >= 0 && e.A < w.ActorCount && e.B == Combat.KindAttack && w.Actors[e.A].Team != w.Actors[me].Team)
+                        {
+                            double dx = w.X[e.A] - w.X[me], dz = w.Z[e.A] - w.Z[me];
+                            double reach = w.Config.Class(w.Actors[e.A].Cls).AttackRange + 1.0;
+                            if (dx * dx + dz * dz <= reach * reach) Hint(w, me, _hinted[(int)MovesHelp.Verb.Guard] ? MovesHelp.Verb.JumpEvade : MovesHelp.Verb.Guard);
+                        }
+                        break;
+                    case SimEventType.TravelChanged:
+                        if (e.A == me && e.Value > 0.5) Hint(w, me, MovesHelp.Verb.Slide);
                         break;
                     case SimEventType.HitBlocked:
                         if ((int)System.Math.Round(e.Value) == PlayerReasons.BlockedParried)

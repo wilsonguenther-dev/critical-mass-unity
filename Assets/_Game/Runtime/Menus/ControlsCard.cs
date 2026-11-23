@@ -70,6 +70,7 @@ namespace CriticalMass.Runtime.Menus
             var l = new List<string> { "Move", "Aim", "Lock facing (hold)", "Attack", "Class ability", "Jump" };
             if (RowIndex("Dodge") >= 0) l.Add("Dodge");
             if (RowIndex("Guard / parry") >= 0) l.Add("Guard / parry");   // class moves T2-1
+            if (CriticalMass.Runtime.View.B17.MovesHelp.CardOn) l.AddRange(CriticalMass.Runtime.View.B17.MovesHelp.CardLines);   // mv-6: heavy, combo, slide, glide, TNT (play build only)
             if (RowIndex("Cancel attack (feint)") >= 0) l.Add("Cancel attack (feint)");   // b16 CANCEL (test feature)
             l.AddRange(new[] { "Interact / carry", "Build / mine", "Next tool", "Ping wheel", "Scoreboard", "Full map", "Base station", "Pause menu" });
             return l.ToArray();
@@ -85,6 +86,8 @@ namespace CriticalMass.Runtime.Menus
         {
             int i = FindRow(label);
             if (i >= 0) return i;
+            string mvRow = CriticalMass.Runtime.View.B17.MovesHelp.CardRow(label);   // mv-6: a moves line borrows its button's row
+            if (mvRow != null) return RowIndex(mvRow);
             if (label == "Build / mine") return FindRow("Dig / place");
             if (label == "Next tool") { int r = FindRow("Switch piece"); return r >= 0 ? r : FindRow("Switch dig / place"); }
             return -1;
@@ -202,6 +205,8 @@ namespace CriticalMass.Runtime.Menus
         static string CellText(InputActionMap map, string label, int[] rows, Col col)
         {
             if (map == null || rows.Length == 0 || rows[0] < 0) return "";
+            string mvRow = CriticalMass.Runtime.View.B17.MovesHelp.CardRow(label);   // mv-6: HOLD / AGAIN + the borrowed button
+            if (mvRow != null) { string mt = CellText(map, mvRow, rows, col); return mt.Length > 0 ? CriticalMass.Runtime.View.B17.MovesHelp.CardPrefix(label) + mt : mt; }
             if (label == "Move")
             {
                 if (col == Col.Pad) return SlotsText(map, rows[4], ControlDevice.Gamepad, SlotColumn.Auto);
