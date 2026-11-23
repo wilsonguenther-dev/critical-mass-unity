@@ -312,6 +312,9 @@ namespace CriticalMass.Runtime.Camera
         /// rises up to RobustMaxSteep over a wall, never goes over the head, and keeps the fighter (SightX/Y/Z) in frame.
         /// Whatever is still in the way is faded by GroundView, never dodged by moving in.</summary>
         public bool Robust;
+        /// <summary>fix/px-camera-in-editor: 1 = the robust look keeps the whole fighter in frame, 0 = only his chest (the
+        /// combat framing aims between the fighters).</summary>
+        public double BodyRule;
     }
 
     /// <summary>
@@ -477,7 +480,7 @@ namespace CriticalMass.Runtime.Camera
         /// <summary>Never closer to the boom's pivot than this (u); the lens keeps RobustRadius clear of walls and the
         /// ground RobustFloor under it (the HUD planes at 0.4-0.6 m never meet geometry); never steeper than RobustMaxSteep
         /// (deg) looking at the chest; the chest stays RobustFrameMargin (deg) inside the frame.</summary>
-        public const double RobustMin = 1.6, RobustRadius = 0.45, RobustFloor = 0.7, RobustMaxSteep = 55, RobustFrameMargin = 5;
+        public const double RobustMin = 1.6, RobustRadius = 0.6, RobustFloor = 0.7, RobustMaxSteep = 55, RobustFrameMargin = 5;
         /// <summary>The fighter for the frame rule: the sight point (chest) is RobustChestUp over his feet, he is RobustBodyTall.</summary>
         public const double RobustChestUp = 1.2, RobustBodyTall = 2.1;
         /// <summary>Distance: in at once (a wall), out only after RobustHold s clear, then on RobustOutTau (no pumping).
@@ -566,16 +569,17 @@ namespace CriticalMass.Runtime.Camera
             double floor = GroundCollision.SolidTop(f.Map, CamX, CamZ);
             if (CamY - RobustFloor < floor) CamY = floor + RobustFloor;
             // never closer than RobustMin to the fighter himself either (the framing's look point sits toward the enemy, and
-            // a knockback can carry him at the lens): out along the ground from his chest
+            // a knockback can carry him at the lens): further out along the same boom, so the framing's angle is kept
             {
-                double ddx = CamX - f.SightX, ddy = CamY - f.SightY, ddz = CamZ - f.SightZ;
-                if (ddx * ddx + ddy * ddy + ddz * ddz < RobustMin * RobustMin)
+                double t = Dist;
+                for (int i = 0; i < 60; i++)
                 {
-                    double hl = Math.Sqrt(ddx * ddx + ddz * ddz);
-                    if (hl < 1e-3) { ddx = -ux; ddz = -uz; hl = 1; }
-                    double need = Math.Sqrt(Math.Max(0, RobustMin * RobustMin - ddy * ddy));
-                    CamX = f.SightX + ddx / hl * need;
-                    CamZ = f.SightZ + ddz / hl * need;
+                    double ddx = CamX - f.SightX, ddy = CamY - f.SightY, ddz = CamZ - f.SightZ;
+                    if (ddx * ddx + ddy * ddy + ddz * ddz >= RobustMin * RobustMin) break;
+                    t += 0.05;
+                    CamX = ox - ux * cp * t;
+                    CamY = Math.Max(oy + sp * t, floor + RobustFloor);
+                    CamZ = oz - uz * cp * t;
                 }
             }
             Blocked = GroundCollision.Inside(f.Map, CamX, CamY, CamZ, GroundCollision.Radius, f.Cylinders, f.CylinderCount)
@@ -588,8 +592,14 @@ namespace CriticalMass.Runtime.Camera
             double feetY = f.SightY - RobustChestUp, headY = feetY + RobustBodyTall;
             double sFeet = Math.Atan2(CamY - feetY, h) * 180 / Math.PI, sHead = Math.Atan2(CamY - headY, h) * 180 / Math.PI;
             double half = Math.Max(10, (f.VFovDeg > 0 ? f.VFovDeg : 60) * 0.5) - RobustFrameMargin;
+            // in a framed fight (BodyRule 0) only the chest is held in frame: the framing's own aim between the two fighters
+            // is kept (the whole-body rule pitched down onto me and put my body over the enemy)
+            double sChest = Math.Atan2(CamY - f.SightY, h) * 180 / Math.PI;
             double lo = sFeet - half, hi = sHead + half;
-            Pitch = lo <= hi ? Clamp(boomPitch, lo, hi) : (sFeet + sHead) * 0.5;
+            double whole = lo <= hi ? Clamp(boomPitch, lo, hi) : (sFeet + sHead) * 0.5;
+            double chestOnly = Clamp(boomPitch, sChest - half, sChest + half);
+            double k = Clamp(f.BodyRule, 0, 1);
+            Pitch = chestOnly + (whole - chestOnly) * k;
         }
 
         /// <summary>Over-the-head fallback height above the pivot (u).</summary>
