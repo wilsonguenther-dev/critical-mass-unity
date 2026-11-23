@@ -166,6 +166,13 @@ namespace CriticalMass.Runtime.View.Anim
             if (refused) { _commitPending = false; _commitReady = false; }   // no SwingCommit for a refused press
         }
 
+        /// <summary>mv-6 readability-2 item 1: ActorViews saw the local Attack press on this frame (every press edge, predicted or
+        /// not). A swing the sim starts within PressFloorFrames rises on this press's clock.</summary>
+        public void NotePress() { _pressFrame = Time.frameCount; _pressWall = Time.unscaledTimeAsDouble; }
+        public const int PressFloorFrames = 6;
+        int _pressFrame = -1;
+        double _pressWall;
+
         public bool TakeSwingCommit(out float weight)
         {
             weight = _commitW;
@@ -784,7 +791,7 @@ namespace CriticalMass.Runtime.View.Anim
             // swing on release; GLIDE (Healer) = arms out (Cast held). Every weight stays 0 while World.Moves is null.
             {
                 bool mvGuard = !actor.Alive ? false : B17.MovesPoses.GuardShown(w, i) && m.HasClip(ArtMapping.Blocking);   // readability item 1: the local press shows on its own frame
-                if (mvGuard && _mvGuardW < 0.5f && i == B17.MovesPoses.PredictActor) _mvGuardW = 0.5f;   // half up on the press frame itself
+                if (mvGuard && _mvGuardW < B17.MovesPoses.GuardFirstFrame) _mvGuardW = B17.MovesPoses.GuardFirstFrame;   // readability-2 item 5: 0.8 on the first frame (press frame for the local press)
                 _mvGuardW = B17.MovesPoses.Approach(_mvGuardW, mvGuard ? 1f : 0f, dSim, mvGuard ? B17.MovesPoses.GuardRiseSeconds : B17.MovesPoses.GuardFallSeconds);
                 if (_mvGuardW > 0f && m.HasClip(ArtMapping.Blocking))
                 {
@@ -1076,7 +1083,15 @@ namespace CriticalMass.Runtime.View.Anim
             if (_predicting && !fromPredict) LastPredictionEnded = true;
             _predicting = false;
             if (fromPredict) { _predFloor = Math.Max(_lastActW, 0.01f); _predFloorT = _lastActTime; _predFloorWall = _predWall; _predFloorFrame = _predFrame; }
+            else if (kind == 1 && clip != null && !_actThrow && _pressFrame >= 0 && Time.frameCount - _pressFrame <= PressFloorFrames)
+            {
+                // mv-6 readability-2 item 1: the local press was seen but not predicted (third person: the press frame's tick
+                // already took it, or a swing was still fading), so the sim's swing would restart the rise from its own
+                // frame (pass 2: 0.00 at press + 1, 0.56 at + 2). The rise runs on the PRESS's clock instead, as a hand-over does.
+                _predFloor = 0.01f; _predFloorT = 0; _predFloorWall = _pressWall; _predFloorFrame = _pressFrame;
+            }
             else { _predFloor = 0f; _predFloorWall = double.NaN; }
+            _pressFrame = -1;
             if (_actClip != null && _lastActW > 0f && !fromPredict)
             {
                 _prevClip = _actClip;

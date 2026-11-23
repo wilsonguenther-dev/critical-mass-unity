@@ -20,6 +20,7 @@ namespace CriticalMass.Runtime.View.Anim
         static Vector3 _focus;
         static bool _hasFocus;
         static int _frame;
+        static int _pinA = -1, _pinB = -1;
 
         /// <summary>Once per view update: the gameplay camera's ground focus (its forward ray on the y = 0 plane).</summary>
         public static void BeginFrame()
@@ -27,17 +28,29 @@ namespace CriticalMass.Runtime.View.Anim
             _frame = Time.frameCount;
             UnityEngine.Camera cam = UnityEngine.Camera.main;
             _hasFocus = false;
+            bool low = CriticalMass.Runtime.Camera.GroundView.LodActive;
+            // fix/px-combat-camera-2: in the low views the followed fighter (and the enemy the combat framing shows) always
+            // pose every frame, and the focus is the followed body's look point, not where the view meets y = 0: at the
+            // framed pitch (8 deg) that ground hit lands 10 to 20 u ahead, far enough to throttle my own fighter.
+            _pinA = low ? CriticalMass.Runtime.Camera.GroundView.LodSelf : -1;
+            _pinB = low ? CriticalMass.Runtime.Camera.GroundView.DuelTarget : -1;
             if (cam == null) return;
             Transform t = cam.transform;
-            Vector3 f = t.forward;
-            if (f.y < -0.05f)
-            {
-                float k = -t.position.y / f.y;
-                _focus = t.position + f * k;
-            }
-            else _focus = t.position;
+            _focus = FocusPoint(t.position, t.forward, low, CriticalMass.Runtime.Camera.GroundView.LodAnchor);
             _hasFocus = true;
         }
+
+        /// <summary>The throttle's focus (pure; tests): a low view's followed look point; else the camera's forward ray on
+        /// the y = 0 plane (the top-down rule, unchanged), or the camera itself when it looks level or up.</summary>
+        public static Vector3 FocusPoint(Vector3 camPos, Vector3 forward, bool lowView, Vector3 followed)
+        {
+            if (lowView) return followed;
+            if (forward.y < -0.05f) return camPos + forward * (-camPos.y / forward.y);
+            return camPos;
+        }
+
+        /// <summary>Actor ids that always evaluate this frame (low views: the followed fighter and the framed enemy).</summary>
+        public static bool Pinned(int id) => id >= 0 && (id == _pinA || id == _pinB);
 
         public static bool Near(Vector3 pos)
         {
@@ -49,7 +62,7 @@ namespace CriticalMass.Runtime.View.Anim
         /// <summary>Whether to evaluate a model's graph this frame.</summary>
         public static bool ShouldEvaluate(bool alwaysAnimate, bool fresh, bool anyVisible, Vector3 pos, int id)
         {
-            if (!Enabled || alwaysAnimate || fresh) return true;
+            if (!Enabled || alwaysAnimate || fresh || Pinned(id)) return true;
             if (!anyVisible) return false;
             // perf-60hz-32p: on the title (the backdrop match nobody plays) every fighter poses every other frame.
             bool near = Near(pos) && !CriticalMass.Runtime.Game.FrameGovernor.IdleTitle;

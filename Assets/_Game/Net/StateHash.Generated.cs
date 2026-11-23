@@ -1397,6 +1397,7 @@ namespace CriticalMass.Net
             A(ref h, o.BotChainFlip);
             A(ref h, o.BotChains);
             A(ref h, o.BotChargeLeft);
+            A(ref h, o.ChainDebt);
             A(ref h, o.ChainNext);
             A(ref h, o.ChainUntil);
             A(ref h, o.ChainVictim);

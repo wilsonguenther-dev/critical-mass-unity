@@ -937,9 +937,9 @@ namespace CriticalMass.Runtime.Hud
                 // mv-6 readability item 5: exactly while the next Attack press chains, the slot stands out (larger, strike rim,
                 // a slow 2.5 Hz swell; steady with reduce flashing), so a masher learns the window instead of missing it
                 bool calm = !CriticalMass.Runtime.View.Moments.FlashSafety.IntenseAllowed;
-                float pulse = 1.10f + (calm ? 0f : 0.05f * Mathf.Sin(Time.unscaledTime * 2f * Mathf.PI * 2.5f));
+                float pulse = 1.20f + (calm ? 0f : 0.06f * Mathf.Sin(Time.unscaledTime * 2f * Mathf.PI * 2.5f));   // readability-2 item 4: 20%
                 _buttons[0].Rt.localScale = Vector3.Scale(_buttons[0].Rt.localScale, new Vector3(pulse, pulse, 1f));
-                _buttons[0].Body.SetRim(CriticalMass.Runtime.Hud.Player.PxPalette.Strike);
+                _buttons[0].Body.SetRim(Color.Lerp(CriticalMass.Runtime.Hud.Player.PxPalette.Strike, Color.white, 0.45f));   // brighter rim
             }
             ApplyButton(_buttons[1], s.AbilityCd01, s.AbilityCdSeconds, UiIcons.Ability[iconRow, team], AbilityNames[cls], dt);
             ApplyDenied(_buttons[1], dt);

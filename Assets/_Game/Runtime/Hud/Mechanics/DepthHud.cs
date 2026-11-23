@@ -859,7 +859,7 @@ namespace CriticalMass.Runtime.Hud.Mechanics
                     if (global::CriticalMass.Runtime.View.Fog.FogOfWar.Hides(id)) continue;
                     double dx = w.X[id] - mx, dz = w.Z[id] - mz;
                     if (dx * dx + dz * dz > TagRange * TagRange) continue;
-                    Vector3 head = Head(w, id, _driver.Alpha, 2.65f);
+                    Vector3 head = CriticalMass.Runtime.Camera.GroundView.TagPoint(w, id, Head(w, id, _driver.Alpha, 2.65f), 2.65f);   // fix/px-combat-camera-2: just above his head while framed
                     if (!ToLocal(cam, head, out Vector2 at)) continue;
                     // owner walk 1: a tag that would sit on a HUD panel (the Kaiju panel, the feed, the minimap) waits
                     Vector3 hp = cam.WorldToScreenPoint(head);

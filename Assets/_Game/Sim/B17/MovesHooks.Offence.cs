@@ -54,6 +54,9 @@ namespace CriticalMass.Sim.Core
         /// <summary>fix/mv-combo-buffer: the tick of a person's Attack press made in the active / recovery frames of a swing that
         /// opened the chain (NoTick = none); it starts the next step on the first tick the swing can start, inside the chain.</summary>
         public int[] ComboPressTick = new int[0];
+        /// <summary>fix/mv-combo-reach: cooldown ticks a person's open chain borrowed (the next step may start when the recovery
+        /// ends); paid back on the finisher, a step's whiff, or the next opener, so a whole chain keeps the class's swing rate.</summary>
+        public int[] ChainDebt = new int[0];
         /// <summary>Integrator (decision 2): the body the actor's last landed strike hit (its dodge breaks the chain), -1 = none.</summary>
         public int[] ChainVictim = new int[0];
         /// <summary>Demolitions' fuse strike: the tick a fuse stuck on this body blows (NoTick = none) and who lit it.</summary>
@@ -90,6 +93,7 @@ namespace CriticalMass.Sim.Core
             ChainNext = new int[n];
             ChainUntil = new int[n];
             ComboPressTick = new int[n];
+            ChainDebt = new int[n];
             ChainVictim = new int[n];
             FuseTick = new int[n];
             FuseOwner = new int[n];
@@ -117,6 +121,7 @@ namespace CriticalMass.Sim.Core
                 ChainNext[i] = 0;
                 ChainUntil[i] = CombatFeel.NoTick;
                 ComboPressTick[i] = CombatFeel.NoTick;
+                ChainDebt[i] = 0;
                 ChainVictim[i] = -1;
                 FuseTick[i] = CombatFeel.NoTick;
                 FuseOwner[i] = -1;
@@ -317,6 +322,7 @@ namespace CriticalMass.Sim.Core
                     bool live = a.Alive && a.StandUp <= 0;
                     if (!live)
                     {
+                        s.ChainDebt[i] = 0;
                         OffenceClearHold(s, i);
                         s.PendingHeavy[i] = -1;
                         s.BotChargeLeft[i] = 0;
@@ -453,6 +459,7 @@ namespace CriticalMass.Sim.Core
             int windup = lw != null ? w.Dur.LightWindup[c] : w.Dur.AttackWindup[c];
             if (windup < 1) windup = 1;
             a.AttackCd = lw != null ? lw.CooldownSeconds : cc.AttackCooldown;
+            OffencePayChainDebt(w, s, i);
             a.AnimAction = 0;
             a.SwingTick = w.Tick;
             a.SwingWindup = windup;
@@ -605,6 +612,7 @@ namespace CriticalMass.Sim.Core
             s.ComboPressTick[i] = CombatFeel.NoTick;   // the remembered press is spent by this swing
             int step = 1;
             if (s.ChainNext[i] >= 2 && w.Tick <= s.ChainUntil[i] && OffenceMayChain(w, s, i)) step = s.ChainNext[i];
+            if (step < 2) OffencePayChainDebt(w, s, i);   // an opener after a chain that did not finish pays what it borrowed
             s.ChainNext[i] = 0;
             s.StepSwingTick[i] = w.Tick;
             s.StepOf[i] = step;
@@ -669,6 +677,7 @@ namespace CriticalMass.Sim.Core
             if (hits <= 0)
             {
                 s.ChainNext[i] = 0;   // a whiff resets to step 1
+                OffencePayChainDebt(w, s, i);
                 return;
             }
             int steps = OffenceSteps(w, a.Cls);
@@ -686,10 +695,28 @@ namespace CriticalMass.Sim.Core
                     s.Counts[OffenceCountFinishers]++;
                     a.SwingRecovery += Durations.T30(w.Config, m.FinisherExtraRecoveryTicks);
                     OffenceCooldownFloor(w, a);
+                    OffencePayChainDebt(w, s, i);
                 }
                 return;
             }
             s.ChainNext[i] = step + 1;
+            // fix/mv-combo-reach: a person's next step may start as soon as this swing's recovery ends (never sooner than
+            // OffenceMinStepGapTicks after the hit, so a lag-6 victim's dodge still fits), not after the full class cooldown: the
+            // step follows before the staggered victim's own swing can land (the Editor's chain that "never connected" was this
+            // trade, not reach). The cooldown it skips is borrowed and paid back when the chain ends.
+            if (OffenceHuman(w, i))
+            {
+                double hz = w.Config.SimHz;
+                int cdTicks = (int)Math.Ceiling(a.AttackCd * hz - 1e-9);
+                int early = a.SwingRecovery > OffenceMinStepGapTicks ? a.SwingRecovery : OffenceMinStepGapTicks;
+                int c = (int)a.Cls, most = c < OffenceStepBorrowTicks.Length ? OffenceStepBorrowTicks[c] : 0;
+                if (cdTicks - early > most) early = cdTicks - most;
+                if (early < cdTicks)
+                {
+                    s.ChainDebt[i] += cdTicks - early;
+                    a.AttackCd = early / hz;
+                }
+            }
             // the chain holds while the next step can follow at once: until the cooldown is spent plus the input buffer (a press
             // made during the recovery is held that long), never past ComboResetSeconds. A dodge out of reach between steps
             // therefore breaks it (the attacker cannot walk back in and still finish), and so does a pause.
@@ -713,6 +740,21 @@ namespace CriticalMass.Sim.Core
         }
 
         /// <summary>The cooldown never ends before the (longer) recovery: CombatFeel.AfterContact's rule on the new recovery.</summary>
+        /// <summary>fix/mv-combo-reach: the fewest ticks from a step's hit to the next step's start (its contact comes at least a
+        /// step wind-up, 5 ticks, later).</summary>
+        public const int OffenceMinStepGapTicks = 3;
+
+        /// <summary>fix/mv-combo-reach: the most cooldown (30 Hz ticks) one step may borrow, per class. The Farmer borrows less
+        /// (his 3-step chain front-loads two borrows: passive time to kill must stay inside the 5-15% band).</summary>
+        public static readonly int[] OffenceStepBorrowTicks = { 99, 6, 99, 99, 99, 0 };
+
+        static void OffencePayChainDebt(World w, OffenceMovesState s, int i)
+        {
+            if (s.ChainDebt[i] <= 0) return;
+            w.Actors[i].AttackCd += s.ChainDebt[i] / w.Config.SimHz;
+            s.ChainDebt[i] = 0;
+        }
+
         static void OffenceCooldownFloor(World w, Actor a)
         {
             double left = a.SwingRecovery / w.Config.SimHz;
@@ -769,7 +811,52 @@ namespace CriticalMass.Sim.Core
         static void OffenceDamaged(World w, int target, int source, DamageCause cause, double dmg) { }
 
         /// <summary>Walk-speed multiplier (charging x ChargeMoveMul). Exactly 1.0 when not charging.</summary>
-        static double OffenceSpeedScale(World w, int i) =>
-            w.Moves.Offence.Charging[i] != 0 && On(w, Cfg(w).Heavy) ? Cfg(w).ChargeMoveMul : 1.0;
+        static double OffenceSpeedScale(World w, int i)
+        {
+            if (w.Moves.Offence.Charging[i] != 0 && On(w, Cfg(w).Heavy)) return Cfg(w).ChargeMoveMul;
+            return OffenceStepLunge(w, i);
+        }
+
+        /// <summary>fix/mv-combo-reach: the most a combo step may close on its victim during its wind-up, per class (units), sized
+        /// to the class's own step-1 knock plus the victim's walk-out in that wind-up (the Farmer's thrust shoves furthest).</summary>
+        public static readonly double[] OffenceStepLungeUnits = { 1.2, 2.0, 1.2, 1.4, 1.5, 0 };
+
+        /// <summary>
+        /// fix/mv-combo-reach (Editor pass 2: "the Farmer's combo never connected"): a person's combo step (2 or 3) that winds up
+        /// while the move stick points at the chain's victim steps in: the walk speed is scaled so the step closes the gap to
+        /// its reach by its contact tick, at most OffenceStepLungeUnits of extra ground over the wind-up. No step, no stick
+        /// toward the victim, a bot, or already in reach: exactly 1. A victim who dodged broke the chain, so no step lunges after it.
+        /// </summary>
+        static double OffenceStepLunge(World w, int i)
+        {
+            MovesConfig m = Cfg(w);
+            OffenceMovesState s = w.Moves.Offence;
+            Actor a = w.Actors[i];
+            if (!On(w, m.Combos) || !a.SwingPending || s.StepSwingTick[i] != a.SwingTick || s.StepOf[i] < 2) return 1.0;
+            int v = s.ChainVictim[i];
+            if (v < 0 || v >= w.ActorCount || !w.Actors[v].Alive || !OffenceHuman(w, i)) return 1.0;
+            int c = (int)a.Cls;
+            double budget = c < OffenceStepLungeUnits.Length ? OffenceStepLungeUnits[c] : 0;
+            if (!(budget > 0)) return 1.0;
+            double dx = w.X[v] - w.X[i], dz = w.Z[v] - w.Z[i];
+            double d = Math.Sqrt(dx * dx + dz * dz);
+            if (d < 1e-6) return 1.0;
+            InputFrame f = w.Inputs[i];
+            double ml = Math.Sqrt(f.MoveX * f.MoveX + f.MoveZ * f.MoveZ);
+            if (ml < 0.5 || (f.MoveX * dx + f.MoveZ * dz) / (ml * d) < 0.7) return 1.0;   // the stick must point at the victim
+            ClassConfig cc = w.Config.Class(a.Cls);
+            double want = cc.AttackRange + w.Config.Class(w.Actors[v].Cls).Radius - 0.25;   // a little inside the reach
+            double gap = d - want;
+            if (gap <= 0) return 1.0;
+            int left = a.SwingTick + a.SwingWindup - w.Tick;
+            if (left < 1) left = 1;
+            double dt = 1.0 / w.Config.SimHz;
+            double basePerTick = cc.MoveSpeed * dt;
+            if (!(basePerTick > 0)) return 1.0;
+            double need = gap / left / basePerTick;   // the scale that closes the gap by contact
+            double cap = 1 + budget / (a.SwingWindup > 0 ? a.SwingWindup : 1) / basePerTick;
+            double k = need < cap ? need : cap;
+            return k > 1 ? k : 1.0;
+        }
     }
 }
