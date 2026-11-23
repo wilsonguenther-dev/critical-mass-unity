@@ -112,6 +112,14 @@ namespace CriticalMass.Runtime.Camera
         /// <summary>follow-camera-3: a sim point (x, z) the auto-follow should face in the low play views (captures frame
         /// the fight and the Kaiju with it). Null = behind the fighter as usual.</summary>
         public static Vector2? AimAt;
+        /// <summary>fix/px-camera-in-editor: Editor diagnostics only (A/B against the old follow, SessionState key
+        /// cm.camera.robustOff, gone when the Editor quits); always false in a player.</summary>
+        public static bool RobustOffForDiagnostics
+#if UNITY_EDITOR
+            => UnityEditor.SessionState.GetBool("cm.camera.robustOff", false);
+#else
+            => false;
+#endif
 
         public SimDriverBehaviour Driver;
         public GroundViewMode Mode { get; private set; }
@@ -406,7 +414,7 @@ namespace CriticalMass.Runtime.Camera
             _folCount = GatherScenery(w, tx, tz, 0, _fol, target);
             // fix/px-camera-in-editor: the third-person play camera collides only with hard scenery (rocks, props,
             // buildings) and the grid; trees and groves never move it, they fade (UpdateFades)
-            bool robust = Mode == GroundViewMode.Play && _view != CameraView.FirstPerson;
+            bool robust = Mode == GroundViewMode.Play && _view != CameraView.FirstPerson && !RobustOffForDiagnostics;
             _hardCount = 0;
             for (int i = 0; i < _folCount; i++) if (!robust || !_fol[i].Soft) _hard[_hardCount++] = _fol[i];
             var f = new GroundFollowInput
