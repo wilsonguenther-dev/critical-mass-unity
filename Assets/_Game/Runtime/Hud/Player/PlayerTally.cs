@@ -50,8 +50,10 @@ namespace CriticalMass.Runtime.Hud.Player
         public void Tick(World w, int me, AssistTracker assists, int crits)
         {
             if (me < 0 || me >= w.ActorCount) { PxUi.Show(_line, false); return; }
-            PxUi.Show(_line, true);
             Actor a = w.Actors[me];
+            // mv-6 readability-3 item 3: under the class moves the tally leaves the fight HUD (it sat under the TEAM BUILD BANK
+            // panel, digits clipped): the scoreboard and the results carry the same numbers. The counts keep updating.
+            PxUi.Show(_line, !WorldWords.MovesCap);
             MatchStats ms = MatchStatsRecorder.Current;
             ActorStats st = ms != null && me < ms.ActorCount && ms.Actors != null && me < ms.Actors.Length ? ms.Actors[me] : null;
             int ko = a.Kills, ast = assists.Assists(me);
