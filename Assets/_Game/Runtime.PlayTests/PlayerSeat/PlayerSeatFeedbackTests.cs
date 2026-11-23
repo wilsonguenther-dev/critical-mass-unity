@@ -73,6 +73,8 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
             public int SoundsBefore, SoundsPeak;
             public bool Seen;
             public double CamPxPeak, SimMoved100, ModelMoved100, ModelMovedFull, SimMovedFull;
+            /// <summary>fix/px-combat-camera-3: the fixed point's whole screen motion (kick + combat framing), logged only.</summary>
+            public double FramePxPeak;
             public int CamPxFrame = -1, CamPx6Frame = -1;
             public string Dump = "";
             public double HitX, HitZ;
@@ -140,12 +142,14 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
                 if (model != null && FlashShare(model) >= CriticalMass.Runtime.View.Anim.HitFeelTuning.FlashShareSafe) r.FlashFrame = 0;
                 if (cam0 != null)
                 {
-                    Vector3 pe = cam0.WorldToScreenPoint(fixedPoint);   // the camera as rendered: the kick is on it now
-                    double movedE = new Vector2(pe.x - px0.x, pe.y - px0.y).magnitude * 1080.0 / Math.Max(1, Screen.height);
-                    if (movedE > r.CamPxPeak) { r.CamPxPeak = movedE; r.CamPxFrame = 0; }
-                    if (movedE >= 6 && r.CamPx6Frame < 0) r.CamPx6Frame = 0;
-                    double kickE = CameraShake.KickApplied.magnitude * 1080.0 / Math.Max(1e-3, 2 * Math.Tan(cam0.fieldOfView * Math.PI / 360) * Math.Max(0.5, Vector3.Distance(cam0.transform.position, fixedPoint)));
+                    // fix/px-combat-camera-3: the KICK's own screen motion (the point with and without this frame's kick
+                    // offset, through the rendered camera), apart from the combat framing's swing-in (FramePxPeak, logged)
+                    double kickE = KickOnlyPx(cam0, fixedPoint);
+                    if (kickE > r.CamPxPeak) { r.CamPxPeak = kickE; r.CamPxFrame = 0; }
+                    if (kickE >= 6 && r.CamPx6Frame < 0) r.CamPx6Frame = 0;
                     if (kickE > r.KickPxPeak) { r.KickPxPeak = kickE; r.KickPxFrame = 0; }
+                    Vector3 pe = cam0.WorldToScreenPoint(fixedPoint);
+                    r.FramePxPeak = Math.Max(r.FramePxPeak, new Vector2(pe.x - px0.x, pe.y - px0.y).magnitude * 1080.0 / Math.Max(1, Screen.height));
                 }
             }
             for (int f = 0; f < T.CueFrames; f++)
@@ -164,12 +168,13 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
                 if (rendered >= 0 && r.FlashFrame < 0 && model != null && FlashShare(model) >= CriticalMass.Runtime.View.Anim.HitFeelTuning.FlashShareSafe) r.FlashFrame = rendered;
                 if (cam0 != null && rendered >= 0)
                 {
-                    Vector3 pn = cam0.WorldToScreenPoint(fixedPoint - CameraShake.KickApplied);
-                    double moved = new Vector2(pn.x - px0.x, pn.y - px0.y).magnitude * 1080.0 / Math.Max(1, Screen.height);
-                    if (moved > r.CamPxPeak) { r.CamPxPeak = moved; r.CamPxFrame = rendered; }
-                    if (moved >= 6 && r.CamPx6Frame < 0) r.CamPx6Frame = rendered;   // the promise: 6 px within 2 rendered frames
-                    double kickPx = CameraShake.KickApplied.magnitude * 1080.0 / Math.Max(1e-3, 2 * Math.Tan(cam0.fieldOfView * Math.PI / 360) * Math.Max(0.5, Vector3.Distance(cam0.transform.position, fixedPoint)));
+                    // fix/px-combat-camera-3: the kick alone (see the hit frame above); the framing's own motion is logged apart
+                    double kickPx = KickOnlyPx(cam0, fixedPoint);
+                    if (kickPx > r.CamPxPeak) { r.CamPxPeak = kickPx; r.CamPxFrame = rendered; }
+                    if (kickPx >= 6 && r.CamPx6Frame < 0) r.CamPx6Frame = rendered;   // the promise: 6 px within 2 rendered frames
                     if (kickPx > r.KickPxPeak) { r.KickPxPeak = kickPx; r.KickPxFrame = rendered; }
+                    Vector3 pn = cam0.WorldToScreenPoint(fixedPoint);
+                    r.FramePxPeak = Math.Max(r.FramePxPeak, new Vector2(pn.x - px0.x, pn.y - px0.y).magnitude * 1080.0 / Math.Max(1, Screen.height));
                 }
                 if (!r.Seen && cue(r)) { r.Seen = true; r.SeenFrame = f; }
                 // one rendered step = 16.7 ms of real time (60 fps): cues on unscaled time (camera kick, fades) see real time pass
@@ -194,6 +199,15 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
         }
 
         static string Tag(ClassId c, CameraView v) => c + " " + v;
+
+        /// <summary>fix/px-combat-camera-3: px at 1080p a world point moves on screen because of this frame's kick alone:
+        /// the rendered camera carries CameraShake.KickApplied, so the point shifted by the same offset is where it would
+        /// draw without it.</summary>
+        static double KickOnlyPx(UnityEngine.Camera cam, Vector3 p)
+        {
+            Vector3 a = cam.WorldToScreenPoint(p), b = cam.WorldToScreenPoint(p + CameraShake.KickApplied);
+            return new Vector2(a.x - b.x, a.y - b.y).magnitude * 1080.0 / Math.Max(1, Screen.height);
+        }
 
         /// <summary>fix round 5: the largest CMToon `_HitFlash` share on the drawn renderers under a fighter's model.</summary>
         static float FlashShare(Transform model)
@@ -1286,7 +1300,7 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
         {
             var r = new Watch();
             yield return HitAndWatch(ClassId.Warrior, v, q => false, r);
-            Check("D3 HitMovesCamera", Tag(ClassId.Warrior, v), r.Hit ? "a fixed world point moved " + r.CamPxPeak.ToString("0.0") + " px at 1080p, peak at rendered frame " + r.CamPxFrame + ", first >= 6 px at rendered frame " + r.CamPx6Frame + "; kick alone " + r.KickPxPeak.ToString("0.0") + " px peaking at rendered frame " + r.KickPxFrame + " (0 = the hit frame)" : r.Note, ">= 6 px by rendered frame 1 and the kick's peak by rendered frame 1 (reduce motion off)", r.Hit && r.CamPx6Frame >= 0 && r.CamPx6Frame <= 1 && r.KickPxFrame >= 0 && r.KickPxFrame <= 1);
+            Check("D3 HitMovesCamera", Tag(ClassId.Warrior, v), r.Hit ? "the kick moved a fixed world point " + r.CamPxPeak.ToString("0.0") + " px at 1080p (all camera motion incl. the combat framing " + r.FramePxPeak.ToString("0.0") + " px), peak at rendered frame " + r.CamPxFrame + ", first >= 6 px at rendered frame " + r.CamPx6Frame + "; kick alone " + r.KickPxPeak.ToString("0.0") + " px peaking at rendered frame " + r.KickPxFrame + " (0 = the hit frame)" : r.Note, ">= 6 px by rendered frame 1 and the kick's peak by rendered frame 1 (reduce motion off)", r.Hit && r.CamPx6Frame >= 0 && r.CamPx6Frame <= 1 && r.KickPxFrame >= 0 && r.KickPxFrame <= 1);
         }
 
         static Rect UiRect(Object src)

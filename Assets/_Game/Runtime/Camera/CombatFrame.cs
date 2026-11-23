@@ -48,6 +48,29 @@ namespace CriticalMass.Runtime.Camera
         /// while framed, a head tag sits at most TagGapShare of the screen height above the drawn head top and never above
         /// the top HUD rows (score, objective, resources: the top TagTopShare of the screen).</summary>
         public const double TagGapShare = 0.03, TagTopShare = 0.25;
+        /// <summary>fix/px-combat-camera-3 (pass 3: framed only 1% of a forest fight, 8% of the hill minute): STICKY. Once
+        /// framed it stays while an enemy stands within KeepRange u (no facing cone); a framing that is blocked tries the
+        /// same side at half and a quarter of the swing (24, 12 deg) before the other side, then the closer-and-higher
+        /// fallback (no swing, FallbackPitchDeg, FallbackCloser nearer); scenery hiding a fighter from EVERY pose is
+        /// tolerated OcclusionGraceSeconds before it lets go.</summary>
+        public const double KeepRange = 5.0, FallbackPitchDeg = 20, FallbackCloser = 0.2, OcclusionGraceSeconds = 0.5;
+        /// <summary>fix/px-combat-camera-3 (pass 3: after a drag the view swung back 45 deg by itself; re-framing rotated
+        /// another 43): when the player steers (manual look mode, or he looked within RespectSeconds of this fight) the
+        /// framing may rotate his view at most RespectYawDeg, at RespectYawRate deg/s, and frames with a wider lens shift
+        /// (RespectShoulderU) instead. When it lets go, its yaw offset is folded into his own yaw (TakeYaw), so the view
+        /// never unwinds on its own.</summary>
+        public const double RespectYawDeg = 10, RespectYawRate = 20, RespectSeconds = 5, RespectShoulderU = 1.2;
+        /// <summary>fix/px-combat-camera-3 (pass 3: when the framing lets go the plain camera hid the enemy behind me, 21-37%
+        /// visible): with an enemy within KeepRange and no framing, the plain camera takes a small collision-checked lens
+        /// shift (AssistShoulderU, to the enemy's side) and AssistPitchDeg more pitch, eased over AssistSeconds.</summary>
+        public const double AssistShoulderU = 0.6, AssistPitchDeg = 6, AssistSeconds = 0.35;
+
+        /// <summary>The swing share kept by the best clear pose of one side: 1 (48 deg), 0.5 (24), 0.25 (12) or 0.</summary>
+        public static double BestSwing(double full, double half, double quarter) =>
+            full >= WallShare ? 1 : half >= WallShare ? 0.5 : quarter >= WallShare ? 0.25 : 0;
+        /// <summary>The framed pitch (deg) and distance share for a kept swing share (1: the design; 0: the fallback).</summary>
+        public static double PosePitch(double keep) => PitchDeg + (FallbackPitchDeg - PitchDeg) * (1 - keep);
+        public static double PoseReach(double keep) => 1 - FallbackCloser * (1 - keep);
         /// <summary>The yaw offset and the shoulder chase their target with this time constant (s) and rate limits (deg/s,
         /// u/s): no snap when the side changes or the enemy circles.</summary>
         public const double ChaseTau = 0.12, MaxYawRate = 200, MaxShoulderRate = 2.5;
@@ -67,12 +90,20 @@ namespace CriticalMass.Runtime.Camera
         /// </summary>
         public static double SideClear(CriticalMass.Sim.Grid.MapDef map, double fx, double fy, double fz, double lineYaw, int turn, double strength, double fovFit,
             double mx, double my, double mz, double ex, double ey, double ez, SeeThroughCylinder[] cyl, int n,
+            out double lx, out double ly, out double lz) =>
+            SideClear(map, fx, fy, fz, lineYaw, turn, turn == 0 ? 0 : 1, strength, fovFit, mx, my, mz, ex, ey, ez, cyl, n, out lx, out ly, out lz);
+
+        /// <summary>fix/px-combat-camera-3: one pose of the ladder: turn (+1 / -1 / 0) at swing share (1, 0.5, 0.25; 0 = the
+        /// closer-and-higher fallback, PosePitch / PoseReach).</summary>
+        public static double SideClear(CriticalMass.Sim.Grid.MapDef map, double fx, double fy, double fz, double lineYaw, int turn, double swing, double strength, double fovFit,
+            double mx, double my, double mz, double ex, double ey, double ez, SeeThroughCylinder[] cyl, int n,
             out double lx, out double ly, out double lz)
         {
-            double yaw = lineYaw + turn * YawDeg;
-            double pitch = FollowCamera.ThirdPitch + (PitchDeg - FollowCamera.ThirdPitch) * strength;
-            double sh = -turn * ShoulderU * strength;
-            double dist = FollowCamera.ThirdDistance + (Distance * fovFit - FollowCamera.ThirdDistance) * strength;
+            double keep = turn == 0 ? 0 : swing;
+            double yaw = lineYaw + turn * YawDeg * keep;
+            double pitch = FollowCamera.ThirdPitch + (PosePitch(keep) - FollowCamera.ThirdPitch) * strength;
+            double sh = -turn * ShoulderU * keep * strength;
+            double dist = FollowCamera.ThirdDistance + (Distance * fovFit * PoseReach(keep) - FollowCamera.ThirdDistance) * strength;
             GroundCamera.Basis(yaw, out double ux, out double uz, out double rx, out double rz);
             double pr = pitch * Math.PI / 180, cp = Math.Cos(pr), sp = Math.Sin(pr);
             double share = 1, s = Math.Abs(sh);
@@ -204,8 +235,13 @@ namespace CriticalMass.Runtime.Camera
         public bool Looking;
         /// <summary>Clearance (CombatFrame.SideClear: walls AND scenery AND sight to both chests; 0..1) for turn +1 and -1.</summary>
         public double ClearPlus, ClearMinus;
-        /// <summary>Even the no-orbit pose is blocked (scenery or a wall hides a fighter from it): the framing lets go.</summary>
+        /// <summary>Even the no-orbit pose is blocked (scenery or a wall hides a fighter from it): the framing lets go after
+        /// OcclusionGraceSeconds of it.</summary>
         public bool NoClearFrame;
+        /// <summary>fix/px-combat-camera-3: the reduced swings' clearance (24 deg, 12 deg) for turn +1 and -1 (0 = not tried).</summary>
+        public double ClearPlusHalf, ClearMinusHalf, ClearPlusQuarter, ClearMinusQuarter;
+        /// <summary>fix/px-combat-camera-3: the player steers the yaw himself (manual look mode): the framing respects it.</summary>
+        public bool Manual;
     }
 
     /// <summary>
@@ -230,17 +266,36 @@ namespace CriticalMass.Runtime.Camera
         public double WallKeep { get; private set; } = 1;
         /// <summary>He turned more than ReleaseDeg off the line: let go until he faces within ReacquireDeg again.</summary>
         public bool TurnedAway { get; private set; }
+        /// <summary>fix/px-combat-camera-3: the distance share of the kept pose (PoseReach) and the respect mode (see
+        /// RespectYawDeg) this frame.</summary>
+        public double Reach { get; private set; } = 1;
+        public bool Respecting { get; private set; }
+        /// <summary>Seconds every pose has been blocked (logs; lets go at OcclusionGraceSeconds).</summary>
+        public double BlockedFor => _blockedFor;
         /// <summary>The framing is on (engaged or holding) this frame.</summary>
         public bool Active { get; private set; }
 
-        double _hold, _swapHeld, _lineYaw;
+        double _hold, _swapHeld, _lineYaw, _blockedFor, _respect, _restView = double.NaN;
         bool _have;
+
+        double _fold;
+
+        /// <summary>fix/px-combat-camera-3: yaw (deg) the framing gave up since the last call (its bound shrank: easing out,
+        /// or respecting his steering). The caller adds it to the player's own yaw, so the drawn view (own + offset) does
+        /// not move: a framing that lets go never unwinds the view as a rotation, and the aim lands on screen centre.</summary>
+        public double TakeFold()
+        {
+            double y = _fold;
+            _fold = 0;
+            return y;
+        }
 
         public void Reset()
         {
             Weight = K = YawOffset = PitchOffset = Lift = Shoulder = Focus = 0;
             TurnedAway = false;
             WallKeep = 1;
+            Reach = 1;
             Turn = 0;
             Active = _have = false;
             _hold = _swapHeld = 0;
@@ -248,6 +303,9 @@ namespace CriticalMass.Runtime.Camera
 
         static double Smooth01(double x) => x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3 - 2 * x);
         static double Clamp(double v, double lo, double hi) => v < lo ? lo : v > hi ? hi : v;
+        static double SideSwing(in CombatFrameInput f, int turn) => turn > 0
+            ? CombatFrame.BestSwing(f.ClearPlus, f.ClearPlusHalf, f.ClearPlusQuarter)
+            : CombatFrame.BestSwing(f.ClearMinus, f.ClearMinusHalf, f.ClearMinusQuarter);
 
         public void Step(in CombatFrameInput f)
         {
@@ -255,9 +313,25 @@ namespace CriticalMass.Runtime.Camera
             // fix/px-combat-camera-2: turned away from the enemy (or no clear framing at all): let go, no hold.
             double facing = Math.Abs(GroundCamera.DeltaAngle(f.OwnYaw, f.LineYaw));
             bool wasOn = Active || Weight > 0;
-            TurnedAway = f.Enabled && (TurnedAway ? facing > CombatFrame.ReacquireDeg : wasOn && facing > CombatFrame.ReleaseDeg);
-            bool letGo = TurnedAway || f.NoClearFrame;
-            bool engaged = f.Enabled && f.Engaged && !letGo && facing <= CombatFrame.ReleaseDeg;
+            // fix/px-combat-camera-3: only HIS look lets go by turning away (auto follow drifting behind a moving fighter
+            // never does: that was most of the forest drops); brief occlusion of every pose is tolerated.
+            // his turn = how far his look took the drawn view from where it rested (the framed view sits up to 48 deg off
+            // the line by design, and folded yaw moves his own yaw, so neither is the measure); back = the view faces the fight
+            double view = f.OwnYaw + YawOffset;
+            if (!f.Looking || double.IsNaN(_restView)) _restView = view;
+            double turned = Math.Abs(GroundCamera.DeltaAngle(_restView, view));
+            double viewFacing = Math.Abs(GroundCamera.DeltaAngle(view, f.LineYaw));
+            TurnedAway = f.Enabled && (TurnedAway ? viewFacing > CombatFrame.ReacquireDeg : wasOn && f.Looking && turned > CombatFrame.ReleaseDeg);
+            _blockedFor = f.NoClearFrame ? _blockedFor + dt : 0;
+            // his steering during a framed fight (or manual look mode) earns respect; the auto follow's own swing after a
+            // fight (no framing on) does not
+            if ((f.Looking && wasOn) || f.Manual) _respect = CombatFrame.RespectSeconds;
+            else if (!wasOn) _respect = Math.Max(0, _respect - dt);
+            Respecting = f.Manual || _respect > 0;
+            bool letGo = TurnedAway || _blockedFor >= CombatFrame.OcclusionGraceSeconds;
+            // a fresh engagement needs him facing the fight; once framed it is sticky (no facing rule, GroundView keeps the
+            // target while any enemy stands within KeepRange)
+            bool engaged = f.Enabled && f.Engaged && !letGo && (wasOn || facing <= CombatFrame.ReleaseDeg);
             if (engaged) { _hold = CombatFrame.HoldSeconds; _have = true; _lineYaw = f.LineYaw; }
             else if (_hold > 0) _hold = f.Enabled && f.TargetAlive && !letGo ? _hold - dt : 0;
             if (!engaged && f.Enabled && f.TargetAlive && _hold > 0 && _have) _lineYaw = f.LineYaw;   // the hold frames the live body
@@ -268,6 +342,7 @@ namespace CriticalMass.Runtime.Camera
             else Weight = on ? Math.Min(1, Weight + dt / CombatFrame.InSeconds) : Math.Max(0, Weight - dt / CombatFrame.OutSeconds);
             if (Weight <= 0 && !on)
             {
+                _fold += YawOffset;   // whatever is left is his now (never a rotation back)
                 bool away = TurnedAway;
                 Reset();
                 TurnedAway = away;   // let go stays let go until he faces the fight again
@@ -279,13 +354,12 @@ namespace CriticalMass.Runtime.Camera
             if (Turn == 0 || (f.Snap && on) || (fresh && on))
             {
                 Turn = d0 >= 0 ? 1 : -1;
-                double here0 = Turn > 0 ? f.ClearPlus : f.ClearMinus, there0 = Turn > 0 ? f.ClearMinus : f.ClearPlus;
-                if (here0 < CombatFrame.WallShare && there0 > here0) Turn = -Turn;   // a wall on that side: start on the other
+                if (SideSwing(f, Turn) < SideSwing(f, -Turn)) Turn = -Turn;   // a wall or scenery on that side: start on the other
                 _swapHeld = 0;
             }
-            double here = Turn > 0 ? f.ClearPlus : f.ClearMinus, there = Turn > 0 ? f.ClearMinus : f.ClearPlus;
-            bool wallSwap = here < CombatFrame.WallShare && there >= CombatFrame.WallShare;
-            bool viewSwap = !f.Looking && -Turn * d0 > CombatFrame.SideHysteresisDeg && there >= CombatFrame.WallShare;   // never mid-look
+            double here = SideSwing(f, Turn), there = SideSwing(f, -Turn);
+            bool wallSwap = there > here;
+            bool viewSwap = !f.Looking && -Turn * d0 > CombatFrame.SideHysteresisDeg && there > 0 && there >= here;   // never mid-look
             if (on && (wallSwap || viewSwap))
             {
                 _swapHeld += dt;
@@ -298,8 +372,8 @@ namespace CriticalMass.Runtime.Camera
             }
             else _swapHeld = 0;
 
-            // Both sides blocked: the orbit and the shoulder ease out (then in again when a side clears).
-            double keepGoal = here >= CombatFrame.WallShare ? 1 : 0;
+            // The kept swing: the best clear pose on this side (48, 24, 12 deg), else the closer-and-higher fallback.
+            double keepGoal = here;
             WallKeep = f.Snap ? keepGoal : keepGoal > WallKeep ? Math.Min(keepGoal, WallKeep + dt / CombatFrame.InSeconds)
                                                                : Math.Max(keepGoal, WallKeep - dt / CombatFrame.InSeconds);
 
@@ -309,9 +383,10 @@ namespace CriticalMass.Runtime.Camera
 
             // Yaw: toward the line + Turn x YawDeg, never more than the cap off the player's own yaw, scaled by K.
             double wantYaw = _lineYaw + Turn * CombatFrame.YawDeg * keep;
-            double cap = CombatFrame.MaxDeviationDeg;
+            // fix/px-combat-camera-3: respecting his steering, at most RespectYawDeg of rotation (slowly) and a wider shift
+            double cap = Respecting ? CombatFrame.RespectYawDeg : CombatFrame.MaxDeviationDeg;
             double yawGoal = Clamp(GroundCamera.DeltaAngle(f.OwnYaw, wantYaw), -cap, cap) * K;
-            double shoulderGoal = -Turn * CombatFrame.ShoulderU * K * keep;
+            double shoulderGoal = -Turn * (Respecting ? CombatFrame.RespectShoulderU : CombatFrame.ShoulderU) * K * keep;
             if (f.Snap)
             {
                 YawOffset = yawGoal;
@@ -320,14 +395,17 @@ namespace CriticalMass.Runtime.Camera
             else
             {
                 double a = dt > 0 ? 1 - Math.Exp(-dt / CombatFrame.ChaseTau) : 0;
-                double ym = CombatFrame.MaxYawRate * dt, sm = CombatFrame.MaxShoulderRate * dt;
+                double ym = (Respecting ? CombatFrame.RespectYawRate : CombatFrame.MaxYawRate) * dt, sm = CombatFrame.MaxShoulderRate * dt;
                 // fix/px-combat-camera-2: while he looks around the offset is held (his turn moves the view 1:1); it
                 // re-settles only once he stops. As K eases out the bound below takes it home.
                 if (!f.Looking) YawOffset += Clamp((yawGoal - YawOffset) * a, -ym, ym);
                 Shoulder += Clamp((shoulderGoal - Shoulder) * a, -sm, sm);
-                YawOffset = Clamp(YawOffset, -cap * K, cap * K);
+                double clamped = Clamp(YawOffset, -cap * K, cap * K);
+                _fold += YawOffset - clamped;
+                YawOffset = clamped;
             }
-            PitchOffset = (CombatFrame.PitchDeg - FollowCamera.ThirdPitch) * K;
+            PitchOffset = (CombatFrame.PosePitch(keep) - FollowCamera.ThirdPitch) * K;
+            Reach = CombatFrame.PoseReach(keep);
             Lift = (CombatFrame.FocusHeight - FollowCamera.ThirdPivotHeight) * K;
             Focus = CombatFrame.FocusShare * K;
         }

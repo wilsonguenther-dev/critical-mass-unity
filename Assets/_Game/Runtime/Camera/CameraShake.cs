@@ -179,7 +179,13 @@ namespace CriticalMass.Runtime.Camera
             if (ke > 0f)
             {
                 // px lane C: the hit kick, its own size (never times Limit), along the hit in the screen plane.
-                _kickNow = (tr.right * _kickVec.x + tr.up * _kickVec.y) * (_kickU * ke);
+                // fix/px-combat-camera-3 (pass 3 D3: the third-person kick peaked at rendered frame 3): the kick is sized for
+                // the lens at FocusDistance; the combat framing swings the lens in during the kick, which grew its screen
+                // size for a few frames. Scaled to the live lens distance, its screen size follows the envelope alone, so
+                // it peaks on the hit frame.
+                double lens = GroundView.LensDistance, at = FocusDistance();
+                float live = lens > 0.3 && at > 0.3 ? (float)(lens / at) : 1f;
+                _kickNow = (tr.right * _kickVec.x + tr.up * _kickVec.y) * (_kickU * ke * live);
                 off += _kickNow;
                 KickFrames++;
             }
