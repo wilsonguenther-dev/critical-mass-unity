@@ -61,6 +61,9 @@ namespace CriticalMass.Runtime.Hud.Player
                 case PlayerReasons.BlockedPassive: return "IMMUNE";
                 case PlayerReasons.BlockedImmune: return "IMMUNE";
                 case PlayerReasons.BlockedShield: return Blocked;   // review fix (defect 6): a shield that takes the hit says BLOCKED
+                case PlayerReasons.BlockedGuard: return Blocked;    // class moves T2-1 (lane 6): a frontal guard cut the hit
+                case PlayerReasons.BlockedParried: return ParryWord;   // class moves T2-1: the parry negated it (large, see OnDefended)
+                case PlayerReasons.BlockedAir: return AirborneWord;    // class moves T2-7: the swing passed under a jump
             }
             if (code == BlockedGlancing) return TooClose;   // review fix (defect 15): small and once per target per 2 s, no number
             // a code appended later (lane DM's dodge report, ...): worded by its constant's name, never an exception
@@ -95,6 +98,8 @@ namespace CriticalMass.Runtime.Hud.Player
         public static bool IsDefence(int code)
         {
             if (code == PlayerReasons.BlockedDodge || code == PlayerReasons.BlockedShield) return true;
+            // class moves (lane 6): my guard, my parry and my jump over a swing are my defence working too
+            if (code == PlayerReasons.BlockedGuard || code == PlayerReasons.BlockedParried || code == PlayerReasons.BlockedAir) return true;
             string n = BlockedName(code);
             return n != null && (n.IndexOf("Dodg", System.StringComparison.OrdinalIgnoreCase) >= 0 || n.IndexOf("Parr", System.StringComparison.OrdinalIgnoreCase) >= 0);
         }
@@ -112,6 +117,7 @@ namespace CriticalMass.Runtime.Hud.Player
                 case PlayerReasons.ButtonCancel: return "CANCEL";
                 case PlayerReasons.ButtonJump: return "JUMP";
                 case ButtonStationBuy: return "UPGRADE";
+                case PlayerReasons.ButtonGuard: return "GUARD";
                 default: return "PRESS";
             }
         }
@@ -148,6 +154,10 @@ namespace CriticalMass.Runtime.Hud.Player
                 case RefusedCarrying: return button == PlayerReasons.ButtonDodge ? "CAN'T DODGE WHILE CARRYING" : "PUT YOUR LOAD DOWN FIRST";
                 case RefusedInAir: return button == PlayerReasons.ButtonDodge ? "CAN'T DODGE IN THE AIR" : "ALREADY IN THE AIR";
                 case RefusedRuleOff: return button == ButtonStationBuy ? "STATION UPGRADES ARE OFF: THE HUT LEVELS THE TEAM" : "OFF IN THIS MATCH";
+                case PlayerReasons.RefusedGuarding: return "LOWER YOUR GUARD FIRST";
+                case PlayerReasons.RefusedGliding: return "NOT WHILE GLIDING";
+                case PlayerReasons.RefusedLanding: return button == PlayerReasons.ButtonJump ? "JUMP NOT READY" : "LANDING";
+                case PlayerReasons.RefusedParryLockout: return "PARRY NOT READY";
                 default: return "CAN'T DO THAT NOW";
             }
         }
@@ -232,7 +242,7 @@ namespace CriticalMass.Runtime.Hud.Player
             Text t = glance
                 ? _words.Show(text, 1500 + (target & 63), target >= 0 && target < w.ActorCount ? target : -1, at, TargetLift,
                     PxPalette.Cream, CriticalMass.Runtime.Hud.Style.CMTokens.Stone.Color, false, 0.8f, GlanceRepeat)
-                : _words.Show(text, 1000 + code * 4 + (target & 3), target >= 0 && target < w.ActorCount ? target : -1, at, TargetLift,
+                : (code == PlayerReasons.BlockedParried ? SizeNext(Mathf.RoundToInt(WorldWords.StrongSize * LargeWordScale)) : _words).Show(text, 1000 + code * 4 + (target & 3), target >= 0 && target < w.ActorCount ? target : -1, at, TargetLift,
                     PxPalette.StrikeInk, PxPalette.Strike, true, Seconds);
             if (t != null) PlayerFeedback.Report(FeedbackChannel.BlockedTag, target, amount, t, code);
         }
@@ -264,6 +274,7 @@ namespace CriticalMass.Runtime.Hud.Player
             _defendedWordAt = Time.unscaledTime;
             bool perfect = tier >= 1 && code == PlayerReasons.BlockedDodge;
             if (perfect) _words.NextSize = Mathf.RoundToInt(WorldWords.StrongSize * 1.25f);
+            if (code == PlayerReasons.BlockedParried) _words.NextSize = Mathf.RoundToInt(WorldWords.StrongSize * LargeWordScale);   // class moves: PARRY is large
             Text t = _words.Show(perfect ? PerfectWord : BlockedWords(code, 0), 2400 + code, me, Vector3.zero, SelfLift, PxPalette.Cream, PxPalette.Brass, true, Seconds);
             if (t != null) PlayerFeedback.Report(FeedbackChannel.BlockedTag, me, Mathf.RoundToInt((float)lost), t, code);
         }
@@ -292,6 +303,73 @@ namespace CriticalMass.Runtime.Hud.Player
         }
 
         public const float CritLift = 3.0f;
+
+
+        // ------------------------------------------------------------------ class moves (lane 6): the new verbs' words
+        // Every word below shows only when its sim event arrives, and every event is pushed only while its switch is on, so
+        // with every switch off none of these can appear. Words never flash: a pill fades in and out (WorldWords), so the
+        // reduce-flashing setting needs no other path here.
+
+        public const string ParryWord = "PARRY", AirborneWord = "AIRBORNE", GuardBreakWord = "GUARD BREAK", GuardBrokenWord = "GUARD BROKEN",
+            BaitedWord = "BAITED", LungeWord = "LUNGE", ChargedWord = "CHARGED", FinisherWord = "FINISHER", TrippedWord = "TRIPPED",
+            SecondWindWord = "SECOND WIND", ParriedOnMeWord = "PARRIED";
+        /// <summary>Large words (PARRY, GUARD BREAK, BAITED on the victim) are this many times the strong pill size.</summary>
+        public const float LargeWordScale = 1.35f;
+
+        /// <summary>The words a class-moves event shows (pure, tested). mine = the local fighter did it (attacker / feinter /
+        /// slider / charger); onMe = it happened to the local fighter. Null = nothing to say for this viewer.</summary>
+        public static string MovesWords(SimEventType type, double value, int tier, bool mine, bool onMe)
+        {
+            switch (type)
+            {
+                case SimEventType.GuardBreak: return onMe ? GuardBrokenWord : mine ? GuardBreakWord : null;
+                case SimEventType.FeintBaited: return mine ? BaitedWord : onMe ? BaitedWord : null;
+                case SimEventType.Lunge: return mine ? LungeWord : null;
+                case SimEventType.HeavyRelease: return mine && value >= 0.999 ? ChargedWord : null;
+                case SimEventType.ComboStep: return mine ? tier >= 1 ? FinisherWord : CriticalMass.Runtime.View.B17.MovesRead.ComboWord((int)System.Math.Round(value)) : null;
+                case SimEventType.Slide: return value > 0 && (mine || onMe) ? TrippedWord : null;
+                case SimEventType.SecondWind: return onMe ? SecondWindWord : null;
+                default: return null;
+            }
+        }
+
+        /// <summary>GUARD BREAK on the broken guard (large, hurt rim) when I broke it; GUARD BROKEN over me when mine broke.</summary>
+        public void OnGuardBreak(World w, int guard, int attacker, int me)
+        {
+            bool onMe = guard == me;
+            string text = MovesWords(SimEventType.GuardBreak, 0, 0, attacker == me, onMe);
+            if (text == null) return;
+            _words.NextSize = Mathf.RoundToInt(WorldWords.StrongSize * LargeWordScale);
+            Text t = _words.Show(text, 5000 + (guard & 63), guard >= 0 && guard < w.ActorCount ? guard : -1, Vector3.zero, onMe ? SelfLift : TargetLift,
+                onMe ? PxPalette.Cream : PxPalette.StrikeInk, onMe ? PxPalette.Hurt : PxPalette.Strike, true, Seconds);
+            if (t != null) PlayerFeedback.Report(FeedbackChannel.BlockedTag, guard, 0f, t, 900 + (int)SimEventType.GuardBreak);
+        }
+
+        /// <summary>T1-4a: my feint baited him: FEINT (small) on me and BAITED (large) on the victim.</summary>
+        public void OnFeintBaited(World w, int feinter, int victim, int me)
+        {
+            if (feinter != me && victim != me) return;
+            if (feinter == me) OnFeint(w, me);
+            if (victim < 0 || victim >= w.ActorCount) return;
+            _words.NextSize = Mathf.RoundToInt(WorldWords.StrongSize * LargeWordScale);
+            bool onMe = victim == me;
+            Text t = _words.Show(BaitedWord, 5100 + (victim & 63), victim, Vector3.zero, onMe ? SelfLift + 0.25f : TargetLift,
+                onMe ? PxPalette.Cream : PxPalette.StrikeInk, onMe ? PxPalette.Hurt : PxPalette.Strike, true, Seconds);
+            if (t != null) PlayerFeedback.Report(FeedbackChannel.BlockedTag, victim, 0f, t, 900 + (int)SimEventType.FeintBaited);
+        }
+
+        /// <summary>A self word of the new verbs (LUNGE, CHARGED, x2 / x3 / FINISHER on the target, SECOND WIND): key keeps one per kind.</summary>
+        public Text OnMovesWord(World w, string text, int key, int actor, bool strong, bool large, Color ink, Color rim, float seconds, int reason)
+        {
+            if (string.IsNullOrEmpty(text)) return null;
+            if (large) _words.NextSize = Mathf.RoundToInt(WorldWords.StrongSize * LargeWordScale);
+            bool onSelf = actor == HudBinder.LocalActor;
+            Text t = _words.Show(text, key, actor >= 0 && actor < w.ActorCount ? actor : -1, Vector3.zero, onSelf ? SelfLift : TargetLift, ink, rim, strong, seconds);
+            if (t != null) PlayerFeedback.Report(FeedbackChannel.BlockedTag, actor, 0f, t, reason);
+            return t;
+        }
+
+        WorldWords SizeNext(int size) { _words.NextSize = size; return _words; }
 
         public void OnFeint(World w, int me) => _words.Show(Feint, 2001, me, Vector3.zero, SelfLift, PxPalette.Cream, PxPalette.Brass, false, 0.8f);
 

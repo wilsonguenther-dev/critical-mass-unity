@@ -53,6 +53,10 @@ namespace CriticalMass.Runtime.Replay
 
         public static ReplayPlayback Current { get; private set; }
 
+        /// <summary>Class moves lane 6 (T1-8): a replay rendered to a film by MatchVideo (-replayFile with -matchVideo): the
+        /// playback bar and hints are not drawn, so the film shows only the recorded player's gameplay view and HUD.</summary>
+        public static bool FilmMode;
+
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         static void ResetStatics()
         {
@@ -410,7 +414,7 @@ namespace CriticalMass.Runtime.Replay
         void UpdateUi()
         {
             if (_canvas == null) Build();
-            bool show = GameFlow.State != FlowState.Results;   // the results screen of a replayed match stands alone
+            bool show = GameFlow.State != FlowState.Results && !FilmMode;   // the results screen of a replayed match stands alone
             if (_canvas.enabled != show) _canvas.enabled = show;
             if (!show) return;
             if (_canvas.worldCamera == null) _canvas.worldCamera = UnityEngine.Camera.main;
