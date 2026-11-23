@@ -112,6 +112,8 @@ namespace CriticalMass.Runtime.Camera
         /// <summary>follow-camera-3: a sim point (x, z) the auto-follow should face in the low play views (captures frame
         /// the fight and the Kaiju with it). Null = behind the fighter as usual.</summary>
         public static Vector2? AimAt;
+        double _extraSm;
+        const double ExtraInTau = 0.1, ExtraOutTau = 1.1;
         /// <summary>fix/px-camera-in-editor: Editor diagnostics only (A/B against the old follow, SessionState key
         /// cm.camera.robustOff, gone when the Editor quits); always false in a player.</summary>
         public static bool RobustOffForDiagnostics
@@ -417,6 +419,11 @@ namespace CriticalMass.Runtime.Camera
             bool robust = Mode == GroundViewMode.Play && _view != CameraView.FirstPerson && !RobustOffForDiagnostics;
             _hardCount = 0;
             for (int i = 0; i < _folCount; i++) if (!robust || !_fol[i].Soft) _hard[_hardCount++] = _fol[i];
+            // fix/px-camera-in-editor (no pumping): the framing's distance change goes in fast and comes out slowly, so a
+            // framing that flickers on and off never pumps the lens
+            if (robust && !snap && !paused && dt > 0)
+                _extraSm += (extra - _extraSm) * (1 - Math.Exp(-dt / (extra < _extraSm ? ExtraInTau : ExtraOutTau)));
+            else _extraSm = extra;
             var f = new GroundFollowInput
             {
                 Dt = paused ? 0 : dt,
@@ -424,7 +431,7 @@ namespace CriticalMass.Runtime.Camera
                 TargetZ = tz,
                 GroundY = gy,
                 PivotLift = lift,
-                ExtraDistance = extra,
+                ExtraDistance = robust ? _extraSm : extra,
                 WantYaw = GroundCamera.YawOfFacing(facing),
                 AutoYaw = Mode == GroundViewMode.Watch,
                 Rig = rig,
