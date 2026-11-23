@@ -22,19 +22,31 @@ namespace CriticalMass.Runtime.Input
         double _stickAt = double.NegativeInfinity;
         double _keysAt = double.NegativeInfinity;
         double _keyAttackAt = double.NegativeInfinity;
+        bool _pointerEverMoved;
 
         /// <summary>Forget every device (match start: the player has touched nothing yet).</summary>
         public void Reset()
         {
             _pointerAt = _stickAt = _keysAt = _keyAttackAt = double.NegativeInfinity;
+            _pointerEverMoved = false;
         }
 
-        public void NotePointerMoved(double now) => _pointerAt = now;
+        public void NotePointerMoved(double now)
+        {
+            _pointerAt = now;
+            _pointerEverMoved = true;
+        }
         /// <summary>Fix round 7 (owner's call): a mouse BUTTON press (attack, ability, any mouse-bound verb) is aim input too:
         /// it hands the aim to the cursor for that press and after it, with no move needed and whatever PointerHoldSeconds
         /// says, so a mouse player who walks with W A S D and leaves the cursor resting still swings AT the cursor. The keys
-        /// take the aim back only by their own rules (a keyboard attack key, or walking past the hold after this press).</summary>
-        public void NotePointerPressed(double now) => _pointerAt = now;
+        /// take the aim back only by their own rules (a keyboard attack key, or walking past the hold after this press).
+        /// Round 3 (pass 3, F31 keys-only top-down 0 of 8): only for a mouse the player has MOVED since Reset (match start).
+        /// A keys player who clicks to attack with a mouse he never moved keeps the keys aim (facing / the nearest enemy);
+        /// handing it to a cursor resting wherever the match left it aimed every top-down swing at a stale ground point.</summary>
+        public void NotePointerPressed(double now)
+        {
+            if (_pointerEverMoved) _pointerAt = now;
+        }
         public void NoteStick(double now) => _stickAt = now;
         /// <summary>The move keys were used (attack: a keyboard attack or ability key was pressed).</summary>
         public void NoteKeys(double now, bool attack = false)

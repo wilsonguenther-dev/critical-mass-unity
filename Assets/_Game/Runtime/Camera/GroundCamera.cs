@@ -164,6 +164,66 @@ namespace CriticalMass.Runtime.Camera
             return false;
         }
 
+        /// <summary>fix/px-combat-camera-3: the share of the screen (0..1, a box estimate) a vertical cylinder covers seen from
+        /// the lens at (lx, ly, lz) with vertical FOV vfov and aspect (1 when the lens is inside it).</summary>
+        public static double OccluderShare(double lx, double ly, double lz, in SeeThroughCylinder c, double vfovDeg, double aspect)
+        {
+            double dx = c.X - lx, dz = c.Z - lz, dc = Math.Sqrt(dx * dx + dz * dz);
+            if (dc <= c.R) return ly >= c.Y0 && ly <= c.Y1 ? 1 : 0.5;
+            double tv = Math.Tan(Math.Max(10, vfovDeg) * Math.PI / 360), th = tv * Math.Max(0.5, aspect);
+            double half = Math.Asin(Math.Min(1, c.R / dc));
+            double w = Math.Min(1, Math.Tan(Math.Min(half, 1.5)) / th);
+            double near = Math.Max(0.05, dc - c.R);
+            double top = Math.Atan((c.Y1 - ly) / near), bot = Math.Atan((c.Y0 - ly) / near);
+            double h = Math.Min(1, Math.Max(0, Math.Tan(Math.Min(top, 1.5)) - Math.Tan(Math.Max(bot, -1.5))) / (2 * tv));
+            return w * h;
+        }
+
+        /// <summary>fix/px-combat-camera-3: true when the segment a-b passes through the cylinder (in plan and in height),
+        /// ignoring its last stopShort u.</summary>
+        public static bool Crosses(double ax, double ay, double az, double bx, double by, double bz, double stopShort, in SeeThroughCylinder c)
+        {
+            double dx = bx - ax, dy = by - ay, dz = bz - az;
+            double len = Math.Sqrt(dx * dx + dy * dy + dz * dz);
+            double end = len - stopShort;
+            if (!(end > 0)) return false;
+            for (double t = 0; t <= end; t += Step * 0.5)
+            {
+                double k = t / len, x = ax + dx * k, y = ay + dy * k, z = az + dz * k;
+                double ex = x - c.X, ez = z - c.Z;
+                if (ex * ex + ez * ez < c.R * c.R && y > c.Y0 && y < c.Y1) return true;
+            }
+            return false;
+        }
+
+        /// <summary>fix/px-combat-camera-3: how far back (at most want) the lens may sit along (dx, dy, dz) from (px, py, pz)
+        /// so that no cylinder crossing the sight line to the chest (sx, sy, sz) covers more than MaxOccluderShare of the
+        /// screen: pulled in past it. When even MinDistance does not clear it, want comes back with blocked set (the caller
+        /// fades it instead) and r its radius.</summary>
+        public static double SightLimit(double px, double py, double pz, double dx, double dy, double dz, double want,
+            double sx, double sy, double sz, double vfovDeg, double aspect, SeeThroughCylinder[] cyl, int n, out bool blocked, out double r)
+        {
+            blocked = false;
+            r = 0;
+            if (cyl == null || n <= 0 || !(want > MinDistance)) return want;
+            int m = Math.Min(n, cyl.Length);
+            for (double t = want; t >= MinDistance - 1e-9; t -= Step)
+            {
+                double lx = px + dx * t, ly = py + dy * t, lz = pz + dz * t;
+                bool big = false;
+                for (int k = 0; k < m && !big; k++)
+                {
+                    if (!Crosses(lx, ly, lz, sx, sy, sz, CombatFrame.SightStopU, cyl[k])) continue;
+                    if (OccluderShare(lx, ly, lz, cyl[k], vfovDeg, aspect) <= GroundFollow.MaxOccluderShare) continue;
+                    big = true;
+                    r = Math.Max(r, cyl[k].R);
+                }
+                if (!big) { r = 0; return t; }
+            }
+            blocked = true;
+            return want;
+        }
+
         /// <summary>fix/px-combat-camera-2: true when the sight line from a (the lens) to b (a fighter's chest) meets the grid
         /// or a cylinder (trees with their crowns, rocks, crystals, props, buildings) before stopShort u from b. The lens
         /// itself inside something counts as blocked.</summary>
@@ -237,6 +297,16 @@ namespace CriticalMass.Runtime.Camera
         public MapDef Map;
         public SeeThroughCylinder[] Cylinders;
         public int CylinderCount;
+        /// <summary>fix/px-combat-camera-3 (pass 3: the plain follow pumped 1.6 to 4.7 u in half a second in a forest): the
+        /// distance pulls in at once but lets out only after the path has been clear for ClearHoldSeconds, then over about
+        /// a second (SlowOutTau). Off: the old OutTau ease (the director's watch view).</summary>
+        public bool SlowOut;
+        /// <summary>fix/px-combat-camera-3: the followed fighter's chest (sim). With SightOn, a scenery cylinder between the
+        /// lens and it that would cover more than MaxOccluderShare of the screen pulls the lens in past it.</summary>
+        public bool SightOn;
+        public double SightX, SightY, SightZ;
+        /// <summary>Vertical field of view (deg) and aspect for the occluder's screen share.</summary>
+        public double VFovDeg, Aspect;
     }
 
     /// <summary>
@@ -260,6 +330,13 @@ namespace CriticalMass.Runtime.Camera
         public double CamX { get; private set; }
         public double CamY { get; private set; }
         public double CamZ { get; private set; }
+        /// <summary>fix/px-combat-camera-3: a scenery cylinder still stands between the lens and the chest this frame (the
+        /// pull-in could not clear it), and its radius: GroundView widens the occluder dither for it.</summary>
+        public bool SightBlocked { get; private set; }
+        public double SightR { get; private set; }
+
+        public const double ClearHoldSeconds = 0.4, SlowOutTau = 0.33, MaxOccluderShare = 0.35;
+        double _clearFor;
 
         readonly Spring1 _px = CameraSpring.CreateSpring(0), _py = CameraSpring.CreateSpring(0), _pz = CameraSpring.CreateSpring(0);
         double _sinceOrbit = 999;
@@ -343,9 +420,27 @@ namespace CriticalMass.Runtime.Camera
             }
             double want = baseDist + f.ExtraDistance;
             double allowed = GroundCollision.Resolve(f.Map, ox, oy, oz, -fx, -fy, -fz, want, f.Cylinders, f.CylinderCount);
+            SightBlocked = false;
+            SightR = 0;
+            if (f.SightOn)
+            {
+                allowed = GroundCollision.SightLimit(ox, oy, oz, -fx, -fy, -fz, allowed, f.SightX, f.SightY, f.SightZ, f.VFovDeg, f.Aspect,
+                                                     f.Cylinders, f.CylinderCount, out bool blocked, out double r);
+                SightBlocked = blocked;
+                SightR = r;
+            }
             Allowed = allowed;
-            if (snap || allowed < Dist) Dist = allowed;
-            else if (dt > 0) Dist += (allowed - Dist) * (1 - Math.Exp(-dt / GroundCamera.OutTau));
+            if (snap || allowed < Dist) { Dist = allowed; _clearFor = 0; }
+            else if (dt > 0)
+            {
+                if (f.SlowOut)
+                {
+                    // pull in at once; out only once the path has stayed clear ClearHoldSeconds, then slowly (no pumping)
+                    _clearFor = allowed > Dist + 0.05 ? _clearFor + dt : 0;
+                    if (_clearFor >= ClearHoldSeconds) Dist += (allowed - Dist) * (1 - Math.Exp(-dt / SlowOutTau));
+                }
+                else Dist += (allowed - Dist) * (1 - Math.Exp(-dt / GroundCamera.OutTau));
+            }
             if (Dist > allowed) Dist = allowed;
             CamX = ox - fx * Dist;
             CamY = oy - fy * Dist;

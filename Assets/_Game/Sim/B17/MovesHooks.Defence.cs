@@ -4,6 +4,7 @@
 // goldens are the base branch's. Contract: cm-incidents/class-moves-audit-2026-11-22/LANE1-CONTRACT.md; numbers: MovesConfig.
 // Deterministic: plain arithmetic in actor-id order, no RNG, no allocation per tick.
 using System;
+using CriticalMass.Sim.Bots;
 using CriticalMass.Sim.Config;
 
 namespace CriticalMass.Sim.Core
@@ -38,6 +39,9 @@ namespace CriticalMass.Sim.Core
         public byte[] LungePressed = new byte[0];
         /// <summary>Integrator: the SwingTick of actor i's current LUNGE swing (LungeArmour), CombatFeel.NoTick = none.</summary>
         public int[] LungeSwingTick = new int[0];
+        /// <summary>round 3 swing snap: the enemy a person's plain swing closes on through its wind-up (-1 none) and that swing's tick.</summary>
+        public int[] SnapTarget = new int[0];
+        public int[] SnapSwing = new int[0];
         /// <summary>Integrator: the tick actor i took the knock of an enemy's melee LIGHT strike (ComboDodgeOutOfKnock).</summary>
         public int[] LightKnockTick = new int[0];
         // ---- guard fix (2026-11-23): what the defenders did to attacker i's current swing (keyed by its SwingTick), read by
@@ -81,6 +85,8 @@ namespace CriticalMass.Sim.Core
             LungeDashEnd = new int[n];
             LungePressed = new byte[n];
             LungeSwingTick = new int[n];
+            SnapTarget = new int[n];
+            SnapSwing = new int[n];
             LightKnockTick = new int[n];
             ChainSwing = new int[n];
             ChainBodies = new int[n];
@@ -111,6 +117,8 @@ namespace CriticalMass.Sim.Core
                 LungeDashEnd[i] = CombatFeel.NoTick;
                 LungePressed[i] = 0;
                 LungeSwingTick[i] = CombatFeel.NoTick;
+                SnapTarget[i] = -1;
+                SnapSwing[i] = CombatFeel.NoTick;
                 LightKnockTick[i] = CombatFeel.NoTick;
                 ChainSwing[i] = CombatFeel.NoTick;
                 ChainBodies[i] = ChainParried[i] = ChainBlocked[i] = 0;
@@ -286,6 +294,7 @@ namespace CriticalMass.Sim.Core
                     continue;
                 }
                 if (m.Guard) DefenceGuardTick(w, d, s, m, i);
+                DefenceSnapSteer(w, d, i);
                 if (m.DodgeLunge && d.LungeArmed[i] != 0)
                 {
                     if (Dodge.Active(w, i) && w.Inputs[i].Attack) d.LungePressed[i] = 1;
@@ -422,7 +431,25 @@ namespace CriticalMass.Sim.Core
 
         static double DefenceSpeedScale(World w, int i)
         {
-            if (!Cfg(w).Guard || DefenceS(w).GuardOn[i] == 0) return 1.0;
+            // round 3 (pass 3: the Builder lunge whiffed in third person): through his own LUNGE wind-up a player keeps only a
+            // stick that points at the lunge target (within 45 degrees); any other stick (a camera-relative forward that swung with
+            // the combat camera's yaw) holds him where the dash put him, so the swing lands from the stop point
+            DefenceMovesState ds = DefenceS(w);
+            Actor la = w.Actors[i];
+            if (Cfg(w).DodgeLunge && la.SwingPending && la.SwingTick == ds.LungeSwingTick[i])
+            {
+                int lt = ds.LungeTarget[i];
+                InputFrame inp = w.Inputs[i];
+                if (lt >= 0 && lt < w.ActorCount && w.Actors[lt].Alive && inp != null)
+                {
+                    double tx = w.X[lt] - w.X[i], tz = w.Z[lt] - w.Z[i];
+                    double tl = Math.Sqrt(tx * tx + tz * tz), ml = Math.Sqrt(inp.MoveX * inp.MoveX + inp.MoveZ * inp.MoveZ);
+                    if (tl > 1e-9 && ml > 1e-9 && (inp.MoveX * tx + inp.MoveZ * tz) / (tl * ml) < DefenceLungeFollowCos) return 0;
+                }
+            }
+            double snap = DefenceSnapScale(w, ds, i);
+            if (snap != 1.0) return snap;
+            if (!Cfg(w).Guard || ds.GuardOn[i] == 0) return 1.0;
             double[] row = Cfg(w).GuardMoveMul;
             int c = DefenceCls(w, i);
             return row != null && c < row.Length ? row[c] : 1.0;
@@ -503,6 +530,105 @@ namespace CriticalMass.Sim.Core
             return go;
         }
 
+        // ================================================================== round 3 swing snap
+
+        /// <summary>round 3: how far past his reach (body edge, units) a person's plain swing still closes on the enemy it faces.</summary>
+        const double DefenceSnapUnits = 0.6;
+
+        /// <summary>round 3 (pass 3: a click-only new player's swings whiffed as the bot stood just out of reach): a PERSON's plain
+        /// swing (no lunge, the move stick idle) facing an enemy (within the swing's arc) whose body edge is past 0.85 x his
+        /// reach and at most DefenceSnapUnits past it steps in through the wind-up (DefenceSnapSteer / DefenceSnapScale), to
+        /// 0.8 x reach by contact. Bots never snap. Called at Combat's swing start (SwingTick = w.Tick follows).</summary>
+        static void DefenceSnapPick(World w, DefenceMovesState d, int i, int windup)
+        {
+            d.SnapTarget[i] = -1;
+            if (!BotAim.IsHumanSeat(w, i) || i == 0 && BotBrain.ActorZeroOnAutopilot(w)) return;
+            InputFrame inp = w.Inputs[i];
+            if (inp != null && inp.MoveX * inp.MoveX + inp.MoveZ * inp.MoveZ > 0.04) return;
+            Actor a = w.Actors[i];
+            LightWeapon lw = LightWeapons.Of(w, a.Cls);
+            double reach = lw != null ? lw.Range : w.Config.Class(a.Cls).AttackRange;
+            double arc = lw != null ? lw.ArcDeg : w.Config.Class(a.Cls).AttackArcDeg;
+            double cosHalf = JsMath.Cos(arc / 2 * Math.PI / 180);
+            double fx = JsMath.Cos(a.Facing), fz = JsMath.Sin(a.Facing);
+            int best = -1;
+            double bestG = double.MaxValue;
+            for (int j = 0; j < w.ActorCount; j++)
+            {
+                Actor t = w.Actors[j];
+                if (j == i || !t.Alive || t.Team == a.Team) continue;
+                double ex = w.X[j] - w.X[i], ez = w.Z[j] - w.Z[i];
+                double ed = Math.Sqrt(ex * ex + ez * ez);
+                if (!(ed > 1e-6) || (ex * fx + ez * fz) / ed < cosHalf) continue;
+                double g = ed - w.Config.Class(t.Cls).Radius;
+                if (g <= 0.85 * reach || g > reach + DefenceSnapUnits) continue;
+                if (g < bestG) { bestG = g; best = j; }
+            }
+            if (best < 0) return;
+            d.SnapTarget[i] = best;
+            d.SnapSwing[i] = w.Tick;
+        }
+
+        static bool DefenceSnapping(World w, DefenceMovesState d, int i, out int t)
+        {
+            t = d.SnapTarget[i];
+            Actor a = w.Actors[i];
+            return t >= 0 && t < w.ActorCount && w.Actors[t].Alive && a.Alive && a.SwingPending && a.SwingTick == d.SnapSwing[i];
+        }
+
+        /// <summary>round 3 swing snap, per tick before Movement: the snapping person's idle stick points at his snap target.</summary>
+        static void DefenceSnapSteer(World w, DefenceMovesState d, int i)
+        {
+            if (!DefenceSnapping(w, d, i, out int t)) return;
+            InputFrame inp = w.Inputs[i];
+            if (inp == null || inp.MoveX * inp.MoveX + inp.MoveZ * inp.MoveZ > 0.04) { d.SnapTarget[i] = -1; return; }   // he steers himself
+            double ex = w.X[t] - w.X[i], ez = w.Z[t] - w.Z[i];
+            double ed = Math.Sqrt(ex * ex + ez * ez);
+            if (!(ed > 1e-6)) return;
+            inp.MoveX = ex / ed;
+            inp.MoveZ = ez / ed;
+        }
+
+        /// <summary>round 3 swing snap: the walk scale that brings the snapping person to 0.8 x reach of his target by contact
+        /// (at most DefenceSnapUnits over the wind-up); 0 once he is there; 1.0 when not snapping.</summary>
+        static double DefenceSnapScale(World w, DefenceMovesState d, int i)
+        {
+            if (!DefenceSnapping(w, d, i, out int t)) return 1.0;
+            Actor a = w.Actors[i];
+            LightWeapon lw = LightWeapons.Of(w, a.Cls);
+            double reach = lw != null ? lw.Range : w.Config.Class(a.Cls).AttackRange;
+            double ex = w.X[t] - w.X[i], ez = w.Z[t] - w.Z[i];
+            double gap = Math.Sqrt(ex * ex + ez * ez) - w.Config.Class(w.Actors[t].Cls).Radius - 0.8 * reach;
+            if (gap <= 0) return 0;
+            int left = a.SwingTick + a.SwingWindup - w.Tick;
+            if (left < 1) left = 1;
+            double per = w.Config.Class(a.Cls).MoveSpeed / w.Config.SimHz;
+            if (!(per > 0)) return 1.0;
+            double need = gap / left / per;
+            double cap = DefenceSnapUnits / (a.SwingWindup > 0 ? a.SwingWindup : 1) / per * 2;
+            return need < cap ? need : cap;
+        }
+
+        /// <summary>round 3: at the lunge swing's start, will target lt's body edge be within DefenceLungeArmMaxShare x reach at
+        /// contact (its velocity over the lunge wind-up; a stick held within 45 degrees of it credits DefenceLungeChaseShare of the
+        /// player's base speed, any other stick holds him still: DefenceSpeedScale)?</summary>
+        static bool DefenceLungeStillLands(World w, int i, int lt, int lunge)
+        {
+            if (lt < 0 || lt >= w.ActorCount || !w.Actors[lt].Alive) return false;
+            Actor a = w.Actors[i];
+            LightWeapon lw = LightWeapons.Of(w, a.Cls);
+            double reach = lw != null ? lw.Range : w.Config.Class(a.Cls).AttackRange;
+            double ls = lunge / w.Config.SimHz;
+            double fx = w.X[lt] + w.Vx[lt] * ls - w.X[i], fz = w.Z[lt] + w.Vz[lt] * ls - w.Z[i];
+            double edge = Math.Sqrt(fx * fx + fz * fz) - w.Config.Class(w.Actors[lt].Cls).Radius;
+            InputFrame inp = w.Inputs[i];
+            double ml = inp != null ? Math.Sqrt(inp.MoveX * inp.MoveX + inp.MoveZ * inp.MoveZ) : 0;
+            double fl = Math.Sqrt(fx * fx + fz * fz);
+            bool follows = ml > 1e-9 && fl > 1e-9 && (inp.MoveX * fx + inp.MoveZ * fz) / (ml * fl) >= DefenceLungeFollowCos;
+            double follow = follows ? DefenceLungeChaseShare * w.Config.Class(a.Cls).MoveSpeed * ls : 0;
+            return edge - follow <= DefenceLungeArmMaxShare * reach;
+        }
+
         /// <summary>Integrator: actor i's lunge wind-up multiplier (LungeWindupMulByClass, else LungeWindupMul).</summary>
         static double DefenceLungeMul(World w, int i)
         {
@@ -521,6 +647,9 @@ namespace CriticalMass.Sim.Core
 
         /// <summary>fix/mv-lunge-stop: the share of his base speed a chasing player is credited after the dash (arm check only).</summary>
         const double DefenceLungeChaseShare = 0.5;
+
+        /// <summary>round 3: through a LUNGE wind-up only a stick within 45 degrees of the lunge target moves the player.</summary>
+        const double DefenceLungeFollowCos = 0.70710678118654757;
 
         /// <summary>The shortest dodge-in dash, as a share of the dodge distance (an enemy already inside the stop distance).</summary>
         const double DefenceLungeMinShare = 0.2;
@@ -549,12 +678,15 @@ namespace CriticalMass.Sim.Core
             MovesConfig m = Cfg(w);
             if (!m.DodgeLunge) return windup;
             DefenceMovesState d = DefenceS(w);
-            if (d.LungeArmed[i] == 0) return windup;
+            if (d.LungeArmed[i] == 0) { DefenceSnapPick(w, d, i, windup); return windup; }
             bool pressed = d.LungePressed[i] != 0 || w.Inputs[i].Attack;
-            if (!pressed || w.Tick < d.LungeDashEnd[i] || w.Tick > d.LungeDashEnd[i] + 2) return windup;
+            if (!pressed || w.Tick < d.LungeDashEnd[i] || w.Tick > d.LungeDashEnd[i] + 2) { DefenceSnapPick(w, d, i, windup); return windup; }
             int lunge = (int)Math.Floor(windup * DefenceLungeMul(w, i) + 1e-9);   // x0.75, rounded down (Warrior 12 to 9, Farmer 9 to 6); the Miner x0.6
             if (lunge < 1) lunge = 1;
             d.LungeArmed[i] = 0;
+            // round 3: decided again at the swing. A target that moved off after the press (a step back, a dodge) and will not be
+            // within DefenceLungeArmMaxShare x reach at contact gets no LUNGE: the swing is a plain one, never a LUNGE that whiffs
+            if (!DefenceLungeStillLands(w, i, d.LungeTarget[i], lunge)) { DefenceSnapPick(w, d, i, windup); return windup; }
             // guard fix (T1-2, the third-person whiff): the lunge swing faces where its target will be at contact. Combat locks
             // SwingFacing = Facing right after this hook; the aim it would otherwise use is the camera's ground point in third
             // person, which lags the dash, so a lunge that reached its stop point swung past the target.

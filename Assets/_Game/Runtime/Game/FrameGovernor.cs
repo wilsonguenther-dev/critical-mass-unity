@@ -411,11 +411,16 @@ namespace CriticalMass.Runtime.Game
             _seenHz = Screen.currentResolution.refreshRateRatio.value;
         }
 
-        void OnApplicationFocus(bool focus) => _focused = focus;
+        void OnApplicationFocus(bool focus)
+        {
+            _focused = focus;
+            SessionKeeper.NoteFocus(focus);
+        }
 
         void OnApplicationPause(bool pause)
         {
             if (pause) _focused = false;
+            SessionKeeper.NotePause(pause);
         }
 
         // ── heat (macOS: pmset off the main thread, every 2 minutes; other platforms: none, UNVERIFIED API) ──
