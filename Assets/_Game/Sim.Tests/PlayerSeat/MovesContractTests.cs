@@ -90,7 +90,7 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
         /// <summary>The FullMoves golden (SPEC.md rule 0.2): Full rules plus every switch on. Pinned by the combine once, after the
         /// 72-seed balance run (integration/class-moves-cand1): a moved pin means class-moves behaviour changed; re-pin only with
         /// the reason in the commit.</summary>
-        public const ulong FullMoves16v16Seed1 = 0xCBBCD88B20865511, FullMoves5v5Seed42 = 0xA3126CE682DC36D3;   // fix/mv-healer-ruling: Healer GlideStrikeDamageMul 0.8, Warrior AvoidRefundShareByClass 0.2
+        public const ulong FullMoves16v16Seed1 = 0x80E1D63B4685EA5D, FullMoves5v5Seed42 = 0x7C68E107EF10057C;   // guard fix + combo buffer: parry/block chain undo, whiffed-tap lockout, GuardRaiseTicks 2, lunge steer + facing, Warrior refund 0.4, ComboPressTick
 
         [Test]
         public void TheFullMovesGoldenIsReported()
