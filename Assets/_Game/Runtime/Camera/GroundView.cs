@@ -84,6 +84,8 @@ namespace CriticalMass.Runtime.Camera
         /// <summary>fix/px-combat-camera-2: every solid dressed piece (trees with their crowns, rocks, crystals, props,
         /// buildings, landmarks) as cylinders from the kit meshes' bounds, and the set near the framed fight.</summary>
         const int MaxScenery = 8192, MaxNearScenery = 256;
+        /// <summary>A standing wood grove as a camera obstacle (DepthWorldView.Grove: trees 0.75 u out, crowns 0.42 u half-width, ~2.1 u tall).</summary>
+        const double GroveRadiusU = 1.3, GroveHeightU = 2.2;
 
         public static GroundView Current { get; private set; }
         /// <summary>True while the local player plays from the ground camera (HumanInputSource reads it).</summary>
@@ -943,6 +945,19 @@ namespace CriticalMass.Runtime.Camera
                 double dx = _scenery[i].X - fx, dz = _scenery[i].Z - fz, reach = near + _scenery[i].R;
                 if (dx * dx + dz * dz > reach * reach) continue;
                 _scn[n++] = _scenery[i];
+            }
+            // Editor review pass 3: the wood groves (DepthWorldView.Grove: up to four trees, crowns to ~2 u, within ~1.2 u of
+            // the source) are sim sources drawn in the Depth Solid mesh, not dressing, so they were missing from the set
+            // above and the framing parked the lens inside one beside the 28.5:58.5 grove. A standing grove counts like a tree.
+            int sources = CriticalMass.Runtime.View.Mechanics.DepthRead.SourceCount(w);
+            for (int i = 0; i < sources && n < MaxNearScenery - 1; i++)
+            {
+                if (!CriticalMass.Runtime.View.Mechanics.DepthRead.Source(w, i, out bool water, out double sx, out double sz, out int ch, out _, out _)) continue;
+                if (water || ch <= 0) continue;
+                double dx = sx - fx, dz = sz - fz, reach = near + GroveRadiusU;
+                if (dx * dx + dz * dz > reach * reach) continue;
+                double gy = GroundHeight.At(w.Map, sx, sz);
+                _scn[n++] = new SeeThroughCylinder { X = sx, Z = sz, R = GroveRadiusU, Y0 = gy, Y1 = gy + GroveHeightU };
             }
             Kaiju k = w.Kaiju;
             if (w.Match.Hatched && k.State != KaijuState.Egg)
