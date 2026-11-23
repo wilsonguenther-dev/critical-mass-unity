@@ -430,6 +430,7 @@ namespace CriticalMass.Runtime.Camera
                 SlowOut = Mode == GroundViewMode.Play,
                 SightOn = !robust && Mode == GroundViewMode.Play && target >= 0,
                 Robust = robust,
+                BodyRule = 1 - Math.Max(0, Math.Min(1, _combat.K)),
                 SightX = tx0,
                 SightY = gy0 + 1.2,
                 SightZ = tz0,
