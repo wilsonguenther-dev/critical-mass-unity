@@ -158,6 +158,8 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
         [ThreadStatic] public static bool ApproachPolicy;
         /// <summary>The duel cells' aim help (1 = Low, the audit probe's model; 0 = Off, the S5 / S44 / S45 gate model).</summary>
         public static int CellHelp = Help;
+        /// <summary>The rig's held-Attack model (PlayerSeatRig HumanModel.HoldAttack) in Cell; false = the rig's tap mode with Heavy on.</summary>
+        public static bool CellHold;
 
         public static void Step(Seat s, Action<Seat> post)
         {
@@ -222,6 +224,7 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
             {
                 Seat s = PlayerSeatRig.Duel(me, them, TargetMode.RealBot, PlayerSeatRig.AngleOf(k, angles), k, Lag, bots: bots, tweak: tweak);
                 s.Human.AimHelp = CellHelp;
+                s.Human.HoldAttack = CellHold;
                 bool strong = variant == "strong";
                 if (strong)
                 {
@@ -730,6 +733,34 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
 
     [TestFixture]
     [Category("PlayerSeat")]
+    public sealed class MovesOffenceTapOnly
+    {
+        /// <summary>fix/mv-heavy-press acceptance: every switch on, a human who only taps (the rig's tap mode) or holds the way the
+        /// old rig held (HoldAttack): each class's duel result is within 1 of the same human with only Heavy off. The light starts on
+        /// the press, so the heavy's existence costs the person no tick.</summary>
+        [Test]
+        [Category("Slow")]
+        public void TapOnly_EverySwitchOn_HeavyOnWithin1OfHeavyOff()
+        {
+            Action<GameConfig> allOn = c => MovesConfig.PlayBuildAllOn(c.Depth.Moves);
+            Action<GameConfig> noHeavy = c => { MovesConfig.PlayBuildAllOn(c.Depth.Moves); c.Depth.Moves.Heavy = false; };
+            var bad = new List<string>();
+            foreach (ClassId me in T.Classes)
+            {
+                OffTally off = OffRig.Row(me, "base", noHeavy, false, false);
+                OffTally tap = OffRig.Row(me, "base", allOn, false, false);
+                OffRig.CellHold = true;
+                OffTally hold = OffRig.Row(me, "base", allOn, false, false);
+                OffRig.CellHold = false;
+                bool ok = Math.Abs(tap.Wins - off.Wins) <= 1 && Math.Abs(hold.Wins - off.Wins) <= 1;
+                if (!PxLog.Line("fix-heavy TapOnly", me + " lag-6, aim help Low, vs Normal bots (5 x 8), every switch on", "Heavy off " + off + " | Heavy on, taps " + tap + " | Heavy on, rig hold model " + hold, "taps and hold within 1 of Heavy off", ok)) bad.Add(me.ToString());
+            }
+            Assert.IsEmpty(bad);
+        }
+    }
+
+    [TestFixture]
+    [Category("PlayerSeat")]
     public sealed class MovesOffenceDuelTable
     {
         [Test]
@@ -787,6 +818,63 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
                 }
             }
             OffRig.CellHelp = OffRig.Help;
+            Assert.IsEmpty(bad);
+        }
+    }
+}
+
+namespace CriticalMass.Sim.Tests.PlayerSeat
+{
+    using System;
+    using System.Collections.Generic;
+    using CriticalMass.Sim.Bots;
+    using CriticalMass.Sim.Config;
+    using CriticalMass.Sim.Core;
+    using NUnit.Framework;
+
+    /// <summary>fix/mv-heavy-press item 2: bot-only play must not move with Heavy (or Combos) on; one switch at a time, so a
+    /// divergence names its switch.</summary>
+    [TestFixture]
+    [Category("PlayerSeat")]
+    public sealed class MovesOffenceBotIdentity
+    {
+        static string Run(Action<MovesConfig> on, int ticks)
+        {
+            GameConfig ca = GameConfig.CreateBrowser5v5().ApplyRules(RulesProfile.Full);
+            ca.Depth.Moves.FeintBait = true;
+            GameConfig cb = GameConfig.CreateBrowser5v5().ApplyRules(RulesProfile.Full);
+            cb.Depth.Moves.FeintBait = true;
+            on(cb.Depth.Moves);
+            World a = World.CreateWorld(new WorldOptions { Seed = 1, TeamSize = 16, HumanTeam = TeamId.Azure, HumanClass = ClassId.Warrior, Config = ca });
+            World b = World.CreateWorld(new WorldOptions { Seed = 1, TeamSize = 16, HumanTeam = TeamId.Azure, HumanClass = ClassId.Warrior, Config = cb });
+            InputFrame sa = SimInput.EmptyInput(), sb = SimInput.EmptyInput();
+            for (int t = 0; t < ticks; t++)
+            {
+                MatchTick.Advance(a, null, sa);
+                MatchTick.Advance(b, null, sb);
+                for (int i = 0; i < a.ActorCount; i++)
+                    if (a.X[i] != b.X[i] || a.Z[i] != b.Z[i] || a.Actors[i].Hp != b.Actors[i].Hp)
+                        return "diverged at tick " + a.Tick + " on actor " + i + " (" + a.Actors[i].Cls + ")";
+            }
+            return null;
+        }
+
+        [Test]
+        public void BotOnly16v16_HeavyAlone_CombosAlone_Both_AreTickForTickToday()
+        {
+            var bad = new List<string>();
+            var arms = new (string, Action<MovesConfig>)[]
+            {
+                ("Heavy", m => m.Heavy = true),
+                ("Combos", m => m.Combos = true),
+                ("Heavy + Combos", m => { m.Heavy = true; m.Combos = true; }),
+                ("lane-5 bot verbs (step-out, guard, heavy, combos, slide)", m => { m.BotStepOut = true; m.Guard = true; m.Heavy = true; m.Combos = true; m.Slide = true; }),
+            };
+            foreach (var (name, on) in arms)
+            {
+                string r = Run(on, 3600);
+                if (!PxLog.Line("fix-heavy bot-only identity", "16v16 seed 1, 2:00, actor 0 on autopilot: " + name + " vs every switch off", r ?? "identical for 3600 ticks", "identical", r == null)) bad.Add(name);
+            }
             Assert.IsEmpty(bad);
         }
     }

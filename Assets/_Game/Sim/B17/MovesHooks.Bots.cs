@@ -393,7 +393,7 @@ namespace CriticalMass.Sim.Core
                 int contact = a.SwingTick + a.SwingWindup;
                 bool window = feel != null && feel.LandedSwing != null && feel.LandedSwing[id] == a.SwingTick && !a.SwingPending
                     && w.Tick > contact && w.Tick <= contact + a.SwingRecovery;
-                if (window)
+                if (window && human)   // fix/mv-heavy-press: against a bot no press is held back (bots never chain on bots)
                 {
                     if (b.ComboKey[id] != a.SwingTick + 1)
                     {
@@ -414,7 +414,7 @@ namespace CriticalMass.Sim.Core
                 // a held-back press, replayed on the tick the swing could start, only while the buffer would still hold it: the
                 // swing the buffered press gave before (no earlier, no later, never one the buffer had lost)
                 if (w.Tick - (b.ComboDefer[id] - 1) > CombatFeel.Ticks(w, w.Config.Depth.CombatFeel.BufferSeconds)) b.ComboDefer[id] = 0;
-                else if (Combat.AttackReady(w, id) && !(heavy && held > 0))
+                else if (Combat.AttackReady(w, id))   // fix/mv-heavy-press: Heavy no longer changes a bot's presses
                 {
                     o.Attack = true;
                     b.ComboDefer[id] = 0;
@@ -432,15 +432,13 @@ namespace CriticalMass.Sim.Core
                 if (dx * dx + dz * dz <= reach * reach
                     && BotReflex.Roll(w.Opts.Seed ^ BotsSaltCharge, a.SwingTick * 64 + id + 1, id) < BotsChance(Cfg(w).BotChargeChance, d))
                 {
-                    b.ChargeHold[id] = m.ChargeFullTick;
+                    // fix/mv-heavy-press: the bot's deliberate charge goes through lane 4's bot entry (its swing waits, then the
+                    // heavy fires); a bot's held Attack is never a charge, so no tap discipline is needed and a bot that does not
+                    // charge presses exactly as with Heavy off
+                    OffenceBotCharge(w, id, m.ChargeFullTick);
                     b.Charges[id]++;
                     return;
                 }
-            }
-            if (held > 0)
-            {
-                o.Attack = false;   // a tap: let go one tick
-                b.ComboDefer[id] = w.Tick + 1;
             }
         }
 
