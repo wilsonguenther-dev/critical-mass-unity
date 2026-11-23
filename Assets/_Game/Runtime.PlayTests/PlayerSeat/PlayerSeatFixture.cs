@@ -268,7 +268,10 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
         protected void PressAttack(CameraView view, bool gamepad = false)
         {
             if (gamepad) { Press(Pad.rightTrigger); return; }
-            if (view == CameraView.TopDown && Enemy >= 0) Set(Ms.position, ScreenOf(W.X[Enemy], W.Z[Enemy]));
+            // fix/px-base-seat-reds: a mouse user MOVES the mouse onto the enemy before he clicks (position with its delta); a
+            // bare position event plus a click aimed only through the old click-takes-the-aim rule, which no longer holds for a
+            // mouse never moved this match
+            if (view == CameraView.TopDown && Enemy >= 0) MoveMouse(ScreenOf(W.X[Enemy], W.Z[Enemy]));
             Press(Ms.leftButton);
         }
 

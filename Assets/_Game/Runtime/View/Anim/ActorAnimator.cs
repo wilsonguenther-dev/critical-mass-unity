@@ -132,7 +132,12 @@ namespace CriticalMass.Runtime.View.Anim
 
         /// <summary>Fix round 7: refused = the sim will not take this press (the attack is cooling down): the same wind-up, capped
         /// at HitFeelTuning.RefusedPressWeight, that fades out by 0.12 s (press acknowledged, never a strike).</summary>
-        public void PredictSwing(ModelView m, Actor actor, GameConfig cfg, double simTime, bool refused)
+        public void PredictSwing(ModelView m, Actor actor, GameConfig cfg, double simTime, bool refused) => PredictSwing(m, actor, cfg, simTime, refused, false);
+
+        /// <summary>fix/px-base-seat-reds: simTook = the sim already started this press's swing on the latest tick (its step ran
+        /// before the view this frame): the prediction is keyed on the tick before it, so this frame's pose hands it over to the
+        /// sim's swing (HandOver, no dip) instead of reading the fresh AnimAction as another action (Abort).</summary>
+        public void PredictSwing(ModelView m, Actor actor, GameConfig cfg, double simTime, bool refused, bool simTook)
         {
             if (m == null || actor == null || _predicting || (_kind == 1 && _actClip != null && _lastActW > 0f)) return;
             string clip = AttackTiming.AttackClip(m, actor.Cls);
@@ -158,7 +163,7 @@ namespace CriticalMass.Runtime.View.Anim
             _predicting = true;
             _predWall = Time.unscaledTimeAsDouble;
             _predFrame = Time.frameCount;
-            _predSwingTick = actor.SwingTick;
+            _predSwingTick = simTook ? actor.SwingTick - 1 : actor.SwingTick;
             _predFloor = 0f;
             _predFloorWall = double.NaN;
             _predRefused = refused;
