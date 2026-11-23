@@ -477,7 +477,9 @@ namespace CriticalMass.Runtime.Camera
         /// <summary>Never closer to the boom's pivot than this (u); the lens keeps RobustRadius clear of walls and the
         /// ground RobustFloor under it (the HUD planes at 0.4-0.6 m never meet geometry); never steeper than RobustMaxSteep
         /// (deg) looking at the chest; the chest stays RobustFrameMargin (deg) inside the frame.</summary>
-        public const double RobustMin = 1.6, RobustRadius = 0.45, RobustFloor = 0.7, RobustMaxSteep = 55, RobustFrameMargin = 12;
+        public const double RobustMin = 1.6, RobustRadius = 0.45, RobustFloor = 0.7, RobustMaxSteep = 55, RobustFrameMargin = 5;
+        /// <summary>The fighter for the frame rule: the sight point (chest) is RobustChestUp over his feet, he is RobustBodyTall.</summary>
+        public const double RobustChestUp = 1.2, RobustBodyTall = 2.1;
         /// <summary>Distance: in at once (a wall), out only after RobustHold s clear, then on RobustOutTau (no pumping).
         /// Wall rise: up on RobustRiseTau, down after RobustHold on RobustFallTau.</summary>
         public const double RobustHold = 0.6, RobustOutTau = 0.9, RobustRiseTau = 0.08, RobustFallTau = 0.9;
@@ -567,11 +569,14 @@ namespace CriticalMass.Runtime.Camera
                       || BoomAt(f, ox, oy, oz, ux, uz, boomPitch, want) < RobustMin - 1e-6;
             SightBlocked = false;
             SightR = 0;
-            // 3. the drawn look: the fighter's chest stays RobustFrameMargin inside the top and bottom of the frame
-            double h = Math.Sqrt((CamX - f.SightX) * (CamX - f.SightX) + (CamZ - f.SightZ) * (CamZ - f.SightZ));
-            double steep = Math.Atan2(CamY - f.SightY, Math.Max(1e-3, h)) * 180 / Math.PI;
+            // 3. the drawn look: the whole fighter (feet to head top) stays RobustFrameMargin inside the bottom and top of
+            // the frame; when he is too tall for that at this distance, he is centred
+            double h = Math.Max(1e-3, Math.Sqrt((CamX - f.SightX) * (CamX - f.SightX) + (CamZ - f.SightZ) * (CamZ - f.SightZ)));
+            double feetY = f.SightY - RobustChestUp, headY = feetY + RobustBodyTall;
+            double sFeet = Math.Atan2(CamY - feetY, h) * 180 / Math.PI, sHead = Math.Atan2(CamY - headY, h) * 180 / Math.PI;
             double half = Math.Max(10, (f.VFovDeg > 0 ? f.VFovDeg : 60) * 0.5) - RobustFrameMargin;
-            Pitch = Clamp(boomPitch, steep - half, steep + half);
+            double lo = sFeet - half, hi = sHead + half;
+            Pitch = lo <= hi ? Clamp(boomPitch, lo, hi) : (sFeet + sHead) * 0.5;
         }
 
         /// <summary>Over-the-head fallback height above the pivot (u).</summary>
