@@ -36,7 +36,7 @@ namespace CriticalMass.Runtime.Tests
             _kbOnly = ControlBindings.KeyboardOnly;
             _hand = ControlBindings.Hand;
             _prefs.Clear();
-            foreach (string k in ControllerSettings.AllKeys) _prefs[k] = (PlayerPrefs.HasKey(k), PlayerPrefs.GetInt(k, 0));
+            foreach (string k in ControllerSettings.AllKeys) _prefs[k] = (CmPrefs.HasKey(k), CmPrefs.GetInt(k, 0));
         }
 
         [TearDown]
@@ -48,10 +48,10 @@ namespace CriticalMass.Runtime.Tests
             ControllerSettings.ForceFamily(null);
             foreach (var kv in _prefs)
             {
-                PlayerPrefs.DeleteKey(kv.Key);
-                if (kv.Value.has) PlayerPrefs.SetInt(kv.Key, kv.Value.v);
+                CmPrefs.DeleteKey(kv.Key);
+                if (kv.Value.has) CmPrefs.SetInt(kv.Key, kv.Value.v);
             }
-            PlayerPrefs.Save();
+            CmPrefs.Save();
         }
 
         InputActionMap Map => _asset.FindActionMap("Player", true);
@@ -384,7 +384,7 @@ namespace CriticalMass.Runtime.Tests
             ControllerSettings.Vibration = false;
             Assert.IsFalse(ControllerSettings.Vibration);
             ControllerSettings.DeadZoneIndex = 2;
-            Assert.AreEqual(2, PlayerPrefs.GetInt(ControllerSettings.DeadZoneKey));
+            Assert.AreEqual(2, CmPrefs.GetInt(ControllerSettings.DeadZoneKey));
             ControllerSettings.ResetAll();
             Assert.IsTrue(ControllerSettings.Vibration);
             Assert.AreEqual(0, ControllerSettings.DeadZoneIndex);

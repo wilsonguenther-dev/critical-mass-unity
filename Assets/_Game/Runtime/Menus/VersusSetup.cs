@@ -145,18 +145,18 @@ namespace CriticalMass.Runtime.Menus
 
         static ClassId Read(string key, ClassId fallback)
         {
-            int v = PlayerPrefs.GetInt(key, (int)fallback);
+            int v = CmPrefs.GetInt(key, (int)fallback);
             ClassId c = (ClassId)Mathf.Clamp(v, 0, ClassIds.All.Count - 1);
             return MatchSetup.Playable.Contains(c) ? c : fallback;
         }
 
         public static ClassId Mine(MatchMode m) => Read(m == MatchMode.Range ? RangeMineKey : DuelMineKey, SetupPrefs.Load().Class);
         public static ClassId Enemy(MatchMode m) => Read(m == MatchMode.Range ? RangeEnemyKey : DuelEnemyKey, m == MatchMode.Range ? ClassId.Warrior : ClassId.Farmer);
-        public static void SetMine(MatchMode m, ClassId c) => PlayerPrefs.SetInt(m == MatchMode.Range ? RangeMineKey : DuelMineKey, (int)c);
-        public static void SetEnemy(MatchMode m, ClassId c) => PlayerPrefs.SetInt(m == MatchMode.Range ? RangeEnemyKey : DuelEnemyKey, (int)c);
+        public static void SetMine(MatchMode m, ClassId c) => CmPrefs.SetInt(m == MatchMode.Range ? RangeMineKey : DuelMineKey, (int)c);
+        public static void SetEnemy(MatchMode m, ClassId c) => CmPrefs.SetInt(m == MatchMode.Range ? RangeEnemyKey : DuelEnemyKey, (int)c);
 
-        public static BotDifficulty Bots() => (BotDifficulty)Mathf.Clamp(PlayerPrefs.GetInt(DuelBotsKey, (int)BotDifficulty.Normal), 0, 2);
-        public static void SetBots(BotDifficulty b) => PlayerPrefs.SetInt(DuelBotsKey, (int)b);
+        public static BotDifficulty Bots() => (BotDifficulty)Mathf.Clamp(CmPrefs.GetInt(DuelBotsKey, (int)BotDifficulty.Normal), 0, 2);
+        public static void SetBots(BotDifficulty b) => CmPrefs.SetInt(DuelBotsKey, (int)b);
 
         /// <summary>Easy, Normal, Hard in reading order (the enum keeps Normal first for the browser bots).</summary>
         public static BotDifficulty StepBots(BotDifficulty b, int d)
@@ -166,8 +166,8 @@ namespace CriticalMass.Runtime.Menus
             return o[((i + (d < 0 ? -1 : 1)) % 3 + 3) % 3];
         }
 
-        public static RangeDummy Dummy() => (RangeDummy)Mathf.Clamp(PlayerPrefs.GetInt(RangeDummyKey, 0), 0, 2);
-        public static void SetDummy(RangeDummy k) => PlayerPrefs.SetInt(RangeDummyKey, (int)k);
+        public static RangeDummy Dummy() => (RangeDummy)Mathf.Clamp(CmPrefs.GetInt(RangeDummyKey, 0), 0, 2);
+        public static void SetDummy(RangeDummy k) => CmPrefs.SetInt(RangeDummyKey, (int)k);
 
         public static string DummyWord(RangeDummy k) => k == RangeDummy.Moving ? "MOVES, NEVER HITS" : k == RangeDummy.Fighting ? "FIGHTS BACK" : "STANDS, NEVER HITS";
 
@@ -185,8 +185,8 @@ namespace CriticalMass.Runtime.Menus
 
         public static void SaveLastMode(MatchMode m)
         {
-            PlayerPrefs.SetInt(LastKey, (int)m);
-            PlayerPrefs.Save();
+            CmPrefs.SetInt(LastKey, (int)m);
+            CmPrefs.Save();
         }
 
         /// <summary>The setup a duel or range launch plays from the saved choices (team and speed from basis).</summary>

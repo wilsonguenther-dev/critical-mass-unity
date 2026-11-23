@@ -432,27 +432,27 @@ namespace CriticalMass.Runtime.Tests
         [Test]
         public void ShakeIsOffOnAFreshInstallEverywhere()
         {
-            bool had = PlayerPrefs.HasKey(GameSettings.ShakeKey);
-            int old = PlayerPrefs.GetInt(GameSettings.ShakeKey, 0);
-            bool hadRm = PlayerPrefs.HasKey(GameSettings.ReducedMotionKey);
-            int oldRm = PlayerPrefs.GetInt(GameSettings.ReducedMotionKey, 0);
+            bool had = CmPrefs.HasKey(GameSettings.ShakeKey);
+            int old = CmPrefs.GetInt(GameSettings.ShakeKey, 0);
+            bool hadRm = CmPrefs.HasKey(GameSettings.ReducedMotionKey);
+            int oldRm = CmPrefs.GetInt(GameSettings.ReducedMotionKey, 0);
             try
             {
-                PlayerPrefs.DeleteKey(GameSettings.ShakeKey);
-                PlayerPrefs.DeleteKey(GameSettings.ReducedMotionKey);
+                CmPrefs.DeleteKey(GameSettings.ShakeKey);
+                CmPrefs.DeleteKey(GameSettings.ReducedMotionKey);
                 Assert.IsFalse(GameSettings.CameraShake);
                 Assert.IsFalse(Effects.ShakeEnabled);
                 Assert.AreEqual(GameSettings.CameraShake, Effects.ShakeEnabled);
                 Assert.AreEqual(1f, ReactionBudget.MotionScale);
-                PlayerPrefs.SetInt(GameSettings.ReducedMotionKey, 1);
+                CmPrefs.SetInt(GameSettings.ReducedMotionKey, 1);
                 Assert.AreEqual(0.25f, ReactionBudget.MotionScale);
-                PlayerPrefs.SetInt(GameSettings.ShakeKey, 1);
+                CmPrefs.SetInt(GameSettings.ShakeKey, 1);
                 Assert.IsTrue(Effects.ShakeEnabled, "the player can still turn shake on");
             }
             finally
             {
-                if (had) PlayerPrefs.SetInt(GameSettings.ShakeKey, old); else PlayerPrefs.DeleteKey(GameSettings.ShakeKey);
-                if (hadRm) PlayerPrefs.SetInt(GameSettings.ReducedMotionKey, oldRm); else PlayerPrefs.DeleteKey(GameSettings.ReducedMotionKey);
+                if (had) CmPrefs.SetInt(GameSettings.ShakeKey, old); else CmPrefs.DeleteKey(GameSettings.ShakeKey);
+                if (hadRm) CmPrefs.SetInt(GameSettings.ReducedMotionKey, oldRm); else CmPrefs.DeleteKey(GameSettings.ReducedMotionKey);
             }
         }
 

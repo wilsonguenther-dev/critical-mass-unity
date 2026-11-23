@@ -28,7 +28,7 @@ namespace CriticalMass.Runtime.Online
                 for (int i = 0; i + 1 < args.Length; i++) if (args[i] == "-onlineRelay") return args[i + 1];
                 string env = Environment.GetEnvironmentVariable("CM_RELAY_URL");
                 if (!string.IsNullOrEmpty(env)) return env;
-                string saved = PlayerPrefs.GetString("cm.online.relay", "");
+                string saved = CmPrefs.GetString("cm.online.relay", "");
                 return !string.IsNullOrEmpty(saved) ? saved : DefaultRelayUrl;
             }
         }

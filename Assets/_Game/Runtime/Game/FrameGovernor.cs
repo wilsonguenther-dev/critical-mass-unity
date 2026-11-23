@@ -266,7 +266,7 @@ namespace CriticalMass.Runtime.Game
                         "\nreason=" + reason + "\ngpu=" + SystemInfo.graphicsDeviceName + "\nram_mb=" + SystemInfo.systemMemorySize + "\n"), true, out _);
                 }
                 // The player's own choice wins, except in an isolated measurement run (-dataDir): the owner's choice must not leak in.
-                int chosen = GamePaths.Isolated ? -1 : PlayerPrefs.GetInt(PrefQuality, -1);
+                int chosen = GamePaths.Isolated ? -1 : CmPrefs.GetInt(PrefQuality, -1);
                 if (chosen >= 0 && chosen < names.Length)
                 {
                     level = chosen;
@@ -492,9 +492,9 @@ namespace CriticalMass.Runtime.Game
                 _reapply = false;
                 // An isolated measurement run (-dataDir) never reads the owner's choices: defaults plus its own flags.
                 bool own = !GamePaths.Isolated;
-                _prefCap = _argCap >= 0 ? _argCap : own ? SanitiseCap(PlayerPrefs.GetInt(PrefFpsCap, DefaultCap)) : DefaultCap;
-                _prefBg = own ? PlayerPrefs.GetInt(PrefBgThrottle, 0) : 0;
-                _prefVSync = own ? PlayerPrefs.GetInt(PrefVSync, 1) : 1;
+                _prefCap = _argCap >= 0 ? _argCap : own ? SanitiseCap(CmPrefs.GetInt(PrefFpsCap, DefaultCap)) : DefaultCap;
+                _prefBg = own ? CmPrefs.GetInt(PrefBgThrottle, 0) : 0;
+                _prefVSync = own ? CmPrefs.GetInt(PrefVSync, 1) : 1;
                 _title = FindAnyObjectByType<TitleScreen>() != null;
                 TitleUp = _title;
                 // perf/fullscreen-cost-1: once the title has been up 1.5 s, warm the HUD fonts while nobody plays.

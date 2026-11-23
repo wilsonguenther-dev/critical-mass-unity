@@ -33,8 +33,8 @@ namespace CriticalMass.Runtime.Tests
             keys.AddRange(PlayModes.AllKeys);
             foreach (string k in keys)
             {
-                _saved[k] = PlayerPrefs.HasKey(k) ? PlayerPrefs.GetInt(k) : (int?)null;
-                PlayerPrefs.DeleteKey(k);
+                _saved[k] = CmPrefs.HasKey(k) ? CmPrefs.GetInt(k) : (int?)null;
+                CmPrefs.DeleteKey(k);
             }
             _savedSpectate = SpectatorMode.SpectateNextMatch;
             _savedClass = ClassSelect.SelectedClass;
@@ -48,10 +48,10 @@ namespace CriticalMass.Runtime.Tests
         {
             foreach (KeyValuePair<string, int?> kv in _saved)
             {
-                if (kv.Value.HasValue) PlayerPrefs.SetInt(kv.Key, kv.Value.Value);
-                else PlayerPrefs.DeleteKey(kv.Key);
+                if (kv.Value.HasValue) CmPrefs.SetInt(kv.Key, kv.Value.Value);
+                else CmPrefs.DeleteKey(kv.Key);
             }
-            PlayerPrefs.Save();
+            CmPrefs.Save();
             SpectatorMode.SpectateNextMatch = _savedSpectate;
             ClassSelect.SelectedClass = _savedClass;
             GameFlow.ResetForTests();

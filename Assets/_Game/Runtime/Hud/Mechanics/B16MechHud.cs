@@ -192,12 +192,12 @@ namespace CriticalMass.Runtime.Hud.Mechanics
 
         static bool TipsOn => CriticalMass.Runtime.Menu.WorldFeedbackSettings.Hints != CriticalMass.Runtime.Menu.WorldFeedbackSettings.HintsOff;
 
-        public static bool Seen(string id) => PlayerPrefs.GetInt(B16Words.PrefPrefix + id, 0) != 0;
+        public static bool Seen(string id) => CmPrefs.GetInt(B16Words.PrefPrefix + id, 0) != 0;
 
         static void MarkSeen(string id)
         {
-            PlayerPrefs.SetInt(B16Words.PrefPrefix + id, 1);
-            if (!GamePaths.IsolatedRun) PlayerPrefs.Save();
+            CmPrefs.SetInt(B16Words.PrefPrefix + id, 1);
+            if (!GamePaths.IsolatedRun) CmPrefs.Save();
         }
 
         static bool DismissPressed()

@@ -65,6 +65,7 @@ namespace CriticalMass.Runtime.Replay
         {
             if (d == null) return;
             string folder = Folder;
+            if (GamePaths.InEditor) _ = GamePaths.PlayerRoot; // resolved here, on the main thread (EditorRefuses reads it)
             ThreadPool.QueueUserWorkItem(_ =>
             {
                 string path = SaveNow(d, folder);
@@ -77,6 +78,7 @@ namespace CriticalMass.Runtime.Replay
         {
             try
             {
+                if (EditorRefuses(folder, "save")) return null;
                 Directory.CreateDirectory(folder);
                 string name = FileName(d.Header.RecordedUtc, d.Header.Start != null ? d.Header.Start.Seed : 0);
                 string path = System.IO.Path.Combine(folder, name);
@@ -87,7 +89,7 @@ namespace CriticalMass.Runtime.Replay
                 File.WriteAllBytes(tmp, bytes);
                 if (File.Exists(path)) File.Delete(path);
                 File.Move(tmp, path);
-                Prune(folder, Keep);
+                if (!GamePaths.InEditor || _folderOverride != null) Prune(folder, Keep);
                 Debug.Log($"{Tag} saved {name}: {bytes.Length} bytes, {d.Header.Ticks} ticks, {d.FingerprintCount} fingerprints");
                 return path;
             }
@@ -98,11 +100,25 @@ namespace CriticalMass.Runtime.Replay
             }
         }
 
+        /// <summary>
+        /// rough-spots pass 2: in the Unity Editor the store never saves into or prunes the shipped game's own data folder
+        /// (a session once deleted one of the owner's replays through the keep-20 limit). Editor saves go to the Editor's
+        /// folder (GamePaths.PersistentRoot) and are never pruned there either unless a test pointed the store at its own
+        /// folder. Always false in a player build.
+        /// </summary>
+        public static bool EditorRefuses(string folder, string what)
+        {
+            if (!GamePaths.InEditor || !GamePaths.IsInsidePlayerRoot(folder)) return false;
+            Debug.LogWarning($"{Tag} Editor: refused to {what} in the player's own folder {folder}");
+            return true;
+        }
+
         /// <summary>Deletes all but the newest keep replays in folder (and stray .tmp files of earlier crashes).</summary>
         public static void Prune(string folder, int keep)
         {
             try
             {
+                if (EditorRefuses(folder, "prune")) return;
                 if (!Directory.Exists(folder)) return;
                 var names = new List<string>();
                 foreach (string f in Directory.GetFiles(folder))

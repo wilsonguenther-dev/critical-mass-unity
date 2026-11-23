@@ -25,17 +25,17 @@ namespace CriticalMass.Runtime.Tests
         [SetUp]
         public void SetUp()
         {
-            _hadMask = PlayerPrefs.HasKey(CodexProgress.Key);
-            _savedMask = PlayerPrefs.GetInt(CodexProgress.Key, 0);
+            _hadMask = CmPrefs.HasKey(CodexProgress.Key);
+            _savedMask = CmPrefs.GetInt(CodexProgress.Key, 0);
             CodexProgress.ResetAll();
         }
 
         [TearDown]
         public void TearDown()
         {
-            if (_hadMask) PlayerPrefs.SetInt(CodexProgress.Key, _savedMask);
-            else PlayerPrefs.DeleteKey(CodexProgress.Key);
-            PlayerPrefs.Save();
+            if (_hadMask) CmPrefs.SetInt(CodexProgress.Key, _savedMask);
+            else CmPrefs.DeleteKey(CodexProgress.Key);
+            CmPrefs.Save();
         }
 
         [Test]
@@ -102,7 +102,7 @@ namespace CriticalMass.Runtime.Tests
             Assert.IsTrue(CodexProgress.Mark(CodexProgress.CrownIndex));
             Assert.AreEqual(1, CodexProgress.FoundCount, "the crown is not one of the 8");
             Assert.AreEqual("1 OF 8", CodexProgress.CountLabel(CodexProgress.FoundCount));
-            Assert.AreEqual((1 << 2) | (1 << 8), PlayerPrefs.GetInt(CodexProgress.Key, 0), "persisted");
+            Assert.AreEqual((1 << 2) | (1 << 8), CmPrefs.GetInt(CodexProgress.Key, 0), "persisted");
             Assert.AreEqual("relic-12", CodexProgress.IdOf(CodexProgress.CrownIndex));
         }
 

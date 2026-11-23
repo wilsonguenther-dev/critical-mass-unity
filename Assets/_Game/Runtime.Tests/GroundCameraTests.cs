@@ -280,14 +280,14 @@ namespace CriticalMass.Runtime.Tests
         [Test]
         public void TheCameraSettingPersistsAndDefaultsToHigh()
         {
-            bool had = PlayerPrefs.HasKey(GameSettings.GroundCameraKey);
-            int old = PlayerPrefs.GetInt(GameSettings.GroundCameraKey, 0);
+            bool had = CmPrefs.HasKey(GameSettings.GroundCameraKey);
+            int old = CmPrefs.GetInt(GameSettings.GroundCameraKey, 0);
             try
             {
-                PlayerPrefs.DeleteKey(GameSettings.GroundCameraKey);
+                CmPrefs.DeleteKey(GameSettings.GroundCameraKey);
                 Assert.IsFalse(GameSettings.GroundCamera, "HIGH by default");
                 GameSettings.GroundCamera = true;
-                Assert.AreEqual(1, PlayerPrefs.GetInt(GameSettings.GroundCameraKey, 0), "stored in PlayerPrefs (kept between launches)");
+                Assert.AreEqual(1, CmPrefs.GetInt(GameSettings.GroundCameraKey, 0), "stored in PlayerPrefs (kept between launches)");
                 Assert.IsTrue(GameSettings.GroundCamera);
                 GameSettings.GroundCamera = false;
                 Assert.IsFalse(GameSettings.GroundCamera);
@@ -295,8 +295,8 @@ namespace CriticalMass.Runtime.Tests
             }
             finally
             {
-                if (had) PlayerPrefs.SetInt(GameSettings.GroundCameraKey, old);
-                else PlayerPrefs.DeleteKey(GameSettings.GroundCameraKey);
+                if (had) CmPrefs.SetInt(GameSettings.GroundCameraKey, old);
+                else CmPrefs.DeleteKey(GameSettings.GroundCameraKey);
             }
         }
 

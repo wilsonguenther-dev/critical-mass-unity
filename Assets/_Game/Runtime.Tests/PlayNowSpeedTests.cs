@@ -29,8 +29,8 @@ namespace CriticalMass.Runtime.Tests
             _saved.Clear();
             foreach (string k in SetupPrefs.AllKeys)
             {
-                _saved[k] = PlayerPrefs.HasKey(k) ? PlayerPrefs.GetInt(k) : (int?)null;
-                PlayerPrefs.DeleteKey(k);
+                _saved[k] = CmPrefs.HasKey(k) ? CmPrefs.GetInt(k) : (int?)null;
+                CmPrefs.DeleteKey(k);
             }
             _savedClass = ClassSelect.SelectedClass;
             _savedSpectate = SpectatorMode.SpectateNextMatch;
@@ -44,10 +44,10 @@ namespace CriticalMass.Runtime.Tests
         {
             foreach (KeyValuePair<string, int?> kv in _saved)
             {
-                if (kv.Value.HasValue) PlayerPrefs.SetInt(kv.Key, kv.Value.Value);
-                else PlayerPrefs.DeleteKey(kv.Key);
+                if (kv.Value.HasValue) CmPrefs.SetInt(kv.Key, kv.Value.Value);
+                else CmPrefs.DeleteKey(kv.Key);
             }
-            PlayerPrefs.Save();
+            CmPrefs.Save();
             ClassSelect.SelectedClass = _savedClass;
             SpectatorMode.SpectateNextMatch = _savedSpectate;
             GameFlow.ResetForTests();
@@ -148,7 +148,7 @@ namespace CriticalMass.Runtime.Tests
         [Test]
         public void PlayNowFallsBackToWarriorWhenTheSavedClassIsNotPlayable()
         {
-            PlayerPrefs.SetInt(SetupPrefs.ClassKey, 99);   // clamped to the last class, which must be playable or Warrior
+            CmPrefs.SetInt(SetupPrefs.ClassKey, 99);   // clamped to the last class, which must be playable or Warrior
             GameFlow.ResetForTests();
             MatchSetupChoice c = PlayNow.Choice();
             Assert.IsTrue(MatchSetup.Playable.Contains(c.Class));
@@ -226,7 +226,7 @@ namespace CriticalMass.Runtime.Tests
                 MatchSetupChoice c = MatchSetupChoice.Default;
                 c.Pace = MatchSpeed.PaceOf(s);
                 SetupPrefs.Save(c);
-                Assert.AreEqual((int)s, PlayerPrefs.GetInt(SetupPrefs.SpeedKey, -1));
+                Assert.AreEqual((int)s, CmPrefs.GetInt(SetupPrefs.SpeedKey, -1));
                 Assert.AreEqual(MatchSpeed.PaceOf(s), SetupPrefs.Load().Pace, 1e-9, s.ToString());
                 GameFlow.ResetForTests();
                 Assert.AreEqual(MatchSpeed.PaceOf(s), PlayNow.Choice().Pace, 1e-9, "Play Now uses the remembered speed: " + s);
@@ -237,7 +237,7 @@ namespace CriticalMass.Runtime.Tests
         public void NoSavedSpeedMeansTheDefault()
         {
             Assert.AreEqual(MatchSpeed.DefaultPace, SetupPrefs.Load().Pace, 1e-9);
-            PlayerPrefs.SetInt(SetupPrefs.SpeedKey, 9);
+            CmPrefs.SetInt(SetupPrefs.SpeedKey, 9);
             Assert.AreEqual(MatchSpeed.DefaultPace, SetupPrefs.Load().Pace, 1e-9, "a bad value falls back to the default");
         }
 

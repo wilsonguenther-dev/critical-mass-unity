@@ -435,7 +435,7 @@ namespace CriticalMass.Runtime.Hud
                 b.Name = Label(c, "Ability Name " + i, CMTokens.Ui, HudLayout.AbilityNameMax, Cream, TextAnchor.MiddleCenter, bx, AbilityNameY, HudLayout.AbilityButton, AbilityNameH, "", 2f);
                 _buttons[i] = b;
             }
-            bool showNames = PlayerPrefs.GetInt(MatchesPlayedKey, 0) < AbilityNameMatches;
+            bool showNames = CmPrefs.GetInt(MatchesPlayedKey, 0) < AbilityNameMatches;
             for (int i = 0; i < 3; i++) _buttons[i].Name.gameObject.SetActive(showNames);
         }
 
@@ -729,8 +729,8 @@ namespace CriticalMass.Runtime.Hud
             if (State.Ended && !_countedMatch)
             {
                 _countedMatch = true;
-                PlayerPrefs.SetInt(MatchesPlayedKey, PlayerPrefs.GetInt(MatchesPlayedKey, 0) + 1);
-                if (!CriticalMass.Runtime.Game.GamePaths.IsolatedRun) PlayerPrefs.Save();   // DG-53: once per match; never in a -dataDir run
+                CmPrefs.SetInt(MatchesPlayedKey, CmPrefs.GetInt(MatchesPlayedKey, 0) + 1);
+                if (!CriticalMass.Runtime.Game.GamePaths.IsolatedRun) CmPrefs.Save();   // DG-53: once per match; never in a -dataDir run
             }
         }
 

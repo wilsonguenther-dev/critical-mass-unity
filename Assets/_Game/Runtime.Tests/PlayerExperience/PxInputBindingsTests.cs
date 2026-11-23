@@ -49,7 +49,7 @@ namespace CriticalMass.Runtime.Tests.PlayerExperience
             _asset = InputActionAsset.FromJson(src.ToJson());
             _prefs.Clear();
             var keys = new List<string>(AimHelpSettings.AllKeys) { SettingsExtras.CleanHudKey, SettingsExtras.CleanHudMigrationKey };
-            foreach (string k in keys) _prefs[k] = (PlayerPrefs.HasKey(k), PlayerPrefs.GetInt(k, 0));
+            foreach (string k in keys) _prefs[k] = (CmPrefs.HasKey(k), CmPrefs.GetInt(k, 0));
         }
 
         [TearDown]
@@ -58,10 +58,10 @@ namespace CriticalMass.Runtime.Tests.PlayerExperience
             if (_asset != null) UnityEngine.Object.DestroyImmediate(_asset);
             foreach (var kv in _prefs)
             {
-                PlayerPrefs.DeleteKey(kv.Key);
-                if (kv.Value.has) PlayerPrefs.SetInt(kv.Key, kv.Value.v);
+                CmPrefs.DeleteKey(kv.Key);
+                if (kv.Value.has) CmPrefs.SetInt(kv.Key, kv.Value.v);
             }
-            PlayerPrefs.Save();
+            CmPrefs.Save();
         }
 
         InputActionMap Map => _asset.FindActionMap("Player", true);
@@ -126,7 +126,7 @@ namespace CriticalMass.Runtime.Tests.PlayerExperience
         [Test]
         public void AStoredHiddenHudIsClearedOnceByTheMigration()
         {
-            PlayerPrefs.DeleteKey(SettingsExtras.CleanHudMigrationKey);
+            CmPrefs.DeleteKey(SettingsExtras.CleanHudMigrationKey);
             SettingsExtras.CleanHud = true;
             Assert.IsTrue(SettingsExtras.MigrateCleanHudOnce(), "the old flag is cleared");
             Assert.IsFalse(SettingsExtras.CleanHud);
@@ -207,7 +207,7 @@ namespace CriticalMass.Runtime.Tests.PlayerExperience
             Assert.AreEqual(AimHelpLevel.High, AimHelpSettings.Get(AimDevice.Mouse));
             AimHelpSettings.Step(AimDevice.Mouse, 1);
             Assert.AreEqual(AimHelpLevel.Off, AimHelpSettings.Get(AimDevice.Mouse));
-            Assert.AreEqual(0, PlayerPrefs.GetInt(AimHelpSettings.MouseKey, -1));
+            Assert.AreEqual(0, CmPrefs.GetInt(AimHelpSettings.MouseKey, -1));
             AimHelpSettings.Step(AimDevice.Mouse, -1);
             Assert.AreEqual(AimHelpLevel.High, AimHelpSettings.Get(AimDevice.Mouse));
         }

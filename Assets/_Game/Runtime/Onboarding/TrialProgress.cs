@@ -19,21 +19,21 @@ namespace CriticalMass.Runtime.Onboarding
         /// <summary>The first-time card has had its one showing (persisted).</summary>
         public static bool Offered
         {
-            get => PlayerPrefs.GetInt(OfferedKey, 0) != 0;
+            get => CmPrefs.GetInt(OfferedKey, 0) != 0;
             set
             {
-                PlayerPrefs.SetInt(OfferedKey, value ? 1 : 0);
-                PlayerPrefs.Save();
+                CmPrefs.SetInt(OfferedKey, value ? 1 : 0);
+                CmPrefs.Save();
             }
         }
 
         public static bool Done
         {
-            get => PlayerPrefs.GetInt(DoneKey, 0) != 0;
+            get => CmPrefs.GetInt(DoneKey, 0) != 0;
             set
             {
-                PlayerPrefs.SetInt(DoneKey, value ? 1 : 0);
-                PlayerPrefs.Save();
+                CmPrefs.SetInt(DoneKey, value ? 1 : 0);
+                CmPrefs.Save();
             }
         }
     }

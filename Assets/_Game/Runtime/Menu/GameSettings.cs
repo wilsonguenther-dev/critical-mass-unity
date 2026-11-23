@@ -159,7 +159,7 @@ namespace CriticalMass.Runtime.Menu
         public static bool CameraShake
         {
             // The ACCESS amount decides once it exists; before that the older on/off key does (default off on a fresh install).
-            get => PlayerPrefs.HasKey(ShakeScaleKey) ? ShakeScale > 0f : GetB(ShakeKey, false);
+            get => CmPrefs.HasKey(ShakeScaleKey) ? ShakeScale > 0f : GetB(ShakeKey, false);
             set => ShakeScale = value ? 1f : 0f;
         }
 
@@ -172,12 +172,12 @@ namespace CriticalMass.Runtime.Menu
         /// </summary>
         public static float ShakeScale
         {
-            get => Mathf.Clamp(PlayerPrefs.GetInt(ShakeScaleKey, 0), 0, 100) / 100f;
+            get => Mathf.Clamp(CmPrefs.GetInt(ShakeScaleKey, 0), 0, 100) / 100f;
             set
             {
                 int v = Mathf.Clamp(Mathf.RoundToInt(value * 100f), 0, 100);
-                PlayerPrefs.SetInt(ShakeKey, v > 0 ? 1 : 0);
-                PlayerPrefs.SetInt(ShakeScaleKey, v);
+                CmPrefs.SetInt(ShakeKey, v > 0 ? 1 : 0);
+                CmPrefs.SetInt(ShakeScaleKey, v);
                 Save();
             }
         }
@@ -219,14 +219,14 @@ namespace CriticalMass.Runtime.Menu
         {
             get
             {
-                if (PlayerPrefs.HasKey(GoreKey))
+                if (CmPrefs.HasKey(GoreKey))
                 {
-                    int v = PlayerPrefs.GetInt(GoreKey, 2);
+                    int v = CmPrefs.GetInt(GoreKey, 2);
                     return v <= 0 ? global::CriticalMass.Runtime.View.Effects.GoreLevel.Off : v == 1 ? global::CriticalMass.Runtime.View.Effects.GoreLevel.Reduced : global::CriticalMass.Runtime.View.Effects.GoreLevel.Full;
                 }
                 return global::CriticalMass.Runtime.View.Effects.GoreGate.DefaultLevel;
             }
-            set { PlayerPrefs.SetInt(GoreKey, (int)value); PlayerPrefs.Save(); }
+            set { CmPrefs.SetInt(GoreKey, (int)value); CmPrefs.Save(); }
         }
         /// <summary>
         /// "Movement assist" (cm.moveAssist, default on): one direction key follows a bridge it points along (within 50
@@ -253,7 +253,7 @@ namespace CriticalMass.Runtime.Menu
                 // The ground-camera key stays the "low view on" switch (older saves and tests use it); the view key says which.
                 if (!GetB(GroundCameraKey, false)) return CriticalMass.Runtime.Camera.CameraView.TopDown;
                 // b16: with FollowCamera.FirstPersonEnabled off (the demo default) a stored first person reads as third person
-                return PlayerPrefs.GetInt(CameraViewKey, 1) == 2 && CriticalMass.Runtime.Camera.FollowCamera.FirstPersonEnabled
+                return CmPrefs.GetInt(CameraViewKey, 1) == 2 && CriticalMass.Runtime.Camera.FollowCamera.FirstPersonEnabled
                     ? CriticalMass.Runtime.Camera.CameraView.FirstPerson : CriticalMass.Runtime.Camera.CameraView.ThirdPerson;
             }
             set
@@ -262,7 +262,7 @@ namespace CriticalMass.Runtime.Menu
                 // setter refuses FirstPerson and stores THIRD PERSON, so nothing can ask for a view the game does not give.
                 if (value == CriticalMass.Runtime.Camera.CameraView.FirstPerson && !CriticalMass.Runtime.Camera.FollowCamera.FirstPersonEnabled)
                     value = CriticalMass.Runtime.Camera.CameraView.ThirdPerson;
-                if (value != CriticalMass.Runtime.Camera.CameraView.TopDown) PlayerPrefs.SetInt(CameraViewKey, (int)value);
+                if (value != CriticalMass.Runtime.Camera.CameraView.TopDown) CmPrefs.SetInt(CameraViewKey, (int)value);
                 SetB(GroundCameraKey, value != CriticalMass.Runtime.Camera.CameraView.TopDown);
             }
         }
@@ -292,16 +292,16 @@ namespace CriticalMass.Runtime.Menu
         /// <summary>Manual orbit sensitivity, 0.25 to 3 (default 1).</summary>
         public static float CameraSensitivity
         {
-            get => Mathf.Clamp(PlayerPrefs.GetInt(CameraSensKey, 100), 25, 300) / 100f;
-            set { PlayerPrefs.SetInt(CameraSensKey, Mathf.Clamp(Mathf.RoundToInt(value * 100f), 25, 300)); PlayerPrefs.Save(); }
+            get => Mathf.Clamp(CmPrefs.GetInt(CameraSensKey, 100), 25, 300) / 100f;
+            set { CmPrefs.SetInt(CameraSensKey, Mathf.Clamp(Mathf.RoundToInt(value * 100f), 25, 300)); CmPrefs.Save(); }
         }
 
         /// <summary>Field of view of the third- and first-person views (degrees, 50 to 90, default 65).</summary>
         public static int CameraFov
         {
-            get => Mathf.Clamp(PlayerPrefs.GetInt(CameraFovKey, CriticalMass.Runtime.Camera.FollowCamera.FovDefault),
+            get => Mathf.Clamp(CmPrefs.GetInt(CameraFovKey, CriticalMass.Runtime.Camera.FollowCamera.FovDefault),
                 CriticalMass.Runtime.Camera.FollowCamera.FovMin, CriticalMass.Runtime.Camera.FollowCamera.FovMax);
-            set { PlayerPrefs.SetInt(CameraFovKey, Mathf.Clamp(value, CriticalMass.Runtime.Camera.FollowCamera.FovMin, CriticalMass.Runtime.Camera.FollowCamera.FovMax)); PlayerPrefs.Save(); }
+            set { CmPrefs.SetInt(CameraFovKey, Mathf.Clamp(value, CriticalMass.Runtime.Camera.FollowCamera.FovMin, CriticalMass.Runtime.Camera.FollowCamera.FovMax)); CmPrefs.Save(); }
         }
 
         // ---- video ----
@@ -318,12 +318,12 @@ namespace CriticalMass.Runtime.Menu
         {
             get
             {
-                int v = PlayerPrefs.GetInt(FpsCapKey, DefaultFpsCap);
+                int v = CmPrefs.GetInt(FpsCapKey, DefaultFpsCap);
                 return Array.IndexOf(FpsCapOptions, v) >= 0 ? v : DefaultFpsCap;
             }
             set
             {
-                PlayerPrefs.SetInt(FpsCapKey, Array.IndexOf(FpsCapOptions, value) >= 0 ? value : DefaultFpsCap);
+                CmPrefs.SetInt(FpsCapKey, Array.IndexOf(FpsCapOptions, value) >= 0 ? value : DefaultFpsCap);
                 Save();
                 CriticalMass.Runtime.Game.FrameGovernor.Reapply();   // FrameGovernor applies it on the next frame
             }
@@ -347,10 +347,10 @@ namespace CriticalMass.Runtime.Menu
         /// <summary>Quality level index (QualitySettings.names); -1 = the project's default level.</summary>
         public static int Quality
         {
-            get => PlayerPrefs.GetInt(QualityKey, -1);
+            get => CmPrefs.GetInt(QualityKey, -1);
             set
             {
-                PlayerPrefs.SetInt(QualityKey, value);
+                CmPrefs.SetInt(QualityKey, value);
                 Save();
                 ApplyVideo();
             }
@@ -359,11 +359,11 @@ namespace CriticalMass.Runtime.Menu
         /// <summary>The stored resolution, or (0, 0) for "the current one".</summary>
         public static Vector2Int Resolution
         {
-            get => new Vector2Int(PlayerPrefs.GetInt(WidthKey, 0), PlayerPrefs.GetInt(HeightKey, 0));
+            get => new Vector2Int(CmPrefs.GetInt(WidthKey, 0), CmPrefs.GetInt(HeightKey, 0));
             set
             {
-                PlayerPrefs.SetInt(WidthKey, value.x);
-                PlayerPrefs.SetInt(HeightKey, value.y);
+                CmPrefs.SetInt(WidthKey, value.x);
+                CmPrefs.SetInt(HeightKey, value.y);
                 Save();
                 ApplyVideo();
             }
@@ -472,7 +472,7 @@ namespace CriticalMass.Runtime.Menu
         /// <summary>Restores every default (deletes the stored keys) and applies them.</summary>
         public static void ResetAll()
         {
-            for (int i = 0; i < AllKeys.Length; i++) PlayerPrefs.DeleteKey(AllKeys[i]);
+            for (int i = 0; i < AllKeys.Length; i++) CmPrefs.DeleteKey(AllKeys[i]);
             Save();
             Flush();
             ApplyAll();
@@ -496,29 +496,29 @@ namespace CriticalMass.Runtime.Menu
         /// <summary>DG-53: stamps cm.prefsVersion; a newer format (a later build ran) is kept and logged, never misread.</summary>
         static void CheckPrefsVersion()
         {
-            int v = PlayerPrefs.GetInt(PrefsVersionKey, 0);
+            int v = CmPrefs.GetInt(PrefsVersionKey, 0);
             if (v == PrefsVersion) return;
             if (v > PrefsVersion)
             {
                 Debug.LogWarning($"[CM.Settings] settings were saved by a newer build (format {v}); reading what this build knows");
                 return;
             }
-            PlayerPrefs.SetInt(PrefsVersionKey, PrefsVersion);
+            CmPrefs.SetInt(PrefsVersionKey, PrefsVersion);
             _dirty = true;
         }
 
-        static float GetF(string k, float d) => PlayerPrefs.GetFloat(k, d);
-        static bool GetB(string k, bool d) => PlayerPrefs.GetInt(k, d ? 1 : 0) != 0;
+        static float GetF(string k, float d) => CmPrefs.GetFloat(k, d);
+        static bool GetB(string k, bool d) => CmPrefs.GetInt(k, d ? 1 : 0) != 0;
 
         static void SetF(string k, float v)
         {
-            PlayerPrefs.SetFloat(k, v);
+            CmPrefs.SetFloat(k, v);
             Save();
         }
 
         static void SetB(string k, bool v)
         {
-            PlayerPrefs.SetInt(k, v ? 1 : 0);
+            CmPrefs.SetInt(k, v ? 1 : 0);
             Save();
         }
 
@@ -554,8 +554,8 @@ namespace CriticalMass.Runtime.Menu
             }
             try
             {
-                PlayerPrefs.SetInt(PrefsVersionKey, PrefsVersion);
-                PlayerPrefs.Save();
+                CmPrefs.SetInt(PrefsVersionKey, PrefsVersion);
+                CmPrefs.Save();
                 _dirty = false;
                 SaveCount++;
                 LastSaveError = null;

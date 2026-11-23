@@ -34,9 +34,9 @@ namespace CriticalMass.Runtime.Game
     public sealed class PlayerPrefsAchievementStore : IAchievementStore
     {
         public const string Prefix = "cm.ach.";
-        public bool Has(string id) => PlayerPrefs.GetInt(Prefix + id, 0) == 1;
-        public void Set(string id) => PlayerPrefs.SetInt(Prefix + id, 1);
-        public void Flush() => PlayerPrefs.Save();
+        public bool Has(string id) => CmPrefs.GetInt(Prefix + id, 0) == 1;
+        public void Set(string id) => CmPrefs.SetInt(Prefix + id, 1);
+        public void Flush() => CmPrefs.Save();
     }
 
     /// <summary>

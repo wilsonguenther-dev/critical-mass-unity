@@ -93,7 +93,7 @@ namespace CriticalMass.Runtime.Input
         {
             get
             {
-                string s = PlayerPrefs.GetString(PrefsKey, string.Empty);
+                string s = CmPrefs.GetString(PrefsKey, string.Empty);
                 return Enum.TryParse(s, out ControlPreset p) && Array.IndexOf(All, p) >= 0 ? p : (ControlPreset?)null;
             }
         }
@@ -122,7 +122,7 @@ namespace CriticalMass.Runtime.Input
                         }
                 }
             });
-            PlayerPrefs.SetString(PrefsKey, p.ToString());
+            CmPrefs.SetString(PrefsKey, p.ToString());
             _leftHanded = p == ControlPreset.LeftHanded;
             ControlBindings.Persist(asset);   // saves and raises BindingsChanged
             ApplyHand(p);
@@ -167,7 +167,7 @@ namespace CriticalMass.Runtime.Input
         /// <summary>RESET ALL: no preset is remembered (the defaults are the three right-handed layouts at once).</summary>
         public static void Forget()
         {
-            PlayerPrefs.DeleteKey(PrefsKey);
+            CmPrefs.DeleteKey(PrefsKey);
             _leftHanded = false;
         }
 

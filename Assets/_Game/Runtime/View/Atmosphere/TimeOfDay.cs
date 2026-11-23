@@ -302,8 +302,8 @@ namespace CriticalMass.Runtime.View.Atmosphere
         /// <summary>Deletes the retired key (one PlayerPrefs call when present; pure otherwise).</summary>
         public static bool RetireOldKey()
         {
-            if (!PlayerPrefs.HasKey(OldKey)) return false;
-            PlayerPrefs.DeleteKey(OldKey);
+            if (!CmPrefs.HasKey(OldKey)) return false;
+            CmPrefs.DeleteKey(OldKey);
             return true;
         }
         public static event Action Changed;
@@ -312,13 +312,13 @@ namespace CriticalMass.Runtime.View.Atmosphere
         {
             get
             {
-                int v = PlayerPrefs.GetInt(Key, 0);
+                int v = CmPrefs.GetInt(Key, 0);
                 return v >= 0 && v <= 3 ? (TimeOfDayChoice)v : TimeOfDayChoice.Day;
             }
             set
             {
-                PlayerPrefs.SetInt(Key, (int)value);
-                PlayerPrefs.Save();
+                CmPrefs.SetInt(Key, (int)value);
+                CmPrefs.Save();
                 Changed?.Invoke();
             }
         }
@@ -331,8 +331,8 @@ namespace CriticalMass.Runtime.View.Atmosphere
 
         public static void Reset()
         {
-            PlayerPrefs.DeleteKey(Key);
-            PlayerPrefs.Save();
+            CmPrefs.DeleteKey(Key);
+            CmPrefs.Save();
             Changed?.Invoke();
         }
 

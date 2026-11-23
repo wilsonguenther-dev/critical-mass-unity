@@ -32,8 +32,8 @@ namespace CriticalMass.Runtime.PlayTests
         {
             _info.Clear();
             Trial.InfoLog = line => _info.Add(line);   // the trial's "[Trial] ..." information lines, checked below
-            _hadDone = PlayerPrefs.HasKey(TrialProgress.DoneKey);
-            _wasDone = PlayerPrefs.GetInt(TrialProgress.DoneKey, 0);
+            _hadDone = CmPrefs.HasKey(TrialProgress.DoneKey);
+            _wasDone = CmPrefs.GetInt(TrialProgress.DoneKey, 0);
             SceneManager.LoadScene(BootScene);
             yield return null;
             yield return null;
@@ -71,9 +71,9 @@ namespace CriticalMass.Runtime.PlayTests
                 s.editorInputBehaviorInPlayMode = _savedEditorBehaviour;
                 _settingsSaved = false;
             }
-            if (_hadDone) PlayerPrefs.SetInt(TrialProgress.DoneKey, _wasDone);
-            else PlayerPrefs.DeleteKey(TrialProgress.DoneKey);
-            PlayerPrefs.Save();
+            if (_hadDone) CmPrefs.SetInt(TrialProgress.DoneKey, _wasDone);
+            else CmPrefs.DeleteKey(TrialProgress.DoneKey);
+            CmPrefs.Save();
             _driver = null;
         }
 

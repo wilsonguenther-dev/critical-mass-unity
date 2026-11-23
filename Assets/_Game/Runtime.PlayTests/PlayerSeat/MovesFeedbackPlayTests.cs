@@ -236,7 +236,7 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
             for (int v = 0; v < _hintPrefs.Length; v++)
             {
                 string k = MovesHelp.PrefKey((MovesHelp.Verb)v);
-                _hintPrefs[v] = PlayerPrefs.HasKey(k) ? PlayerPrefs.GetInt(k) : (int?)null;
+                _hintPrefs[v] = CmPrefs.HasKey(k) ? CmPrefs.GetInt(k) : (int?)null;
             }
         }
 
@@ -245,8 +245,8 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
             for (int v = 0; v < _hintPrefs.Length; v++)
             {
                 string k = MovesHelp.PrefKey((MovesHelp.Verb)v);
-                if (_hintPrefs[v].HasValue) PlayerPrefs.SetInt(k, _hintPrefs[v].Value);
-                else PlayerPrefs.DeleteKey(k);
+                if (_hintPrefs[v].HasValue) CmPrefs.SetInt(k, _hintPrefs[v].Value);
+                else CmPrefs.DeleteKey(k);
             }
             MovesPoses.ClearHolds();
             base.TearDown();

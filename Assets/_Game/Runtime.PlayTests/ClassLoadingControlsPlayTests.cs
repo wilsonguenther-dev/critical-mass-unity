@@ -33,10 +33,10 @@ namespace CriticalMass.Runtime.PlayTests
         [UnitySetUp]
         public IEnumerator SetUp()
         {
-            _hadClass = PlayerPrefs.HasKey(ClassSelect.PrefsKey);
-            _savedClass = PlayerPrefs.GetInt(ClassSelect.PrefsKey, 0);
-            _hadSeen = PlayerPrefs.HasKey(ControlsCardScreen.SeenKey);
-            _savedSeen = PlayerPrefs.GetInt(ControlsCardScreen.SeenKey, 0);
+            _hadClass = CmPrefs.HasKey(ClassSelect.PrefsKey);
+            _savedClass = CmPrefs.GetInt(ClassSelect.PrefsKey, 0);
+            _hadSeen = CmPrefs.HasKey(ControlsCardScreen.SeenKey);
+            _savedSeen = CmPrefs.GetInt(ControlsCardScreen.SeenKey, 0);
             _savedAutoCard = ControlsCardScreen.AutoFirstTime;
             _savedAutoRespawn = ClassSelect.AutoRespawn;
             ControlsCardScreen.AutoFirstTime = false;
@@ -56,11 +56,11 @@ namespace CriticalMass.Runtime.PlayTests
         {
             ClassSelect.Hide();
             ControlsCardScreen.Hide();
-            if (_hadClass) PlayerPrefs.SetInt(ClassSelect.PrefsKey, _savedClass);
-            else PlayerPrefs.DeleteKey(ClassSelect.PrefsKey);
-            if (_hadSeen) PlayerPrefs.SetInt(ControlsCardScreen.SeenKey, _savedSeen);
-            else PlayerPrefs.DeleteKey(ControlsCardScreen.SeenKey);
-            PlayerPrefs.Save();
+            if (_hadClass) CmPrefs.SetInt(ClassSelect.PrefsKey, _savedClass);
+            else CmPrefs.DeleteKey(ClassSelect.PrefsKey);
+            if (_hadSeen) CmPrefs.SetInt(ControlsCardScreen.SeenKey, _savedSeen);
+            else CmPrefs.DeleteKey(ControlsCardScreen.SeenKey);
+            CmPrefs.Save();
             ControlsCardScreen.AutoFirstTime = _savedAutoCard;
             ClassSelect.AutoRespawn = _savedAutoRespawn;
             SimDriverBehaviour.CaptureMode = false;

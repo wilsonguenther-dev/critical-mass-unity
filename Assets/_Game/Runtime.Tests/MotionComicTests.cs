@@ -351,12 +351,12 @@ namespace CriticalMass.Runtime.Tests
         [Test]
         public void IntroPlaysOnTheFirstLaunchOnlyUnlessEveryLaunchIsOn()
         {
-            bool had = PlayerPrefs.HasKey(CriticalMass.Runtime.Menu.GameSettings.IntroAtLaunchKey);
-            int saved = PlayerPrefs.GetInt(CriticalMass.Runtime.Menu.GameSettings.IntroAtLaunchKey, 0);
+            bool had = CmPrefs.HasKey(CriticalMass.Runtime.Menu.GameSettings.IntroAtLaunchKey);
+            int saved = CmPrefs.GetInt(CriticalMass.Runtime.Menu.GameSettings.IntroAtLaunchKey, 0);
             try
             {
                 // b15 safe defaults (owner-approved 2026-11-17): first launch only; WATCH INTRO replays it from the menu.
-                PlayerPrefs.DeleteKey(CriticalMass.Runtime.Menu.GameSettings.IntroAtLaunchKey);
+                CmPrefs.DeleteKey(CriticalMass.Runtime.Menu.GameSettings.IntroAtLaunchKey);
                 Assert.IsFalse(CriticalMass.Runtime.Menu.GameSettings.IntroAtLaunch, "PLAY INTRO AT EVERY LAUNCH defaults to off");
                 var title = CriticalMass.Runtime.Flow.FlowState.Title;
                 bool every = CriticalMass.Runtime.Menu.GameSettings.IntroAtLaunch;
@@ -372,8 +372,8 @@ namespace CriticalMass.Runtime.Tests
             }
             finally
             {
-                if (had) PlayerPrefs.SetInt(CriticalMass.Runtime.Menu.GameSettings.IntroAtLaunchKey, saved);
-                else PlayerPrefs.DeleteKey(CriticalMass.Runtime.Menu.GameSettings.IntroAtLaunchKey);
+                if (had) CmPrefs.SetInt(CriticalMass.Runtime.Menu.GameSettings.IntroAtLaunchKey, saved);
+                else CmPrefs.DeleteKey(CriticalMass.Runtime.Menu.GameSettings.IntroAtLaunchKey);
             }
         }
 

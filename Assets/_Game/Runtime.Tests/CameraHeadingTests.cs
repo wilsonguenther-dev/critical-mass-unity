@@ -75,11 +75,11 @@ namespace CriticalMass.Runtime.Tests
         public void TheSettingDefaultFollowsTheFlipLineAndBothHeadingsStaySelectable()
         {
             CameraHeading.Pin = null;
-            bool had = PlayerPrefs.HasKey(CameraHeading.Key);
-            int old = PlayerPrefs.GetInt(CameraHeading.Key, 0);
+            bool had = CmPrefs.HasKey(CameraHeading.Key);
+            int old = CmPrefs.GetInt(CameraHeading.Key, 0);
             try
             {
-                PlayerPrefs.DeleteKey(CameraHeading.Key);
+                CmPrefs.DeleteKey(CameraHeading.Key);
                 Assert.AreEqual(CameraHeading.CreatorAngleIsDefault ? CameraHeading.Creator : CameraHeading.Classic, CameraHeading.Chosen);
                 CameraHeading.ClassicChosen = true;
                 Assert.AreEqual(CameraHeading.Classic, CameraHeading.Chosen);
@@ -89,7 +89,7 @@ namespace CriticalMass.Runtime.Tests
             }
             finally
             {
-                if (had) PlayerPrefs.SetInt(CameraHeading.Key, old); else PlayerPrefs.DeleteKey(CameraHeading.Key);
+                if (had) CmPrefs.SetInt(CameraHeading.Key, old); else CmPrefs.DeleteKey(CameraHeading.Key);
             }
         }
     }

@@ -199,20 +199,20 @@ namespace CriticalMass.Runtime.Tests
         [Test]
         public void BloodSettingIsHonoured()
         {
-            bool had = PlayerPrefs.HasKey(BloodSetting.Key);
-            int old = PlayerPrefs.GetInt(BloodSetting.Key, 1);
+            bool had = CmPrefs.HasKey(BloodSetting.Key);
+            int old = CmPrefs.GetInt(BloodSetting.Key, 1);
             // GORE (cm.gore) wins over the legacy key when set: clear it for this test and put it back after.
-            bool hadGore = PlayerPrefs.HasKey(CriticalMass.Runtime.Menu.GameSettings.GoreKey);
-            int oldGore = PlayerPrefs.GetInt(CriticalMass.Runtime.Menu.GameSettings.GoreKey, 2);
+            bool hadGore = CmPrefs.HasKey(CriticalMass.Runtime.Menu.GameSettings.GoreKey);
+            int oldGore = CmPrefs.GetInt(CriticalMass.Runtime.Menu.GameSettings.GoreKey, 2);
             try
             {
-                PlayerPrefs.DeleteKey(CriticalMass.Runtime.Menu.GameSettings.GoreKey);
-                PlayerPrefs.DeleteKey(BloodSetting.Key);
+                CmPrefs.DeleteKey(CriticalMass.Runtime.Menu.GameSettings.GoreKey);
+                CmPrefs.DeleteKey(BloodSetting.Key);
                 Assert.IsFalse(BloodSetting.Enabled, "b15 safe defaults: gore, and so blood, defaults to off");
-                PlayerPrefs.SetInt(CriticalMass.Runtime.Menu.GameSettings.GoreKey, 2);
+                CmPrefs.SetInt(CriticalMass.Runtime.Menu.GameSettings.GoreKey, 2);
                 Assert.IsTrue(BloodSetting.Enabled, "an explicit FULL turns blood on");
-                PlayerPrefs.DeleteKey(CriticalMass.Runtime.Menu.GameSettings.GoreKey);
-                PlayerPrefs.SetInt(BloodSetting.Key, 0);
+                CmPrefs.DeleteKey(CriticalMass.Runtime.Menu.GameSettings.GoreKey);
+                CmPrefs.SetInt(BloodSetting.Key, 0);
                 Assert.IsFalse(BloodSetting.Enabled);
 
                 GameConfig cfg = GameConfig.CreateDefault();
@@ -241,10 +241,10 @@ namespace CriticalMass.Runtime.Tests
             }
             finally
             {
-                if (had) PlayerPrefs.SetInt(BloodSetting.Key, old);
-                else PlayerPrefs.DeleteKey(BloodSetting.Key);
-                if (hadGore) PlayerPrefs.SetInt(CriticalMass.Runtime.Menu.GameSettings.GoreKey, oldGore);
-                else PlayerPrefs.DeleteKey(CriticalMass.Runtime.Menu.GameSettings.GoreKey);
+                if (had) CmPrefs.SetInt(BloodSetting.Key, old);
+                else CmPrefs.DeleteKey(BloodSetting.Key);
+                if (hadGore) CmPrefs.SetInt(CriticalMass.Runtime.Menu.GameSettings.GoreKey, oldGore);
+                else CmPrefs.DeleteKey(CriticalMass.Runtime.Menu.GameSettings.GoreKey);
             }
         }
 

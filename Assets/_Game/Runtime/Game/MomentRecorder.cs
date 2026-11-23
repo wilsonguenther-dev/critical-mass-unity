@@ -205,7 +205,7 @@ namespace CriticalMass.Runtime.Game
             _onStill = OnStill;
             _onPhoto = OnPhoto;
             _onLogo = OnLogo;
-            _photoDir = Path.Combine(Application.persistentDataPath, PhotoFolder);
+            _photoDir = Path.Combine(GamePaths.PersistentRoot, PhotoFolder);
         }
 
         // The logo's pixels are read back once, early, so the first photo already carries it.
@@ -442,7 +442,7 @@ namespace CriticalMass.Runtime.Game
             frame.Logo = _logo;
             frame.LogoW = _logoW;
             frame.LogoH = _logoH;
-            string dir = _photoDir ?? Path.Combine(Application.persistentDataPath, PhotoFolder);
+            string dir = _photoDir ?? Path.Combine(GamePaths.PersistentRoot, PhotoFolder);
             string stamp = DateTime.Now.ToString("yyyyMMdd-HHmmss", System.Globalization.CultureInfo.InvariantCulture);
             ThreadPool.QueueUserWorkItem(_ =>
             {

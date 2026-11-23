@@ -300,11 +300,63 @@ namespace CriticalMass.Runtime.Game
             return false;
         }
 
+        /// <summary>true in the Unity Editor (compile-time: a player build never takes the Editor branch).</summary>
+#if UNITY_EDITOR
+        public const bool InEditor = true;
+#else
+        public const bool InEditor = false;
+#endif
+
+        /// <summary>The name suffix of the Editor's own data folder ("Critical Mass" -> "Critical Mass (Editor)").</summary>
+        public const string EditorSuffix = " (Editor)";
+
+        static string _root, _playerRoot;
+
+        /// <summary>
+        /// The shipped game's data folder (Application.persistentDataPath: profile, replays, photos, logs). Only for
+        /// comparisons (IsInsidePlayerRoot); the game writes through PersistentRoot or DataDir. Main thread on first use.
+        /// </summary>
+        public static string PlayerRoot => _playerRoot ?? (_playerRoot = Application.persistentDataPath);
+
+        /// <summary>
+        /// rough-spots pass 2: the root of every file the game keeps. A player build: Application.persistentDataPath,
+        /// exactly as before. The Unity Editor: the sibling folder "NAME (Editor)" (EditorRoot), so opening the Editor or
+        /// entering Play never reads, writes or prunes the owner's profile, replays, photos or logs. Main thread on first use.
+        /// </summary>
+        public static string PersistentRoot => _root ?? (_root = RootFor(PlayerRoot, InEditor));
+
+        /// <summary>The data root for a player root (pure; tests): the player root itself, or EditorRoot in the Editor.</summary>
+        public static string RootFor(string playerRoot, bool editor) => editor ? EditorRoot(playerRoot) : playerRoot;
+
+        /// <summary>The Editor's sibling folder for a player root (pure; tests).</summary>
+        public static string EditorRoot(string playerRoot)
+        {
+            string t = (playerRoot ?? "").TrimEnd('/', '\\');
+            if (t.Length == 0) return Path.Combine(Path.GetTempPath(), "CriticalMass" + EditorSuffix);
+            string parent = Path.GetDirectoryName(t);
+            string name = Path.GetFileName(t) + EditorSuffix;
+            return string.IsNullOrEmpty(parent) ? name : Path.Combine(parent, name);
+        }
+
+        /// <summary>true when path is the shipped game's data folder or inside it (pure on its arguments; tests).</summary>
+        public static bool IsInside(string path, string root)
+        {
+            if (string.IsNullOrEmpty(path) || string.IsNullOrEmpty(root)) return false;
+            string p, r;
+            try { p = Path.GetFullPath(path).TrimEnd('/', '\\'); r = Path.GetFullPath(root).TrimEnd('/', '\\'); }
+            catch (Exception) { return false; }
+            return string.Equals(p, r, StringComparison.OrdinalIgnoreCase) ||
+                   p.StartsWith(r + "/", StringComparison.OrdinalIgnoreCase) || p.StartsWith(r + "\\", StringComparison.OrdinalIgnoreCase);
+        }
+
+        /// <summary>true when path is inside the shipped game's own data folder (main thread on first use).</summary>
+        public static bool IsInsidePlayerRoot(string path) => IsInside(path, PlayerRoot);
+
         static string Init()
         {
             string arg = DataDirArg(Environment.GetCommandLineArgs());
             Isolated = arg != null;
-            string dir = arg != null ? Path.GetFullPath(arg) : Application.persistentDataPath;
+            string dir = arg != null ? Path.GetFullPath(arg) : PersistentRoot;
             if (Writable(dir)) return dir;
             string fallback = Path.Combine(Path.GetTempPath(), "CriticalMass");
             Debug.LogWarning($"[CM.Paths] {dir} cannot be written; using {fallback} for this session");

@@ -71,7 +71,7 @@ namespace CriticalMass.Runtime.Game
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         private static void Boot()
         {
-            if (Wanted(Environment.GetCommandLineArgs(), PlayerPrefs.GetInt(PrefKey, 0))) Enable();
+            if (Wanted(Environment.GetCommandLineArgs(), CmPrefs.GetInt(PrefKey, 0))) Enable();
         }
 
         public static void Enable()
@@ -131,7 +131,7 @@ namespace CriticalMass.Runtime.Game
             _world = w;
             _ended = false;
             int seat = LocalSeat.Actor;
-            string dir = Path.Combine(Application.persistentDataPath, "PlayerSeatLogs");
+            string dir = Path.Combine(GamePaths.PersistentRoot, "PlayerSeatLogs");
             Directory.CreateDirectory(dir);
             CurrentPath = Path.Combine(dir, DateTime.UtcNow.ToString("yyyyMMdd-HHmmss", System.Globalization.CultureInfo.InvariantCulture) + "-" + w.Actors[seat].Cls + ".jsonl");
             _sink = new Sink(CurrentPath);

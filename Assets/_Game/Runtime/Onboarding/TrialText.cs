@@ -33,11 +33,11 @@ namespace CriticalMass.Runtime.Onboarding
 
         public static string Line(int i, ControlDevice device) => TrialText.Fill(Lines[Mathf.Clamp(i, 0, Count - 1)], device);
 
-        public static int ShownMask() => PlayerPrefs.GetInt(PrefsKey, 0);
+        public static int ShownMask() => CmPrefs.GetInt(PrefsKey, 0);
         public static void MarkShown(int i)
         {
-            PlayerPrefs.SetInt(PrefsKey, ShownMask() | (1 << i));
-            PlayerPrefs.Save();
+            CmPrefs.SetInt(PrefsKey, ShownMask() | (1 << i));
+            CmPrefs.Save();
         }
 
         /// <summary>The player can do it now (the rule is on, the class fits, the player is up).</summary>

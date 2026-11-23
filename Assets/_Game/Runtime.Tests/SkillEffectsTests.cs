@@ -186,9 +186,9 @@ namespace CriticalMass.Runtime.Tests
         [Test]
         public void TheSkillEffectsSwitchIsOnByDefault()
         {
-            bool had = PlayerPrefs.HasKey(WorldFeedbackSettings.SkillFxKey);
-            int was = PlayerPrefs.GetInt(WorldFeedbackSettings.SkillFxKey, 1);
-            PlayerPrefs.DeleteKey(WorldFeedbackSettings.SkillFxKey);
+            bool had = CmPrefs.HasKey(WorldFeedbackSettings.SkillFxKey);
+            int was = CmPrefs.GetInt(WorldFeedbackSettings.SkillFxKey, 1);
+            CmPrefs.DeleteKey(WorldFeedbackSettings.SkillFxKey);
             try
             {
                 Assert.IsTrue(WorldFeedbackSettings.SkillEffects);
@@ -196,7 +196,7 @@ namespace CriticalMass.Runtime.Tests
             }
             finally
             {
-                if (had) PlayerPrefs.SetInt(WorldFeedbackSettings.SkillFxKey, was);
+                if (had) CmPrefs.SetInt(WorldFeedbackSettings.SkillFxKey, was);
             }
         }
     }

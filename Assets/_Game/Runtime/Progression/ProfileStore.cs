@@ -197,7 +197,7 @@ namespace CriticalMass.Runtime.Progression
         /// b15 profile: where v1 kept the achievements (PlayerPrefs "cm.ach." + id = 1). Tests replace it; the keys are read,
         /// never deleted, so an older build on the same machine still sees its unlocks.
         /// </summary>
-        public static Func<string, bool> LegacyAchievement = id => PlayerPrefs.GetInt(CriticalMass.Runtime.Game.PlayerPrefsAchievementStore.Prefix + id, 0) == 1;
+        public static Func<string, bool> LegacyAchievement = id => CmPrefs.GetInt(CriticalMass.Runtime.Game.PlayerPrefsAchievementStore.Prefix + id, 0) == 1;
 
         /// <summary>
         /// v1 to v2: every v1 field stays as it was (JsonUtility already filled them); the new parts start empty, the
@@ -269,7 +269,7 @@ namespace CriticalMass.Runtime.Progression
         {
             get
             {
-                if (_store == null) _store = new ProfileStore(Path.Combine(Application.persistentDataPath, FolderName));
+                if (_store == null) _store = new ProfileStore(Path.Combine(CriticalMass.Runtime.Game.GamePaths.PersistentRoot, FolderName));
                 return _store;
             }
         }

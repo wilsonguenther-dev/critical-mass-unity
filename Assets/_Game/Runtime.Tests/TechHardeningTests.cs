@@ -78,7 +78,7 @@ namespace CriticalMass.Runtime.Tests
             Assert.AreEqual(60, FramePolicy.BackgroundCap(60, false));
             Assert.AreEqual(30, FramePolicy.BackgroundCap(30, false), "never below 30");
             Assert.AreEqual(15, FramePolicy.BackgroundCap(60, true));
-            PlayerPrefs.DeleteKey(GameSettings.BgThrottleKey);
+            CmPrefs.DeleteKey(GameSettings.BgThrottleKey);
             Assert.IsFalse(GameSettings.BackgroundThrottle, "save power in background is off by default (DG-51)");
         }
 
@@ -269,18 +269,18 @@ namespace CriticalMass.Runtime.Tests
         {
             var asset = ScriptableObject.CreateInstance<InputActionAsset>();
             asset.AddActionMap("Test").AddAction("Fire", binding: "<Keyboard>/space");
-            string saved = PlayerPrefs.GetString(ControlBindings.PrefsKey, null);
+            string saved = CmPrefs.GetString(ControlBindings.PrefsKey, null);
             LogAssert.ignoreFailingMessages = true;
             try
             {
-                PlayerPrefs.SetString(ControlBindings.PrefsKey, "{ this is not json ]");
+                CmPrefs.SetString(ControlBindings.PrefsKey, "{ this is not json ]");
                 Assert.DoesNotThrow(() => ControlBindings.Restore(asset));
             }
             finally
             {
                 LogAssert.ignoreFailingMessages = false;
-                if (saved != null) PlayerPrefs.SetString(ControlBindings.PrefsKey, saved);
-                else PlayerPrefs.DeleteKey(ControlBindings.PrefsKey);
+                if (saved != null) CmPrefs.SetString(ControlBindings.PrefsKey, saved);
+                else CmPrefs.DeleteKey(ControlBindings.PrefsKey);
                 UnityEngine.Object.DestroyImmediate(asset);
             }
         }

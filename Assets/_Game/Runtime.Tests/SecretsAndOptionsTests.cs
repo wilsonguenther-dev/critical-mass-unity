@@ -111,8 +111,8 @@ namespace CriticalMass.Runtime.Tests
             _had = new bool[_keys.Length];
             for (int i = 0; i < _keys.Length; i++)
             {
-                _had[i] = PlayerPrefs.HasKey(_keys[i]);
-                _ints[i] = PlayerPrefs.GetInt(_keys[i], 0);
+                _had[i] = CmPrefs.HasKey(_keys[i]);
+                _ints[i] = CmPrefs.GetInt(_keys[i], 0);
             }
         }
 
@@ -121,10 +121,10 @@ namespace CriticalMass.Runtime.Tests
         {
             for (int i = 0; i < _keys.Length; i++)
             {
-                if (_had[i]) PlayerPrefs.SetInt(_keys[i], _ints[i]);
-                else PlayerPrefs.DeleteKey(_keys[i]);
+                if (_had[i]) CmPrefs.SetInt(_keys[i], _ints[i]);
+                else CmPrefs.DeleteKey(_keys[i]);
             }
-            PlayerPrefs.Save();
+            CmPrefs.Save();
             JumpGate.Override = null;
         }
 
@@ -147,13 +147,13 @@ namespace CriticalMass.Runtime.Tests
             SettingsExtras.UiScalePercent = 130;
             SettingsExtras.IntenseFlashing = true;
             SettingsExtras.ShakeAmount = 35;
-            Assert.AreEqual(1, PlayerPrefs.GetInt(SettingsExtras.HideNamesKey));
-            Assert.AreEqual(1, PlayerPrefs.GetInt(SettingsExtras.CleanHudKey));
-            Assert.AreEqual(0, PlayerPrefs.GetInt(SettingsExtras.SubtitlesKey));
-            Assert.AreEqual(130, PlayerPrefs.GetInt(SettingsExtras.UiScaleKey));
-            Assert.AreEqual(1, PlayerPrefs.GetInt(SettingsExtras.IntenseFlashingKey));
+            Assert.AreEqual(1, CmPrefs.GetInt(SettingsExtras.HideNamesKey));
+            Assert.AreEqual(1, CmPrefs.GetInt(SettingsExtras.CleanHudKey));
+            Assert.AreEqual(0, CmPrefs.GetInt(SettingsExtras.SubtitlesKey));
+            Assert.AreEqual(130, CmPrefs.GetInt(SettingsExtras.UiScaleKey));
+            Assert.AreEqual(1, CmPrefs.GetInt(SettingsExtras.IntenseFlashingKey));
             Assert.IsFalse(SettingsExtras.ReduceFlashing, "opting in lifts the safe look");
-            Assert.AreEqual(35, PlayerPrefs.GetInt(SettingsExtras.ShakeAmountKey));
+            Assert.AreEqual(35, CmPrefs.GetInt(SettingsExtras.ShakeAmountKey));
             Assert.IsTrue(GameSettings.CameraShake, "the older on/off flag follows the amount");
             Assert.AreEqual(1.3f, SettingsExtras.UiScale, 1e-6f);
             Assert.AreEqual(int.MaxValue, SettingsExtras.MaxFlashesPerSecond, "no cap only after opting in");

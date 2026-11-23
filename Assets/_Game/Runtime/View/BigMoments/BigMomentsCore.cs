@@ -225,28 +225,28 @@ namespace CriticalMass.Runtime.View.Moments
             get
             {
                 if (ModeOverride.HasValue) return ModeOverride.Value;
-                int v = PlayerPrefs.GetInt(ModeKey, DefaultMode);
+                int v = CmPrefs.GetInt(ModeKey, DefaultMode);
                 return v == 1 ? BigMomentsMode.Reduced : v == 2 ? BigMomentsMode.Off : BigMomentsMode.Full;
             }
             set
             {
-                PlayerPrefs.SetInt(ModeKey, (int)value);
-                PlayerPrefs.Save();
+                CmPrefs.SetInt(ModeKey, (int)value);
+                CmPrefs.Save();
                 Changed?.Invoke();
             }
         }
 
-        public static bool ReducedMotion => ReducedMotionOverride ?? PlayerPrefs.GetInt(ReducedMotionKey, 0) != 0;
+        public static bool ReducedMotion => ReducedMotionOverride ?? CmPrefs.GetInt(ReducedMotionKey, 0) != 0;
         /// <summary>b15 safe defaults: true unless the player opted into INTENSE FLASHING (GameSettings.ReduceFlashing).</summary>
         public static bool ReduceFlashing => ReduceFlashingOverride ?? CriticalMass.Runtime.Menu.GameSettings.ReduceFlashing;
 
         public static bool SlowMotion
         {
-            get => SlowMotionOverride ?? PlayerPrefs.GetInt(SlowMotionKey, 0) != 0;
+            get => SlowMotionOverride ?? CmPrefs.GetInt(SlowMotionKey, 0) != 0;
             set
             {
-                PlayerPrefs.SetInt(SlowMotionKey, value ? 1 : 0);
-                PlayerPrefs.Save();
+                CmPrefs.SetInt(SlowMotionKey, value ? 1 : 0);
+                CmPrefs.Save();
                 Changed?.Invoke();
             }
         }

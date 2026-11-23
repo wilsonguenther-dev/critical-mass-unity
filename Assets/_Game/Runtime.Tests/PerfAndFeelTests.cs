@@ -320,14 +320,14 @@ namespace CriticalMass.Runtime.Tests
         {
             string[] keys = { GameSettings.ShakeScaleKey, GameSettings.ShakeKey };
             var saved = new Dictionary<string, (bool has, int v)>();
-            foreach (string k in keys) saved[k] = (PlayerPrefs.HasKey(k), PlayerPrefs.GetInt(k, 0));
+            foreach (string k in keys) saved[k] = (CmPrefs.HasKey(k), CmPrefs.GetInt(k, 0));
             try
             {
-                foreach (string k in keys) PlayerPrefs.DeleteKey(k);
+                foreach (string k in keys) CmPrefs.DeleteKey(k);
                 Assert.AreEqual(0f, GameSettings.ShakeScale, "owner decision OD-6 / PR #28: shake off by default");
                 Assert.IsFalse(GameSettings.CameraShake);
                 GameSettings.ShakeScale = 0.5f;
-                Assert.AreEqual(50, PlayerPrefs.GetInt(GameSettings.ShakeScaleKey), "same 0..100 int as PR #28");
+                Assert.AreEqual(50, CmPrefs.GetInt(GameSettings.ShakeScaleKey), "same 0..100 int as PR #28");
                 Assert.IsTrue(GameSettings.CameraShake);
                 GameSettings.CameraShake = false;
                 Assert.AreEqual(0f, GameSettings.ShakeScale);
@@ -335,8 +335,8 @@ namespace CriticalMass.Runtime.Tests
             finally
             {
                 foreach (string k in keys)
-                    if (saved[k].has) PlayerPrefs.SetInt(k, saved[k].v);
-                    else PlayerPrefs.DeleteKey(k);
+                    if (saved[k].has) CmPrefs.SetInt(k, saved[k].v);
+                    else CmPrefs.DeleteKey(k);
             }
         }
 

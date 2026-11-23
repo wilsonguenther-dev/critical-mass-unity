@@ -55,7 +55,7 @@ namespace CriticalMass.Runtime.Tests
             _hand = ControlBindings.Hand;
             _prefs.Clear();
             foreach (string k in new[] { ControlBindings.PrefsKey, ControlPresets.PrefsKey })
-                _prefs[k] = PlayerPrefs.HasKey(k) ? PlayerPrefs.GetString(k) : null;
+                _prefs[k] = CmPrefs.HasKey(k) ? CmPrefs.GetString(k) : null;
         }
 
         [TearDown]
@@ -64,10 +64,10 @@ namespace CriticalMass.Runtime.Tests
             if (_asset != null) Object.DestroyImmediate(_asset);
             foreach (var kv in _prefs)
             {
-                if (kv.Value == null) PlayerPrefs.DeleteKey(kv.Key);
-                else PlayerPrefs.SetString(kv.Key, kv.Value);
+                if (kv.Value == null) CmPrefs.DeleteKey(kv.Key);
+                else CmPrefs.SetString(kv.Key, kv.Value);
             }
-            PlayerPrefs.Save();
+            CmPrefs.Save();
             ControlPresets.SetLeftHandedForTests(ControlPresets.Stored == ControlPreset.LeftHanded);
             ControlBindings.SetKeyboardOnly(_kbOnly);
             ControlBindings.SetHand(_hand);
@@ -232,7 +232,7 @@ namespace CriticalMass.Runtime.Tests
             Assert.AreEqual(0.9f, GameSettings.Mix(0.9f, 0.7f, 0.6f, false, false, false, false).master, 1e-6f, "option off: background plays");
 
             string[] keys = { GameSettings.MuteMusicKey, GameSettings.MuteEffectsKey, GameSettings.MuteInBackgroundKey, GameSettings.ColourBlindTeamsKey };
-            var saved = keys.ToDictionary(k => k, k => PlayerPrefs.HasKey(k) ? PlayerPrefs.GetInt(k) : (int?)null);
+            var saved = keys.ToDictionary(k => k, k => CmPrefs.HasKey(k) ? CmPrefs.GetInt(k) : (int?)null);
             bool cb = CMTokens.ColourBlindTeams;
             try
             {
@@ -243,18 +243,18 @@ namespace CriticalMass.Runtime.Tests
                 Assert.IsTrue(GameSettings.MuteMusic && GameSettings.MuteEffects && GameSettings.MuteInBackground);
                 Assert.AreEqual(music, GameSettings.MusicVolume, "a mute keeps the slider");
                 foreach (string k in new[] { GameSettings.MuteMusicKey, GameSettings.MuteEffectsKey, GameSettings.MuteInBackgroundKey })
-                    Assert.AreEqual(1, PlayerPrefs.GetInt(k, 0), k);
+                    Assert.AreEqual(1, CmPrefs.GetInt(k, 0), k);
                 CollectionAssert.IsSubsetOf(keys, GameSettings.AllKeys, "RESET ALL SETTINGS clears them");
             }
             finally
             {
                 foreach (var kv in saved)
                 {
-                    if (kv.Value.HasValue) PlayerPrefs.SetInt(kv.Key, kv.Value.Value);
-                    else PlayerPrefs.DeleteKey(kv.Key);
+                    if (kv.Value.HasValue) CmPrefs.SetInt(kv.Key, kv.Value.Value);
+                    else CmPrefs.DeleteKey(kv.Key);
                 }
                 CMTokens.ColourBlindTeams = cb;
-                PlayerPrefs.Save();
+                CmPrefs.Save();
             }
         }
 

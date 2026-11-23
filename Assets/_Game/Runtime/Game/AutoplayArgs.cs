@@ -658,7 +658,7 @@ namespace CriticalMass.Runtime.Game
                     Debug.Log("[CM.Cost] title " + FrameCost.Report());
                     if (FrameRecorder.Active)
                     {
-                        string perfBase = string.IsNullOrEmpty(Current.PerfLog) ? Path.Combine(Application.persistentDataPath, "perf-last.json") : Current.PerfLog;
+                        string perfBase = string.IsNullOrEmpty(Current.PerfLog) ? Path.Combine(GamePaths.PersistentRoot, "perf-last.json") : Current.PerfLog;
                         string titleCsv = Path.Combine(Path.GetDirectoryName(Path.GetFullPath(perfBase)) ?? "", "frames-title.csv");
                         Debug.Log("[CM.Frames] title " + FrameRecorder.End(titleCsv));
                     }
@@ -791,7 +791,7 @@ namespace CriticalMass.Runtime.Game
                 ("kaiju_own", kaijuOwn),
             };
             {
-                string perfBase = string.IsNullOrEmpty(Current.PerfLog) ? Path.Combine(Application.persistentDataPath, "perf-last.json") : Current.PerfLog;
+                string perfBase = string.IsNullOrEmpty(Current.PerfLog) ? Path.Combine(GamePaths.PersistentRoot, "perf-last.json") : Current.PerfLog;
                 string recorder = FrameRecorder.End(FrameRecorder.CsvPathFor(PerfPathFor(perfBase, _match)));
                 Array.Resize(ref extra, extra.Length + 1);
                 extra[extra.Length - 1] = ("frame_recorder", recorder);
@@ -800,7 +800,7 @@ namespace CriticalMass.Runtime.Game
             _pendingExtra = extra;
             _pendingReport = r;
             string basePath = Current.PerfLog;
-            if (string.IsNullOrEmpty(basePath)) basePath = Path.Combine(Application.persistentDataPath, "perf-last.json");
+            if (string.IsNullOrEmpty(basePath)) basePath = Path.Combine(GamePaths.PersistentRoot, "perf-last.json");
             string path = PerfPathFor(basePath, _match);
             _pendingPath = path;
             try

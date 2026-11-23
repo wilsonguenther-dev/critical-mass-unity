@@ -853,20 +853,20 @@ namespace CriticalMass.Runtime.Tests
         public void TheSettingRefusesFirstPersonWhileItIsHidden()
         {
             bool sw = FollowCamera.FirstPersonEnabled;
-            bool hadView = UnityEngine.PlayerPrefs.HasKey(GameSettings.CameraViewKey);
-            int view = UnityEngine.PlayerPrefs.GetInt(GameSettings.CameraViewKey, 1);
+            bool hadView = CmPrefs.HasKey(GameSettings.CameraViewKey);
+            int view = CmPrefs.GetInt(GameSettings.CameraViewKey, 1);
             bool ground = GameSettings.GroundCamera;
             try
             {
                 FollowCamera.FirstPersonEnabled = false;
                 GameSettings.CameraView = CameraView.FirstPerson;
                 Assert.AreEqual(CameraView.ThirdPerson, GameSettings.CameraView);
-                Assert.AreEqual((int)CameraView.ThirdPerson, UnityEngine.PlayerPrefs.GetInt(GameSettings.CameraViewKey, -1), "stored as third person");
+                Assert.AreEqual((int)CameraView.ThirdPerson, CmPrefs.GetInt(GameSettings.CameraViewKey, -1), "stored as third person");
             }
             finally
             {
                 FollowCamera.FirstPersonEnabled = sw;
-                if (hadView) UnityEngine.PlayerPrefs.SetInt(GameSettings.CameraViewKey, view); else UnityEngine.PlayerPrefs.DeleteKey(GameSettings.CameraViewKey);
+                if (hadView) CmPrefs.SetInt(GameSettings.CameraViewKey, view); else CmPrefs.DeleteKey(GameSettings.CameraViewKey);
                 GameSettings.GroundCamera = ground;
             }
         }

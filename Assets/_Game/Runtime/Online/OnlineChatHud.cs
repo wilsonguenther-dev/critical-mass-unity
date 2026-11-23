@@ -540,7 +540,7 @@ namespace CriticalMass.Runtime.Online
         {
             string text = ch.Report(peer, OnlineMatch.NowMs, DateTime.UtcNow.ToString("u"));
             if (text == null) return;
-            try { System.IO.File.AppendAllText(System.IO.Path.Combine(Application.persistentDataPath, "chat-reports.txt"), text + "\n"); }
+            try { System.IO.File.AppendAllText(System.IO.Path.Combine(CriticalMass.Runtime.Game.GamePaths.PersistentRoot, "chat-reports.txt"), text + "\n"); }
             catch (Exception e) { Debug.LogWarning("chat report not saved: " + e.Message); }
             Debug.Log("[chat] " + text);
         }

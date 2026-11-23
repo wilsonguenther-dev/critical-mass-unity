@@ -391,11 +391,11 @@ namespace CriticalMass.Runtime.Menus
         /// <summary>The player has seen the first-time card (or opened the card).</summary>
         public static bool Seen
         {
-            get => PlayerPrefs.GetInt(SeenKey, 0) == 1;
+            get => CmPrefs.GetInt(SeenKey, 0) == 1;
             set
             {
-                PlayerPrefs.SetInt(SeenKey, value ? 1 : 0);
-                PlayerPrefs.Save();
+                CmPrefs.SetInt(SeenKey, value ? 1 : 0);
+                CmPrefs.Save();
             }
         }
 

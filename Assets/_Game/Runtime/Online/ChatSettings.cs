@@ -14,8 +14,8 @@ namespace CriticalMass.Runtime.Online
         public const string ChatKey = "cm.chat.on", TypedKey = "cm.chat.typed", FilterKey = "cm.chat.filter", VoiceKey = "cm.chat.voice", MuteAllKey = "cm.chat.muteAll";
         public static readonly string[] AllKeys = { ChatKey, TypedKey, FilterKey, VoiceKey, MuteAllKey };
 
-        static bool Get(string k, bool d) => PlayerPrefs.GetInt(k, d ? 1 : 0) == 1;
-        static void Set(string k, bool v) { PlayerPrefs.SetInt(k, v ? 1 : 0); PlayerPrefs.Save(); Changed++; }
+        static bool Get(string k, bool d) => CmPrefs.GetInt(k, d ? 1 : 0) == 1;
+        static void Set(string k, bool v) { CmPrefs.SetInt(k, v ? 1 : 0); CmPrefs.Save(); Changed++; }
 
         /// <summary>Bumps on every change (the chat applies the switches when it moves).</summary>
         public static int Changed { get; private set; }
@@ -31,8 +31,8 @@ namespace CriticalMass.Runtime.Online
 
         public static void Reset()
         {
-            foreach (string k in AllKeys) PlayerPrefs.DeleteKey(k);
-            PlayerPrefs.Save();
+            foreach (string k in AllKeys) CmPrefs.DeleteKey(k);
+            CmPrefs.Save();
             Changed++;
         }
 

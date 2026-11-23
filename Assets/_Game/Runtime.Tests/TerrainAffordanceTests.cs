@@ -107,7 +107,7 @@ namespace CriticalMass.Runtime.Tests
         public void Clean()
         {
             WorldFeedbackSettings.ResetAll();
-            PlayerPrefs.Save();
+            CmPrefs.Save();
         }
 
         // ------------------------------------------------------------------ Miner

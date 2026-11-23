@@ -282,19 +282,19 @@ namespace CriticalMass.Runtime.Tests
             Assert.AreEqual(0f, scene.Trauma(t + 5.0, pad.X, pad.Z), "decayed after the blast");
             Assert.AreEqual(1, scene.ExplosionCount(t + 0.01));
 
-            bool had = PlayerPrefs.HasKey(Effects.ShakeKey);
-            int old = PlayerPrefs.GetInt(Effects.ShakeKey, 0);
+            bool had = CmPrefs.HasKey(Effects.ShakeKey);
+            int old = CmPrefs.GetInt(Effects.ShakeKey, 0);
             try
             {
-                PlayerPrefs.DeleteKey(Effects.ShakeKey);
+                CmPrefs.DeleteKey(Effects.ShakeKey);
                 Assert.IsFalse(Effects.ShakeEnabled, "shake is off unless the player turns it on (art direction)");
-                PlayerPrefs.SetInt(Effects.ShakeKey, 1);
+                CmPrefs.SetInt(Effects.ShakeKey, 1);
                 Assert.IsTrue(Effects.ShakeEnabled);
             }
             finally
             {
-                if (had) PlayerPrefs.SetInt(Effects.ShakeKey, old);
-                else PlayerPrefs.DeleteKey(Effects.ShakeKey);
+                if (had) CmPrefs.SetInt(Effects.ShakeKey, old);
+                else CmPrefs.DeleteKey(Effects.ShakeKey);
             }
             Assert.IsFalse(Effects.Explode(Vector3.zero, 2f, ExplosionKind.Tnt), "no CombatFx running: the API is a safe no-op");
         }

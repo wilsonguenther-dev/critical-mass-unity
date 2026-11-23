@@ -131,7 +131,7 @@ namespace CriticalMass.Runtime.Camera
         public static void Nudge(float amount)
         {
             if (_instance == null || amount <= 0f) return;
-            bool chosen = PlayerPrefs.HasKey(CriticalMass.Runtime.Menu.GameSettings.ShakeScaleKey) || PlayerPrefs.HasKey(CriticalMass.Runtime.Menu.GameSettings.ShakeKey);
+            bool chosen = CmPrefs.HasKey(CriticalMass.Runtime.Menu.GameSettings.ShakeScaleKey) || CmPrefs.HasKey(CriticalMass.Runtime.Menu.GameSettings.ShakeKey);
             float s = NudgeScale(FeelGate.ReduceMotion, chosen, FeelGate.ShakeScale);
             if (s <= 0f) return;
             _instance._trauma = Mathf.Min(1f, _instance._trauma + amount * s);

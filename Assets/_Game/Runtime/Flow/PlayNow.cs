@@ -32,26 +32,26 @@ namespace CriticalMass.Runtime.Flow
         public static MatchSetupChoice Load()
         {
             MatchSetupChoice d = MatchSetupChoice.Default;
-            int speed = PlayerPrefs.GetInt(SpeedKey, (int)MatchSpeed.DefaultChoice);
+            int speed = CmPrefs.GetInt(SpeedKey, (int)MatchSpeed.DefaultChoice);
             if (speed < 0 || speed > 2) speed = (int)MatchSpeed.DefaultChoice;
             return new MatchSetupChoice
             {
-                Team = PlayerPrefs.GetInt(TeamKey, (int)d.Team) == 1 ? TeamId.Crimson : TeamId.Azure,
-                Class = (ClassId)Mathf.Clamp(PlayerPrefs.GetInt(ClassKey, (int)d.Class), 0, ClassIds.All.Count - 1),
-                BotDifficulty = (CriticalMass.Sim.Core.BotDifficulty)Mathf.Clamp(PlayerPrefs.GetInt(BotsKey, (int)d.BotDifficulty), 0, 2),
-                TeamSize = PlayerPrefs.GetInt(SizeKey, d.TeamSize) <= 5 ? 5 : 16,
+                Team = CmPrefs.GetInt(TeamKey, (int)d.Team) == 1 ? TeamId.Crimson : TeamId.Azure,
+                Class = (ClassId)Mathf.Clamp(CmPrefs.GetInt(ClassKey, (int)d.Class), 0, ClassIds.All.Count - 1),
+                BotDifficulty = (CriticalMass.Sim.Core.BotDifficulty)Mathf.Clamp(CmPrefs.GetInt(BotsKey, (int)d.BotDifficulty), 0, 2),
+                TeamSize = CmPrefs.GetInt(SizeKey, d.TeamSize) <= 5 ? 5 : 16,
                 Pace = MatchSpeed.PaceOf((MatchSpeedChoice)speed),
             };
         }
 
         public static void Save(MatchSetupChoice c)
         {
-            PlayerPrefs.SetInt(TeamKey, (int)c.Team);
-            PlayerPrefs.SetInt(ClassKey, (int)c.Class);
-            PlayerPrefs.SetInt(SizeKey, c.TeamSize <= 5 ? 5 : 16);
-            PlayerPrefs.SetInt(BotsKey, (int)c.BotDifficulty);
-            PlayerPrefs.SetInt(SpeedKey, (int)MatchSpeed.FromPace(c.Pace));
-            PlayerPrefs.Save();
+            CmPrefs.SetInt(TeamKey, (int)c.Team);
+            CmPrefs.SetInt(ClassKey, (int)c.Class);
+            CmPrefs.SetInt(SizeKey, c.TeamSize <= 5 ? 5 : 16);
+            CmPrefs.SetInt(BotsKey, (int)c.BotDifficulty);
+            CmPrefs.SetInt(SpeedKey, (int)MatchSpeed.FromPace(c.Pace));
+            CmPrefs.Save();
         }
 
         /// <summary>

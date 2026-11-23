@@ -545,21 +545,21 @@ namespace CriticalMass.Runtime.Tests
         [Test]
         public void TheDoneFlagPersists()
         {
-            bool had = PlayerPrefs.HasKey(TrialProgress.DoneKey);
-            int was = PlayerPrefs.GetInt(TrialProgress.DoneKey, 0);
+            bool had = CmPrefs.HasKey(TrialProgress.DoneKey);
+            int was = CmPrefs.GetInt(TrialProgress.DoneKey, 0);
             try
             {
                 TrialProgress.Done = false;
                 Assert.IsFalse(TrialProgress.Done);
                 TrialProgress.Done = true;
                 Assert.IsTrue(TrialProgress.Done);
-                Assert.AreEqual(1, PlayerPrefs.GetInt(TrialProgress.DoneKey, 0));
+                Assert.AreEqual(1, CmPrefs.GetInt(TrialProgress.DoneKey, 0));
             }
             finally
             {
-                if (had) PlayerPrefs.SetInt(TrialProgress.DoneKey, was);
-                else PlayerPrefs.DeleteKey(TrialProgress.DoneKey);
-                PlayerPrefs.Save();
+                if (had) CmPrefs.SetInt(TrialProgress.DoneKey, was);
+                else CmPrefs.DeleteKey(TrialProgress.DoneKey);
+                CmPrefs.Save();
             }
         }
 

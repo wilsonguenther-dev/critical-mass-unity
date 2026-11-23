@@ -243,10 +243,10 @@ namespace CriticalMass.Runtime.Tests
         {
             var had = new bool[Keys.Length];
             var old = new int[Keys.Length];
-            for (int i = 0; i < Keys.Length; i++) { had[i] = PlayerPrefs.HasKey(Keys[i]); old[i] = PlayerPrefs.GetInt(Keys[i], 0); }
+            for (int i = 0; i < Keys.Length; i++) { had[i] = CmPrefs.HasKey(Keys[i]); old[i] = CmPrefs.GetInt(Keys[i], 0); }
             try
             {
-                foreach (string k in Keys) PlayerPrefs.DeleteKey(k);
+                foreach (string k in Keys) CmPrefs.DeleteKey(k);
                 Assert.AreEqual(CameraView.TopDown, GameSettings.CameraView, "top-down by default");
                 Assert.IsFalse(GameSettings.CameraManual, "auto follow by default");
                 Assert.AreEqual(1f, GameSettings.CameraSensitivity, 1e-6);
@@ -262,7 +262,7 @@ namespace CriticalMass.Runtime.Tests
                 for (int i = 0; i < 2; i++) { PauseMenu.StepCamera(1); offSeen.Add(PauseMenu.CameraText()); }
                 Assert.AreEqual(3, offSeen.Count, "switch off: the CAMERA line shows the two top-down angles and third person");
                 Assert.IsFalse(offSeen.Contains("FIRST PERSON"));
-                PlayerPrefs.SetInt(GameSettings.CameraViewKey, 2);
+                CmPrefs.SetInt(GameSettings.CameraViewKey, 2);
                 GameSettings.GroundCamera = true;
                 Assert.AreEqual(CameraView.ThirdPerson, GameSettings.CameraView, "a stored first person plays as third person while hidden");
                 GameSettings.CameraView = CameraView.TopDown;
@@ -280,7 +280,7 @@ namespace CriticalMass.Runtime.Tests
                 Assert.AreEqual(CameraView.TopDown, GameSettings.CameraView);
                 GameSettings.GroundCamera = true;
                 Assert.AreEqual(CameraView.FirstPerson, GameSettings.CameraView, "the old switch brings back the last low view");
-                PlayerPrefs.DeleteKey(GameSettings.CameraViewKey);
+                CmPrefs.DeleteKey(GameSettings.CameraViewKey);
                 Assert.AreEqual(CameraView.ThirdPerson, GameSettings.CameraView, "an older save with only GROUND on reads as third person");
 
                 GameSettings.CameraManual = true;
@@ -291,7 +291,7 @@ namespace CriticalMass.Runtime.Tests
                 Assert.IsTrue(GameSettings.CameraInvertY);
                 Assert.AreEqual(3f, GameSettings.CameraSensitivity, 1e-6, "clamped");
                 Assert.AreEqual(FollowCamera.FovMin, GameSettings.CameraFov, "clamped");
-                Assert.AreEqual(1, PlayerPrefs.GetInt(GameSettings.CameraManualKey, 0), "stored in the prefs");
+                Assert.AreEqual(1, CmPrefs.GetInt(GameSettings.CameraManualKey, 0), "stored in the prefs");
 
                 // The Settings line cycles all four choices and back.
                 GameSettings.CameraView = CameraView.TopDown;
@@ -312,8 +312,8 @@ namespace CriticalMass.Runtime.Tests
                 FollowCamera.FirstPersonEnabled = false;
                 for (int i = 0; i < Keys.Length; i++)
                 {
-                    if (had[i]) PlayerPrefs.SetInt(Keys[i], old[i]);
-                    else PlayerPrefs.DeleteKey(Keys[i]);
+                    if (had[i]) CmPrefs.SetInt(Keys[i], old[i]);
+                    else CmPrefs.DeleteKey(Keys[i]);
                 }
             }
         }

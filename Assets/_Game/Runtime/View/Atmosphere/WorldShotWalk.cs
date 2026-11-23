@@ -31,7 +31,7 @@ namespace CriticalMass.Runtime.View.Atmosphere
         {
             if (_started || Application.isEditor) return;
             bool want;
-            try { want = AutoplayArgs.Current.Shots && (PlayerPrefs.GetInt(PrefKey, 0) == 1 || Environment.GetEnvironmentVariable("CM_WORLD_SHOTS") == "1"); }
+            try { want = AutoplayArgs.Current.Shots && (CmPrefs.GetInt(PrefKey, 0) == 1 || Environment.GetEnvironmentVariable("CM_WORLD_SHOTS") == "1"); }
             catch (Exception) { want = false; }
             if (!want) return;
             _started = true;

@@ -50,8 +50,8 @@ namespace CriticalMass.Editor.Flow
                 _frames = _shots = _wanted = 0;
                 Log.Clear();
                 Stats.Clear();
-                _hadPref = PlayerPrefs.HasKey(TimeOfDaySettings.Key);
-                _pref = PlayerPrefs.GetInt(TimeOfDaySettings.Key, 0);
+                _hadPref = CriticalMass.Runtime.CmPrefs.HasKey(TimeOfDaySettings.Key);
+                _pref = CriticalMass.Runtime.CmPrefs.GetInt(TimeOfDaySettings.Key, 0);
                 EditorSceneManager.OpenScene(GameBootstrap.BootScenePath, OpenSceneMode.Single);
                 GameFlow.ForceEnabled = true;
                 _walk = Walk();
@@ -376,7 +376,7 @@ namespace CriticalMass.Editor.Flow
             EditorApplication.update -= Update;
             TimeOfDayDirector.Override = null;
             AmbientLife.ClockOverride = null;
-            if (_hadPref) PlayerPrefs.SetInt(TimeOfDaySettings.Key, _pref); else PlayerPrefs.DeleteKey(TimeOfDaySettings.Key);
+            if (_hadPref) CriticalMass.Runtime.CmPrefs.SetInt(TimeOfDaySettings.Key, _pref); else CriticalMass.Runtime.CmPrefs.DeleteKey(TimeOfDaySettings.Key);
             GameFlow.ForceEnabled = false;
             if (UnityEngine.Camera.main != null) { UnityEngine.Camera.main.targetTexture = null; UnityEngine.Camera.main.ResetAspect(); }
             Note($"exit {code}, {_shots} of {_wanted} shot(s)");

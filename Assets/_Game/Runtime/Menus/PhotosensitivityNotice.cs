@@ -44,11 +44,11 @@ namespace CriticalMass.Runtime.Menus
         /// <summary>Dismissed once on this profile.</summary>
         public static bool Seen
         {
-            get => PlayerPrefs.GetInt(SeenKey, 0) != 0;
+            get => CmPrefs.GetInt(SeenKey, 0) != 0;
             set
             {
-                PlayerPrefs.SetInt(SeenKey, value ? 1 : 0);
-                PlayerPrefs.Save();
+                CmPrefs.SetInt(SeenKey, value ? 1 : 0);
+                CmPrefs.Save();
             }
         }
 

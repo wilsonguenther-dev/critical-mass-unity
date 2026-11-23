@@ -28,9 +28,9 @@ namespace CriticalMass.Runtime.PlayTests
         [UnitySetUp]
         public IEnumerator SetUp()
         {
-            _hadSetting = PlayerPrefs.HasKey(GameSettings.GroundCameraKey);
-            _oldSetting = PlayerPrefs.GetInt(GameSettings.GroundCameraKey, 0);
-            PlayerPrefs.DeleteKey(GameSettings.GroundCameraKey);
+            _hadSetting = CmPrefs.HasKey(GameSettings.GroundCameraKey);
+            _oldSetting = CmPrefs.GetInt(GameSettings.GroundCameraKey, 0);
+            CmPrefs.DeleteKey(GameSettings.GroundCameraKey);
             SpectatorMode.SpectateNextMatch = false;
             SimDriverBehaviour.CaptureMode = true;
             SceneManager.LoadScene(BootScene);
@@ -49,8 +49,8 @@ namespace CriticalMass.Runtime.PlayTests
             if (GroundView.Current != null) GroundView.Current.WatchGround = false;
             SimDriverBehaviour.CaptureMode = false;
             SpectatorMode.SpectateNextMatch = false;
-            if (_hadSetting) PlayerPrefs.SetInt(GameSettings.GroundCameraKey, _oldSetting);
-            else PlayerPrefs.DeleteKey(GameSettings.GroundCameraKey);
+            if (_hadSetting) CmPrefs.SetInt(GameSettings.GroundCameraKey, _oldSetting);
+            else CmPrefs.DeleteKey(GameSettings.GroundCameraKey);
             _driver = null;
         }
 

@@ -21,9 +21,9 @@ namespace CriticalMass.Runtime.Tests
         [SetUp]
         public void SetUp()
         {
-            _hadKey = PlayerPrefs.HasKey(GameSettings.IntenseFlashingKey);
-            _savedKey = _hadKey ? PlayerPrefs.GetInt(GameSettings.IntenseFlashingKey).ToString() : null;
-            PlayerPrefs.DeleteKey(GameSettings.IntenseFlashingKey);   // a fresh profile
+            _hadKey = CmPrefs.HasKey(GameSettings.IntenseFlashingKey);
+            _savedKey = _hadKey ? CmPrefs.GetInt(GameSettings.IntenseFlashingKey).ToString() : null;
+            CmPrefs.DeleteKey(GameSettings.IntenseFlashingKey);   // a fresh profile
             BigMomentsSettings.ClearOverrides();
             FlashSafety.IntenseOverride = null;
             FlashSafety.ResetShared();
@@ -32,8 +32,8 @@ namespace CriticalMass.Runtime.Tests
         [TearDown]
         public void TearDown()
         {
-            if (_hadKey) PlayerPrefs.SetInt(GameSettings.IntenseFlashingKey, int.Parse(_savedKey));
-            else PlayerPrefs.DeleteKey(GameSettings.IntenseFlashingKey);
+            if (_hadKey) CmPrefs.SetInt(GameSettings.IntenseFlashingKey, int.Parse(_savedKey));
+            else CmPrefs.DeleteKey(GameSettings.IntenseFlashingKey);
             BigMomentsSettings.ClearOverrides();
             FlashSafety.IntenseOverride = null;
             FlashSafety.ResetShared();
@@ -58,16 +58,16 @@ namespace CriticalMass.Runtime.Tests
                                   " (min " + FlashSafety.SafeFlashSeconds + ") pulseCeilingHz=" + pulse + " (limit " + FeelGate.ReducedPulseHz + ")");
 
             // The old key from earlier builds no longer turns the cap off: an older "reduce flashing 0" save is ignored.
-            bool hadOld = PlayerPrefs.HasKey(GameSettings.ReduceFlashingKey);
-            int old = PlayerPrefs.GetInt(GameSettings.ReduceFlashingKey, 0);
+            bool hadOld = CmPrefs.HasKey(GameSettings.ReduceFlashingKey);
+            int old = CmPrefs.GetInt(GameSettings.ReduceFlashingKey, 0);
             try
             {
-                PlayerPrefs.SetInt(GameSettings.ReduceFlashingKey, 0);
+                CmPrefs.SetInt(GameSettings.ReduceFlashingKey, 0);
                 Assert.IsTrue(GameSettings.ReduceFlashing, "a legacy key never lifts the safe default");
             }
             finally
             {
-                if (hadOld) PlayerPrefs.SetInt(GameSettings.ReduceFlashingKey, old); else PlayerPrefs.DeleteKey(GameSettings.ReduceFlashingKey);
+                if (hadOld) CmPrefs.SetInt(GameSettings.ReduceFlashingKey, old); else CmPrefs.DeleteKey(GameSettings.ReduceFlashingKey);
             }
         }
 

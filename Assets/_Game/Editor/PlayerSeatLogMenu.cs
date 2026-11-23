@@ -15,21 +15,21 @@ namespace CriticalMass.Editor
         [MenuItem(Item)]
         private static void Toggle()
         {
-            bool on = PlayerPrefs.GetInt(PlayerSeatLogger.PrefKey, 0) != 1;
-            PlayerPrefs.SetInt(PlayerSeatLogger.PrefKey, on ? 1 : 0);
-            PlayerPrefs.Save();
+            bool on = CriticalMass.Runtime.CmPrefs.GetInt(PlayerSeatLogger.PrefKey, 0) != 1;
+            CriticalMass.Runtime.CmPrefs.SetInt(PlayerSeatLogger.PrefKey, on ? 1 : 0);
+            CriticalMass.Runtime.CmPrefs.Save();
             if (Application.isPlaying)
             {
                 if (on) PlayerSeatLogger.Enable();
                 else PlayerSeatLogger.Disable();
             }
-            Debug.Log("[CM.PlayerSeatLog] " + (on ? "ON: each match writes " + Application.persistentDataPath + "/PlayerSeatLogs/*.jsonl" : "OFF"));
+            Debug.Log("[CM.PlayerSeatLog] " + (on ? "ON: each match writes " + CriticalMass.Runtime.Game.GamePaths.PersistentRoot + "/PlayerSeatLogs/*.jsonl" : "OFF"));
         }
 
         [MenuItem(Item, true)]
         private static bool ToggleValidate()
         {
-            Menu.SetChecked(Item, PlayerPrefs.GetInt(PlayerSeatLogger.PrefKey, 0) == 1);
+            Menu.SetChecked(Item, CriticalMass.Runtime.CmPrefs.GetInt(PlayerSeatLogger.PrefKey, 0) == 1);
             return true;
         }
     }

@@ -27,7 +27,7 @@ namespace CriticalMass.Runtime.View.Effects
             _driver = GetComponentInParent<SimDriverBehaviour>();
             string[] args = Environment.GetCommandLineArgs();
             int i = Array.IndexOf(args, "-shotsOut");
-            _dir = i >= 0 && i + 1 < args.Length ? args[i + 1] : Path.Combine(Application.persistentDataPath, "dodge-shots");
+            _dir = i >= 0 && i + 1 < args.Length ? args[i + 1] : Path.Combine(CriticalMass.Runtime.Game.GamePaths.PersistentRoot, "dodge-shots");
             Directory.CreateDirectory(_dir);
             Debug.Log("[CM.DodgeShots] watching; pictures to " + _dir);
         }

@@ -91,12 +91,12 @@ namespace CriticalMass.Runtime.Menus
         public static bool ShouldShow =>
             (ForceForTests || (!Application.isEditor && !Application.isBatchMode)) && !GameFlow.Autoplay && !Done && FlowDirector.Current != null;
 
-        public static bool Done => PlayerPrefs.GetInt(DoneKey, 0) != 0;
+        public static bool Done => CmPrefs.GetInt(DoneKey, 0) != 0;
 
         public static void MarkDone()
         {
-            PlayerPrefs.SetInt(DoneKey, 1);
-            PlayerPrefs.Save();
+            CmPrefs.SetInt(DoneKey, 1);
+            CmPrefs.Save();
         }
 
         /// <summary>One line of what you DO as this class (no numbers: the class cards have them).</summary>
@@ -241,7 +241,7 @@ namespace CriticalMass.Runtime.Menus
             MatchSetupChoice s = SetupPrefs.EnsureLoaded();
             s.Class = c;
             GameFlow.LastSetup = s;
-            PlayerPrefs.SetInt(SetupPrefs.ClassKey, (int)c);
+            CmPrefs.SetInt(SetupPrefs.ClassKey, (int)c);
             MarkDone();
         }
 

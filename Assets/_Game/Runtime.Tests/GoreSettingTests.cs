@@ -228,41 +228,41 @@ namespace CriticalMass.Runtime.Tests
         [Test]
         public void TheSettingDefaultsToOffKeepsAnExplicitFullAndPersists()
         {
-            bool hadG = PlayerPrefs.HasKey(GameSettings.GoreKey), hadB = PlayerPrefs.HasKey(GameSettings.BloodKey);
-            int oldG = PlayerPrefs.GetInt(GameSettings.GoreKey, 2), oldB = PlayerPrefs.GetInt(GameSettings.BloodKey, 1);
+            bool hadG = CmPrefs.HasKey(GameSettings.GoreKey), hadB = CmPrefs.HasKey(GameSettings.BloodKey);
+            int oldG = CmPrefs.GetInt(GameSettings.GoreKey, 2), oldB = CmPrefs.GetInt(GameSettings.BloodKey, 1);
             GoreLevel? oldOverride = GoreGate.Override;
             try
             {
                 GoreGate.Override = null;
-                PlayerPrefs.DeleteKey(GameSettings.GoreKey);
-                PlayerPrefs.DeleteKey(GameSettings.BloodKey);
+                CmPrefs.DeleteKey(GameSettings.GoreKey);
+                CmPrefs.DeleteKey(GameSettings.BloodKey);
                 // b15 safe defaults (owner-approved 2026-11-17; bible: "competitive chaos without gore").
                 Assert.AreEqual(GoreLevel.Off, GameSettings.Gore, "Off is the default on a fresh profile");
                 Assert.AreEqual(GoreLevel.Off, GoreGate.Current);
                 Assert.AreEqual(GoreLevel.Off, GoreGate.DefaultLevel);
-                Assert.IsFalse(PlayerPrefs.HasKey(GameSettings.GoreKey), "a default is not written until changed");
+                Assert.IsFalse(CmPrefs.HasKey(GameSettings.GoreKey), "a default is not written until changed");
                 Assert.Contains(GameSettings.GoreKey, GameSettings.AllKeys, "reset clears it with the other settings");
                 TestContext.WriteLine("gore default: fresh profile=" + GameSettings.Gore + " (expect Off)");
 
                 // Migration: a stored value is an explicit choice and is kept. A player who chose FULL keeps FULL.
-                PlayerPrefs.SetInt(GameSettings.GoreKey, 2);
+                CmPrefs.SetInt(GameSettings.GoreKey, 2);
                 Assert.AreEqual(GoreLevel.Full, GameSettings.Gore, "an explicit FULL survives the new default");
                 // The old BLOOD switch alone (no gore key) never brings gore back: Off either way.
-                PlayerPrefs.DeleteKey(GameSettings.GoreKey);
-                PlayerPrefs.SetInt(GameSettings.BloodKey, 1);
+                CmPrefs.DeleteKey(GameSettings.GoreKey);
+                CmPrefs.SetInt(GameSettings.BloodKey, 1);
                 Assert.AreEqual(GoreLevel.Off, GameSettings.Gore, "only the legacy blood key: the new default");
-                PlayerPrefs.SetInt(GameSettings.BloodKey, 0);
+                CmPrefs.SetInt(GameSettings.BloodKey, 0);
                 Assert.AreEqual(GoreLevel.Off, GameSettings.Gore, "legacy blood off: Off");
-                PlayerPrefs.DeleteKey(GameSettings.BloodKey);
+                CmPrefs.DeleteKey(GameSettings.BloodKey);
                 TestContext.WriteLine("gore migration: stored 2 -> Full, legacy blood only -> Off");
 
                 GameSettings.Gore = GoreLevel.Reduced;
-                Assert.AreEqual(1, PlayerPrefs.GetInt("cm.gore", -1), "stored in PlayerPrefs for the next launch");
+                Assert.AreEqual(1, CmPrefs.GetInt("cm.gore", -1), "stored in PlayerPrefs for the next launch");
                 Assert.AreEqual(GoreLevel.Reduced, GoreGate.Current);
                 GameSettings.Gore = GoreLevel.Full;
                 Assert.AreEqual(GoreLevel.Full, GoreGate.Current, "Full stays an option");
                 GameSettings.Gore = GoreLevel.Off;
-                Assert.AreEqual(0, PlayerPrefs.GetInt("cm.gore", -1));
+                Assert.AreEqual(0, CmPrefs.GetInt("cm.gore", -1));
                 Assert.IsFalse(BloodSetting.Enabled, "Off turns the legacy blood flag off");
 
                 GoreGate.Override = GoreLevel.Reduced;
@@ -271,8 +271,8 @@ namespace CriticalMass.Runtime.Tests
             finally
             {
                 GoreGate.Override = oldOverride;
-                if (hadG) PlayerPrefs.SetInt(GameSettings.GoreKey, oldG); else PlayerPrefs.DeleteKey(GameSettings.GoreKey);
-                if (hadB) PlayerPrefs.SetInt(GameSettings.BloodKey, oldB); else PlayerPrefs.DeleteKey(GameSettings.BloodKey);
+                if (hadG) CmPrefs.SetInt(GameSettings.GoreKey, oldG); else CmPrefs.DeleteKey(GameSettings.GoreKey);
+                if (hadB) CmPrefs.SetInt(GameSettings.BloodKey, oldB); else CmPrefs.DeleteKey(GameSettings.BloodKey);
             }
         }
 

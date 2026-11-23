@@ -64,7 +64,7 @@ namespace CriticalMass.Runtime.Audio.Sound
             {
                 if (_hitConfirm < 0)
                 {
-                    try { _hitConfirm = PlayerPrefs.GetInt(HitConfirmKey, 1) != 0 ? 1 : 0; }
+                    try { _hitConfirm = CmPrefs.GetInt(HitConfirmKey, 1) != 0 ? 1 : 0; }
                     catch (Exception) { _hitConfirm = 1; }   // off the main thread (never in game): the default
                 }
                 return _hitConfirm != 0;
@@ -72,8 +72,8 @@ namespace CriticalMass.Runtime.Audio.Sound
             set
             {
                 _hitConfirm = value ? 1 : 0;
-                PlayerPrefs.SetInt(HitConfirmKey, _hitConfirm);
-                PlayerPrefs.Save();
+                CmPrefs.SetInt(HitConfirmKey, _hitConfirm);
+                CmPrefs.Save();
             }
         }
     }

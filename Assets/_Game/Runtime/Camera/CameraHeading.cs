@@ -28,8 +28,8 @@ namespace CriticalMass.Runtime.Camera
 
         public static bool ClassicChosen
         {
-            get => PlayerPrefs.GetInt(Key, CreatorAngleIsDefault ? 0 : 1) == 1;
-            set { PlayerPrefs.SetInt(Key, value ? 1 : 0); PlayerPrefs.Save(); }
+            get => CmPrefs.GetInt(Key, CreatorAngleIsDefault ? 0 : 1) == 1;
+            set { CmPrefs.SetInt(Key, value ? 1 : 0); CmPrefs.Save(); }
         }
 
         /// <summary>The heading the next match uses.</summary>

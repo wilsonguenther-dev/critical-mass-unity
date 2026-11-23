@@ -584,14 +584,14 @@ namespace CriticalMass.Runtime.View.B17
             if (!MovesHelp.SwitchOn(w, v, w.Actors[me].Cls)) return;
             if (Time.unscaledTime - _hintAt < 4f) return;
             string pref = MovesHelp.PrefKey(v);
-            int seen = PlayerPrefs.GetInt(pref, 0);
+            int seen = CmPrefs.GetInt(pref, 0);
             _hinted[(int)v] = true;
             if (seen >= MovesHelp.HintShows && !HintsAlways) return;
             string key = CriticalMass.Runtime.Input.InputGlyphs.Words(MovesHelp.HintAction(v));
             string text = MovesHelp.HintText(v, key);
             ShowHintLine(text);   // item 2: the fixed hint row, never in world space over a fighter
             _hintAt = Time.unscaledTime;
-            PlayerPrefs.SetInt(pref, seen + 1);
+            CmPrefs.SetInt(pref, seen + 1);
             Said(text);
         }
 
@@ -766,7 +766,7 @@ namespace CriticalMass.Runtime.View.B17
                             _lastVictimOfMe[0] = e.A;
                             _focus = e.A; _focusAt = Time.unscaledTime;   // readability-3 item 1: my opponent
                             // readability-2 item 4: the combo hint on my first landed hit, until I have chained twice ever
-                            if (PlayerPrefs.GetInt(ChainedPref, 0) < ChainedToLearn) Hint(w, me, MovesHelp.Verb.Combo);
+                            if (CmPrefs.GetInt(ChainedPref, 0) < ChainedToLearn) Hint(w, me, MovesHelp.Verb.Combo);
                         }
                         break;
                     case SimEventType.AttackStart:
@@ -783,11 +783,11 @@ namespace CriticalMass.Runtime.View.B17
                         if (e.A == me && e.Value > 0.5)
                         {
                             // item 2: SPRINT over me the first few times travel lights up (then the speed lines say it)
-                            int seen = PlayerPrefs.GetInt(SprintPref, 0);
+                            int seen = CmPrefs.GetInt(SprintPref, 0);
                             if (tags != null && (seen < SprintWordShows || HintsAlways)
                                 && tags.OnMovesWord(w, SprintWord, 5800, me, true, false, PxPalette.Cream, PxPalette.Brass, 0.9f, 900 + (int)e.Type) != null)   // readability-3 item 7: callout size
                             {
-                                PlayerPrefs.SetInt(SprintPref, seen + 1);
+                                CmPrefs.SetInt(SprintPref, seen + 1);
                                 Said(SprintWord);
                             }
                             Hint(w, me, MovesHelp.Verb.Slide);
@@ -832,7 +832,7 @@ namespace CriticalMass.Runtime.View.B17
                         if (tags != null && e.A == me && e.Value >= 0.999 && tags.OnMovesWord(w, ActionTags.ChargedWord, 5300, me, true, false, PxPalette.Cream, PxPalette.Brass, 0.8f, 900 + (int)e.Type) != null) Said(ActionTags.ChargedWord);
                         break;
                     case SimEventType.ComboStep:
-                        if (e.A == me && e.Value >= 2 && !HintsAlways) PlayerPrefs.SetInt(ChainedPref, PlayerPrefs.GetInt(ChainedPref, 0) + 1);   // item 4
+                        if (e.A == me && e.Value >= 2 && !HintsAlways) CmPrefs.SetInt(ChainedPref, CmPrefs.GetInt(ChainedPref, 0) + 1);   // item 4
                         if (tags != null && e.A == me)
                         {
                             string word = ActionTags.MovesWords(e.Type, e.Value, e.Tier, true, false);

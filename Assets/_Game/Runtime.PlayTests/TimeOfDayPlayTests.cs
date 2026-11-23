@@ -41,8 +41,8 @@ namespace CriticalMass.Runtime.PlayTests
             _errors.Clear();
             Application.logMessageReceived += OnLog;
             _level = RenderTier.Level;
-            _hadPref = PlayerPrefs.HasKey(TimeOfDaySettings.Key);
-            _pref = PlayerPrefs.GetInt(TimeOfDaySettings.Key, 0);
+            _hadPref = CmPrefs.HasKey(TimeOfDaySettings.Key);
+            _pref = CmPrefs.GetInt(TimeOfDaySettings.Key, 0);
         }
 
         [TearDown]
@@ -53,7 +53,7 @@ namespace CriticalMass.Runtime.PlayTests
             TimeOfDayDirector.Override = null;
             AmbientLife.ClockOverride = null;
             if (RenderTier.Level != _level) RenderTier.Set(_level);
-            if (_hadPref) PlayerPrefs.SetInt(TimeOfDaySettings.Key, _pref); else PlayerPrefs.DeleteKey(TimeOfDaySettings.Key);
+            if (_hadPref) CmPrefs.SetInt(TimeOfDaySettings.Key, _pref); else CmPrefs.DeleteKey(TimeOfDaySettings.Key);
             SanityWorld.Reset();
             _w = null;
         }

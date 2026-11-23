@@ -28,7 +28,7 @@ namespace CriticalMass.Runtime.PlayTests
         [UnitySetUp]
         public IEnumerator SetUp()
         {
-            _savedSeen = PlayerPrefs.GetInt(StoryIntro.SeenKey, 0);
+            _savedSeen = CmPrefs.GetInt(StoryIntro.SeenKey, 0);
             SceneManager.LoadScene(BootScene);
             yield return null;
             yield return null;
@@ -59,8 +59,8 @@ namespace CriticalMass.Runtime.PlayTests
                 s.editorInputBehaviorInPlayMode = _savedEditorBehaviour;
                 _settingsSaved = false;
             }
-            PlayerPrefs.SetInt(StoryIntro.SeenKey, _savedSeen);
-            PlayerPrefs.Save();
+            CmPrefs.SetInt(StoryIntro.SeenKey, _savedSeen);
+            CmPrefs.Save();
         }
 
         IEnumerator Send(KeyboardState state)
@@ -111,7 +111,7 @@ namespace CriticalMass.Runtime.PlayTests
                 yield return Send(new KeyboardState(Key.Space));
                 Assert.IsFalse(StoryIntro.IsPlaying, "a fresh press after the lock skips");
                 Assert.IsTrue(skipped);
-                Assert.AreEqual(1, PlayerPrefs.GetInt(StoryIntro.SeenKey, 0));
+                Assert.AreEqual(1, CmPrefs.GetInt(StoryIntro.SeenKey, 0));
                 yield return Send(new KeyboardState());
             }
             finally

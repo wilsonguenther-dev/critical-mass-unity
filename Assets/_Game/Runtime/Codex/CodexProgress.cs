@@ -26,7 +26,7 @@ namespace CriticalMass.Runtime.Codex
         /// <summary>Words pack id of relic <paramref name="index"/> (0..7 placed, 8 the crown).</summary>
         public static string IdOf(int index) => index >= 0 && index < Ids.Length ? Ids[index] : null;
 
-        public static int Mask => PlayerPrefs.GetInt(Key, 0);
+        public static int Mask => CmPrefs.GetInt(Key, 0);
 
         public static bool IsFound(int index) => index >= 0 && index <= CrownIndex && (Mask & (1 << index)) != 0;
 
@@ -45,8 +45,8 @@ namespace CriticalMass.Runtime.Codex
         public static bool Mark(int index)
         {
             if (index < 0 || index > CrownIndex || IsFound(index)) return false;
-            PlayerPrefs.SetInt(Key, Mask | (1 << index));
-            PlayerPrefs.Save();
+            CmPrefs.SetInt(Key, Mask | (1 << index));
+            CmPrefs.Save();
             Found?.Invoke(index);
             return true;
         }
@@ -54,8 +54,8 @@ namespace CriticalMass.Runtime.Codex
         /// <summary>Forgets every relic (tests).</summary>
         public static void ResetAll()
         {
-            PlayerPrefs.DeleteKey(Key);
-            PlayerPrefs.Save();
+            CmPrefs.DeleteKey(Key);
+            CmPrefs.Save();
         }
 
         static readonly string[] CountText = { "0 OF 8", "1 OF 8", "2 OF 8", "3 OF 8", "4 OF 8", "5 OF 8", "6 OF 8", "7 OF 8", "8 OF 8" };

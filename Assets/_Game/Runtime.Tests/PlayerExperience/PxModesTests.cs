@@ -33,7 +33,7 @@ namespace CriticalMass.Runtime.Tests.PlayerExperience
         public void SaveState()
         {
             _prefs.Clear();
-            foreach (string k in Keys()) _prefs[k] = (PlayerPrefs.HasKey(k), PlayerPrefs.GetInt(k, 0));
+            foreach (string k in Keys()) _prefs[k] = (CmPrefs.HasKey(k), CmPrefs.GetInt(k, 0));
             _last = GameFlow.LastSetup;
             _idle = HumanControlGuard.IdleAutopilotEnabled;
         }
@@ -43,8 +43,8 @@ namespace CriticalMass.Runtime.Tests.PlayerExperience
         {
             GameFlow.ResetForTests();
             foreach (KeyValuePair<string, (bool has, int v)> kv in _prefs)
-                if (kv.Value.has) PlayerPrefs.SetInt(kv.Key, kv.Value.v); else PlayerPrefs.DeleteKey(kv.Key);
-            PlayerPrefs.Save();
+                if (kv.Value.has) CmPrefs.SetInt(kv.Key, kv.Value.v); else CmPrefs.DeleteKey(kv.Key);
+            CmPrefs.Save();
             GameFlow.LastSetup = _last;
             PlayModes.ResetForTests();
             HumanControlGuard.IdleAutopilotEnabled = _idle;
@@ -310,7 +310,7 @@ namespace CriticalMass.Runtime.Tests.PlayerExperience
         [Test]
         public void TheFirstPlayNowPicksAClassOnceWithThreeStartersFirst()
         {
-            PlayerPrefs.DeleteKey(StarterPick.DoneKey);
+            CmPrefs.DeleteKey(StarterPick.DoneKey);
             Assert.IsFalse(StarterPick.Done);
             Assert.IsFalse(StarterPick.ShouldShow, "never in the Editor unless a test forces it (play tests press PLAY NOW)");
             CollectionAssert.AreEqual(new[] { ClassId.Farmer, ClassId.Warrior, ClassId.Miner }, new[] { StarterPick.Order[0], StarterPick.Order[1], StarterPick.Order[2] },
@@ -340,7 +340,7 @@ namespace CriticalMass.Runtime.Tests.PlayerExperience
 
             StarterPick.Remember(ClassId.Miner);
             Assert.IsTrue(StarterPick.Done, "shown once per profile");
-            Assert.AreEqual((int)ClassId.Miner, PlayerPrefs.GetInt(SetupPrefs.ClassKey));
+            Assert.AreEqual((int)ClassId.Miner, CmPrefs.GetInt(SetupPrefs.ClassKey));
             Assert.AreEqual(ClassId.Miner, PlayNow.Choice().Class, "later PLAY NOW keeps the picked class");
             StarterPick.ForceForTests = true;
             Assert.IsFalse(StarterPick.ShouldShow, "never again after the pick");

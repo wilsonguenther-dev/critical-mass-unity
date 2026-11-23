@@ -36,28 +36,28 @@ namespace CriticalMass.Runtime.Input
 
         public static int DeadZoneIndex
         {
-            get => Mathf.Clamp(PlayerPrefs.GetInt(DeadZoneKey, 0), 0, DeadZones.Length - 1);
-            set { PlayerPrefs.SetInt(DeadZoneKey, Mathf.Clamp(value, 0, DeadZones.Length - 1)); Save(); }
+            get => Mathf.Clamp(CmPrefs.GetInt(DeadZoneKey, 0), 0, DeadZones.Length - 1);
+            set { CmPrefs.SetInt(DeadZoneKey, Mathf.Clamp(value, 0, DeadZones.Length - 1)); Save(); }
         }
 
         public static int SensitivityIndex
         {
-            get => Mathf.Clamp(PlayerPrefs.GetInt(SensitivityKey, 1), 0, Curves.Length - 1);
-            set { PlayerPrefs.SetInt(SensitivityKey, Mathf.Clamp(value, 0, Curves.Length - 1)); Save(); }
+            get => Mathf.Clamp(CmPrefs.GetInt(SensitivityKey, 1), 0, Curves.Length - 1);
+            set { CmPrefs.SetInt(SensitivityKey, Mathf.Clamp(value, 0, Curves.Length - 1)); Save(); }
         }
 
         public static bool InvertAimY
         {
-            get => PlayerPrefs.GetInt(InvertKey, 0) == 1;
-            set { PlayerPrefs.SetInt(InvertKey, value ? 1 : 0); Save(); }
+            get => CmPrefs.GetInt(InvertKey, 0) == 1;
+            set { CmPrefs.SetInt(InvertKey, value ? 1 : 0); Save(); }
         }
 
         public static bool Vibration
         {
-            get => PlayerPrefs.GetInt(VibrationKey, 1) == 1;
+            get => CmPrefs.GetInt(VibrationKey, 1) == 1;
             set
             {
-                PlayerPrefs.SetInt(VibrationKey, value ? 1 : 0);
+                CmPrefs.SetInt(VibrationKey, value ? 1 : 0);
                 if (!value && Gamepad.current != null) Gamepad.current.ResetHaptics();
                 Save();
             }
@@ -65,14 +65,14 @@ namespace CriticalMass.Runtime.Input
 
         static void Save()
         {
-            PlayerPrefs.Save();
+            CmPrefs.Save();
             Changed?.Invoke();
         }
 
         /// <summary>Every controller setting back to its default.</summary>
         public static void ResetAll()
         {
-            for (int i = 0; i < AllKeys.Length; i++) PlayerPrefs.DeleteKey(AllKeys[i]);
+            for (int i = 0; i < AllKeys.Length; i++) CmPrefs.DeleteKey(AllKeys[i]);
             Save();
         }
 

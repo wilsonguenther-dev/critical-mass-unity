@@ -52,7 +52,7 @@ namespace CriticalMass.Runtime.PlayTests
         public IEnumerator SetUp()
         {
             _prefs.Clear();
-            foreach (string k in Keys()) _prefs[k] = PlayerPrefs.HasKey(k) ? PlayerPrefs.GetInt(k) : (int?)null;
+            foreach (string k in Keys()) _prefs[k] = CmPrefs.HasKey(k) ? CmPrefs.GetInt(k) : (int?)null;
             SettingsExtras.ResetAll();
             CodexProgress.ResetAll();
             yield return Boot();
@@ -93,10 +93,10 @@ namespace CriticalMass.Runtime.PlayTests
             }
             foreach (KeyValuePair<string, int?> p in _prefs)
             {
-                if (p.Value.HasValue) PlayerPrefs.SetInt(p.Key, p.Value.Value);
-                else PlayerPrefs.DeleteKey(p.Key);
+                if (p.Value.HasValue) CmPrefs.SetInt(p.Key, p.Value.Value);
+                else CmPrefs.DeleteKey(p.Key);
             }
-            PlayerPrefs.Save();
+            CmPrefs.Save();
             foreach (string f in _files) if (File.Exists(f)) File.Delete(f);
             _files.Clear();
             JumpGate.Override = null;
@@ -130,12 +130,12 @@ namespace CriticalMass.Runtime.PlayTests
             shake.Stepped(1);
             shake.Stepped(1);
             Assert.AreEqual("ON", Item("HIDE NAMES").Value.text);
-            Assert.AreEqual(1, PlayerPrefs.GetInt(SettingsExtras.HideNamesKey));
-            Assert.AreEqual(1, PlayerPrefs.GetInt(SettingsExtras.CleanHudKey));
-            Assert.AreEqual(0, PlayerPrefs.GetInt(SettingsExtras.SubtitlesKey));
-            Assert.AreEqual(110, PlayerPrefs.GetInt(SettingsExtras.UiScaleKey));
-            Assert.AreEqual(1, PlayerPrefs.GetInt(SettingsExtras.IntenseFlashingKey));
-            Assert.AreEqual(10, PlayerPrefs.GetInt(SettingsExtras.ShakeAmountKey), "two steps of 5");
+            Assert.AreEqual(1, CmPrefs.GetInt(SettingsExtras.HideNamesKey));
+            Assert.AreEqual(1, CmPrefs.GetInt(SettingsExtras.CleanHudKey));
+            Assert.AreEqual(0, CmPrefs.GetInt(SettingsExtras.SubtitlesKey));
+            Assert.AreEqual(110, CmPrefs.GetInt(SettingsExtras.UiScaleKey));
+            Assert.AreEqual(1, CmPrefs.GetInt(SettingsExtras.IntenseFlashingKey));
+            Assert.AreEqual(10, CmPrefs.GetInt(SettingsExtras.ShakeAmountKey), "two steps of 5");
             _menu.Resume();
             yield return null;
 
@@ -387,7 +387,7 @@ namespace CriticalMass.Runtime.PlayTests
             }
             Assert.IsNotNull(saved, "the card was written");
             _files.Add(saved);
-            StringAssert.StartsWith(Path.Combine(Application.persistentDataPath, MomentRecorder.PhotoFolder), saved);
+            StringAssert.StartsWith(Path.Combine(CriticalMass.Runtime.Game.GamePaths.PersistentRoot, MomentRecorder.PhotoFolder), saved);
             Assert.IsFalse(File.Exists(saved + ".tmp"), "written atomically");
             var tex = new Texture2D(2, 2);
             Assert.IsTrue(tex.LoadImage(File.ReadAllBytes(saved)));

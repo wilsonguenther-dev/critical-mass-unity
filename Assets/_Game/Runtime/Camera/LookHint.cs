@@ -40,7 +40,7 @@ namespace CriticalMass.Runtime.Camera
 
         private void Start()
         {
-            _done = PlayerPrefs.GetInt(PrefKey, 0) != 0 || SimDriverBehaviour.CaptureMode;
+            _done = CmPrefs.GetInt(PrefKey, 0) != 0 || SimDriverBehaviour.CaptureMode;
         }
 
         /// <summary>Never show the hint again (also called when the player looks).</summary>
@@ -48,8 +48,8 @@ namespace CriticalMass.Runtime.Camera
         {
             if (!_done)
             {
-                PlayerPrefs.SetInt(PrefKey, 1);
-                PlayerPrefs.Save();
+                CmPrefs.SetInt(PrefKey, 1);
+                CmPrefs.Save();
             }
             _done = true;
         }

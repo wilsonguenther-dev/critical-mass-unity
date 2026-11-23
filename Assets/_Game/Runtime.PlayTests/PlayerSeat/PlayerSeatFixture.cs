@@ -136,7 +136,7 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
             _vsyncWas = QualitySettings.vSyncCount;
             try { base.Setup(); }
             catch { RestoreActions(); throw; }
-            foreach (string k in SavedKeys) _saved[k] = PlayerPrefs.HasKey(k) ? PlayerPrefs.GetInt(k) : (int?)null;
+            foreach (string k in SavedKeys) _saved[k] = CmPrefs.HasKey(k) ? CmPrefs.GetInt(k) : (int?)null;
             InputSettings s = InputSystem.settings;
             s.backgroundBehavior = InputSettings.BackgroundBehavior.IgnoreFocus;
             s.editorInputBehaviorInPlayMode = InputSettings.EditorInputBehaviorInPlayMode.AllDeviceInputAlwaysGoesToGameView;
@@ -150,10 +150,10 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
         {
             foreach (var kv in _saved)
             {
-                if (kv.Value.HasValue) PlayerPrefs.SetInt(kv.Key, kv.Value.Value);
-                else PlayerPrefs.DeleteKey(kv.Key);
+                if (kv.Value.HasValue) CmPrefs.SetInt(kv.Key, kv.Value.Value);
+                else CmPrefs.DeleteKey(kv.Key);
             }
-            PlayerPrefs.Save();
+            CmPrefs.Save();
             CriticalMass.Runtime.View.Fog.FogConfig.CaptureOverride = _fogWas;
             Paced(false);
             try

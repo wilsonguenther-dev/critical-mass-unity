@@ -20,14 +20,14 @@ namespace CriticalMass.Runtime.Input
 
         public static AimHelpLevel Get(AimDevice d)
         {
-            int v = PlayerPrefs.GetInt(KeyOf(d), (int)AimAssistTunables.DefaultFor(d));
+            int v = CmPrefs.GetInt(KeyOf(d), (int)AimAssistTunables.DefaultFor(d));
             return v >= (int)AimHelpLevel.Off && v <= (int)AimHelpLevel.High ? (AimHelpLevel)v : AimAssistTunables.DefaultFor(d);
         }
 
         public static void Set(AimDevice d, AimHelpLevel level)
         {
-            PlayerPrefs.SetInt(KeyOf(d), (int)level);
-            PlayerPrefs.Save();
+            CmPrefs.SetInt(KeyOf(d), (int)level);
+            CmPrefs.Save();
             Changed?.Invoke();
         }
 
@@ -42,8 +42,8 @@ namespace CriticalMass.Runtime.Input
 
         public static void ResetAll()
         {
-            for (int i = 0; i < AllKeys.Length; i++) PlayerPrefs.DeleteKey(AllKeys[i]);
-            PlayerPrefs.Save();
+            for (int i = 0; i < AllKeys.Length; i++) CmPrefs.DeleteKey(AllKeys[i]);
+            CmPrefs.Save();
             Changed?.Invoke();
         }
     }

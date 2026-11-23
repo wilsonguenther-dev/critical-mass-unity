@@ -60,14 +60,14 @@ namespace CriticalMass.Runtime.Menu
         /// <summary>HintsOff, HintsFirstMatches (default) or HintsAlways.</summary>
         public static int Hints
         {
-            get => Mathf.Clamp(PlayerPrefs.GetInt(HintsKey, HintsFirstMatches), HintsOff, HintsAlways);
-            set { PlayerPrefs.SetInt(HintsKey, Mathf.Clamp(value, HintsOff, HintsAlways)); Changed?.Invoke(); }
+            get => Mathf.Clamp(CmPrefs.GetInt(HintsKey, HintsFirstMatches), HintsOff, HintsAlways);
+            set { CmPrefs.SetInt(HintsKey, Mathf.Clamp(value, HintsOff, HintsAlways)); Changed?.Invoke(); }
         }
 
         public static string HintsLabel(int level) => level == HintsOff ? "OFF" : level == HintsAlways ? "ALWAYS" : "FIRST TWO MATCHES";
 
         /// <summary>Matches of class index ci already started with the hint.</summary>
-        public static int HintSeen(int ci) => PlayerPrefs.GetInt(HintSeenPrefix + ci, 0);
+        public static int HintSeen(int ci) => CmPrefs.GetInt(HintSeenPrefix + ci, 0);
 
         /// <summary>Should a match of class index ci that starts now show the first-minute hint?</summary>
         public static bool HintDue(int ci)
@@ -79,12 +79,12 @@ namespace CriticalMass.Runtime.Menu
         }
 
         /// <summary>Counts a match of class index ci as hinted (once per match, by the view).</summary>
-        public static void NoteHinted(int ci) => PlayerPrefs.SetInt(HintSeenPrefix + ci, HintSeen(ci) + 1);
+        public static void NoteHinted(int ci) => CmPrefs.SetInt(HintSeenPrefix + ci, HintSeen(ci) + 1);
 
         public static void ResetAll()
         {
-            for (int i = 0; i < AllKeys.Length; i++) PlayerPrefs.DeleteKey(AllKeys[i]);
-            for (int i = 0; i < 6; i++) PlayerPrefs.DeleteKey(HintSeenPrefix + i);
+            for (int i = 0; i < AllKeys.Length; i++) CmPrefs.DeleteKey(AllKeys[i]);
+            for (int i = 0; i < 6; i++) CmPrefs.DeleteKey(HintSeenPrefix + i);
             Changed?.Invoke();
         }
 
@@ -129,11 +129,11 @@ namespace CriticalMass.Runtime.Menu
             PauseMenu.AddTab(new PauseMenu.ExtraTab { Name = TabName, Build = BuildTab, Order = 10 });
         }
 
-        static bool GetB(string k, bool d) => PlayerPrefs.GetInt(k, d ? 1 : 0) != 0;
+        static bool GetB(string k, bool d) => CmPrefs.GetInt(k, d ? 1 : 0) != 0;
 
         static void SetB(string k, bool v)
         {
-            PlayerPrefs.SetInt(k, v ? 1 : 0);
+            CmPrefs.SetInt(k, v ? 1 : 0);
             Changed?.Invoke();
         }
     }

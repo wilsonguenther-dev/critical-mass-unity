@@ -306,7 +306,7 @@ namespace CriticalMass.Runtime.Menus
         /// <summary>Reduced motion (int, 1 = on, default 0). Stored by the settings work; read here and by AttractMode.</summary>
         public const string ReducedMotionKey = "cm.reducedMotion";
 
-        public static bool ReducedMotion => PlayerPrefs.GetInt(ReducedMotionKey, 0) != 0;
+        public static bool ReducedMotion => CmPrefs.GetInt(ReducedMotionKey, 0) != 0;
 
         /// <summary>Play automatically on the first launch of a player build. The game-flow item may set this false.</summary>
         public static bool PlayOnFirstLaunch = true;
@@ -417,7 +417,7 @@ namespace CriticalMass.Runtime.Menus
             bool capture = IntroFilmCapture.Requested;
             bool autoplay = GameFlow.Autoplay && !capture;
             bool play = ShouldPlayAtLaunch(PlayOnFirstLaunch || capture, titleOnBoot, GameFlow.State, autoplay,
-                GameSettings.IntroAtLaunch || capture, PlayerPrefs.GetInt(SeenKey, 0) != 0 && !capture);
+                GameSettings.IntroAtLaunch || capture, CmPrefs.GetInt(SeenKey, 0) != 0 && !capture);
             // b15: the one-time photosensitivity notice comes first (before the film's flashes), once per profile.
             bool notice = PhotosensitivityNotice.ShouldShow(titleOnBoot, GameFlow.State, autoplay, capture, PhotosensitivityNotice.Seen,
                 Environment.GetCommandLineArgs());
@@ -533,7 +533,7 @@ namespace CriticalMass.Runtime.Menus
             }
             _comic.Reduced = ReducedMotion;
             _comic.ReduceFlashing = GameSettings.ReduceFlashing;
-            _comic.ShakeScale = PlayerPrefs.HasKey(GameSettings.ShakeScaleKey) ? GameSettings.ShakeScale : 1f;
+            _comic.ShakeScale = CmPrefs.HasKey(GameSettings.ShakeScaleKey) ? GameSettings.ShakeScale : 1f;
             _comic.VoiceOn = _kind != PlayKind.Attract;
             if (!_comic.BeginStream(_table, shots))
             {
@@ -793,8 +793,8 @@ namespace CriticalMass.Runtime.Menus
             bool intro = _kind == PlayKind.Intro;
             if (intro)
             {
-                PlayerPrefs.SetInt(SeenKey, 1);
-                PlayerPrefs.Save();
+                CmPrefs.SetInt(SeenKey, 1);
+                CmPrefs.Save();
             }
             ReleaseAssets();
             Audio.MusicDirector.FilmBed = 1f;

@@ -44,8 +44,8 @@ namespace CriticalMass.Runtime.Flow
         /// <summary>Makes the NEXT PLAY NOW show the class pick in the Editor too (clears the profile's "done" key).</summary>
         public static void ArmStarterPick()
         {
-            PlayerPrefs.DeleteKey(StarterPick.DoneKey);
-            PlayerPrefs.Save();
+            CmPrefs.DeleteKey(StarterPick.DoneKey);
+            CmPrefs.Save();
             StarterPick.ForceForTests = true;
         }
 

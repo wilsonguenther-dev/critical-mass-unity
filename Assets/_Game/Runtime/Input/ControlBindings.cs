@@ -449,8 +449,8 @@ namespace CriticalMass.Runtime.Input
         /// <summary>Writes the asset's overrides to PlayerPrefs (cm.bindings) and flushes them to disk.</summary>
         public static void Persist(InputActionAsset asset)
         {
-            PlayerPrefs.SetString(PrefsKey, SaveJson(asset));
-            PlayerPrefs.Save();
+            CmPrefs.SetString(PrefsKey, SaveJson(asset));
+            CmPrefs.Save();
             BindingsChanged?.Invoke();
         }
 
@@ -459,13 +459,13 @@ namespace CriticalMass.Runtime.Input
         {
             try
             {
-                LoadJson(asset, PlayerPrefs.GetString(PrefsKey, string.Empty));
+                LoadJson(asset, CmPrefs.GetString(PrefsKey, string.Empty));
             }
             catch (Exception e)
             {
                 // DG-53: a corrupt or foreign cm.bindings must never stop the game: drop it once and keep the defaults.
                 if (asset != null) PlayerActionsLifetime.ChangeWhileDisabled(asset, asset.RemoveAllBindingOverrides);
-                PlayerPrefs.DeleteKey(PrefsKey);
+                CmPrefs.DeleteKey(PrefsKey);
                 Debug.LogWarning($"[CM.Controls] saved bindings could not be read ({e.GetType().Name}); using the defaults");
                 BindingsChanged?.Invoke();
             }
@@ -475,9 +475,9 @@ namespace CriticalMass.Runtime.Input
         public static void ResetAll(InputActionAsset asset)
         {
             if (asset != null) PlayerActionsLifetime.ChangeWhileDisabled(asset, asset.RemoveAllBindingOverrides);
-            PlayerPrefs.DeleteKey(PrefsKey);
+            CmPrefs.DeleteKey(PrefsKey);
             ControlPresets.Forget();
-            PlayerPrefs.Save();
+            CmPrefs.Save();
             BindingsChanged?.Invoke();
         }
 

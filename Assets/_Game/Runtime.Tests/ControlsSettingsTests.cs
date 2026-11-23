@@ -32,7 +32,7 @@ namespace CriticalMass.Runtime.Tests
             _asset = InputActionAsset.FromJson(src.ToJson());
             _saved.Clear();
             foreach (string k in GameSettings.AllKeys.Concat(new[] { ControlBindings.PrefsKey }))
-                _saved[k] = (PlayerPrefs.HasKey(k), PlayerPrefs.GetString(k, ""), PlayerPrefs.GetInt(k, 0), PlayerPrefs.GetFloat(k, 0f));
+                _saved[k] = (CmPrefs.HasKey(k), CmPrefs.GetString(k, ""), CmPrefs.GetInt(k, 0), CmPrefs.GetFloat(k, 0f));
         }
 
         [TearDown]
@@ -42,13 +42,13 @@ namespace CriticalMass.Runtime.Tests
             // Restore exactly what was there (type is unknown to PlayerPrefs, so restore by the key's own kind).
             foreach (var kv in _saved)
             {
-                PlayerPrefs.DeleteKey(kv.Key);
+                CmPrefs.DeleteKey(kv.Key);
                 if (!kv.Value.has) continue;
-                if (kv.Key == ControlBindings.PrefsKey) PlayerPrefs.SetString(kv.Key, kv.Value.s);
-                else if (kv.Key.StartsWith("cm.audio.")) PlayerPrefs.SetFloat(kv.Key, kv.Value.f);
-                else PlayerPrefs.SetInt(kv.Key, kv.Value.i);
+                if (kv.Key == ControlBindings.PrefsKey) CmPrefs.SetString(kv.Key, kv.Value.s);
+                else if (kv.Key.StartsWith("cm.audio.")) CmPrefs.SetFloat(kv.Key, kv.Value.f);
+                else CmPrefs.SetInt(kv.Key, kv.Value.i);
             }
-            PlayerPrefs.Save();
+            CmPrefs.Save();
         }
 
         InputAction A(string name) => _asset.FindActionMap("Player", true).FindAction(name, true);
@@ -158,7 +158,7 @@ namespace CriticalMass.Runtime.Tests
             int arrowUp = ControlBindings.FindBindingIndex(up, new RebindSlot("Move", ControlDevice.KeyboardMouse, 0, "Arrows", "up"));
             up.ApplyBindingOverride(arrowUp, "<Keyboard>/i");
             ControlBindings.Persist(_asset);
-            Assert.That(PlayerPrefs.GetString(ControlBindings.PrefsKey), Does.Contain("<Keyboard>/q"));
+            Assert.That(CmPrefs.GetString(ControlBindings.PrefsKey), Does.Contain("<Keyboard>/q"));
 
             // A fresh copy of the asset (a new launch) gets the overrides back from PlayerPrefs.
             var src = AssetDatabase.LoadAssetAtPath<InputActionAsset>(AssetPath);
@@ -174,7 +174,7 @@ namespace CriticalMass.Runtime.Tests
 
                 ControlBindings.ResetAll(fresh);
                 Assert.AreEqual("<Keyboard>/space", j2.bindings[kb].effectivePath);
-                Assert.IsFalse(PlayerPrefs.HasKey(ControlBindings.PrefsKey));
+                Assert.IsFalse(CmPrefs.HasKey(ControlBindings.PrefsKey));
             }
             finally
             {
@@ -266,9 +266,9 @@ namespace CriticalMass.Runtime.Tests
         [Test]
         public void SettingsPersistInPlayerPrefsWithDefaults()
         {
-            foreach (string k in GameSettings.AllKeys) PlayerPrefs.DeleteKey(k);
+            foreach (string k in GameSettings.AllKeys) CmPrefs.DeleteKey(k);
             Assert.IsFalse(GameSettings.Blood, "b15 safe defaults: gore (blood) defaults off");
-            Assert.AreEqual(0, PlayerPrefs.GetInt(GameSettings.BloodKey, 0), "a default is not written until changed");
+            Assert.AreEqual(0, CmPrefs.GetInt(GameSettings.BloodKey, 0), "a default is not written until changed");
             Assert.AreEqual(1f, GameSettings.MasterVolume);
 
             GameSettings.Blood = false;
@@ -284,8 +284,8 @@ namespace CriticalMass.Runtime.Tests
 
             // What another system (or the next launch) reads straight from PlayerPrefs.
             Assert.AreEqual("cm.blood", GameSettings.BloodKey);
-            Assert.AreEqual(0, PlayerPrefs.GetInt("cm.blood", 1));
-            Assert.AreEqual(0.4f, PlayerPrefs.GetFloat(GameSettings.MasterKey), 1e-6f);
+            Assert.AreEqual(0, CmPrefs.GetInt("cm.blood", 1));
+            Assert.AreEqual(0.4f, CmPrefs.GetFloat(GameSettings.MasterKey), 1e-6f);
             Assert.IsFalse(GameSettings.DamageNumbers);
             Assert.IsFalse(GameSettings.CameraShake);
             Assert.AreEqual(0.25f, GameSettings.MusicVolume, 1e-6f);
@@ -303,8 +303,8 @@ namespace CriticalMass.Runtime.Tests
         [Test]
         public void FrameRateLimitAndBackgroundThrottleAreStoredForTheLimiter()
         {
-            PlayerPrefs.DeleteKey("cm.fpsCap");
-            PlayerPrefs.DeleteKey("cm.bgThrottle");
+            CmPrefs.DeleteKey("cm.fpsCap");
+            CmPrefs.DeleteKey("cm.bgThrottle");
             Assert.AreEqual(0, GameSettings.FpsCap, "perf-smooth-1: default OFF (vsync on, locked to the display)");
             Assert.IsFalse(GameSettings.BackgroundThrottle, "default off: save power in background (DG-51)");
             CollectionAssert.AreEqual(new[] { 30, 60, 120, 144, 0, -1 }, GameSettings.FpsCapOptions);
@@ -313,19 +313,19 @@ namespace CriticalMass.Runtime.Tests
             Assert.AreEqual("60 FPS", PauseMenu.FpsCapText());
 
             GameSettings.FpsCap = 120;
-            Assert.AreEqual(120, PlayerPrefs.GetInt("cm.fpsCap"));
+            Assert.AreEqual(120, CmPrefs.GetInt("cm.fpsCap"));
             GameSettings.FpsCap = 0;
-            Assert.AreEqual(0, PlayerPrefs.GetInt("cm.fpsCap"));
+            Assert.AreEqual(0, CmPrefs.GetInt("cm.fpsCap"));
             Assert.AreEqual("OFF", PauseMenu.FpsCapText());
             GameSettings.FpsCap = 144;
             Assert.AreEqual("144 FPS", PauseMenu.FpsCapText());
             GameSettings.FpsCap = -1;
-            Assert.AreEqual(-1, PlayerPrefs.GetInt("cm.fpsCap"));
+            Assert.AreEqual(-1, CmPrefs.GetInt("cm.fpsCap"));
             Assert.AreEqual("UNLIMITED", PauseMenu.FpsCapText());
             GameSettings.FpsCap = 45;   // not a choice: back to the default
-            Assert.AreEqual(0, PlayerPrefs.GetInt("cm.fpsCap"));
+            Assert.AreEqual(0, CmPrefs.GetInt("cm.fpsCap"));
             GameSettings.BackgroundThrottle = false;
-            Assert.AreEqual(0, PlayerPrefs.GetInt("cm.bgThrottle", 1));
+            Assert.AreEqual(0, CmPrefs.GetInt("cm.bgThrottle", 1));
         }
 
         [Test]

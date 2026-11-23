@@ -346,12 +346,12 @@ namespace CriticalMass.Runtime.PlayTests
         /// <summary>Boots with the launch rule on, as a player build does, with the given saved profile.</summary>
         IEnumerator WithLaunchProfile(bool introSetting, Func<TitleScreen, IEnumerator> body)
         {
-            int oldSeen = PlayerPrefs.GetInt(OldStorySeenKey, 0), seenV2 = PlayerPrefs.GetInt(StoryIntro.SeenKey, 0);
-            int noticeSeen = PlayerPrefs.GetInt(PhotosensitivityNotice.SeenKey, 0);
-            PlayerPrefs.SetInt(PhotosensitivityNotice.SeenKey, 1);   // b15: the one-time notice was dismissed on this profile
+            int oldSeen = CmPrefs.GetInt(OldStorySeenKey, 0), seenV2 = CmPrefs.GetInt(StoryIntro.SeenKey, 0);
+            int noticeSeen = CmPrefs.GetInt(PhotosensitivityNotice.SeenKey, 0);
+            CmPrefs.SetInt(PhotosensitivityNotice.SeenKey, 1);   // b15: the one-time notice was dismissed on this profile
             bool atLaunch = GameSettings.IntroAtLaunch;
-            PlayerPrefs.SetInt(OldStorySeenKey, 1);
-            PlayerPrefs.SetInt(StoryIntro.SeenKey, 1);
+            CmPrefs.SetInt(OldStorySeenKey, 1);
+            CmPrefs.SetInt(StoryIntro.SeenKey, 1);
             GameSettings.IntroAtLaunch = introSetting;
             StoryIntro.ResetLaunchForTests();
             StoryIntro.LaunchRuleInEditorForTests = true;
@@ -365,11 +365,11 @@ namespace CriticalMass.Runtime.PlayTests
                 StoryIntro.LaunchRuleInEditorForTests = false;
                 StoryIntro.Skip();
                 StoryIntro.ResetLaunchForTests();
-                PlayerPrefs.SetInt(OldStorySeenKey, oldSeen);
-                PlayerPrefs.SetInt(StoryIntro.SeenKey, seenV2);
-                PlayerPrefs.SetInt(PhotosensitivityNotice.SeenKey, noticeSeen);
+                CmPrefs.SetInt(OldStorySeenKey, oldSeen);
+                CmPrefs.SetInt(StoryIntro.SeenKey, seenV2);
+                CmPrefs.SetInt(PhotosensitivityNotice.SeenKey, noticeSeen);
                 GameSettings.IntroAtLaunch = atLaunch;
-                PlayerPrefs.Save();
+                CmPrefs.Save();
             }
         }
 

@@ -458,11 +458,11 @@ namespace CriticalMass.Runtime.Audio
         public static bool SubtitlesEnabled
         {
             // Integration batch 2: the ACCESS tab's SUBTITLES line (SettingsExtras) switches these off too.
-            get => PlayerPrefs.GetInt(SubtitlesKey, 1) != 0 && CriticalMass.Runtime.Menu.SettingsExtras.Subtitles;
+            get => CmPrefs.GetInt(SubtitlesKey, 1) != 0 && CriticalMass.Runtime.Menu.SettingsExtras.Subtitles;
             set
             {
-                PlayerPrefs.SetInt(SubtitlesKey, value ? 1 : 0);
-                PlayerPrefs.Save();
+                CmPrefs.SetInt(SubtitlesKey, value ? 1 : 0);
+                CmPrefs.Save();
             }
         }
 

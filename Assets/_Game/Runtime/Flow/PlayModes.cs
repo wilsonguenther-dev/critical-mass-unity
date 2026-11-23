@@ -428,19 +428,19 @@ namespace CriticalMass.Runtime.Flow
         {
             get
             {
-                int v = PlayerPrefs.GetInt(LastModeKey, (int)MatchMode.Quick);
+                int v = CmPrefs.GetInt(LastModeKey, (int)MatchMode.Quick);
                 MatchMode m = (MatchMode)v;
                 return Array.IndexOf(SelectOrder, m) >= 0 && m != MatchMode.Training ? m : MatchMode.Quick;
             }
         }
 
-        public static int SavedQuickSize => ValidQuickSize(PlayerPrefs.GetInt(QuickSizeKey, QuickSizes[0]));
+        public static int SavedQuickSize => ValidQuickSize(CmPrefs.GetInt(QuickSizeKey, QuickSizes[0]));
 
         public static void Save(MatchMode m, int quickSize)
         {
-            if (m != MatchMode.Training && m != MatchMode.Demo && Array.IndexOf(SelectOrder, m) >= 0) PlayerPrefs.SetInt(LastModeKey, (int)m);   // Duel / Range: not cards (saved by VersusSetup)
-            PlayerPrefs.SetInt(QuickSizeKey, ValidQuickSize(quickSize));
-            PlayerPrefs.Save();
+            if (m != MatchMode.Training && m != MatchMode.Demo && Array.IndexOf(SelectOrder, m) >= 0) CmPrefs.SetInt(LastModeKey, (int)m);   // Duel / Range: not cards (saved by VersusSetup)
+            CmPrefs.SetInt(QuickSizeKey, ValidQuickSize(quickSize));
+            CmPrefs.Save();
         }
 
         // ---- continue logic ----
@@ -648,9 +648,9 @@ namespace CriticalMass.Runtime.Flow
             {
                 ClassSelect.SelectedClass = c.Class;   // DG-10's respawn strip and pause menu
                 // The home diorama shows the last class played, next launch too (speed and bots stay the player's own).
-                PlayerPrefs.SetInt(SetupPrefs.ClassKey, (int)c.Class);
-                PlayerPrefs.SetInt(SetupPrefs.TeamKey, (int)c.Team);
-                PlayerPrefs.Save();
+                CmPrefs.SetInt(SetupPrefs.ClassKey, (int)c.Class);
+                CmPrefs.SetInt(SetupPrefs.TeamKey, (int)c.Team);
+                CmPrefs.Save();
             }
             if (c.Mode == MatchMode.Training)
             {

@@ -135,23 +135,23 @@ namespace CriticalMass.Runtime.Tests
         [Test]
         public void DayIsTheDefaultEvenWhereAnOldBuildStoredNight()
         {
-            bool hadOld = PlayerPrefs.HasKey(TimeOfDaySettings.OldKey), hadNew = PlayerPrefs.HasKey(TimeOfDaySettings.Key);
-            int oldV = PlayerPrefs.GetInt(TimeOfDaySettings.OldKey, 0), newV = PlayerPrefs.GetInt(TimeOfDaySettings.Key, 0);
+            bool hadOld = CmPrefs.HasKey(TimeOfDaySettings.OldKey), hadNew = CmPrefs.HasKey(TimeOfDaySettings.Key);
+            int oldV = CmPrefs.GetInt(TimeOfDaySettings.OldKey, 0), newV = CmPrefs.GetInt(TimeOfDaySettings.Key, 0);
             try
             {
-                PlayerPrefs.SetInt(TimeOfDaySettings.OldKey, (int)TimeOfDayChoice.Night);
-                PlayerPrefs.DeleteKey(TimeOfDaySettings.Key);
+                CmPrefs.SetInt(TimeOfDaySettings.OldKey, (int)TimeOfDayChoice.Night);
+                CmPrefs.DeleteKey(TimeOfDaySettings.Key);
                 Assert.AreEqual(TimeOfDayChoice.Day, TimeOfDaySettings.Choice, "a stored old Night does not win over the Day default");
                 Assert.IsTrue(TimeOfDaySettings.RetireOldKey());
-                Assert.IsFalse(PlayerPrefs.HasKey(TimeOfDaySettings.OldKey));
+                Assert.IsFalse(CmPrefs.HasKey(TimeOfDaySettings.OldKey));
                 TimeOfDaySettings.Choice = TimeOfDayChoice.Night;
                 Assert.AreEqual(TimeOfDayChoice.Night, TimeOfDaySettings.Choice, "the player's own choice is kept");
                 Debug.Log("[b15 value] default time of day: DAY; old key retired; a new choice persists");
             }
             finally
             {
-                if (hadOld) PlayerPrefs.SetInt(TimeOfDaySettings.OldKey, oldV); else PlayerPrefs.DeleteKey(TimeOfDaySettings.OldKey);
-                if (hadNew) PlayerPrefs.SetInt(TimeOfDaySettings.Key, newV); else PlayerPrefs.DeleteKey(TimeOfDaySettings.Key);
+                if (hadOld) CmPrefs.SetInt(TimeOfDaySettings.OldKey, oldV); else CmPrefs.DeleteKey(TimeOfDaySettings.OldKey);
+                if (hadNew) CmPrefs.SetInt(TimeOfDaySettings.Key, newV); else CmPrefs.DeleteKey(TimeOfDaySettings.Key);
             }
         }
 

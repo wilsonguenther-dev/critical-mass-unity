@@ -187,8 +187,8 @@ namespace CriticalMass.Runtime.Tests
         [Test]
         public void SettingDefaultsToDayAndSteps()
         {
-            bool had = PlayerPrefs.HasKey(TimeOfDaySettings.Key);
-            int old = PlayerPrefs.GetInt(TimeOfDaySettings.Key, 0);
+            bool had = CmPrefs.HasKey(TimeOfDaySettings.Key);
+            int old = CmPrefs.GetInt(TimeOfDaySettings.Key, 0);
             try
             {
                 TimeOfDaySettings.Reset();
@@ -201,13 +201,13 @@ namespace CriticalMass.Runtime.Tests
                 Assert.AreEqual(TimeOfDayChoice.Day, TimeOfDaySettings.Choice, "wraps");
                 TimeOfDaySettings.Step(-1);
                 Assert.AreEqual(TimeOfDayChoice.Random, TimeOfDaySettings.Choice);
-                PlayerPrefs.SetInt(TimeOfDaySettings.Key, 99);
+                CmPrefs.SetInt(TimeOfDaySettings.Key, 99);
                 Assert.AreEqual(TimeOfDayChoice.Day, TimeOfDaySettings.Choice, "a bad stored value reads as Day");
                 Assert.AreEqual("NIGHT", TimeOfDaySettings.Label(TimeOfDayChoice.Night));
             }
             finally
             {
-                if (had) PlayerPrefs.SetInt(TimeOfDaySettings.Key, old); else PlayerPrefs.DeleteKey(TimeOfDaySettings.Key);
+                if (had) CmPrefs.SetInt(TimeOfDaySettings.Key, old); else CmPrefs.DeleteKey(TimeOfDaySettings.Key);
             }
         }
 

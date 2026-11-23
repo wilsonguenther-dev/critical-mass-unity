@@ -111,13 +111,13 @@ namespace CriticalMass.Runtime.Menus
         {
             get
             {
-                int v = PlayerPrefs.GetInt(PrefsKey, 0);
+                int v = CmPrefs.GetInt(PrefsKey, 0);
                 return v >= 0 && v < ClassIds.All.Count ? ClassIds.All[v] : ClassId.Warrior;
             }
             set
             {
-                PlayerPrefs.SetInt(PrefsKey, (int)value);
-                PlayerPrefs.Save();
+                CmPrefs.SetInt(PrefsKey, (int)value);
+                CmPrefs.Save();
             }
         }
 

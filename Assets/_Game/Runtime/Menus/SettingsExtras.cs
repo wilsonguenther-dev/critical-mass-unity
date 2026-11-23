@@ -79,12 +79,12 @@ namespace CriticalMass.Runtime.Menu
         {
             get
             {
-                int v = PlayerPrefs.GetInt(UiScaleKey, DefaultUiScale);
+                int v = CmPrefs.GetInt(UiScaleKey, DefaultUiScale);
                 return Array.IndexOf(UiScaleOptions, v) >= 0 ? v : DefaultUiScale;
             }
             set
             {
-                PlayerPrefs.SetInt(UiScaleKey, Array.IndexOf(UiScaleOptions, value) >= 0 ? value : DefaultUiScale);
+                CmPrefs.SetInt(UiScaleKey, Array.IndexOf(UiScaleOptions, value) >= 0 ? value : DefaultUiScale);
                 Save();
             }
         }
@@ -98,7 +98,7 @@ namespace CriticalMass.Runtime.Menu
         /// </summary>
         public static int ShakeAmount
         {
-            get => Mathf.Clamp(PlayerPrefs.GetInt(ShakeAmountKey, 0), 0, 100);
+            get => Mathf.Clamp(CmPrefs.GetInt(ShakeAmountKey, 0), 0, 100);
             set { GameSettings.ShakeScale = Mathf.Clamp(value, 0, 100) / 100f; Changed?.Invoke(); }   // one writer: GameSettings keeps cm.shake in step
         }
 
@@ -108,7 +108,7 @@ namespace CriticalMass.Runtime.Menu
         /// <summary>Restores every default of this tab (the Game tab's reset covers GameSettings).</summary>
         public static void ResetAll()
         {
-            for (int i = 0; i < AllKeys.Length; i++) PlayerPrefs.DeleteKey(AllKeys[i]);
+            for (int i = 0; i < AllKeys.Length; i++) CmPrefs.DeleteKey(AllKeys[i]);
             AimHelpSettings.ResetAll();
             GameSettings.CameraShake = false;   // also raises GameSettings.Changed, so FeelGate reloads the cleared keys
             Save();
@@ -138,11 +138,11 @@ namespace CriticalMass.Runtime.Menu
         /// </summary>
         public static bool MigrateCleanHudOnce()
         {
-            if (PlayerPrefs.GetInt(CleanHudMigrationKey, 0) >= CleanHudMigrationVersion) return false;
+            if (CmPrefs.GetInt(CleanHudMigrationKey, 0) >= CleanHudMigrationVersion) return false;
             bool was = CleanHud;
-            PlayerPrefs.DeleteKey(CleanHudKey);
-            PlayerPrefs.SetInt(CleanHudMigrationKey, CleanHudMigrationVersion);
-            PlayerPrefs.Save();
+            CmPrefs.DeleteKey(CleanHudKey);
+            CmPrefs.SetInt(CleanHudMigrationKey, CleanHudMigrationVersion);
+            CmPrefs.Save();
             if (was) Changed?.Invoke();
             return was;
         }
@@ -209,17 +209,17 @@ namespace CriticalMass.Runtime.Menu
             return a != null ? a : menu.gameObject.AddComponent<AccessibilityApplier>();
         }
 
-        static bool GetB(string k, bool d) => PlayerPrefs.GetInt(k, d ? 1 : 0) != 0;
+        static bool GetB(string k, bool d) => CmPrefs.GetInt(k, d ? 1 : 0) != 0;
 
         static void SetB(string k, bool v)
         {
-            PlayerPrefs.SetInt(k, v ? 1 : 0);
+            CmPrefs.SetInt(k, v ? 1 : 0);
             Save();
         }
 
         static void Save()
         {
-            PlayerPrefs.Save();
+            CmPrefs.Save();
             Changed?.Invoke();
         }
     }
