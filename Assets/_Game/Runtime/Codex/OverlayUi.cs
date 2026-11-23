@@ -97,6 +97,41 @@ namespace CriticalMass.Runtime.Codex
         const float SlimH = 44f, SlimY = 872f;
         public static bool IsSlim => _instance != null && _instance._slim;
         bool _slim;
+
+        /// <summary>
+        /// rough-spots pass 2 (item 4: the class goal line sat on the player's own fighter in a fight): while the player plays
+        /// from the ground (third or first person: his fighter stands in the lower middle) or any enemy is within
+        /// TopNearU of him (top-down), a caption is the slim one-line strip in the top band instead, under the teaching
+        /// banner (TopY under a slim or no banner, TopUnderFullY under a full one), clear of both fighters.
+        /// </summary>
+        public const float TopY = 236f, TopUnderFullY = 340f, TopNearU = 7f;
+        public static bool IsTop => _instance != null && _instance._top;
+        bool _top;
+        float _topY = -1f;
+        SimDriverBehaviourRef _drv;
+
+        struct SimDriverBehaviourRef { public CriticalMass.Runtime.Game.SimDriverBehaviour D; public float NextFind; }
+
+        bool WantTop()
+        {
+            if (CriticalMass.Runtime.Camera.GroundView.PlayActive) return true;
+            if (_drv.D == null && Time.unscaledTime >= _drv.NextFind)
+            {
+                _drv.D = FindAnyObjectByType<CriticalMass.Runtime.Game.SimDriverBehaviour>();
+                _drv.NextFind = Time.unscaledTime + 1f;
+            }
+            var w = _drv.D != null ? _drv.D.World : null;
+            int me = LocalSeat.Actor;
+            if (w == null || me < 0 || me >= w.ActorCount || !w.Actors[me].Alive) return false;
+            double r2 = TopNearU * TopNearU;
+            for (int i = 0; i < w.ActorCount; i++)
+            {
+                if (i == me || !w.Actors[i].Alive || w.Actors[i].Team == w.Actors[me].Team) continue;
+                double dx = w.X[i] - w.X[me], dz = w.Z[i] - w.Z[me];
+                if (dx * dx + dz * dz < r2) return true;
+            }
+            return false;
+        }
         VectorShape _plate;
 
         Canvas _canvas;
@@ -158,8 +193,10 @@ namespace CriticalMass.Runtime.Codex
         void Update()
         {
             if (!_showing) return;
-            bool slim = CriticalMass.Runtime.Camera.GroundView.Melee && _slot.childCount == 0;
-            if (slim != _slim) Slim(slim);
+            bool top = WantTop();
+            float topY = Banner.IsOpen && !Banner.IsSlim ? TopUnderFullY : TopY;
+            bool slim = top || (CriticalMass.Runtime.Camera.GroundView.Melee && _slot.childCount == 0);
+            if (slim != _slim || top != _top || (top && topY != _topY)) { _top = top; _topY = topY; Slim(slim); }
             _age += Time.unscaledDeltaTime;
             float a = Mathf.Min(1f, _age / FadeSeconds);
             float end = _hold + FadeSeconds;
@@ -172,8 +209,10 @@ namespace CriticalMass.Runtime.Codex
         {
             _slim = on;
             float x = (HudLayout.RefW - PlateW) * 0.5f;
-            MenuUi.Place(_plate.rectTransform, x, on ? SlimY : PlateY, PlateW, on ? SlimH : PlateH);
-            MenuUi.Place(_text.rectTransform, x + (on ? 20f : 110f), on ? SlimY : PlateY, PlateW - (on ? 40f : 140f), on ? SlimH : PlateH);
+            float y = on ? (_top ? _topY : SlimY) : PlateY;
+            MenuUi.Place(_plate.rectTransform, x, y, PlateW, on ? SlimH : PlateH);
+            MenuUi.Place(_text.rectTransform, x + (on ? 20f : 110f), y, PlateW - (on ? 40f : 140f), on ? SlimH : PlateH);
+            _slot.gameObject.SetActive(!_top);
         }
 
         void OnDestroy()
