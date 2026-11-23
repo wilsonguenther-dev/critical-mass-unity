@@ -28,6 +28,34 @@ namespace CriticalMass.Runtime.Tests.PlayerExperience
             Assert.AreEqual(Mode.Keys, m);
         }
 
+        /// <summary>Round 3 (pass 3, F31 keys-only top-down 0 of 8): a keys player who clicks to attack with a mouse he NEVER moved
+        /// keeps the keys aim, click after click; the first real mouse move hands the aim to the cursor, and from then on a click does.</summary>
+        [Test]
+        public void AClickWithAMouseNeverMovedKeepsTheKeysAim()
+        {
+            var a = new AimDeviceArbiter();
+            Mode m = Mode.Pointer;
+            double t = 0;
+            for (; t < 5.0; t += Dt)
+            {
+                a.NoteKeys(t);
+                if (((int)(t / Dt)) % 15 == 0) a.NotePointerPressed(t);   // a click every half second
+                m = a.Decide(t, m);
+                Assert.AreEqual(Mode.Keys, m, "clicks with a mouse never moved do not take the aim (t " + t.ToString("0.00") + ")");
+            }
+            a.NotePointerMoved(t);
+            Assert.AreEqual(Mode.Pointer, a.Decide(t, m), "a real mouse move takes it");
+            double later = t + 3.0;
+            a.NoteKeys(later);
+            Assert.AreEqual(Mode.Keys, a.Decide(later, Mode.Pointer), "walking past the hold gives it back to the keys");
+            a.NotePointerPressed(later);
+            Assert.AreEqual(Mode.Pointer, a.Decide(later, Mode.Keys), "and now a click (the mouse has moved this match) aims at the cursor");
+            a.Reset();
+            a.NoteKeys(later + 1);
+            a.NotePointerPressed(later + 1);
+            Assert.AreEqual(Mode.Keys, a.Decide(later + 1, Mode.Pointer), "a new match forgets the mouse moved");
+        }
+
         /// <summary>Fix round 7 (owner's call): walk with the keys for 3 s with the cursor resting (it moved once at the start),
         /// then click: the click hands the aim to the cursor at once, past PointerHoldSeconds, with no move.</summary>
         [Test]
