@@ -30,6 +30,7 @@ namespace CriticalMass.Sim.Core
             k.PrevX = k.X;
             k.PrevZ = k.Z;
 
+            MovesHooks.BeginStep(w, dt);   // mv-hook: class moves intents and lane steps (no-op with every switch off)
             Abilities.AbilitiesSystem(w, dt);
             Movement.MovementSystem(w, dt);
             SpatialHash.Rebuild(w.Hash, w.X, w.Z, w.Actors, n);
@@ -57,6 +58,7 @@ namespace CriticalMass.Sim.Core
             Hill.HillSystem(w, dt);
             Match.MatchSystem(w, dt);
 
+            MovesHooks.EndStep(w);   // mv-hook
             DepthState.EndStep(w); // U-063 onward: interact edges for next step
             w.Match.Time += dt;
         }

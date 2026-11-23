@@ -82,6 +82,9 @@ namespace CriticalMass.Runtime.Flow
         public WorldOptions ToWorldOptions(GameConfig cfg)
         {
             if (!Backdrop) Rules.ApplyTo(cfg);
+#if CM_MOVES_ON
+            MovesConfig.PlayBuildAllOn(cfg.Depth.Moves);   // mv-hook: the owner's play build turns every class-moves switch on
+#endif
             return BuildOptions(cfg);
         }
 

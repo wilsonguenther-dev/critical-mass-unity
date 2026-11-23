@@ -27,7 +27,7 @@ namespace CriticalMass.Runtime.Input
     public sealed class HumanInputState
     {
         /// <summary>The bound game buttons (U-006 Controls table).</summary>
-        public enum HumanButton { Jump, Attack, Ability, Interact, DigPlace, Pause, Scoreboard, /* CM b13 J, appended: */ Dodge, /* b16, appended: */ Cancel }
+        public enum HumanButton { Jump, Attack, Ability, Interact, DigPlace, Pause, Scoreboard, /* CM b13 J, appended: */ Dodge, /* b16, appended: */ Cancel, /* class moves, appended: */ Guard }
 
         // Screen -> world basis for the camera heading on screen (CameraHeading.Active: 135 creator's angle by default, 45
         // classic: up = (-1, -1)/sqrt2, right = (1, -1)/sqrt2). Recomputed only when the heading changes.
@@ -98,6 +98,11 @@ namespace CriticalMass.Runtime.Input
         bool _dodgeLatch;
         // b16 CANCEL: latched like Dodge (one InputFrame.Cancel per press, dropped while paused).
         bool _cancelLatch;
+        // Class moves T2-1: GUARD is held AND latched like Interact (a tap shorter than a tick still reaches the sim once, which
+        // is the parry press edge; a hold holds the guard). T2-6: Jump held (the glide), beside the one-shot jump latch.
+        bool _guardHeld;
+        bool _guardLatch;
+        bool _jumpHeld;
         int _classPick = -1;
         double _moveRight;
         double _moveUp;
@@ -222,6 +227,9 @@ namespace CriticalMass.Runtime.Input
             _pick = -1;
             Toolbelt.Reset();
             _jumpLatch = false;
+            _jumpHeld = false;   // class moves
+            _guardHeld = false;
+            _guardLatch = false;
             _dodgeLatch = false;
             _cancelLatch = false;
             _classPick = -1;
@@ -252,6 +260,11 @@ namespace CriticalMass.Runtime.Input
             {
                 case HumanButton.Jump:
                     if (!repeat) _jumpLatch = true;
+                    _jumpHeld = true;   // class moves T2-6
+                    break;
+                case HumanButton.Guard:
+                    _guardHeld = true;   // class moves T2-1
+                    if (!repeat) _guardLatch = true;
                     break;
                 case HumanButton.Dodge:
                     if (!repeat) _dodgeLatch = true; // CM b13 J
@@ -312,6 +325,12 @@ namespace CriticalMass.Runtime.Input
                     break;
                 case HumanButton.Scoreboard:
                     _scoreboardHeld = false;
+                    break;
+                case HumanButton.Jump:
+                    _jumpHeld = false;   // class moves T2-6
+                    break;
+                case HumanButton.Guard:
+                    _guardHeld = false;   // class moves T2-1
                     break;
             }
         }
@@ -448,6 +467,7 @@ namespace CriticalMass.Runtime.Input
                 _jumpLatch = false;
                 _dodgeLatch = false;
                 _cancelLatch = false;
+                _guardLatch = false;   // class moves
                 _interactLatch = false;
                 _classPick = -1;
                 _attackBuffer.Clear();
@@ -519,8 +539,11 @@ namespace CriticalMass.Runtime.Input
             _pick = -1;
             output.Interact = _interactHeld || _interactLatch;
             _interactLatch = false;
+            output.JumpHeld = _jumpHeld || _jumpLatch;   // class moves T2-6: held this step (the press step included)
             output.Jump = _jumpLatch;
             _jumpLatch = false;
+            output.Guard = _guardHeld || _guardLatch;   // class moves T2-1: held, or a tap shorter than one tick (the parry edge)
+            _guardLatch = false;
             output.Dodge = _dodgeLatch; // CM b13 J: one dodge per press
             _dodgeLatch = false;
             output.ClassPick = _classPick;

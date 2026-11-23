@@ -91,6 +91,7 @@ namespace CriticalMass.Sim.Core
         {
             Actor a = w.Actors[id];
             if (!a.Alive || a.StandUp > 0 || a.AirLen > 0) return false;
+            if (MovesHooks.JumpLocked(w, id)) return false;   // mv-hook: relock after an evading jump (lane 3)
             if (a.UnsupportedTicks > CoyoteTicks(w.Config)) return false;
             int k = PlanJump(w, id, w.Vx[id], w.Vz[id], dt);
             if (k == 0) return false;
@@ -118,6 +119,7 @@ namespace CriticalMass.Sim.Core
         public static void LandJump(World w, int id)
         {
             Actor a = w.Actors[id];
+            MovesHooks.Landed(w, id);   // mv-hook: landing recovery, glide end (lane 3), lane 2
             ClearJump(a);
             if (Collide.FootprintClear(w, id, w.X[id], w.Z[id])) return;
             w.X[id] = a.AirFromX;

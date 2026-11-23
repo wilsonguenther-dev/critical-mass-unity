@@ -43,8 +43,8 @@ namespace CriticalMass.Runtime.Input
     public sealed class HumanInputSource : MonoBehaviour
     {
         /// <summary>Action names in the Player map bound to game buttons, parallel to Buttons.</summary>
-        private static readonly string[] ButtonActions = { "Jump", "Attack", "Ability", "Interact", "DigPlace", "Pause", "Scoreboard", "Dodge", "Cancel" };
-        private static readonly B[] Buttons = { B.Jump, B.Attack, B.Ability, B.Interact, B.DigPlace, B.Pause, B.Scoreboard, B.Dodge, B.Cancel };
+        private static readonly string[] ButtonActions = { "Jump", "Attack", "Ability", "Interact", "DigPlace", "Pause", "Scoreboard", "Dodge", "Cancel", "Guard" };
+        private static readonly B[] Buttons = { B.Jump, B.Attack, B.Ability, B.Interact, B.DigPlace, B.Pause, B.Scoreboard, B.Dodge, B.Cancel, B.Guard };
 
         /// <summary>The human's input between two sim steps; SimDriverBehaviour calls State.Fill once per tick.</summary>
         public HumanInputState State { get; } = new HumanInputState();
@@ -216,6 +216,25 @@ namespace CriticalMass.Runtime.Input
         /// \ (by Enter and the arrows), LB (controller; shared by context with Next tool, ControlSchemes.ContextPairs). Free in
         /// every preset: the left-handed one puts Jump on Right Shift and Ping on ; (ControlPresets.LeftHandedRemaps).</summary>
         public static readonly string[] CancelDefaults = { "<Mouse>/forwardButton", "<Keyboard>/p", "<Keyboard>/backslash", "<Gamepad>/leftShoulder" };
+
+        /// <summary>Class moves T2-1: GUARD / PARRY defaults, in the Controls tab's slot order: Q (mouse column; Q is no longer
+        /// show-terrain, which keeps O and R3), ; (by J K L), Right Shift (by the arrows), B (controller east face; no longer a
+        /// second class-ability button, LT keeps it). The left-handed preset moves them (ControlPresets.LeftHandedRemaps).</summary>
+        public static readonly string[] GuardDefaults = { "<Keyboard>/q", "<Keyboard>/semicolon", "<Keyboard>/rightShift", "<Gamepad>/buttonEast" };
+
+        /// <summary>Class moves: adds the Guard action with GuardDefaults when the actions asset lacks it (in memory only).</summary>
+        public static void EnsureGuardAction(InputActionMap map)
+        {
+            if (map == null || map.FindAction("Guard", false) != null) return;
+            bool was = map.enabled;
+            if (was) map.Disable();
+            InputAction g = map.AddAction("Guard", InputActionType.Button);
+            g.AddBinding(GuardDefaults[0], groups: "KeyboardMouse");
+            g.AddBinding(GuardDefaults[1], groups: "KeyboardMouse").WithName(ControlBindings.WasdHand);
+            g.AddBinding(GuardDefaults[2], groups: "KeyboardMouse").WithName(ControlBindings.ArrowsHand);
+            g.AddBinding(GuardDefaults[3], groups: "Gamepad");
+            if (was) map.Enable();
+        }
 
         /// <summary>b16: adds the Cancel action with CancelDefaults when the actions asset lacks it (in memory only).</summary>
         public static void EnsureCancelAction(InputActionMap map)

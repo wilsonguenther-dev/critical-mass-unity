@@ -52,11 +52,12 @@ namespace CriticalMass.Runtime.Input
             InputActionMap map = asset.FindActionMap(MapName, true);
             if (_map != null && !ReferenceEquals(_map, map)) _holders = 0;
             _map = map;
-            if (map.FindAction("Dodge", false) == null || map.FindAction("Cancel", false) == null)
+            if (map.FindAction("Dodge", false) == null || map.FindAction("Cancel", false) == null || map.FindAction("Guard", false) == null)
                 ChangeWhileDisabled(asset, () =>
                 {
                     HumanInputSource.EnsureDodgeAction(map);
                     HumanInputSource.EnsureCancelAction(map);
+                    HumanInputSource.EnsureGuardAction(map);   // class moves
                 });
             _holders++;
             map.Enable();

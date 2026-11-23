@@ -53,6 +53,8 @@ namespace CriticalMass.Sim.Config
         public MechRulesConfig Mech = new MechRulesConfig();
         /// <summary>Player-experience wave lane S2: never-silent presses and the class repairs; PlayerSeatConfig.cs.</summary>
         public PlayerSeatConfig Seat = new PlayerSeatConfig();
+        /// <summary>Class moves (2026-11-22, lane 1): every class-moves switch, all off by default; MovesConfig.cs.</summary>
+        public MovesConfig Moves = new MovesConfig();   // mv-hook
 
         public DepthConfig Clone()
         {
@@ -77,6 +79,7 @@ namespace CriticalMass.Sim.Config
             c.PhysicsFeel = PhysicsFeel.Clone();   // b16
             c.Mech = Mech.Clone();   // b16
             c.Seat = Seat.Clone();   // player-experience S2
+            c.Moves = Moves.Clone();   // mv-hook
             return c;
         }
     }

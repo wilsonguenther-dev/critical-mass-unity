@@ -94,6 +94,7 @@ namespace CriticalMass.Net
             H_MatchState(ref h, o.Match);
             A(ref h, o.MeatDropped);
             H_MechState(ref h, o.Mech);
+            if (o.Moves != null) H_MovesState(ref h, o.Moves);
             {
                 var a3 = o.Nodes;
                 if (a3 == null) M(ref h, -1);
@@ -661,8 +662,10 @@ namespace CriticalMass.Net
             M(ref h, o.Cancel ? 1 : 2);
             M(ref h, o.ClassPick);
             M(ref h, o.Dodge ? 1 : 2);
+            if (o.Guard) M(ref h, 1);
             M(ref h, o.Interact ? 1 : 2);
             M(ref h, o.Jump ? 1 : 2);
+            if (o.JumpHeld) M(ref h, 1);
             D(ref h, o.MoveX);
             D(ref h, o.MoveZ);
             M(ref h, o.PingKind);
@@ -861,6 +864,25 @@ namespace CriticalMass.Net
             A(ref h, o.Surplus);
             A(ref h, o.SurplusLock);
             M(ref h, o.Takeovers);
+        }
+
+        private static void H_MovesState(ref ulong h, global::CriticalMass.Sim.Core.MovesState o)
+        {
+            if (o == null) { M(ref h, 0x4E554C4CL); return; }
+            A(ref h, o.AttackHeldTicks);
+            A(ref h, o.AttackReleased);
+            A(ref h, o.AttackReleasedAfter);
+            H_BotsMovesState(ref h, o.Bots);
+            H_DefenceMovesState(ref h, o.Defence);
+            A(ref h, o.GuardHeldTicks);
+            A(ref h, o.GuardPressed);
+            A(ref h, o.GuardPrev);
+            A(ref h, o.JumpHeldTicks);
+            A(ref h, o.LastDodgePressTick);
+            A(ref h, o.LastGuardPressTick);
+            A(ref h, o.MoveHeldTicks);
+            H_MovementMovesState(ref h, o.Movement);
+            H_OffenceMovesState(ref h, o.Offence);
         }
 
         private static void H_ResourceNode(ref ulong h, global::CriticalMass.Sim.Core.ResourceNode o)
@@ -1275,6 +1297,26 @@ namespace CriticalMass.Net
             A(ref h, o.CancelTick);
             A(ref h, o.PrevMask);
             A(ref h, o.RefusedTick);
+        }
+
+        private static void H_BotsMovesState(ref ulong h, global::CriticalMass.Sim.Core.BotsMovesState o)
+        {
+            if (o == null) { M(ref h, 0x4E554C4CL); return; }
+        }
+
+        private static void H_DefenceMovesState(ref ulong h, global::CriticalMass.Sim.Core.DefenceMovesState o)
+        {
+            if (o == null) { M(ref h, 0x4E554C4CL); return; }
+        }
+
+        private static void H_MovementMovesState(ref ulong h, global::CriticalMass.Sim.Core.MovementMovesState o)
+        {
+            if (o == null) { M(ref h, 0x4E554C4CL); return; }
+        }
+
+        private static void H_OffenceMovesState(ref ulong h, global::CriticalMass.Sim.Core.OffenceMovesState o)
+        {
+            if (o == null) { M(ref h, 0x4E554C4CL); return; }
         }
 
     }

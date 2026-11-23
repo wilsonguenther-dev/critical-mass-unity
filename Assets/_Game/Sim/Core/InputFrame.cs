@@ -46,6 +46,18 @@ namespace CriticalMass.Sim.Core
         /// with BotBrain.UsesCancel. Wire bit 128 of the ping byte (InputCodec), replay button bit 128.
         /// </summary>
         public bool Cancel;
+        /// <summary>
+        /// Class moves T2-1 (lane 1): GUARD is held this step (hold = guard, a press edge inside the window = parry). HELD state,
+        /// like Attack: the human input layer writes it every step (a tap shorter than a tick is latched for one step); the
+        /// sim derives the press edge itself (MovesState.GuardPressed). Read only while MovesConfig.Guard is on. Wire bit 64 of
+        /// the ping byte (InputCodec), replay picks byte bit 64 (ReplayInputStream). Hashed only when true (StateHash).
+        /// </summary>
+        public bool Guard;   // mv-hook
+        /// <summary>
+        /// Class moves T2-6 (lane 1): the Jump button is HELD this step (Jump itself is a one-shot press cleared by Movement).
+        /// The Healer's glide reads it. Wire bit 32 of the ping byte, replay picks byte bit 32. Hashed only when true.
+        /// </summary>
+        public bool JumpHeld;   // mv-hook
 
         public void CopyFrom(InputFrame other)
         {
@@ -66,6 +78,8 @@ namespace CriticalMass.Sim.Core
             PingZ = other.PingZ;
             Dodge = other.Dodge;   // b13-hook
             Cancel = other.Cancel;   // b16 cancel
+            Guard = other.Guard;   // mv-hook
+            JumpHeld = other.JumpHeld;   // mv-hook
         }
     }
 }

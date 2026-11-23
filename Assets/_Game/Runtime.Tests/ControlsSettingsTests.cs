@@ -88,7 +88,9 @@ namespace CriticalMass.Runtime.Tests
             CollectionAssert.AreEqual(new[] { "<Gamepad>/rightStick" }, Paths(A("Aim"), G));
             CollectionAssert.AreEqual(new[] { "<Gamepad>/buttonSouth" }, Paths(A("Jump"), G));
             CollectionAssert.AreEqual(new[] { "<Gamepad>/rightTrigger" }, Paths(A("Attack"), G));
-            CollectionAssert.AreEqual(new[] { "<Gamepad>/leftTrigger", "<Gamepad>/buttonEast" }, Paths(A("Ability"), G));
+            // class moves (owner default, QUESTIONS.md 2): B (east face) is GUARD / PARRY; the class ability keeps LT only.
+            CollectionAssert.AreEqual(new[] { "<Gamepad>/leftTrigger" }, Paths(A("Ability"), G));
+            CollectionAssert.AreEqual(new[] { "<Gamepad>/buttonEast" }, Paths(A("Guard"), G));
             CollectionAssert.AreEqual(new[] { "<Gamepad>/buttonWest" }, Paths(A("Interact"), G));
             CollectionAssert.AreEqual(new[] { "<Gamepad>/buttonNorth" }, Paths(A("DigPlace"), G));
             // b14 (owner decision): the class ability keeps B; dodge moved to the right bumper; the Builder's next tool is LB.

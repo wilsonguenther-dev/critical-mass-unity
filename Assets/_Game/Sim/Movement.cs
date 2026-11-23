@@ -52,6 +52,7 @@ namespace CriticalMass.Sim.Core
                 else a.UnsupportedTicks++;
                 // DG-09 fall rule (U-053): ground gone under the centre for longer than the coyote window = fall in, climb out.
                 if (Terraform.FallIfUnsupported(w, i)) continue;
+                if (MovesHooks.GroundStep(w, i, dt)) continue;   // mv-hook: SLIDE (lane 3), before the dodge takes the press
                 if (B13Hooks.DodgeStep(w, i, dt)) continue;   // b13-hook
                 double mx = inp.MoveX;
                 double mz = inp.MoveZ;
@@ -89,6 +90,7 @@ namespace CriticalMass.Sim.Core
                     speed *= Pickups.SpeedScale(w, i); // U-066 Haste (exactly 1 without it)
                     speed *= B13Hooks.SpeedScale(w, i);   // b13-hook
                     speed *= TerrainHeight.SpeedScale(w, i); // b15: the short slow after a level change (exactly 1 without the rule)
+                    speed *= MovesHooks.SpeedScale(w, i);   // mv-hook: travel (lane 3) x guard (lane 2) x charge (lane 4); exactly 1 when off
                     tx = mx * speed;
                     tz = mz * speed;
                 }
@@ -172,6 +174,7 @@ namespace CriticalMass.Sim.Core
         private static void FlyTick(World w, int i, double dt)
         {
             Actor a = w.Actors[i];
+            MovesHooks.AirTick(w, i, dt);   // mv-hook: GLIDE (lane 3)
             double vx = w.Vx[i];
             double vz = w.Vz[i];
             a.AirTick++;
