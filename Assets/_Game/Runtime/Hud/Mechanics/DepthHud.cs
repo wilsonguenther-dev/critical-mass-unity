@@ -843,6 +843,40 @@ namespace CriticalMass.Runtime.Hud.Mechanics
 
         // ------------------------------------------------------------------ name tags, speech marks, pops
 
+        readonly int[] _order = new int[Tags];
+        readonly Rect[] _placed = new Rect[Tags];
+
+        /// <summary>fix/px-rough-spots item 9 (crowd names on top of each other): the priority names (my target, my aim, the two
+        /// nearest enemies) are laid first and step up one row past any name they would sit on; any other name that would sit on
+        /// one already laid is hidden this frame.</summary>
+        void Declutter(World w, int me, int used)
+        {
+            int n = 0;
+            for (int i = 0; i < used; i++) if (_tag[i].gameObject.activeSelf && _tagActor[i] >= 0) _order[n++] = i;
+            // priority first (stable: then the HUD's own order, which is by actor id)
+            int p = 0;
+            for (int i = 0; i < n; i++) if (CriticalMass.Runtime.Hud.Player.CrowdTags.Priority(w, me, _tagActor[_order[i]])) { int t = _order[p]; _order[p] = _order[i]; _order[i] = t; p++; }
+            int laid = 0;
+            for (int k = 0; k < n; k++)
+            {
+                int i = _order[k];
+                RectTransform rt = _tag[i];
+                float half = Mathf.Max(24f, _tagText[i].preferredWidth * 0.5f + 6f), h = 26f;
+                Vector2 at = rt.anchoredPosition;
+                Rect r = new Rect(at.x - half, at.y - h * 0.5f, half * 2f, h);
+                bool clash = false;
+                for (int step = 0; step < 4; step++)
+                {
+                    clash = false;
+                    for (int j = 0; j < laid; j++) if (_placed[j].Overlaps(r)) { clash = true; if (k < p) r.y = _placed[j].yMax + 1f; break; }
+                    if (!clash || k >= p) break;
+                }
+                if (clash) { rt.gameObject.SetActive(false); _tagActor[i] = -1; continue; }
+                if (r.center.y != at.y) rt.anchoredPosition = new Vector2(at.x, r.center.y);
+                _placed[laid++] = r;
+            }
+        }
+
         void TickTags(World w, DepthWorldView view, int me, UnityEngine.Camera cam, bool on)
         {
             int used = 0;
@@ -894,6 +928,7 @@ namespace CriticalMass.Runtime.Hud.Mechanics
             }
             for (int i = used; i < Tags; i++)
                 if (_tag[i].gameObject.activeSelf) { _tag[i].gameObject.SetActive(false); _tagActor[i] = -1; }
+            if (used > 1 && CriticalMass.Runtime.Hud.Player.CrowdTags.On) Declutter(w, me, used);
 
             // speech marks: the newest answers (1.5 s), own team only (the feed only keeps those)
             DepthFeed f = view.Feed;

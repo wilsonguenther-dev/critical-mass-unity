@@ -19,17 +19,64 @@ namespace CriticalMass.Runtime.Hud.Player
         {
             if (!On) return true;
             if (me < 0 || me >= w.ActorCount || id < 0 || id >= w.ActorCount) return true;
-            return Pick(id, me, WorldWords.Focus, CriticalMass.Runtime.Input.AimAssist.LockTarget,
-                w.Actors[id].Team == w.Actors[me].Team, Dist2(w, me, id));
+            int focus = WorldWords.Focus, aim = CriticalMass.Runtime.Input.AimAssist.LockTarget;
+            bool ally = w.Actors[id].Team == w.Actors[me].Team;
+            Ranks(w, me, focus, aim, out int n0, out int n1, out int crowd);
+            int rank = id == n0 ? 0 : id == n1 ? 1 : 99;
+            return Pick(id, me, focus, aim, ally, Dist2(w, me, id), rank, crowd >= CrowdEnemies);
+        }
+
+        /// <summary>fix/px-rough-spots item 9: my target, the enemy under my aim or one of the two nearest enemies (their names
+        /// win a clash with any other tag).</summary>
+        public static bool Priority(World w, int me, int id)
+        {
+            if (me < 0 || me >= w.ActorCount || id < 0 || id >= w.ActorCount || w.Actors[id].Team == w.Actors[me].Team) return false;
+            int focus = WorldWords.Focus, aim = CriticalMass.Runtime.Input.AimAssist.LockTarget;
+            if (id == focus || id == aim) return true;
+            Ranks(w, me, focus, aim, out int n0, out int n1, out _);
+            return id == n0 || id == n1;
+        }
+
+        /// <summary>fix/px-rough-spots item 9: besides my target, the two nearest standing enemies within NearRange keep their
+        /// names (a crowd's closest threats stay readable); in a crowd (CrowdEnemies or more enemies within NearRange) ally
+        /// names shrink to AllyCrowdRange so they do not pile onto the enemy names.</summary>
+        public const double NearRange = 8.0, AllyCrowdRange = 2.5;
+        public const int CrowdEnemies = 3;
+        static int _rankFrame = -1, _r0 = -1, _r1 = -1, _crowd;
+
+        static void Ranks(World w, int me, int focus, int aim, out int n0, out int n1, out int crowd)
+        {
+            int frame = UnityEngine.Time.frameCount;
+            if (frame != _rankFrame)
+            {
+                _rankFrame = frame; _r0 = _r1 = -1; _crowd = 0;
+                double d0 = double.MaxValue, d1 = double.MaxValue;
+                CriticalMass.Sim.Config.TeamId team = w.Actors[me].Team;
+                for (int i = 0; i < w.ActorCount; i++)
+                {
+                    if (i == me || !w.Actors[i].Alive || w.Actors[i].Team == team) continue;
+                    double d2 = Dist2(w, me, i);
+                    if (d2 > NearRange * NearRange) continue;
+                    _crowd++;
+                    if (i == focus || i == aim) continue;
+                    if (d2 < d0) { d1 = d0; _r1 = _r0; d0 = d2; _r0 = i; }
+                    else if (d2 < d1) { d1 = d2; _r1 = i; }
+                }
+            }
+            n0 = _r0; n1 = _r1; crowd = _crowd;
+        }
+
+        /// <summary>Pure (tests): the rule with the near-enemy rank (0, 1 = the two nearest after my target; else 99) and the
+        /// crowd flag.</summary>
+        public static bool Pick(int id, int me, int focus, int aim, bool ally, double dist2, int nearRank, bool crowd)
+        {
+            if (id == me) return true;
+            if (ally) return dist2 <= (crowd ? AllyCrowdRange * AllyCrowdRange : AllyNameRange * AllyNameRange);
+            return id == focus || id == aim || nearRank < 2;
         }
 
         /// <summary>Pure (tests): the rule itself.</summary>
-        public static bool Pick(int id, int me, int focus, int aim, bool ally, double dist2)
-        {
-            if (id == me) return true;
-            if (ally) return dist2 <= AllyNameRange * AllyNameRange;
-            return id == focus || id == aim;
-        }
+        public static bool Pick(int id, int me, int focus, int aim, bool ally, double dist2) => Pick(id, me, focus, aim, ally, dist2, 99, false);
 
         static double Dist2(World w, int a, int b)
         {
