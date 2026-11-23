@@ -721,6 +721,18 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
             bool died = false, ok = false;
             yield return KillAndRead(() => Ledger(FeedbackChannel.PersonalTally, 0, out FeedbackEntry p, cursor) && Math.Abs(p.Value - W.Actors[0].Kills) < 0.5, (d, o) => { died = d; ok = o; });
             AssertAtControls("the end");
+            if (CriticalMass.Runtime.View.B17.MovesRead.On(W))
+            {   // mv-6 readability-3 item 3: under the class moves the tally line leaves the fight HUD (the scoreboard and the
+                // results carry it); the count must still be reported, only not shown
+                bool reported = false;
+                for (int i = Math.Max(cursor, PlayerFeedback.Head - PlayerFeedback.Capacity); i < PlayerFeedback.Head; i++)
+                {
+                    FeedbackEntry e = PlayerFeedback.At(i);
+                    if (e.Channel == FeedbackChannel.PersonalTally && e.Actor == 0 && Math.Abs(e.Value - W.Actors[0].Kills) < 0.5) reported = true;
+                }
+                Check("F11 PersonalTally", "after one kill, class moves on (line hidden by design)", "kill " + died + ", tally reported = Actor.Kills (" + W.Actors[0].Kills + ") " + reported, "the count still updates", died && reported);
+                yield break;
+            }
             Check("F11 PersonalTally", "after one kill", "kill " + died + ", tally reported = Actor.Kills (" + W.Actors[0].Kills + ") " + ok, "the card counts it", died && ok);
         }
 
