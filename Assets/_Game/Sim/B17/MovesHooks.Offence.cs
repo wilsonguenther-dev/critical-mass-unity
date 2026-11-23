@@ -371,6 +371,7 @@ namespace CriticalMass.Sim.Core
                     }
                 }
             }
+            if (On(w, m.Combos)) OffenceStepTravel(w, s);
             // T2-2 Demolitions fuse strike: a fuse stuck on a body blows DemoFuseSeconds after the heavy landed.
             if (heavy)
             {
@@ -533,6 +534,7 @@ namespace CriticalMass.Sim.Core
         /// combo press in the chain window. Return wants unchanged when off.</summary>
         static bool OffenceWantsAttack(World w, int i, bool wants)
         {
+            if (wants && OffenceChainHeld(w, i)) return false;
             if (!On(w, Cfg(w).Heavy)) return OffenceHuman(w, i) ? OffenceComboBuffer(w, w.Moves.Offence, i, wants) : wants;
             OffenceMovesState s = w.Moves.Offence;
             if (s.PendingHeavy[i] >= 0)
@@ -744,6 +746,9 @@ namespace CriticalMass.Sim.Core
         /// step wind-up, 5 ticks, later).</summary>
         public const int OffenceMinStepGapTicks = 3;
 
+        /// <summary>fix/mv-combo-reach-2: the knock share of a person's chain hit before the finisher (Farmer opener 1.5 u -> 0.45 u).</summary>
+        public const double OffenceChainKnockMul = 0.3;
+
         /// <summary>fix/mv-combo-reach: the most cooldown (30 Hz ticks) one step may borrow, per class. The Farmer borrows less
         /// (his 3-step chain front-loads two borrows: passive time to kill must stay inside the 5-15% band).</summary>
         public static readonly int[] OffenceStepBorrowTicks = { 99, 6, 99, 99, 99, 0 };
@@ -781,6 +786,13 @@ namespace CriticalMass.Sim.Core
             }
             else if (On(w, m.Combos) && s.StepSwingTick[source] == src.SwingTick && s.StepOf[source] >= 2 && s.StepOf[source] >= OffenceSteps(w, src.Cls))
                 knock *= m.FinisherKnockMul;
+            // fix/mv-combo-reach-2 (Editor pass 3: a deliberate second tap whiffed; the opener's knock carried the dummy from 1.15
+            // to 2.7 u): a person's chain hits before the finisher (the opener and a middle step of a chaining class) knock
+            // OffenceChainKnockMul as far, so the victim stays inside the next step's reach wherever and whenever the next press
+            // comes; the finisher keeps the big knock. A victim's dodge still breaks the chain (ComboBreaksOnDodge).
+            else if (On(w, m.Combos) && s.StepSwingTick[source] == src.SwingTick && OffenceSteps(w, src.Cls) >= 2
+                && s.StepOf[source] < OffenceSteps(w, src.Cls) && OffenceHuman(w, source))
+                knock *= OffenceChainKnockMul;
             // charge armour: a hit under the charging body's Poise does not stagger it (the charge goes on)
             if (heavyOn && s.Charging[target] != 0 && s.StrikeAmount[0] < w.Config.Class(w.Actors[target].Cls).Poise) stun = 0;
         }
@@ -819,7 +831,65 @@ namespace CriticalMass.Sim.Core
 
         /// <summary>fix/mv-combo-reach: the most a combo step may close on its victim during its wind-up, per class (units), sized
         /// to the class's own step-1 knock plus the victim's walk-out in that wind-up (the Farmer's thrust shoves furthest).</summary>
-        public static readonly double[] OffenceStepLungeUnits = { 1.2, 2.0, 1.2, 1.4, 1.5, 0 };
+        public static readonly double[] OffenceStepLungeUnits = { 2.5, 2.5, 2.5, 2.5, 2.5, 0 };
+
+        /// <summary>fix/mv-combo-reach-2: where the step lunge stops, as a share of the class reach from the victim's body edge.</summary>
+        public const double OffenceStepLungeStop = 0.6;
+
+        /// <summary>
+        /// fix/mv-combo-reach-2: a person's combo step (2 or 3) travels to its chain victim during the wind-up with or without the
+        /// stick (unless the stick points away: the player is leaving) and faces it: this tick's move and aim intent point at the
+        /// victim while it is beyond the lunge stop (OffenceStepLungeStop x reach from its body edge). Runs before Movement and
+        /// Combat (BeginStep); the walk speed is scaled by OffenceStepLunge.
+        /// </summary>
+        static void OffenceStepTravel(World w, OffenceMovesState s)
+        {
+            for (int i = 0; i < w.ActorCount; i++)
+            {
+                Actor a = w.Actors[i];
+                if (!a.Alive || !a.SwingPending || s.StepSwingTick[i] != a.SwingTick || s.StepOf[i] < 2) continue;
+                int v = s.ChainVictim[i];
+                if (v < 0 || v >= w.ActorCount || !w.Actors[v].Alive || !OffenceHuman(w, i)) continue;
+                double dx = w.X[v] - w.X[i], dz = w.Z[v] - w.Z[i];
+                double d = Math.Sqrt(dx * dx + dz * dz);
+                if (d < 1e-6) continue;
+                InputFrame f = w.Inputs[i];
+                double ml = Math.Sqrt(f.MoveX * f.MoveX + f.MoveZ * f.MoveZ);
+                if (ml > 0.5 && (f.MoveX * dx + f.MoveZ * dz) / (ml * d) < -0.3) continue;   // the stick points away: no pull
+                f.AimX = w.X[v];
+                f.AimZ = w.Z[v];
+                w.HasAim[i] = 1;
+                if (d <= OffenceStepStopDistance(w, i, v)) continue;
+                f.MoveX = dx / d;
+                f.MoveZ = dz / d;
+            }
+        }
+
+        /// <summary>
+        /// fix/mv-combo-reach-2: actor i is the victim of a person's open chain (hit by a step before the finisher, the chain
+        /// window still open or the next step winding up): it cannot start a swing of its own, so a next press anywhere in the
+        /// window lands before a counter (Editor pass 3: a press late in the window was traded by the Normal bot that had shaken
+        /// off its 8-tick stagger). Its outs are the dodge (which breaks the chain), guard and parry; the finisher, a whiff, a
+        /// pause past the window or the attacker's own stagger ends it. Bots never chain on bots, so a bot-only match is unchanged.
+        /// </summary>
+        static bool OffenceChainHeld(World w, int i)
+        {
+            if (!On(w, Cfg(w).Combos)) return false;
+            OffenceMovesState s = w.Moves.Offence;
+            for (int j = 0; j < w.ActorCount; j++)
+            {
+                if (j == i || s.ChainVictim[j] != i || s.ChainNext[j] < 2) continue;
+                Actor a = w.Actors[j];
+                if (!a.Alive || a.HitStunTicks > 0 || !OffenceHuman(w, j)) continue;
+                bool open = w.Tick <= s.ChainUntil[j];
+                bool winding = a.SwingPending && s.StepSwingTick[j] == a.SwingTick && s.StepOf[j] >= 2;
+                if (open || winding) return true;
+            }
+            return false;
+        }
+
+        static double OffenceStepStopDistance(World w, int i, int v) =>
+            OffenceStepLungeStop * w.Config.Class(w.Actors[i].Cls).AttackRange + w.Config.Class(w.Actors[v].Cls).Radius;
 
         /// <summary>
         /// fix/mv-combo-reach (Editor pass 2: "the Farmer's combo never connected"): a person's combo step (2 or 3) that winds up
@@ -845,7 +915,7 @@ namespace CriticalMass.Sim.Core
             double ml = Math.Sqrt(f.MoveX * f.MoveX + f.MoveZ * f.MoveZ);
             if (ml < 0.5 || (f.MoveX * dx + f.MoveZ * dz) / (ml * d) < 0.7) return 1.0;   // the stick must point at the victim
             ClassConfig cc = w.Config.Class(a.Cls);
-            double want = cc.AttackRange + w.Config.Class(w.Actors[v].Cls).Radius - 0.25;   // a little inside the reach
+            double want = OffenceStepStopDistance(w, i, v);   // 0.6 x reach from the victim's body edge
             double gap = d - want;
             if (gap <= 0) return 1.0;
             int left = a.SwingTick + a.SwingWindup - w.Tick;
