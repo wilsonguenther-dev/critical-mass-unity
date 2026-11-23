@@ -587,6 +587,12 @@ namespace CriticalMass.Runtime.View
                 _humanLookFrame = Time.frameCount + 30;
             }
             bool intent = _human != null && _human.isActiveAndEnabled && _human.State.AttackIntent;
+            if (intent && !_intentWas)
+            {   // fix/px-base-seat-reds (F30 diagnosis, read by tests only): what the press frame saw
+                PressSeenFrame = Time.frameCount; PressSeenReady = actor != null && actor.Alive && Combat.AttackReady(w, i);
+                PressSeenCd = actor != null ? actor.AttackCd : -1; PressSeenPredicted = false;
+            }
+            PressSeenHuman = _human != null;
             // mv-6 readability-2 item 1 (gated on the class moves so every switch off draws exactly as before; the third-person
             // late rise is not a class-moves bug, so the integrator may drop the gate)
             if (intent && !_intentWas && actor != null && actor.Alive && w.Moves != null) slot.Anim.NotePress();
@@ -594,6 +600,7 @@ namespace CriticalMass.Runtime.View
             {
                 slot.Anim.PredictSwing(m, actor, cfg, simTime);
                 if (slot.Anim.Predicting) _predStartFrame = Time.frameCount;
+                PressSeenPredicted = slot.Anim.Predicting;
             }
             else if (intent && !_intentWas && actor != null && actor.Alive && actor.AttackCd > 0 && actor.StandUp <= 0)
             {
@@ -606,6 +613,12 @@ namespace CriticalMass.Runtime.View
 
         /// <summary>Fix round 6 (tests): the local fighter's swing pose weight as drawn on frame LocalSwingWeightFrame.</summary>
         public static float LocalSwingWeightDrawn;
+        /// <summary>fix/px-base-seat-reds (F30 diagnosis, tests only): the last local press edge PredictPress saw: its frame,
+        /// whether the sim would take it (Combat.AttackReady), the attack cooldown then, whether the wind-up was predicted, and
+        /// whether a HumanInputSource was found at all.</summary>
+        public static int PressSeenFrame = -1;
+        public static bool PressSeenReady, PressSeenPredicted, PressSeenHuman;
+        public static double PressSeenCd;
         public static int LocalSwingWeightFrame = -1;
         /// <summary>fix/px-view-2 (tests): the local fighter's upper-body action clip and its drawn weight (any action, the TNT throw too).</summary>
         public static float LocalActionWeightDrawn;

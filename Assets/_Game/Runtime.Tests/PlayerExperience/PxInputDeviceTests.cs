@@ -33,11 +33,12 @@ namespace CriticalMass.Runtime.Tests.PlayerExperience
         [Test]
         public void AClickWithAMouseNeverMovedKeepsTheKeysAim()
         {
-            var off = new AimDeviceArbiter { ClickNeedsMovedMouse = false };   // round 4: switches off = shipped 1.0.1566
-            off.NoteKeys(0);
-            off.NotePointerPressed(0.1);
-            Assert.AreEqual(Mode.Pointer, off.Decide(0.1, Mode.Keys), "switches off: a click hands the aim to the cursor, as shipped");
-            var a = new AimDeviceArbiter { ClickNeedsMovedMouse = true };
+            var old = new AimDeviceArbiter { ClickNeedsMovedMouse = false };   // the 1.0.1566 rule, kept settable
+            old.NoteKeys(0);
+            old.NotePointerPressed(0.1);
+            Assert.AreEqual(Mode.Pointer, old.Decide(0.1, Mode.Keys), "the old rule: a click hands the aim to the cursor");
+            var a = new AimDeviceArbiter();
+            Assert.IsTrue(a.ClickNeedsMovedMouse, "the fix is on by default (every build, every switch)");
             Mode m = Mode.Pointer;
             double t = 0;
             for (; t < 5.0; t += Dt)
