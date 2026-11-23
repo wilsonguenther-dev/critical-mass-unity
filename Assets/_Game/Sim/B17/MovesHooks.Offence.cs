@@ -148,7 +148,8 @@ namespace CriticalMass.Sim.Core
 
         /// <summary>A person at the controls of actor id (not a bot, not the idle autopilot): the hold-to-charge input applies.</summary>
         public static bool OffenceHuman(World w, int id) =>
-            id >= 0 && id < w.ActorCount && w.Actors[id].IsHuman && !MechRules.Autopiloted(w, id);
+            id >= 0 && id < w.ActorCount && w.Actors[id].IsHuman && !MechRules.Autopiloted(w, id)
+            && !(id == 0 && Bots.BotBrain.ActorZeroOnAutopilot(w));   // fix/mv-heavy-press: a bot-only soak's null-frame seat is a bot (lane 5's BotsHumanSeat rule)
 
         /// <summary>True when actor id's current (or just-landed) swing is a heavy.</summary>
         public static bool OffenceIsHeavy(World w, int id)
@@ -237,7 +238,7 @@ namespace CriticalMass.Sim.Core
             if (OffenceHuman(w, i)) return true;
             if (s.BotChains[i] == 1) return true;
             if (s.BotChains[i] == 2) return false;
-            if (s.LastHitHuman[i] == 0) return true;
+            if (s.LastHitHuman[i] == 0) return false;   // bot against bot: exactly today's swings (orchestrator 2026-11-23)
             switch (Bots.BotSkill.Of(w, i))
             {
                 case BotDifficulty.Easy: return false;
@@ -263,7 +264,7 @@ namespace CriticalMass.Sim.Core
         {
             if (w.Moves == null || !(dealt > 0) || source < 0 || source >= w.ActorCount || target < 0 || target >= w.ActorCount) return;
             OffenceMovesState s = w.Moves.Offence;
-            s.LastHitHuman[source] = w.Actors[target].IsHuman ? (byte)1 : (byte)0;
+            s.LastHitHuman[source] = OffenceHuman(w, target) ? (byte)1 : (byte)0;   // a person's seat (an autopiloted seat is a bot)
             s.ChainVictim[source] = target;
             if (!On(w, Cfg(w).Heavy) || !OffenceIsHeavy(w, source)) return;
             s.Counts[OffenceCountHeavyHits]++;
@@ -316,14 +317,15 @@ namespace CriticalMass.Sim.Core
                         s.BotChargeLeft[i] = 0;
                         continue;
                     }
-                    bool held = human ? ms.AttackHeldTicks[i] > 0 : s.BotChargeLeft[i] > 0;
+                    if (human)
+                    {
+                        OffenceHumanHold(w, s, ms, i, a, start, full, auto);
+                        continue;
+                    }
+                    // a bot: only lane 5's deliberate OffenceBotCharge holds a charge (the swing waits, then the heavy fires)
+                    bool held = s.BotChargeLeft[i] > 0;
                     if (!held)
                     {
-                        if (human && ms.AttackReleased[i] != 0)
-                        {
-                            if (s.HoldSpent[i] != 0) s.DropRelease[i] = 1;
-                            else if (s.HoldCount[i] >= start) OffenceRelease(w, s, i, s.HoldCount[i], start, full);
-                        }
                         OffenceClearHold(s, i);
                         continue;
                     }
@@ -373,6 +375,98 @@ namespace CriticalMass.Sim.Core
             }
         }
 
+        /// <summary>
+        /// A person's hold (fix/mv-heavy-press, orchestrator 2026-11-23): the light swing starts on the PRESS exactly as with Heavy
+        /// off (same tick, same frame data; Combat starts it). If Attack is still held when the swing has been winding up for
+        /// ChargeStartTick ticks (8 at 30 Hz, the press tick counts 1; every class's light wind-up is 7 to 12 ticks, so the light
+        /// has not landed yet), that wind-up becomes the charge: it is held open (no contact while held), the share grows to full
+        /// at ChargeFullTick, and the release (or ChargeAutoReleaseTick) fires the heavy with its own class wind-up, so a read
+        /// heavy stays dodgeable. Let go before the threshold: nothing changes. A light that lands before the threshold (a combo
+        /// step's short wind-up, the Fast pace) lands; a still-held Attack then auto-repeats lights exactly as with Heavy off.
+        /// A dodge, a stagger or a raised guard breaks the charge and drops the swing; CANCEL feints it.
+        /// </summary>
+        static void OffenceHumanHold(World w, OffenceMovesState s, MovesState ms, int i, Actor a, int start, int full, int auto)
+        {
+            int held = ms.AttackHeldTicks[i];
+            if (held <= 0)
+            {
+                if (ms.AttackReleased[i] != 0)
+                {
+                    if (s.Charging[i] != 0 && a.SwingPending) OffenceFireHeavy(w, s, i, a, s.ChargeShare[i]);
+                    else if (s.HoldSpent[i] != 0) s.DropRelease[i] = 1;
+                }
+                OffenceClearHold(s, i);
+                return;
+            }
+            if (s.HoldSpent[i] != 0) return;
+            if (s.Charging[i] == 0)
+            {
+                if (!a.SwingPending) return;
+                int h0 = w.Tick - a.SwingTick + 1;
+                if (h0 < start || held < h0) return;                    // under the threshold, or a buffered press already let go
+                // (a pending swing has not landed: this runs before Combat, so even its contact tick is still convertible)
+                if (w.Moves.Defence.LungeSwingTick != null && i < w.Moves.Defence.LungeSwingTick.Length
+                    && w.Moves.Defence.LungeSwingTick[i] == a.SwingTick) return;   // lane 2's dodge-in lunge stays a lunge
+                s.Charging[i] = 1;
+                s.StepSwingTick[i] = CombatFeel.NoTick;   // a converted combo step is no longer a step
+                s.StepOf[i] = 0;
+                s.ChainNext[i] = 0;
+            }
+            bool broken = !a.SwingPending || Dodge.Active(w, i) || a.HitStunTicks > 0 || ms.GuardHeldTicks[i] > 0;
+            if (broken)
+            {
+                a.SwingPending = false;
+                s.HoldSpent[i] = 1;
+                s.HoldCount[i] = 0;
+                s.Charging[i] = 0;
+                s.ChargeShare[i] = 0;
+                return;
+            }
+            if (w.Inputs[i].Cancel && OffenceCancelCharge(w, s, i)) return;
+            int h = w.Tick - a.SwingTick + 1;
+            s.HoldCount[i] = h;
+            s.ChargeShare[i] = OffenceShare(h, start, full);
+            if (h >= auto)
+            {
+                OffenceFireHeavy(w, s, i, a, s.ChargeShare[i]);
+                s.HoldSpent[i] = 1;
+                s.HoldCount[i] = 0;
+                s.Charging[i] = 0;
+                s.ChargeShare[i] = 0;
+                return;
+            }
+            if (a.SwingWindup < h) a.SwingWindup = h;   // held open: Combat's contact test (Tick >= SwingTick + SwingWindup) waits
+        }
+
+        /// <summary>A person's charge let go: the held swing becomes the heavy, winding up its class wind-up from now (the
+        /// telegraph and HeavyRelease carry the heavy's real shape). Combat sees a pending swing and lands it on contact.</summary>
+        static void OffenceFireHeavy(World w, OffenceMovesState s, int i, Actor a, double share)
+        {
+            int c = (int)a.Cls;
+            LightWeapon lw = LightWeapons.Of(w, a.Cls);
+            ClassConfig cc = w.Config.Class(a.Cls);
+            int windup = lw != null ? w.Dur.LightWindup[c] : w.Dur.AttackWindup[c];
+            if (windup < 1) windup = 1;
+            a.AttackCd = lw != null ? lw.CooldownSeconds : cc.AttackCooldown;
+            a.AnimAction = 0;
+            a.SwingTick = w.Tick;
+            a.SwingWindup = windup;
+            a.SwingRecovery = lw != null ? w.Dur.LightRecovery[c] : w.Dur.Recovery[c];
+            a.SwingFacing = a.Facing;
+            a.SwingPending = true;
+            s.HeavySwingTick[i] = w.Tick;
+            s.HeavySwingShare[i] = share;
+            s.StepSwingTick[i] = CombatFeel.NoTick;
+            s.StepOf[i] = 0;
+            s.ChainNext[i] = 0;
+            s.Counts[OffenceCountHeavies]++;
+            if (share >= 1 - 1e-9) s.Counts[OffenceCountFullCharges]++;
+            OffenceHeavyShape(w, a.Cls, out double reach, out double arc);
+            World.PushEvent(w, SimEventType.HeavyRelease, i, -1, w.X[i], w.Z[i], share, null, DamageCause.None, reach, 0, 0, arc, 0, windup, 0);
+            double fx = JsMath.Cos(a.Facing), fz = JsMath.Sin(a.Facing);
+            World.PushEvent(w, SimEventType.AttackStart, i, Combat.KindAttack, w.X[i] + fx * reach, w.Z[i] + fz * reach, a.Facing, null, DamageCause.None, reach, fx, fz, arc, 0, windup, a.SwingRecovery);
+        }
+
         static double OffenceShare(int hold, int start, int full)
         {
             if (full <= start) return 1;
@@ -412,6 +506,7 @@ namespace CriticalMass.Sim.Core
             fs.FeintLockUntil[i] = w.Tick + CombatFeel.Ticks(w, f.FeintLockoutSeconds);
             fs.BufferTick[i] = CombatFeel.NoTick;
             fs.Feints++;
+            if (OffenceHuman(w, i)) a.SwingPending = false;   // the held swing is dropped (a person's charge is a held wind-up)
             s.HoldSpent[i] = 1;
             s.HoldCount[i] = 0;
             s.Charging[i] = 0;
@@ -435,14 +530,14 @@ namespace CriticalMass.Sim.Core
             }
             if (OffenceHuman(w, i))
             {
-                // held: a charge (or the first ticks of one), never an auto-repeat light swing
-                if (w.Moves.AttackHeldTicks[i] > 0) return false;
-                if (s.DropRelease[i] != 0)
+                // the light starts on the press exactly as with Heavy off; a hold that already fired its heavy (or was broken or
+                // feinted) swings nothing more until it is let go, and its let-go leaves nothing in the buffer
+                if (s.HoldSpent[i] != 0 || s.DropRelease[i] != 0)
                 {
                     w.Depth.Feel.BufferTick[i] = CombatFeel.NoTick;
                     return false;
                 }
-                return wants;   // a tap: the light swing on the release tick (or buffered)
+                return wants;
             }
             // a bot holding a charge for lane 5 swings nothing until the release
             if (s.BotChargeLeft[i] > 0 || s.HoldCount[i] > 0) return false;

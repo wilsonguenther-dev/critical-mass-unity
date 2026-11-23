@@ -549,7 +549,8 @@ namespace CriticalMass.Sim.Core
             if (m.DodgeLunge && m.LungeArmour != 0 && t.SwingPending && t.SwingTick == DefenceS(w).LungeSwingTick[target]
                 && w.Moves.Offence.StrikeAmount[0] < w.Config.Class(t.Cls).Poise) stun = 0;
             // integrator (decision 2): the knock of an enemy's melee light strike may be dodged out of (Dodge.CanStart)
-            if (m.Combos && m.ComboDodgeOutOfKnock != 0 && !OffenceIsHeavy(w, source) && DefenceEnemyActor(w, target, source)) DefenceS(w).LightKnockTick[target] = w.Tick;
+            if (m.Combos && m.ComboDodgeOutOfKnock != 0 && !OffenceIsHeavy(w, source) && DefenceEnemyActor(w, target, source)
+                && (OffenceHuman(w, source) || OffenceHuman(w, target))) DefenceS(w).LightKnockTick[target] = w.Tick;   // fix/mv-heavy-press: only where a chain can run (bots never chain on bots)
         }
 
         /// <summary>Dodge.CanStart (integrator, decision 2): actor id slides on a knock but may dodge out of it: Combos and

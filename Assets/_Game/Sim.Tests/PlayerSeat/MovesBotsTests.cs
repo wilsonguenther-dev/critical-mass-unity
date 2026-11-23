@@ -399,21 +399,29 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
         [Test]
         public void WithHeavyOn_ABotsHeldSteerPressIsATapAndOnlyAChosenChargeIsHeld()
         {
-            // a Normal Warrior bot fighting a passive human seat: every press is let go the next tick unless it is a chosen charge
+            // fix/mv-heavy-press (orchestrator 2026-11-23): a bot's held Attack is never a charge (the hold-to-charge input is a
+            // person's; a bot presses exactly as with Heavy off) and every bot heavy is one it chose through OffenceBotCharge.
+            // A Normal Warrior bot fighting a passive human seat for 20 s.
             Seat s = PlayerSeatRig.Duel(ClassId.Farmer, ClassId.Warrior, TargetMode.RealBot, 0, 0, Lag, tweak: Switches(heavy: true));
             s.Human.Fight = false;
             s.KeepMeAbove = 0.3;
             World w = s.W;
-            int longest = 0;
+            int heavyEvents = 0, swings = 0, head = w.EventHead;
             s.BeforeTick = q =>
             {
-                int h = w.Moves.AttackHeldTicks[q.Them];
-                if (w.Moves.Bots.ChargeHold[q.Them] == 0 && h > longest) longest = h;
+                for (int i = Math.Max(head, w.EventHead - World.EventCapacity); i < w.EventHead; i++)
+                {
+                    SimEvent e = w.Events[i % World.EventCapacity];
+                    if (e.A != q.Them) continue;
+                    if (e.Type == SimEventType.HeavyRelease) heavyEvents++;
+                    if (e.Type == SimEventType.AttackStart) swings++;
+                }
+                head = w.EventHead;
             };
             PlayerSeatRig.Play(s, 20);
             int charges = w.Moves.Bots.Charges[s.Them];
-            bool ok = PxLog.Line("mv5 bot tap", "Normal Warrior bot vs a passive human Farmer, 20 s, Heavy on (lane 4 stub on this branch)",
-                "longest unchosen hold " + longest + " ticks, chosen charges " + charges, "unchosen holds < ChargeStartTick (" + w.Config.Depth.Moves.ChargeStartTick + ")", longest < w.Config.Depth.Moves.ChargeStartTick);
+            bool ok = PxLog.Line("mv5 bot tap", "Normal Warrior bot vs a passive human Farmer, 20 s, Heavy on",
+                "bot swings " + swings + ", heavies " + heavyEvents + ", chosen charges " + charges, "swings > 0 and heavies <= chosen charges", swings > 0 && heavyEvents <= charges);
             Assert.IsTrue(ok);
         }
 
