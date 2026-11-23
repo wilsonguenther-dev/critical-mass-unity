@@ -23,6 +23,14 @@ namespace CriticalMass.Runtime.View.B17
 
         static double[] _holdUntil = new double[64];
 
+        /// <summary>Readability item 1: the local fighter whose Guard press is shown before the sim takes it, and its
+        /// strength (MovesViews.PredictGuard writes both each frame; ActorAnimator reads them). -1 / 0 = none.</summary>
+        public static int PredictActor = -1;
+        public static float PredictGuard;
+
+        /// <summary>The guard pose shows for actor i: the sim holds it, or it is the local press being predicted.</summary>
+        public static bool GuardShown(World w, int i) => MovesRead.GuardHeld(w, i) || (i == PredictActor && PredictGuard > 0.05f);
+
         /// <summary>Hold actor i's pose until wall time now + seconds (the parry clang's 80 ms).</summary>
         public static void Hold(int i, double now, double seconds)
         {

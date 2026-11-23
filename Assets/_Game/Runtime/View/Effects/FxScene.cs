@@ -731,6 +731,7 @@ namespace CriticalMass.Runtime.View.Effects
             // widened arc the sim tests, along the LIVE SwingFacing until contact (lane S1 tracks the aim in the wind-up).
             tr.Arc = (float)(CriticalMass.Runtime.View.Anim.HitFeelTuning.DrawnHalfArc(_cfg, e.Cls) * 2);
             tr.Radius = (float)CriticalMass.Runtime.View.Anim.HitFeelTuning.SimReach(_cfg, e.Cls);
+            if (CriticalMass.Runtime.View.B17.MovesRead.HeavySwing(w, e.A, out float mvReach, out float mvHalf)) { tr.Arc = mvHalf * 2f; tr.Radius = mvReach; }   // mv-6: the heavy's slash
             tr.Team = e.Team == TeamId.Azure ? AzureC : CrimsonC;
             tr.Kind = (byte)e.Cls;
             tr.Actor = e.A;
@@ -1424,6 +1425,8 @@ namespace CriticalMass.Runtime.View.Effects
                 // px lane C: the wedge is the TRUE hit shape: a body whose centre (its ground ring) is inside it is hit
                 // (range + body widening, the arc widened by asin(r / d) at the edge), along the LIVE SwingFacing.
                 float reach = (float)CriticalMass.Runtime.View.Anim.HitFeelTuning.SimReach(_cfg, a.Cls), half = (float)CriticalMass.Runtime.View.Anim.HitFeelTuning.DrawnHalfArc(_cfg, a.Cls);
+                bool mvHeavy = CriticalMass.Runtime.View.B17.MovesRead.HeavySwing(w, i, out float mvReach, out float mvHalf);   // mv-6: a heavy's wedge is the heavy's shape (one telegraph per swing)
+                if (mvHeavy) { reach = mvReach; half = mvHalf; }
                 float p = Mathf.Clamp01((float)((a.SwingWindup - left + Alpha) / a.SwingWindup));
                 double x = w.PrevX[i] + (w.X[i] - w.PrevX[i]) * Alpha, z = w.PrevZ[i] + (w.Z[i] - w.PrevZ[i]) * Alpha;
                 // b15 view polish r2: (c) the wedge is secondary and sits on the local walking surface (over the hill
@@ -1444,7 +1447,7 @@ namespace CriticalMass.Runtime.View.Effects
                 // stays the hit shape (reach exactly). Drawn in the ground layer (queue GroundFxQueue: after the world decals,
                 // depth-tested so characters stand over it). Reduced flashing caps the bright edge (SwingTelegraph.For).
                 SwingTelegraph st = SwingTelegraph.For(atMe, FeelGate.ReduceFlashing);
-                int seg = Mathf.Clamp((int)(cc.AttackArcDeg / 9), 6, 16);
+                int seg = Mathf.Clamp((int)((mvHeavy ? half * 2f * Mathf.Rad2Deg : (float)cc.AttackArcDeg) / 9), 6, mvHeavy ? 32 : 16);
                 float r0 = SwingTelegraph.Inner;
                 ground.Ring(c, gr, gu, r0, reach, ang - half, ang + half, seg, A(st.Fill, st.BaseIn), A(st.Fill, st.BaseOut));
                 float front = Mathf.Max(r0 + 0.04f, reach * p);

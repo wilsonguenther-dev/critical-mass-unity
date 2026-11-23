@@ -131,6 +131,29 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
         }
 
         [Test]
+        public void WordRanksPutParryOnTop()   // readability item 2
+        {
+            Assert.Greater(WorldWords.Rank(ActionTags.ParryWord), WorldWords.Rank(ActionTags.GuardBreakWord));
+            Assert.Greater(WorldWords.Rank(ActionTags.GuardBreakWord), WorldWords.Rank(ActionTags.FinisherWord));
+            Assert.Greater(WorldWords.Rank(ActionTags.FinisherWord), WorldWords.Rank("BLOCKED"));
+            Assert.Greater(WorldWords.Rank("BLOCKED"), WorldWords.Rank(ActionTags.SecondWindWord));
+            Assert.AreEqual(WorldWords.Rank("STUNNED"), WorldWords.Rank("PERFECT"), "the rest share the lowest rank");
+            Assert.AreEqual(2, WorldWords.MaxPerAnchor);
+        }
+
+        [Test]
+        public void PredictedGuardShowsAtOnceAndFadesWhenRefused()   // readability item 1
+        {
+            Assert.AreEqual(1f, MovesViews.GuardPrediction(true, false, 0f), "the press frame itself");
+            Assert.AreEqual(1f, MovesViews.GuardPrediction(true, false, MovesViews.GuardPredictWait), "waiting for the sim's tick");
+            Assert.AreEqual(1f, MovesViews.GuardPrediction(true, true, 5f), "the sim holds it");
+            Assert.AreEqual(0f, MovesViews.GuardPrediction(true, false, MovesViews.GuardPredictWait + MovesViews.GuardPredictFade), 1e-6, "refused: gone within 0.12 s");
+            Assert.AreEqual(0f, MovesViews.GuardPrediction(false, false, 0f), "released before the sim took it");
+            float mid = MovesViews.GuardPrediction(true, false, MovesViews.GuardPredictWait + MovesViews.GuardPredictFade * 0.5f);
+            Assert.That(mid, Is.InRange(0.4f, 0.6f));
+        }
+
+        [Test]
         public void EveryHelpLineHasAButtonAndEveryHintAKey()
         {
             foreach (string line in MovesHelp.CardLines) Assert.IsNotNull(MovesHelp.CardRow(line), line);
