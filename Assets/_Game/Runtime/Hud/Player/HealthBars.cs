@@ -199,7 +199,7 @@ namespace CriticalMass.Runtime.Hud.Player
                 if (ev < 0) b.Glow = HealGlowSeconds;
                 b.Glow = Mathf.Max(0f, b.Glow - dt);
 
-                Vector3 head = PxProject.Actor(w, i, alpha, Lift);
+                Vector3 head = CriticalMass.Runtime.Camera.GroundView.TagPoint(w, i, PxProject.Actor(w, i, alpha, Lift), Lift);   // fix/px-combat-camera-2: under his tag while framed
                 float dist = (head - cp).magnitude;
                 if (low && !TagLens.Show(dist, TagLens.BarMaxDistance)) { Hide(b); continue; }
                 if (!PxProject.Screen(cam, head, 0f, out Vector2 p) || HudKeepOut.Contains(p, 24f * scale)) { Hide(b); continue; }

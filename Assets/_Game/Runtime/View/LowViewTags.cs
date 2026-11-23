@@ -70,7 +70,7 @@ namespace CriticalMass.Runtime.View
                 {
                     if (!w.Actors[i].Alive) continue;
                     double x = w.PrevX[i] + (w.X[i] - w.PrevX[i]) * a, z = w.PrevZ[i] + (w.Z[i] - w.PrevZ[i]) * a;
-                    Vector3 head = SimSpace.ToWorld(x, GroundHeight.At(w.Map, x, z) + lift, z);
+                    Vector3 head = CriticalMass.Runtime.Camera.GroundView.TagPoint(w, i, SimSpace.ToWorld(x, GroundHeight.At(w.Map, x, z) + lift, z), lift);   // fix/px-combat-camera-2: the anchor the HUD used
                     Vector3 sp = cam.WorldToScreenPoint(head);
                     if (sp.z <= 0f) continue;
                     float dx = sp.x - at.x, dy = sp.y - at.y, d2 = dx * dx + dy * dy;

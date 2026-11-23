@@ -219,7 +219,7 @@ namespace CriticalMass.Runtime.Hud.Player
                 if (s.Row && s.Actor < w.ActorCount)
                 {
                     // the body's word row: above the name tag, rows stacking up, no rise (UnitStack)
-                    Vector3 head = PxProject.Actor(w, s.Actor, alpha, HealthBars.Lift);
+                    Vector3 head = CriticalMass.Runtime.Camera.GroundView.TagPoint(w, s.Actor, PxProject.Actor(w, s.Actor, alpha, HealthBars.Lift), HealthBars.Lift);   // fix/px-combat-camera-2
                     if (!PxProject.Screen(cam, head, 0f, out Vector2 hp)) { PxUi.Alpha(s.Group, 0f); continue; }
                     float tag = PxProject.ThirdPerson ? CriticalMass.Runtime.Camera.TagLens.Scale((head - cam.transform.position).magnitude) : 1f;
                     s.Rt.anchoredPosition = hp / scale + new Vector2(0f, UnitStack.TagRowUp(tag, s.Stack));
