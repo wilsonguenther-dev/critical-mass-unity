@@ -1,42 +1,559 @@
 // Class moves build (2026-11-22): LANE 4 (Offence) owns this file: T1-1 TNT on its own key, T2-2 heavy / charged, T2-3 combos.
-// Stubbed by lane 1: every method is an identity, so the game is the base branch's until lane 4 fills them. Keep every
-// signature; test your own switch with MovesHooks.On(w, MovesHooks.Cfg(w).<Switch>). Contract: LANE1-CONTRACT.md.
+// Contract: cm-incidents/class-moves-audit-2026-11-22/LANE1-CONTRACT.md; items: SPEC.md T1-1, T2-2, T2-3.
+//
+// INPUT SEMANTICS (T2-2, switch Heavy). A HUMAN seat (Actor.IsHuman, not on the idle autopilot): holding Attack no longer
+// auto-repeats light swings. A tap (released before ChargeStartTick of ready hold) is the light swing, started on the release
+// tick (the CombatFeel input buffer still holds it BufferSeconds). A hold of ChargeStartTick or more is a CHARGE (move x
+// ChargeMoveMul, charge armour against hits under the class Poise); the HEAVY fires on release, or on its own at
+// ChargeAutoReleaseTick, with the class wind-up; charge share = (hold - ChargeStartTick) / (ChargeFullTick - ChargeStartTick),
+// clamped 0..1. The hold counts only from the tick the actor could swing (no swing winding up, cooldown spent), so a press held
+// through a cooldown charges from the moment the swing would be accepted. A dodge, a stagger, a raised guard or death breaks
+// the charge (no swing; let go and press again). CANCEL during the charge is a feint (FeintRecoverySeconds, ChargeCancelRefund
+// of a class cooldown back, the feint lockout, the Feint event Value 1 and FeintBaited through MovesHooks.Feinted).
+// A BOT's Attack bit keeps its old meaning (a press is a light at once): bots hold Attack while a target is in reach, so the
+// hold rule would turn every bot swing into an auto-released heavy. Bots charge only through OffenceBotCharge (lane 5).
+//
+// COMBOS (T2-3, switch Combos, every actor): a light swing that LANDS opens the chain until its cooldown is spent plus the
+// input buffer (BufferSeconds), at most ComboResetSeconds; the next light swing started inside it is the next step (wind-up x ComboStepWindupMul, never under 5 ticks, damage x ComboStepDamageMul);
+// the class's last step is the FINISHER (damage x FinisherDamageMul, knock x FinisherKnockMul, recovery +
+// FinisherExtraRecoveryTicks) and closes the chain. A whiff, a heavy, or the window running out resets to step 1. Steps keep
+// the normal cooldown (the press may come during the recovery; the buffer holds it): the chain adds damage, not swings.
+//
+// Everything here acts only while its own switch is on (MovesHooks.On(w, Cfg(w).X)); with every switch off World.Moves is
+// null and no method below is reached. Deterministic: plain arithmetic in actor-id order, no RNG, no allocation per tick.
+using System;
 using CriticalMass.Sim.Config;
 
 namespace CriticalMass.Sim.Core
 {
-    /// <summary>Lane 4's class-moves state (World.Moves.Offence). Add fields here: public, primitive arrays sized in Init.</summary>
+    /// <summary>Lane 4's class-moves state (World.Moves.Offence). Every field: public, a primitive array sized in Init.</summary>
     public sealed class OffenceMovesState
     {
-        public void Init(World w) { }
-        public void Reset(World w) { }
+        /// <summary>Ticks of the current ready hold of Attack (human seats; a bot's OffenceBotCharge hold). 0 = not holding.</summary>
+        public int[] HoldTicks = new int[0];
+        /// <summary>1 = this hold was used (heavy fired on its own, the charge broke or was cancelled): nothing until released.</summary>
+        public byte[] HoldSpent = new byte[0];
+        /// <summary>1 while charging (hold at or past ChargeStartTick): view (CHARGE slot, glow, the heavy's ground arc).</summary>
+        public byte[] Charging = new byte[0];
+        /// <summary>The charge share 0..1 of the current charge (view).</summary>
+        public double[] ChargeShare = new double[0];
+        /// <summary>A heavy released and waiting to start (its charge share), -1 = none; and the last tick it may still start.</summary>
+        public double[] PendingHeavy = new double[0];
+        public int[] PendingHeavyUntil = new int[0];
+        /// <summary>1 = the release of a spent hold: the input buffer's copy of it is dropped.</summary>
+        public byte[] DropRelease = new byte[0];
+        /// <summary>The SwingTick of the actor's heavy swing and its charge share (the swing is a heavy while SwingTick matches).</summary>
+        public int[] HeavySwingTick = new int[0];
+        public double[] HeavySwingShare = new double[0];
+        /// <summary>The SwingTick of the actor's last light swing and its combo step (1 = the opener).</summary>
+        public int[] StepSwingTick = new int[0];
+        public int[] StepOf = new int[0];
+        /// <summary>The next combo step (0 = none) and the last tick a swing may start as that step.</summary>
+        public int[] ChainNext = new int[0];
+        public int[] ChainUntil = new int[0];
+        /// <summary>Demolitions' fuse strike: the tick a fuse stuck on this body blows (NoTick = none) and who lit it.</summary>
+        public int[] FuseTick = new int[0];
+        public int[] FuseOwner = new int[0];
+        /// <summary>Lane 5: ticks a bot holds its charge (OffenceBotCharge), 0 = none.</summary>
+        public int[] BotChargeLeft = new int[0];
+        /// <summary>[0] = the amount of the melee strike being applied now (Combat sets it before CombatFeel.ApplyStrike; charge armour).</summary>
+        public double[] StrikeAmount = new double[1];
+        /// <summary>Counters for tests and the balance print: heavies released, full charges, landed heavies, combo steps landed, finishers, fuses blown.</summary>
+        public int[] Counts = new int[6];
+
+        public void Init(World w)
+        {
+            int n = World.ActorCapacity(w.Config);
+            HoldTicks = new int[n];
+            HoldSpent = new byte[n];
+            Charging = new byte[n];
+            ChargeShare = new double[n];
+            PendingHeavy = new double[n];
+            PendingHeavyUntil = new int[n];
+            DropRelease = new byte[n];
+            HeavySwingTick = new int[n];
+            HeavySwingShare = new double[n];
+            StepSwingTick = new int[n];
+            StepOf = new int[n];
+            ChainNext = new int[n];
+            ChainUntil = new int[n];
+            FuseTick = new int[n];
+            FuseOwner = new int[n];
+            BotChargeLeft = new int[n];
+        }
+
+        public void Reset(World w)
+        {
+            for (int i = 0; i < HoldTicks.Length; i++)
+            {
+                HoldTicks[i] = 0;
+                HoldSpent[i] = 0;
+                Charging[i] = 0;
+                ChargeShare[i] = 0;
+                PendingHeavy[i] = -1;
+                PendingHeavyUntil[i] = CombatFeel.NoTick;
+                DropRelease[i] = 0;
+                HeavySwingTick[i] = CombatFeel.NoTick;
+                HeavySwingShare[i] = 0;
+                StepSwingTick[i] = CombatFeel.NoTick;
+                StepOf[i] = 0;
+                ChainNext[i] = 0;
+                ChainUntil[i] = CombatFeel.NoTick;
+                FuseTick[i] = CombatFeel.NoTick;
+                FuseOwner[i] = -1;
+                BotChargeLeft[i] = 0;
+            }
+            StrikeAmount[0] = 0;
+            for (int k = 0; k < Counts.Length; k++) Counts[k] = 0;
+        }
     }
 
     public static partial class MovesHooks
     {
-        /// <summary>Per tick, before Abilities (charge level, auto-release at ChargeAutoReleaseTick, combo reset timer, fuse blasts).</summary>
-        static void OffenceStep(World w, double dt) { }
+        /// <summary>Counter slots of OffenceMovesState.Counts.</summary>
+        public const int OffenceCountHeavies = 0, OffenceCountFullCharges = 1, OffenceCountHeavyHits = 2, OffenceCountSteps = 3, OffenceCountFinishers = 4, OffenceCountFuses = 5;
+
+        // ================================================================== public queries (view, lane 2, lane 5, Combat, Demolitions)
+
+        /// <summary>T1-1: Demolitions' Attack is always the pry bar (TNT on F / U / pad Y only).</summary>
+        public static bool OffenceTntOnDigOnly(World w) => On(w, Cfg(w).DemoTntOnDigOnly);
+
+        /// <summary>A person at the controls of actor id (not a bot, not the idle autopilot): the hold-to-charge input applies.</summary>
+        public static bool OffenceHuman(World w, int id) =>
+            id >= 0 && id < w.ActorCount && w.Actors[id].IsHuman && !MechRules.Autopiloted(w, id);
+
+        /// <summary>True when actor id's current (or just-landed) swing is a heavy.</summary>
+        public static bool OffenceIsHeavy(World w, int id)
+        {
+            if (w.Moves == null || id < 0 || id >= w.ActorCount) return false;
+            return w.Moves.Offence.HeavySwingTick[id] == w.Actors[id].SwingTick;
+        }
+
+        /// <summary>The charge share 0..1 of actor id's current heavy swing, or -1 when it is not a heavy.</summary>
+        public static double OffenceHeavyShare(World w, int id) => OffenceIsHeavy(w, id) ? w.Moves.Offence.HeavySwingShare[id] : -1;
+
+        /// <summary>View: actor id is charging (and how far: 0..1). The enemy's telegraph draws the heavy shape below.</summary>
+        public static bool OffenceCharging(World w, int id, out double share)
+        {
+            share = 0;
+            if (w.Moves == null || id < 0 || id >= w.ActorCount || w.Moves.Offence.Charging[id] == 0) return false;
+            share = w.Moves.Offence.ChargeShare[id];
+            return true;
+        }
+
+        /// <summary>The heavy's reach and full arc in degrees for class cls (the view's ground arc while charging).</summary>
+        public static void OffenceHeavyShape(World w, ClassId cls, out double reach, out double arcDeg)
+        {
+            MovesConfig m = Cfg(w);
+            int c = (int)cls;
+            reach = m.HeavyReach != null && c < m.HeavyReach.Length ? m.HeavyReach[c] : w.Config.Class(cls).AttackRange;
+            arcDeg = m.HeavyArcDeg != null && c < m.HeavyArcDeg.Length ? m.HeavyArcDeg[c] : w.Config.Class(cls).AttackArcDeg;
+        }
+
+        /// <summary>The combo step of actor id's current light swing (1 = opener, 0 = none / not a light).</summary>
+        public static int OffenceComboStep(World w, int id)
+        {
+            if (w.Moves == null || id < 0 || id >= w.ActorCount) return 0;
+            OffenceMovesState s = w.Moves.Offence;
+            return s.StepSwingTick[id] == w.Actors[id].SwingTick ? s.StepOf[id] : 0;
+        }
+
+        /// <summary>Lane 2 (guard): the Warrior's FULL-charge overhead breaks any guard at once (SPEC T2-2).</summary>
+        public static bool OffenceHeavyBreaksGuard(World w, int source) =>
+            source >= 0 && source < w.ActorCount && w.Actors[source].Cls == ClassId.Warrior && OffenceHeavyShare(w, source) >= 1 - 1e-9;
+
+        /// <summary>Lane 2 (guard): the guard drain multiplier of source's strike from lane 4's verbs (the Miner's armour breaker:
+        /// MinerHeavyGuardDrain, replacing the pick's GuardDrainMinerPick); 0 = no lane-4 rule (lane 2 uses its own).</summary>
+        public static double OffenceGuardDrainMul(World w, int source) =>
+            source >= 0 && source < w.ActorCount && w.Actors[source].Cls == ClassId.Miner && OffenceIsHeavy(w, source) ? Cfg(w).MinerHeavyGuardDrain : 0;
+
+        /// <summary>Lane 2 (jump evade, T2-7): the Builder's ground slam still hits an airborne body.</summary>
+        public static bool OffenceHitsAirborne(World w, int source) =>
+            source >= 0 && source < w.ActorCount && w.Actors[source].Cls == ClassId.Builder && OffenceIsHeavy(w, source);
+
+        /// <summary>Lane 5: bot id holds a charge for ticks (clamped to ChargeStartTick..ChargeAutoReleaseTick, 30 Hz ticks) and
+        /// then releases the heavy. Ignored while the Heavy switch is off, for a human seat, or while a charge is already held.</summary>
+        public static void OffenceBotCharge(World w, int id, int ticks)
+        {
+            if (!On(w, Cfg(w).Heavy) || id < 0 || id >= w.ActorCount || OffenceHuman(w, id)) return;
+            OffenceMovesState s = w.Moves.Offence;
+            if (s.BotChargeLeft[id] > 0 || s.HoldTicks[id] > 0) return;
+            MovesConfig m = Cfg(w);
+            int lo = Durations.T30(w.Config, m.ChargeStartTick), hi = Durations.T30(w.Config, m.ChargeAutoReleaseTick);
+            int t = Durations.T30(w.Config, ticks);
+            s.BotChargeLeft[id] = t < lo ? lo : t > hi ? hi : t;
+        }
+
+        // ================================================================== Combat.cs / Demolitions.cs helpers (lane 4's own files)
+
+        /// <summary>Combat, right before CombatFeel.ApplyStrike: the strike's amount (charge armour reads it in StrikeKnock).</summary>
+        public static void OffenceBeforeStrike(World w, double amount)
+        {
+            if (w.Moves == null) return;
+            w.Moves.Offence.StrikeAmount[0] = amount;
+        }
+
+        /// <summary>Combat, right after CombatFeel.ApplyStrike dealt (dealt &gt; 0 landed): the Miner's 5 s SUNDER and the
+        /// Demolitions fuse of a heavy.</summary>
+        public static void OffenceAfterStrike(World w, int target, int source, double dealt)
+        {
+            if (w.Moves == null || !(dealt > 0) || source < 0 || source >= w.ActorCount || target < 0 || target >= w.ActorCount) return;
+            if (!On(w, Cfg(w).Heavy) || !OffenceIsHeavy(w, source)) return;
+            OffenceMovesState s = w.Moves.Offence;
+            s.Counts[OffenceCountHeavyHits]++;
+            ClassId cls = w.Actors[source].Cls;
+            if (cls == ClassId.Miner)
+            {
+                int until = w.Tick + CombatFeel.Ticks(w, Cfg(w).MinerSunderSeconds);
+                if (until > w.Depth.Feel.SunderUntil[target]) w.Depth.Feel.SunderUntil[target] = until;
+            }
+            else if (cls == ClassId.Demolitions && w.Actors[target].Alive && Cfg(w).DemoFuseDamage > 0)
+            {
+                s.FuseTick[target] = w.Tick + CombatFeel.Ticks(w, Cfg(w).DemoFuseSeconds);
+                s.FuseOwner[target] = source;
+            }
+        }
+
+        /// <summary>Combat, before the AttackStart telegraph of a swing starting now: the heavy's real reach and arc.</summary>
+        public static void OffenceTelegraph(World w, int i, ref double range, ref double arcDeg)
+        {
+            if (w.Moves == null || w.Moves.Offence.HeavySwingTick[i] != w.Tick) return;
+            OffenceHeavyShape(w, w.Actors[i].Cls, out range, out arcDeg);
+        }
+
+        /// <summary>Combat: the Healer's press mends first, except a heavy release (the flare always swings).</summary>
+        public static bool OffenceHeavyStartingNow(World w, int i) =>
+            w.Moves != null && On(w, Cfg(w).Heavy) && w.Moves.Offence.PendingHeavy[i] >= 0;
+
+        // ================================================================== hook bodies (signatures are lane 1's)
+
+        /// <summary>Per tick, before Abilities: the charge state machine, auto-release, the cancel of a charge, fuse blasts.</summary>
+        static void OffenceStep(World w, double dt)
+        {
+            MovesConfig m = Cfg(w);
+            bool heavy = On(w, m.Heavy);
+            OffenceMovesState s = w.Moves.Offence;
+            if (heavy)
+            {
+                MovesState ms = w.Moves;
+                int start = Durations.T30(w.Config, m.ChargeStartTick), full = Durations.T30(w.Config, m.ChargeFullTick), auto = Durations.T30(w.Config, m.ChargeAutoReleaseTick);
+                for (int i = 0; i < w.ActorCount; i++)
+                {
+                    Actor a = w.Actors[i];
+                    s.DropRelease[i] = 0;
+                    bool human = OffenceHuman(w, i);
+                    bool live = a.Alive && a.StandUp <= 0;
+                    if (!live)
+                    {
+                        OffenceClearHold(s, i);
+                        s.PendingHeavy[i] = -1;
+                        s.BotChargeLeft[i] = 0;
+                        continue;
+                    }
+                    bool held = human ? ms.AttackHeldTicks[i] > 0 : s.BotChargeLeft[i] > 0;
+                    if (!held)
+                    {
+                        if (human && ms.AttackReleased[i] != 0)
+                        {
+                            if (s.HoldSpent[i] != 0) s.DropRelease[i] = 1;
+                            else if (s.HoldTicks[i] >= start) OffenceRelease(w, s, i, s.HoldTicks[i], start, full);
+                        }
+                        OffenceClearHold(s, i);
+                        continue;
+                    }
+                    if (s.HoldSpent[i] != 0) continue;
+                    bool charging = s.HoldTicks[i] >= start;
+                    // a dodge, a stagger (a hit at or over the Poise got through the charge armour), a raised guard: the charge breaks
+                    bool broken = Dodge.Active(w, i) || a.HitStunTicks > 0 || ms.GuardHeldTicks[i] > 0;
+                    if (broken)
+                    {
+                        if (s.HoldTicks[i] > 0) { s.HoldSpent[i] = 1; s.HoldTicks[i] = 0; s.Charging[i] = 0; s.ChargeShare[i] = 0; s.BotChargeLeft[i] = 0; }
+                        continue;
+                    }
+                    if (charging && w.Inputs[i].Cancel && OffenceCancelCharge(w, s, i)) continue;
+                    bool ready = !a.SwingPending && Combat.TickDown(a.AttackCd, dt) <= 0;
+                    if (s.HoldTicks[i] > 0 || ready) s.HoldTicks[i]++;
+                    if (!human && s.BotChargeLeft[i] > 0 && s.HoldTicks[i] > 0) s.BotChargeLeft[i]--;
+                    int h = s.HoldTicks[i];
+                    if (h >= start)
+                    {
+                        s.Charging[i] = 1;
+                        s.ChargeShare[i] = OffenceShare(h, start, full);
+                    }
+                    bool botDone = !human && s.BotChargeLeft[i] <= 0 && h > 0;
+                    if (h >= auto || botDone)
+                    {
+                        if (h >= start) OffenceRelease(w, s, i, h, start, full);
+                        s.HoldSpent[i] = human ? (byte)1 : (byte)0;
+                        s.HoldTicks[i] = 0;
+                        s.Charging[i] = 0;
+                        s.ChargeShare[i] = 0;
+                        s.BotChargeLeft[i] = 0;
+                    }
+                }
+            }
+            // T2-2 Demolitions fuse strike: a fuse stuck on a body blows DemoFuseSeconds after the heavy landed.
+            if (heavy)
+            {
+                for (int j = 0; j < w.ActorCount; j++)
+                {
+                    if (s.FuseTick[j] == CombatFeel.NoTick || w.Tick < s.FuseTick[j]) continue;
+                    s.FuseTick[j] = CombatFeel.NoTick;
+                    int owner = s.FuseOwner[j];
+                    s.FuseOwner[j] = -1;
+                    Demolitions.FuseBlast(w, owner, w.X[j], w.Z[j], m.DemoFuseRadius, m.DemoFuseDamage);
+                    s.Counts[OffenceCountFuses]++;
+                }
+            }
+        }
+
+        static double OffenceShare(int hold, int start, int full)
+        {
+            if (full <= start) return 1;
+            double x = (double)(hold - start) / (full - start);
+            return x < 0 ? 0 : x > 1 ? 1 : x;
+        }
+
+        static void OffenceClearHold(OffenceMovesState s, int i)
+        {
+            s.HoldTicks[i] = 0;
+            s.HoldSpent[i] = 0;
+            s.Charging[i] = 0;
+            s.ChargeShare[i] = 0;
+        }
+
+        /// <summary>A heavy released at hold ticks h: queued for Combat this tick (the buffer's span).</summary>
+        static void OffenceRelease(World w, OffenceMovesState s, int i, int h, int start, int full)
+        {
+            s.PendingHeavy[i] = OffenceShare(h, start, full);
+            s.PendingHeavyUntil[i] = w.Tick + CombatFeel.Ticks(w, CombatFeel.Cfg(w).BufferSeconds);
+        }
+
+        /// <summary>CANCEL during a charge: the b16 feint rule on a charge (no swing; ChargeCancelRefund of a class cooldown back).
+        /// The press is read and cleared here, so CombatFeel.TakeCancel sees nothing. False when the feint lockout holds.</summary>
+        static bool OffenceCancelCharge(World w, OffenceMovesState s, int i)
+        {
+            CombatFeelConfig f = CombatFeel.Cfg(w);
+            if (!f.CancelEnabled) return false;
+            CombatFeelState fs = w.Depth.Feel;
+            if (w.Tick < fs.FeintLockUntil[i]) return false;
+            w.Inputs[i].Cancel = false;
+            Actor a = w.Actors[i];
+            double hz = w.Config.SimHz;
+            int rec = CombatFeel.Ticks(w, f.FeintRecoverySeconds);
+            double left = w.Config.Class(a.Cls).AttackCooldown * (1 - Cfg(w).ChargeCancelRefund);
+            a.AttackCd = left > rec / hz ? left : rec / hz;
+            fs.FeintLockUntil[i] = w.Tick + CombatFeel.Ticks(w, f.FeintLockoutSeconds);
+            fs.BufferTick[i] = CombatFeel.NoTick;
+            fs.Feints++;
+            s.HoldSpent[i] = 1;
+            s.HoldTicks[i] = 0;
+            s.Charging[i] = 0;
+            s.ChargeShare[i] = 0;
+            s.BotChargeLeft[i] = 0;
+            World.PushEvent(w, SimEventType.Feint, i, -1, w.X[i], w.Z[i], 1);
+            Feinted(w, i);
+            return true;
+        }
 
         /// <summary>The attack want after the buffer: hold = charge (false while charging), release = the heavy (true once),
         /// combo press in the chain window. Return wants unchanged when off.</summary>
-        static bool OffenceWantsAttack(World w, int i, bool wants) => wants;
+        static bool OffenceWantsAttack(World w, int i, bool wants)
+        {
+            if (!On(w, Cfg(w).Heavy)) return wants;
+            OffenceMovesState s = w.Moves.Offence;
+            if (s.PendingHeavy[i] >= 0)
+            {
+                if (w.Tick <= s.PendingHeavyUntil[i] && w.Actors[i].Alive) return true;
+                s.PendingHeavy[i] = -1;
+            }
+            if (OffenceHuman(w, i))
+            {
+                // held: a charge (or the first ticks of one), never an auto-repeat light swing
+                if (w.Moves.AttackHeldTicks[i] > 0) return false;
+                if (s.DropRelease[i] != 0)
+                {
+                    w.Depth.Feel.BufferTick[i] = CombatFeel.NoTick;
+                    return false;
+                }
+                return wants;   // a tap: the light swing on the release tick (or buffered)
+            }
+            // a bot holding a charge for lane 5 swings nothing until the release
+            if (s.BotChargeLeft[i] > 0 || s.HoldTicks[i] > 0) return false;
+            return wants;
+        }
 
         /// <summary>The wind-up of the swing starting now (combo step x ComboStepWindupMul). Return windup when not a step.</summary>
-        static int OffenceSwingWindup(World w, int i, int windup) => windup;
+        static int OffenceSwingWindup(World w, int i, int windup)
+        {
+            MovesConfig m = Cfg(w);
+            OffenceMovesState s = w.Moves.Offence;
+            if (On(w, m.Heavy) && s.PendingHeavy[i] >= 0)
+            {
+                double share = s.PendingHeavy[i];
+                s.PendingHeavy[i] = -1;
+                s.HeavySwingTick[i] = w.Tick;
+                s.HeavySwingShare[i] = share;
+                s.StepSwingTick[i] = CombatFeel.NoTick;
+                s.StepOf[i] = 0;
+                s.ChainNext[i] = 0;
+                s.Counts[OffenceCountHeavies]++;
+                if (share >= 1 - 1e-9) s.Counts[OffenceCountFullCharges]++;
+                OffenceHeavyShape(w, w.Actors[i].Cls, out double reach, out double arc);
+                World.PushEvent(w, SimEventType.HeavyRelease, i, -1, w.X[i], w.Z[i], share, null, DamageCause.None, reach, 0, 0, arc, 0, windup, 0);
+                return windup;   // the class wind-up (SPEC T2-2)
+            }
+            s.HeavySwingTick[i] = CombatFeel.NoTick;
+            if (!On(w, m.Combos)) return windup;
+            int step = 1;
+            if (s.ChainNext[i] >= 2 && w.Tick <= s.ChainUntil[i]) step = s.ChainNext[i];
+            s.ChainNext[i] = 0;
+            s.StepSwingTick[i] = w.Tick;
+            s.StepOf[i] = step;
+            if (step < 2) return windup;
+            int floor = Durations.T30(w.Config, OffenceMinStepWindupTicks);
+            int k = (int)Math.Floor(windup * m.ComboStepWindupMul + 0.5);
+            if (k < floor) k = floor;
+            return k < windup ? k : windup;
+        }
+
+        /// <summary>SPEC T2-3: "every step's wind-up is at least 5 ticks" (30 Hz), so the victim can dodge or guard between steps.</summary>
+        public const int OffenceMinStepWindupTicks = 5;
+
+        static int OffenceSteps(World w, ClassId cls)
+        {
+            int[] st = Cfg(w).ComboSteps;
+            int c = (int)cls;
+            return st != null && c < st.Length ? st[c] : 1;
+        }
 
         /// <summary>The contact tick's reach, arc and damage (heavy shape, charge and combo damage). Leave them when off.</summary>
-        static void OffenceSwingShape(World w, int i, ref double range, ref double arcDeg, ref double dmg) { }
+        static void OffenceSwingShape(World w, int i, ref double range, ref double arcDeg, ref double dmg)
+        {
+            MovesConfig m = Cfg(w);
+            OffenceMovesState s = w.Moves.Offence;
+            Actor a = w.Actors[i];
+            if (On(w, m.Heavy) && s.HeavySwingTick[i] == a.SwingTick)
+            {
+                OffenceHeavyShape(w, a.Cls, out range, out arcDeg);
+                int c = (int)a.Cls;
+                bool bonus = m.HeavyDamageBonus == null || c >= m.HeavyDamageBonus.Length || m.HeavyDamageBonus[c];
+                if (bonus) dmg *= 1 + (m.ChargeDamageMulMax - 1) * s.HeavySwingShare[i];
+                return;
+            }
+            if (!On(w, m.Combos) || s.StepSwingTick[i] != a.SwingTick) return;
+            int step = s.StepOf[i];
+            if (step < 2) return;
+            dmg *= step >= OffenceSteps(w, a.Cls) ? m.FinisherDamageMul : m.ComboStepDamageMul;
+        }
 
         /// <summary>After actor i's swing contact (hits 0 = whiff): combo advance or reset, HeavyWhiffExtraRecoveryTicks.</summary>
-        static void OffenceAfterContact(World w, int i, int hits) { }
+        static void OffenceAfterContact(World w, int i, int hits)
+        {
+            MovesConfig m = Cfg(w);
+            OffenceMovesState s = w.Moves.Offence;
+            Actor a = w.Actors[i];
+            if (On(w, m.Heavy) && s.HeavySwingTick[i] == a.SwingTick)
+            {
+                s.ChainNext[i] = 0;
+                if (hits <= 0)
+                {
+                    a.SwingRecovery += Durations.T30(w.Config, m.HeavyWhiffExtraRecoveryTicks);
+                    w.Depth.Feel.WhiffRecoverUntil[i] = w.Tick + a.SwingRecovery;   // the PUNISH window covers the longer recovery
+                    OffenceCooldownFloor(w, a);
+                }
+                return;
+            }
+            if (!On(w, m.Combos) || s.StepSwingTick[i] != a.SwingTick) return;
+            int step = s.StepOf[i];
+            if (hits <= 0)
+            {
+                s.ChainNext[i] = 0;   // a whiff resets to step 1
+                return;
+            }
+            int steps = OffenceSteps(w, a.Cls);
+            bool finisher = step >= 2 && step >= steps;
+            if (step >= 2)
+            {
+                s.Counts[OffenceCountSteps]++;
+                World.PushEvent(w, SimEventType.ComboStep, i, -1, w.X[i], w.Z[i], step, null, DamageCause.None, 0, 0, 0, 0, finisher ? 1 : 0, 0, 0);
+            }
+            if (finisher || steps < 2)
+            {
+                s.ChainNext[i] = 0;
+                if (finisher)
+                {
+                    s.Counts[OffenceCountFinishers]++;
+                    a.SwingRecovery += Durations.T30(w.Config, m.FinisherExtraRecoveryTicks);
+                    OffenceCooldownFloor(w, a);
+                }
+                return;
+            }
+            s.ChainNext[i] = step + 1;
+            // the chain holds while the next step can follow at once: until the cooldown is spent plus the input buffer (a press
+            // made during the recovery is held that long), never past ComboResetSeconds. A dodge out of reach between steps
+            // therefore breaks it (the attacker cannot walk back in and still finish), and so does a pause.
+            int cdEnd = w.Tick + (int)Math.Ceiling(a.AttackCd * w.Config.SimHz - 1e-9);
+            int until = cdEnd + CombatFeel.Ticks(w, CombatFeel.Cfg(w).BufferSeconds);
+            int cap = w.Tick + CombatFeel.Ticks(w, m.ComboResetSeconds);
+            s.ChainUntil[i] = until < cap ? until : cap;
+        }
+
+        /// <summary>The cooldown never ends before the (longer) recovery: CombatFeel.AfterContact's rule on the new recovery.</summary>
+        static void OffenceCooldownFloor(World w, Actor a)
+        {
+            double left = a.SwingRecovery / w.Config.SimHz;
+            if (a.AttackCd < left) a.AttackCd = left;
+        }
 
         /// <summary>A melee strike's knock and stagger (heavy x charge, finisher x FinisherKnockMul, charge armour on the target).</summary>
-        static void OffenceStrikeKnock(World w, int source, int target, ref double knock, ref int stun) { }
+        static void OffenceStrikeKnock(World w, int source, int target, ref double knock, ref int stun)
+        {
+            MovesConfig m = Cfg(w);
+            OffenceMovesState s = w.Moves.Offence;
+            if (source < 0 || source >= w.ActorCount || target < 0 || target >= w.ActorCount) return;
+            Actor src = w.Actors[source];
+            bool heavyOn = On(w, m.Heavy);
+            if (heavyOn && s.HeavySwingTick[source] == src.SwingTick)
+            {
+                int c = (int)src.Cls;
+                double cls = m.HeavyKnockMul != null && c < m.HeavyKnockMul.Length ? m.HeavyKnockMul[c] : 1;
+                knock *= (1 + (m.ChargeKnockMulMax - 1) * s.HeavySwingShare[source]) * cls;
+                stun = OffenceHeavyStagger(w, target, stun);
+            }
+            else if (On(w, m.Combos) && s.StepSwingTick[source] == src.SwingTick && s.StepOf[source] >= 2 && s.StepOf[source] >= OffenceSteps(w, src.Cls))
+                knock *= m.FinisherKnockMul;
+            // charge armour: a hit under the charging body's Poise does not stagger it (the charge goes on)
+            if (heavyOn && s.Charging[target] != 0 && s.StrikeAmount[0] < w.Config.Class(w.Actors[target].Cls).Poise) stun = 0;
+        }
 
-        /// <summary>HP was taken (dmg &gt; 0).</summary>
+        /// <summary>"Always a heavy stagger": at least HeavyStaggerSeconds, unless the target is immune or in an armoured wind-up
+        /// (the Warrior's cleave armour stays his edge), and never past the running lock's room (StaggerMaxLockSeconds).</summary>
+        static int OffenceHeavyStagger(World w, int target, int stun)
+        {
+            CombatFeelConfig f = CombatFeel.Cfg(w);
+            CombatFeelState fs = w.Depth.Feel;
+            Actor t = w.Actors[target];
+            if (w.Tick < fs.ImmuneUntil[target]) return stun;
+            bool armoured = t.SwingPending && f.Strikes[(int)t.Cls].ArmouredWindup && (w.Tick > fs.SunderUntil[target] || !f.SunderBreaksArmour)
+                && w.Tick > fs.ArmourBreakUntil[target];
+            if (armoured && stun <= 0) return stun;
+            int heavy = CombatFeel.Ticks(w, f.HeavyStaggerSeconds);
+            if (stun >= heavy) return stun;
+            int ticks = heavy;
+            if (fs.LockStart[target] != CombatFeel.NoTick && w.Tick <= fs.LockUntil[target] + 1)
+            {
+                int cap = fs.LockStart[target] + CombatFeel.Ticks(w, f.StaggerMaxLockSeconds) - w.Tick;
+                if (ticks > cap) ticks = cap < 0 ? 0 : cap;
+            }
+            return ticks > stun ? ticks : stun;
+        }
+
+        /// <summary>HP was taken (dmg &gt; 0). A stagger that got through breaks the charge (OffenceStep, next tick).</summary>
         static void OffenceDamaged(World w, int target, int source, DamageCause cause, double dmg) { }
 
         /// <summary>Walk-speed multiplier (charging x ChargeMoveMul). Exactly 1.0 when not charging.</summary>
-        static double OffenceSpeedScale(World w, int i) => 1.0;
+        static double OffenceSpeedScale(World w, int i) =>
+            w.Moves.Offence.Charging[i] != 0 && On(w, Cfg(w).Heavy) ? Cfg(w).ChargeMoveMul : 1.0;
     }
 }

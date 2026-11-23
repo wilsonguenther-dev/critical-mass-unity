@@ -88,13 +88,16 @@ namespace CriticalMass.Sim.Core
                 // b15: with her TNT ready the attack press is the throw (Demolitions.AttackThrowsNow, before Combat next tick);
                 // the pry bar swings only while the TNT cools down (a held press no longer pry-swings the TNT away for good).
                 // lane S2: an enemy point-blank inside her pry-bar arc gets the pry bar and the TNT stays ready (Demolitions.PointBlank).
-                if (feel && a.Cls == ClassId.Demolitions && w.Config.Abilities.DemolitionsTnt.ThrowOnAttack && w.Tick >= w.Demolitions.TntReadyTick[i] && !Demolitions.PointBlank(w, i)) continue;
+                // class moves T1-1 (lane 4, DemoTntOnDigOnly): a person's Attack is always the pry bar (TNT on F only).
+                if (feel && a.Cls == ClassId.Demolitions && w.Config.Abilities.DemolitionsTnt.ThrowOnAttack && w.Tick >= w.Demolitions.TntReadyTick[i] && !Demolitions.PointBlank(w, i)
+                    && !(w.Moves != null && MovesHooks.OffenceTntOnDigOnly(w) && MovesHooks.OffenceHuman(w, i))) continue;
                 if (a.Cls == ClassId.Healer)
                 {
                     // DG-40 (U-061): the attack press mends a hurt ally FIRST (support first); the lantern swings only when
                     // nobody can be mended, so a Healer among her team heals and a Healer caught alone defends herself.
                     // lane S2: a human Healer whose aim is on an enemy inside her lantern reach swings it (Healer.AimsAtEnemy).
-                    if (!(feel && Healer.AimsAtEnemy(w, i)) && Healer.TryMend(w, i))
+                    // class moves T2-2 (lane 4): a released heavy is the lantern flare, never a mend.
+                    if (!(feel && Healer.AimsAtEnemy(w, i)) && !MovesHooks.OffenceHeavyStartingNow(w, i) && Healer.TryMend(w, i))
                     {
                         if (feel) CombatFeel.TookPress(w, i);
                         continue;
@@ -117,7 +120,9 @@ namespace CriticalMass.Sim.Core
                 double fz = JsMath.Sin(a.Facing);
                 // DG-16 (view request), DG-69: the swing starts on the press tick: reach point, locked facing, wind-up length.
                 // b15 combat feel: the telegraph needs the real hit shape: Radius = reach, Impulse = full arc in degrees.
-                if (lane && feel) World.PushEvent(w, SimEventType.AttackStart, i, KindAttack, w.X[i] + fx * range, w.Z[i] + fz * range, a.Facing, null, DamageCause.None, range, fx, fz, cc.AttackArcDeg, 0, windup, a.SwingRecovery);
+                double teleArc = cc.AttackArcDeg;
+                if (w.Moves != null) MovesHooks.OffenceTelegraph(w, i, ref range, ref teleArc);   // class moves T2-2: a heavy telegraphs its real shape
+                if (lane && feel) World.PushEvent(w, SimEventType.AttackStart, i, KindAttack, w.X[i] + fx * range, w.Z[i] + fz * range, a.Facing, null, DamageCause.None, range, fx, fz, teleArc, 0, windup, a.SwingRecovery);
                 else if (lane) World.PushEvent(w, SimEventType.AttackStart, i, KindAttack, w.X[i] + fx * range, w.Z[i] + fz * range, a.Facing, null, DamageCause.None, 0, fx, fz, 0, 0, windup, a.SwingRecovery);
                 else World.PushEvent(w, SimEventType.AttackStart, i, -1, w.X[i] + fx * range, w.Z[i] + fz * range, a.Facing);
                 if (windup > 0) a.SwingPending = true;
@@ -226,7 +231,12 @@ namespace CriticalMass.Sim.Core
                 // on the queue, before any hit of this tick lands, and the strike applies knock and stagger (CombatFeel).
                 double hitDmg = feel ? dmg * CombatFeel.DamageMul(w, i, j, Math.Sqrt(d2)) : dmg;
                 if (fair) w.Hits.Add(j, i, hitDmg, ax, az);
-                else if (feel) CombatFeel.ApplyStrike(w, j, hitDmg, i, ax, az);
+                else if (feel)
+                {
+                    if (w.Moves != null) MovesHooks.OffenceBeforeStrike(w, hitDmg);   // class moves T2-2: charge armour reads the amount
+                    double dealt = CombatFeel.ApplyStrike(w, j, hitDmg, i, ax, az);
+                    if (w.Moves != null) MovesHooks.OffenceAfterStrike(w, j, i, dealt);   // class moves T2-2: heavy SUNDER, fuse
+                }
                 else if (Damage.ApplyMelee(w, j, dmg, i, ax, az) > 0) LightWeapons.Shove(w, j, i, ax, az, dmg); // feat/light-weapons-1
             }
             // Structures (CM-05): the same swing chips enemy barricades in its arc; a Miner's pick also breaks breakables.
@@ -307,7 +317,9 @@ namespace CriticalMass.Sim.Core
             {
                 if (feel)
                 {
-                    CombatFeel.ApplyStrike(w, h.Target[k], h.Amount[k], h.Source[k], h.SrcX[k], h.SrcZ[k]); // b15 combat feel
+                    if (w.Moves != null) MovesHooks.OffenceBeforeStrike(w, h.Amount[k]);   // class moves T2-2: charge armour reads the amount
+                    double dealt = CombatFeel.ApplyStrike(w, h.Target[k], h.Amount[k], h.Source[k], h.SrcX[k], h.SrcZ[k]); // b15 combat feel
+                    if (w.Moves != null) MovesHooks.OffenceAfterStrike(w, h.Target[k], h.Source[k], dealt);   // class moves T2-2: heavy SUNDER, fuse
                     continue;
                 }
                 // feat/light-weapons-1: a landed light-weapon hit also shoves (Shove is a no-op for every other swing).
