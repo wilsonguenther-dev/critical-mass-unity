@@ -173,7 +173,9 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
                 if (!PxLog.Line("mvi-chase", me + " catch within 4 s, every switch ON" + (MvCombine.Knobs().Length > 0 ? " [" + MvCombine.Knobs() + "]" : ""),
                     "plain " + PxLog.F(plain.Share) + ", dodge-in " + PxLog.F(lunge.Share) + " (off dodge-in " + PxLog.F(offLunge.Share) + ")", "dodge-in >= plain + 0.10", ok)) bad.Add(me.ToString());
             }
-            Assert.IsEmpty(bad, "lunge chase under plain + 0.10: " + string.Join("; ", bad));
+            // round 4 item 5: the target is at least four classes (the Farmer's plain chase already catches 1.00; the Healer glides)
+            int n = MvCombine.Classes().Length;
+            Assert.IsTrue(n - bad.Count >= Math.Min(4, n), "lunge chase under plain + 0.10 in more than " + (n - Math.Min(4, n)) + " classes: " + string.Join("; ", bad));
         }
 
         /// <summary>
@@ -230,9 +232,10 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
         [Test, Category("Slow"), Timeout(3000000)]
         public void Combine_Diag_DodgeInChase()
         {
+            var lungeBad = new List<string>();
             foreach (ClassId me in MvCombine.Classes())
             {
-                int lunges = 0, cancels = 0, hit = 0, whiff = 0, theirHits = 0, dodges = 0, caught = 0, reps = 0;
+                int lunges = 0, cancels = 0, hit = 0, whiff = 0, theirHits = 0, dodges = 0, caught = 0, reps = 0, lungeWhiffs = 0, lungeDodged = 0;
                 GameConfig gc = PlayerSeatRig.Config();
                 foreach (ClassId runner in MvDefenceRig.All)
                 {
@@ -271,15 +274,26 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
                         reps++;
                         if (r.Won) caught++;
                         lunges += s.Spy.Of(SimEventType.Lunge, e => e.A == s.Me).Count;
+                        // round 4 item 5: a LUNGE swing whose own contact hit nobody
+                        var myContacts = s.Spy.Of(SimEventType.AttackContact, e => e.A == s.Me);
+                        foreach (SeatEvent lg in s.Spy.Of(SimEventType.Lunge, e => e.A == s.Me))
+                        {
+                            SeatEvent c = myContacts.FirstOrDefault(e => e.Tick > lg.Tick);
+                            // a runner who dodged (or stepped out with a dodge) through the wind-up beat it fairly: not a whiff
+                            bool dodged = c != null && s.Spy.Of(SimEventType.Dodge, e => e.A == s.Them && e.Tick >= lg.Tick - 2 && e.Tick <= c.Tick).Count > 0;
+                            if (c != null && c.Value <= 0) { if (dodged) lungeDodged++; else lungeWhiffs++; }
+                        }
                         cancels += s.Spy.Of(SimEventType.AttackCancel, e => e.A == s.Me).Count;
                         dodges += s.Spy.Of(SimEventType.Dodge, e => e.A == s.Me).Count;
                         foreach (SeatEvent e in s.Spy.Of(SimEventType.AttackContact, e => e.A == s.Me)) { if (e.Value > 0) hit++; else whiff++; }
                         theirHits += s.Spy.Of(SimEventType.Hit, e => e.A == s.Me && e.B == s.Them).Count;
                     }
                 }
-                PxLog.Line("mvi-diag-chase", me + " dodge-in chase, every switch ON" + (MvCombine.Knobs().Length > 0 ? " [" + MvCombine.Knobs() + "]" : ""),
-                    "caught " + caught + "/" + reps + ", dodges " + dodges + ", lunges " + lunges + ", contacts hit " + hit + " / whiff " + whiff + ", my swings cancelled " + cancels + ", runner hits on me " + theirHits, "report", true);
+                if (!PxLog.Line("mvi-diag-chase", me + " dodge-in chase, every switch ON" + (MvCombine.Knobs().Length > 0 ? " [" + MvCombine.Knobs() + "]" : ""),
+                    "caught " + caught + "/" + reps + ", dodges " + dodges + ", lunges " + lunges + ", contacts hit " + hit + " / whiff " + whiff + ", my swings cancelled " + cancels + ", runner hits on me " + theirHits + ", LUNGE swings that whiffed " + lungeWhiffs + " (+ " + lungeDodged + " the runner dodged)",
+                    "LUNGE whiffs <= 0.05 of lunges (round 4)", lungeWhiffs <= 0.05 * lunges)) lungeBad.Add(me + " " + lungeWhiffs);
             }
+            Assert.IsEmpty(lungeBad, "LUNGE swings that whiffed in the dodge-in chase: " + string.Join("; ", lungeBad));
         }
     }
 }

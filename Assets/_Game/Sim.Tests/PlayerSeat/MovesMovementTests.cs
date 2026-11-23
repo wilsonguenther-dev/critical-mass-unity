@@ -287,6 +287,48 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
                 trips + "/" + tries + " (" + string.Join(", ", rows) + "); slides " + slides + ", dodges " + dodges, "1.0 of aimed slides trip; the Dodge press is never a dodge here", trips == tries && dodges == 0));
         }
 
+        /// <summary>Round 4 (pass 4: TRIPPED never appeared in the engine): a person's slide into a REAL Normal bot in a duel, with
+        /// every class move on, emits the trip (Slide, B = the victim) the view draws as TRIPPED: travel in from 15 u, Dodge pressed
+        /// (lag 6) once the slide reaches the body. Target: at least 0.6 of the slides trip.</summary>
+        [Test]
+        public void Slide_TripsARealBotInADuel()
+        {
+            int trips = 0, slides = 0, tries = 0;
+            var rows = new List<string>();
+            foreach (ClassId c in T.Classes)
+            {
+                int ct = 0, cs = 0;
+                for (int k = 0; k < 4; k++)
+                {
+                    Seat s = PlayerSeatRig.Duel(c, ClassId.Farmer, TargetMode.RealBot, 0, k, distance: 15.0, tweak: MvCombine.AllOn);
+                    World w = s.W;
+                    int ib = s.Dummy != null ? s.Dummy.Me : PlayerSeatRig.EnemySlot(w);
+                    tries++;
+                    double reach = w.Config.Depth.Moves.SlideDistance + Collide.ActorRadius(w, 0) + Collide.ActorRadius(w, ib) - 0.2;
+                    bool pressed = false, tripped = false, slid = false;
+                    var hist = new double[64];
+                    for (int t = 0; t < 240 && !tripped; t++)
+                    {
+                        double d = Dist(w, 0, ib);
+                        hist[w.Tick & 63] = d;
+                        double seen = t >= Lag ? hist[(w.Tick - Lag) & 63] : 99;
+                        s.Human.MoveOverrideX = (w.X[ib] - w.X[0]) / d; s.Human.MoveOverrideZ = (w.Z[ib] - w.Z[0]) / d;
+                        if (!pressed && seen <= reach + 0.6 && MovesHooks.MovementSlideArmed(w, 0)) { s.Human.PressDodge = true; pressed = true; }
+                        s.Step();
+                        if (s.Spy.Of(SimEventType.Slide, e => e.A == 0 && e.B < 0).Count > 0) slid = true;
+                        if (s.Spy.Of(SimEventType.Slide, e => e.A == 0 && e.B == ib).Count > 0) tripped = true;
+                    }
+                    if (slid) { slides++; cs++; }
+                    if (tripped) { trips++; ct++; }
+                }
+                rows.Add(c + " " + ct + "/" + cs);
+            }
+            double rate = slides > 0 ? (double)trips / slides : 0;
+            Assert.IsTrue(PxLog.Line("MV3 T2-5 Slide trip on a real bot", "duel vs a Normal Farmer bot, every switch on, travel in from 15 u, Dodge (lag 6) at slide reach",
+                trips + " trips of " + slides + " slides, " + tries + " tries (" + string.Join(", ", rows) + ")", ">= 0.6 of slides trip (the Slide event with the victim)",
+                slides > 0 && rate >= 0.6));
+        }
+
         [Test]
         public void Slide_TripNumbersAndTheSharedCooldown()
         {
