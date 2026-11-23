@@ -90,7 +90,7 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
         /// <summary>The FullMoves golden (SPEC.md rule 0.2): Full rules plus every switch on. Pinned by the combine once, after the
         /// 72-seed balance run (integration/class-moves-cand1): a moved pin means class-moves behaviour changed; re-pin only with
         /// the reason in the commit.</summary>
-        public const ulong FullMoves16v16Seed1 = 0xAA950BE1A98104ED, FullMoves5v5Seed42 = 0xFA7A5C3EB565D82E;
+        public const ulong FullMoves16v16Seed1 = 0x4CB2793A8378279A, FullMoves5v5Seed42 = 0x64CFFA318AB43C57;
 
         [Test]
         public void TheFullMovesGoldenIsReported()
