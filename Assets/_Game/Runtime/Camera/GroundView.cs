@@ -1221,6 +1221,8 @@ namespace CriticalMass.Runtime.Camera
 
         /// <summary>fix/px-camera-in-editor: only buildings, landmarks and big rocks stop the third-person boom; trees,
         /// crystals and props fade instead (fewer collisions: no pumping, no steep views over a crystal).</summary>
+        /// <summary>pass 5: a prop narrower than this (u from its centre) never moves the third-person boom; it fades.</summary>
+        const double HardPropExtent = 0.8;
         static bool SoftScenery(string cat) => !(cat == "base" || cat == "struct" || cat == "landmark" || cat == "rock_big");
 
         /// <summary>A kit piece's mesh boxes (8 corners per mesh, its own frame), from Mesh.bounds (readable or not).</summary>
@@ -1288,7 +1290,14 @@ namespace CriticalMass.Runtime.Camera
                 if (p.Piece != null && (p.Piece.IndexOf("intact", StringComparison.Ordinal) >= 0 || p.Piece.IndexOf("cracked", StringComparison.Ordinal) >= 0
                                         || p.Piece.IndexOf("destroyed", StringComparison.Ordinal) >= 0)) continue;
                 Vector3[] corners = PieceCorners(cat, p.Piece);
-                if (corners.Length > 0) { AddScenery(p, corners, SoftScenery(p.Cat)); continue; }
+                if (corners.Length > 0)
+                {
+                    // pass 5: small props (barrels, banners, lamps, stakes) fade like trees; only big ones move the boom
+                    double ext = 0;
+                    for (int c = 0; c < corners.Length; c++) ext = Math.Max(ext, Math.Sqrt(corners[c].x * corners[c].x + corners[c].z * corners[c].z));
+                    AddScenery(p, corners, SoftScenery(p.Cat) || ext < HardPropExtent);
+                    continue;
+                }
                 double r, h;
                 if (p.Cat == "tree") { r = SeeThrough.TreeRadius * 1.5; h = p.Piece != null && p.Piece.IndexOf("tall", StringComparison.Ordinal) >= 0 ? SeeThrough.TreeHeightTall : SeeThrough.TreeHeightRound; }
                 else if (p.Cat == "rock_big") { r = 0.8; h = 1.2; }
