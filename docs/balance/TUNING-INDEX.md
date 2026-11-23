@@ -4,7 +4,7 @@ Every tuning field the sim reads from `GameConfig`, found by reflection (`Assets
 
 Regenerate: `tools/balance/balance-report.sh tuning-index (or the balance-report workflow, mode tuning-index)`. `TuningIndexTests` fails when a field has no row here. Paths work as `--set Path=Value` switches for the balance report.
 
-1016 fields.
+1027 fields.
 
 ## (top level)
 
@@ -1034,10 +1034,10 @@ Regenerate: `tools/balance/balance-report.sh tuning-index (or the balance-report
 | `Depth.Moves.QuickWallHp` | 60 | double | `Assets/_Game/Sim/Config/MovesConfig.cs` |  |
 | `Depth.Moves.QuickWallHillKeepOut` | 3 | double | `Assets/_Game/Sim/Config/MovesConfig.cs` |  |
 | `Depth.Moves.QuickWallMaxPerBuilder` | 1 | int | `Assets/_Game/Sim/Config/MovesConfig.cs` |  |
-| `Depth.Moves.GuardCut` | [0, 0.4, 0.45, 0.35, 0.55, 0.35] | double[] | `Assets/_Game/Sim/Config/MovesConfig.cs` | Damage share a frontal guard cuts (Warrior 0 = no guard). |
+| `Depth.Moves.GuardCut` | [0, 0.4, 0.45, 0.35, 0.55, 0.2] | double[] | `Assets/_Game/Sim/Config/MovesConfig.cs` | Damage share a frontal guard cuts (Warrior 0 = no guard). Integrator (decision 1): the Healer's cut 0.35 -> 0.20. |
 | `Depth.Moves.GuardMeter` | [0, 40, 50, 35, 60, 35] | double[] | `Assets/_Game/Sim/Config/MovesConfig.cs` | Damage the guard absorbs before it breaks. |
 | `Depth.Moves.GuardMoveMul` | [1, 0.6, 0.6, 0.6, 0.5, 0.6] | double[] | `Assets/_Game/Sim/Config/MovesConfig.cs` | Move speed multiplier while guarding. |
-| `Depth.Moves.ParryWindowTicks` | [3, 4, 4, 4, 3, 5] | int[] | `Assets/_Game/Sim/Config/MovesConfig.cs` | Parry window: ticks before an enemy melee contact in which a Guard press edge parries. |
+| `Depth.Moves.ParryWindowTicks` | [3, 4, 4, 4, 3, 0] | int[] | `Assets/_Game/Sim/Config/MovesConfig.cs` | Parry window: ticks before an enemy melee contact in which a Guard press edge parries (0 = no parry). |
 | `Depth.Moves.WarriorParryWindowShieldDown` | 2 | int | `Assets/_Game/Sim/Config/MovesConfig.cs` | The Warrior's parry window while his shield is down (3 with it up is ParryWindowTicks[0]). |
 | `Depth.Moves.GuardFrontalDeg` | 60 | double | `Assets/_Game/Sim/Config/MovesConfig.cs` |  |
 | `Depth.Moves.GuardRaiseTicks` | 3 | int | `Assets/_Game/Sim/Config/MovesConfig.cs` |  |
@@ -1071,17 +1071,18 @@ Regenerate: `tools/balance/balance-report.sh tuning-index (or the balance-report
 | `Depth.Moves.DemoFuseDamage` | 12 | double | `Assets/_Game/Sim/Config/MovesConfig.cs` |  |
 | `Depth.Moves.DemoFuseSeconds` | 1 | double | `Assets/_Game/Sim/Config/MovesConfig.cs` |  |
 | `Depth.Moves.DemoFuseRadius` | 1 | double | `Assets/_Game/Sim/Config/MovesConfig.cs` |  |
-| `Depth.Moves.ComboSteps` | [2, 3, 3, 3, 2, 2] | int[] | `Assets/_Game/Sim/Config/MovesConfig.cs` | Steps per class (the last step is the finisher). |
+| `Depth.Moves.ComboSteps` | [2, 3, 2, 2, 3, 1] | int[] | `Assets/_Game/Sim/Config/MovesConfig.cs` | Steps per class (the last step is the finisher; 1 = no combo). Integrator (decision 1, the Healer ruling): the Healer has no chain (2 -> 1; with it her duel variants reached 10 to 14 of 40). |
 | `Depth.Moves.ComboStepWindupMul` | 0.7 | double | `Assets/_Game/Sim/Config/MovesConfig.cs` |  |
 | `Depth.Moves.ComboStepDamageMul` | 1.1 | double | `Assets/_Game/Sim/Config/MovesConfig.cs` |  |
 | `Depth.Moves.FinisherDamageMul` | 1.35 | double | `Assets/_Game/Sim/Config/MovesConfig.cs` |  |
 | `Depth.Moves.FinisherKnockMul` | 1.8 | double | `Assets/_Game/Sim/Config/MovesConfig.cs` |  |
+| `Depth.Moves.FinisherDamageMulByClass` | [-1, -1, -1, 1.3, -1, -1] | double[] | `Assets/_Game/Sim/Config/MovesConfig.cs` | Integrator: per-class finisher damage, -1 = FinisherDamageMul. Demolitions on 2 steps: passive time to kill fell 0.170 at 1.35 (band 0.05 to 0.15). |
 | `Depth.Moves.FinisherExtraRecoveryTicks` | 6 | int | `Assets/_Game/Sim/Config/MovesConfig.cs` |  |
 | `Depth.Moves.ComboResetSeconds` | 1 | double | `Assets/_Game/Sim/Config/MovesConfig.cs` |  |
-| `Depth.Moves.TravelAfterMoveTicks` | 30 | int | `Assets/_Game/Sim/Config/MovesConfig.cs` |  |
+| `Depth.Moves.TravelAfterMoveTicks` | 15 | int | `Assets/_Game/Sim/Config/MovesConfig.cs` | integrator decision 5: x1.5 after 15 (16v16 respawn-to-first-hit 12.1 s -> 9.8 s; Warrior slowest, S58 0 stuck, bands hold) |
 | `Depth.Moves.TravelEnemyRadius` | 8 | double | `Assets/_Game/Sim/Config/MovesConfig.cs` |  |
 | `Depth.Moves.TravelNoCombatSeconds` | 3 | double | `Assets/_Game/Sim/Config/MovesConfig.cs` |  |
-| `Depth.Moves.TravelSpeedMul` | 1.3 | double | `Assets/_Game/Sim/Config/MovesConfig.cs` |  |
+| `Depth.Moves.TravelSpeedMul` | 1.5 | double | `Assets/_Game/Sim/Config/MovesConfig.cs` |  |
 | `Depth.Moves.TravelRampTicks` | 9 | int | `Assets/_Game/Sim/Config/MovesConfig.cs` |  |
 | `Depth.Moves.SlideDistance` | 4.5 | double | `Assets/_Game/Sim/Config/MovesConfig.cs` |  |
 | `Depth.Moves.SlideTicks` | 10 | int | `Assets/_Game/Sim/Config/MovesConfig.cs` |  |
@@ -1101,3 +1102,13 @@ Regenerate: `tools/balance/balance-report.sh tuning-index (or the balance-report
 | `Depth.Moves.JumpEvadeRelockSeconds` | 1 | double | `Assets/_Game/Sim/Config/MovesConfig.cs` |  |
 | `Depth.Moves.SecondWindBelowShare` | 0.25 | double | `Assets/_Game/Sim/Config/MovesConfig.cs` |  |
 | `Depth.Moves.SecondWindHealShare` | 0.15 | double | `Assets/_Game/Sim/Config/MovesConfig.cs` |  |
+| `Depth.Moves.ComboDodgeOutOfKnock` | 1 | int | `Assets/_Game/Sim/Config/MovesConfig.cs` | T2-3 (lane 2 rule, decision 2 "every combo is dodgeable"): with Combos on, a victim whose stagger is over may start a dodge during the knock slide of an enemy's melee LIGHT strike (not a heavy) taken in the last Combo... |
+| `Depth.Moves.GuardKeepsFooting` | [true, true, true, true, true, false] | bool[] | `Assets/_Game/Sim/Config/MovesConfig.cs` | T2-1 (decision 1, ruling "Healer loses nearly every one-on-one"): a guard-blocked melee hit neither staggers nor fully knocks a class marked true here. The Healer's guard only cuts damage: she still staggers and slides. |
+| `Depth.Moves.GuardReleaseTicksByClass` | [-1, -1, -1, -1, -1, 16] | int[] | `Assets/_Game/Sim/Config/MovesConfig.cs` | T2-1 (decision 1): per-class recovery after the guard drops, -1 = GuardReleaseTicks. The Healer's guard is slow to drop (her weakest guard): block-then-punish is not her game. |
+| `Depth.Moves.ComboKnockDodgeTicks` | 20 | int | `Assets/_Game/Sim/Config/MovesConfig.cs` |  |
+| `Depth.Moves.ComboBreaksOnDodge` | 1 | int | `Assets/_Game/Sim/Config/MovesConfig.cs` | T2-3 (decision 2): a victim's dodge breaks every chain whose last landed strike hit it, so the next swing is an opener (no step bonus, no finisher). |
+| `Depth.Moves.LungeArmour` | 1 | int | `Assets/_Game/Sim/Config/MovesConfig.cs` | T1-2 (decision 6): a LUNGE wind-up shrugs off a hit under the lunger's class Poise (no stagger, the swing goes on), so a fleeing target's light hit does not cancel the lunge it ran into. |
+| `Depth.Moves.LungeWindupMulByClass` | [-1, -1, 0.6, -1, -1, -1] | double[] | `Assets/_Game/Sim/Config/MovesConfig.cs` | T1-2 (decision 6): per-class lunge wind-up multiplier, -1 = LungeWindupMul. |
+| `Depth.Moves.SlideCarryTicks` | 30 | int | `Assets/_Game/Sim/Config/MovesConfig.cs` | T2-5 (lane 3's constant, now a knob): after TRAVEL ends because an enemy came within TravelEnemyRadius, Dodge stays the SLIDE for this many ticks unless a press, a hit or an enemy wind-up within 8 u ends it. |
+| `Depth.Moves.BotChargeChance` | [0.1, 0, 0.2] | double[] | `Assets/_Game/Sim/Config/MovesConfig.cs` | T2-2 / T2-3 bot use (lane 5's constants, now knobs; Normal, Easy, Hard): the chance a bot charges a heavy at a human in heavy reach once per swing cycle, and the chance it chains a LANDED light hit on a human. |
+| `Depth.Moves.BotComboChance` | [0.25, 0, 0.5] | double[] | `Assets/_Game/Sim/Config/MovesConfig.cs` |  |

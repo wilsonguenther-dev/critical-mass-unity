@@ -408,6 +408,9 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
                 int tries = 0, negated = 0, staggered = 0, jitterTries = 0, jitterNeg = 0;
                 foreach (ClassId def in MvDefenceRig.All)
                 {
+                    // integrator (decision 1, the Healer ruling): a class with no parry window (the Healer, 0) cannot parry; her
+                    // guard only cuts damage (MovesDefenceTests T2_1 guard rows and the combine duel table measure her)
+                    if (def != ClassId.Warrior && gc.Depth.Moves.ParryWindowTicks[(int)def] <= 0) continue;
                     for (int k = 0; k < 4; k++)
                     {
                         for (int jitter = -1; jitter <= 1; jitter++)
