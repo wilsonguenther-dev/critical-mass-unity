@@ -341,6 +341,16 @@ namespace CriticalMass.Runtime.Hud.Interact
                     local.y = Mathf.Clamp(local.y, r.yMin + EdgePad, r.yMax - EdgePad);
                     scale *= 0.8f;
                     local = PlaceEdge(i, local, r, scale);   // fix/hud-edge-markers-2: clear of every panel, the coins box too
+                    if (EdgeSpread.On && me >= 0 && me < w.ActorCount)
+                    {
+                        // mv-6 readability-4 item 1: spread from the other edge markers, the 4 nearest only
+                        double ex = p.X - w.X[me], ez = p.Z - w.Z[me];
+                        Rect box = _box[i];
+                        Vector2 off = box.center * scale;
+                        Vector2 got = EdgeSpread.Spread(300 + i, local + off - r.min, box.size * (0.5f * scale), r.width, r.height, (float)Math.Sqrt(ex * ex + ez * ez), out bool spreadShown);
+                        local = got + r.min - off;
+                        if (!spreadShown) a = 0f;
+                    }
                 }
                 else local = OffPanels(local, r);   // fix/hud-containment-3 (walk: ping markers on the class card)
                 // fix/hud-containment-5 (owner: "Fern: Help!" in the feed and "NEED HELP 10m" beside it said the same thing):

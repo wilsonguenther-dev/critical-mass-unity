@@ -250,6 +250,7 @@ namespace CriticalMass.Runtime.Hud.Player
             }
             bool calm = CriticalMass.Runtime.Menu.GameSettings.ReduceMotion;
             Rect mine = MyRect(w, alpha, cam, scale);
+            _placedN = 0;   // mv-6 readability-4 item 3
             for (int k = 0; k < Pool; k++)
             {
                 Num n = _nums[k];
@@ -284,8 +285,36 @@ namespace CriticalMass.Runtime.Hud.Player
                     float ps = 1f + (PunchScale - 1f) * (n.Punch / Punch);
                     n.Text.rectTransform.localScale = new Vector3(ps, ps, 1f);
                 }
+                if (WorldWords.MovesCap) Fan(n);   // mv-6 readability-4 item 3: numbers on different bodies never overlap
                 PxUi.Alpha(n.Group, t < 0.55f ? 1f : 1f - (t - 0.55f) / 0.45f);
             }
+        }
+
+        readonly Rect[] _placed = new Rect[Pool];
+        int _placedN;
+
+        /// <summary>mv-6 readability-4 item 3: a number that would cover one already placed this frame moves up past it.</summary>
+        void Fan(Num n)
+        {
+            RectTransform rt = n.Text.rectTransform;
+            Vector2 p = rt.anchoredPosition;
+            int digits = Mathf.Max(1, n.Text.text.Length);
+            int size = n.Text.fontSize;
+            for (int pass = 0; pass < 6; pass++)
+            {
+                bool moved = false;
+                Rect me = UnitStack.NumberRect(p, size, digits);
+                for (int i = 0; i < _placedN; i++)
+                {
+                    if (!me.Overlaps(_placed[i])) continue;
+                    p.y += _placed[i].yMax - me.yMin + 2f;
+                    me = UnitStack.NumberRect(p, size, digits);
+                    moved = true;
+                }
+                if (!moved) break;
+            }
+            if (_placedN < _placed.Length) _placed[_placedN++] = UnitStack.NumberRect(p, size, digits);
+            rt.anchoredPosition = p;
         }
     }
 }

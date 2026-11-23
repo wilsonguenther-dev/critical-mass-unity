@@ -75,7 +75,7 @@ namespace CriticalMass.Runtime.View.B17
                 case Verb.Guard: return k + "HOLD TO GUARD, TAP AS HE SWINGS TO PARRY";
                 case Verb.Heavy: return "HOLD " + k + "CHARGE A HEAVY";
                 case Verb.Combo: return k + "PRESS AGAIN AS THE HIT LANDS";
-                case Verb.Slide: return "TRAVELLING  " + k + "SLIDE";
+                case Verb.Slide: return "SPRINTING: " + (string.IsNullOrEmpty(key) ? "DODGE" : key.ToUpperInvariant()) + " TO SLIDE";   // readability-4 item 5: plain words
                 case Verb.Glide: return "HOLD " + k + "IN THE AIR: GLIDE";
                 case Verb.JumpEvade: return k + "JUMP OVER A GROUND SWING";
                 case Verb.Tnt: return k + "THROW TNT  (ATTACK IS YOUR PRY BAR)";

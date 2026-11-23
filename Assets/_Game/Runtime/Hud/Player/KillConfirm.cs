@@ -120,7 +120,7 @@ namespace CriticalMass.Runtime.Hud.Player
                 {
                     float k = calm ? 1f : Mathf.Lerp(1.2f, 1f, Mathf.Clamp01(_age / PopSeconds));
                     lr.localScale = new Vector3(k, k, 1f);
-                    PxUi.Alpha(_lineGroup, Mathf.Clamp01((Seconds - _age) / Fade));
+                    PxUi.Alpha(_lineGroup, MvAside() * Mathf.Clamp01((Seconds - _age) / Fade));
                 }
             }
             Transform ar = _assist.transform.parent;
@@ -128,8 +128,12 @@ namespace CriticalMass.Runtime.Hud.Player
             {
                 _assistAge = Mathf.Max(_assistAge + dt, Time.unscaledTime - _assistAt);
                 if (_assistAge >= AssistSeconds) ar.gameObject.SetActive(false);
-                else PxUi.Alpha(_assistGroup, Mathf.Clamp01((AssistSeconds - _assistAge) / Fade));
+                else PxUi.Alpha(_assistGroup, MvAside() * Mathf.Clamp01((AssistSeconds - _assistAge) / Fade));
             }
         }
+
+        /// <summary>mv-6 readability-4 item 6: under the class moves the KNOCKED OUT / ASSIST lines stand aside (alpha 0)
+        /// while the corner stinger, which sits on their rows, is up; the kill feed above still lists the knock-out.</summary>
+        static float MvAside() => WorldWords.MovesCap && CriticalMass.Runtime.View.Moments.BigMoments.StingerUp ? 0f : 1f;
     }
 }

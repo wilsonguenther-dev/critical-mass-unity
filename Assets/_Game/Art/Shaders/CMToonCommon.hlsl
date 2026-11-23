@@ -9,6 +9,8 @@
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Color.hlsl"
 // Time of day (arena night life 1): the global grade, the void colour, stars and moon; all globals 0 = Day.
 #include "CMTimeOfDay.hlsl"
+// fix/px-camera-in-editor: the third-person camera's fade volumes, lens sphere and self keep (all zero = no effect).
+#include "CMFadeVolumes.hlsl"
 
 CBUFFER_START(UnityPerMaterial)
     half4 _BaseColor;
@@ -114,6 +116,10 @@ float4 _CMFadeKeep;
 
 void CMToonFadeClip(float3 positionWS, float4 positionCS)
 {
+    // fix/px-camera-in-editor: the third-person fade volumes (crowns, props in the way) and the lens sphere first; rigged
+    // characters (_OutlineSource 3) are never faded by a volume, and the local fighter never by the see-through line
+    CMFadeVolumesClip(positionWS, positionCS, abs(_OutlineSource - 3.0) < 0.5 ? 1.0 : 0.0);
+    if (CMFadeInSelf(positionWS)) return;
     if (_CMFadeCam.w < 0.5) return;
     if (_CMFadeKeep.w > 0.0 && distance(positionWS, _CMFadeKeep.xyz) < _CMFadeKeep.w) return;
     float3 a = _CMFadeCam.xyz;

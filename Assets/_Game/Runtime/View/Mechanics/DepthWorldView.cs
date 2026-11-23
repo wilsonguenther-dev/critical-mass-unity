@@ -59,6 +59,7 @@ namespace CriticalMass.Runtime.View.Mechanics
             _air.ViewCulled = _air.NearFade = true;   // follow-camera-3: air sprites (sparks, puffs, crosses) never fill the lens
             _groundMat = Mat(sh, "Depth Ground", 0, 0, -2, 2986);
             _solidMat = Mat(sh, "Depth Solid", 2, 1, 0, 2456);
+            _solidMat.SetFloat("_CMVolFade", 1f);   // fix/px-camera-in-editor: groves fade with the third-person camera's volumes
             _airMat = Mat(sh, "Depth Air", 0, 0, 0, 3096);
             _groundGo = Layer("Depth Ground", _ground, _groundMat);
             _solidGo = Layer("Depth Solid", _solid, _solidMat);

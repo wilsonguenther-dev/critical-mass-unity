@@ -137,6 +137,20 @@ namespace CriticalMass.Runtime.Camera
         // fix/px-combat-camera-3: the plain follow's own real-size scenery set (crowns, groves, rocks, buildings, Kaiju)
         readonly SeeThroughCylinder[] _fol = new SeeThroughCylinder[MaxNearScenery];
         int _folCount;
+        // fix/px-camera-in-editor: the boom's hard set, and the fade volumes (crowns, groves, props in the way)
+        readonly SeeThroughCylinder[] _hard = new SeeThroughCylinder[MaxNearScenery];
+        int _hardCount;
+        const int MaxFades = 16, ShaderFades = 8;
+        readonly SeeThroughCylinder[] _fadeCyl = new SeeThroughCylinder[MaxFades];
+        readonly float[] _fadeAmt = new float[MaxFades], _fadeWant = new float[MaxFades];
+        int _fadeCount;
+        bool _volSet;
+        readonly Vector4[] _volA = new Vector4[ShaderFades], _volB = new Vector4[ShaderFades];
+        static readonly int VolId = Shader.PropertyToID("_CMFadeVol"), VolYId = Shader.PropertyToID("_CMFadeVolY"),
+            VolCountId = Shader.PropertyToID("_CMFadeVolCount"), LensId = Shader.PropertyToID("_CMFadeLens"), SelfId = Shader.PropertyToID("_CMFadeSelf");
+        /// <summary>fix/px-camera-in-editor: how much a crown or prop in the way is faded (0.75 = a quarter of it drawn), the
+        /// lens sphere radius (nothing closer is drawn) and the local fighter's keep radius.</summary>
+        public const float FadeInWay = 0.75f, LensClearU = 0.8f, SelfKeepU = 0.75f, FadeRate = 5f;
         // fix/px-combat-camera-3: the let-go assist (shoulder to the enemy's side, a little more pitch) and its side
         double _assist;
         int _assistSide = 1;
@@ -390,6 +404,11 @@ namespace CriticalMass.Runtime.Camera
             // fix/px-combat-camera-3 (pass 3: the plain follow parked inside tree crowns): it collides with the same
             // real-size scenery as the framing (this frame's set around the look point), playing or watching.
             _folCount = GatherScenery(w, tx, tz, 0, _fol, target);
+            // fix/px-camera-in-editor: the third-person play camera collides only with hard scenery (rocks, props,
+            // buildings) and the grid; trees and groves never move it, they fade (UpdateFades)
+            bool robust = Mode == GroundViewMode.Play && _view != CameraView.FirstPerson;
+            _hardCount = 0;
+            for (int i = 0; i < _folCount; i++) if (!robust || !_fol[i].Soft) _hard[_hardCount++] = _fol[i];
             var f = new GroundFollowInput
             {
                 Dt = paused ? 0 : dt,
@@ -406,10 +425,11 @@ namespace CriticalMass.Runtime.Camera
                 Snap = snap,
                 Map = map,
                 // fix/px-combat-camera-3: scenery pulls the lens in exactly like a wall, framed or not
-                Cylinders = _fol,
-                CylinderCount = _folCount,
+                Cylinders = _hard,
+                CylinderCount = _hardCount,
                 SlowOut = Mode == GroundViewMode.Play,
-                SightOn = Mode == GroundViewMode.Play && target >= 0,
+                SightOn = !robust && Mode == GroundViewMode.Play && target >= 0,
+                Robust = robust,
                 SightX = tx0,
                 SightY = gy0 + 1.2,
                 SightZ = tz0,
@@ -420,6 +440,7 @@ namespace CriticalMass.Runtime.Camera
             _sightWide = _follow.SightBlocked;
             _sightR = _follow.SightR;
             if (Mode != GroundViewMode.Play) _inputYaw = _follow.Yaw;
+            UpdateFades(w, robust ? target : -1, tx0, gy0, tz0, paused ? 0 : dt);
             ApplyCamera();
 
             _lodValid = true;
@@ -473,7 +494,7 @@ namespace CriticalMass.Runtime.Camera
                 double fx = mx + CombatFrame.FocusShare * k1 * (ex - mx), fz = mz + CombatFrame.FocusShare * k1 * (ez - mz);
                 double gyM = GroundHeight.At(w.Map, mx, mz), gyE = GroundHeight.At(w.Map, ex, ez);
                 double fy = gyM + (gyE - gyM) * CombatFrame.FocusShare * k1 + FollowCamera.ThirdPivotHeight + (CombatFrame.FocusHeight - FollowCamera.ThirdPivotHeight) * k1;
-                _scnCount = GatherScenery(w, fx, fz, Math.Sqrt((ex - mx) * (ex - mx) + (ez - mz) * (ez - mz)), _scn);
+                _scnCount = GatherScenery(w, fx, fz, Math.Sqrt((ex - mx) * (ex - mx) + (ez - mz) * (ez - mz)), _scn, -1, true);
                 double fit = CombatFrame.FovFit(_fov), myC = gyM + CombatFrame.ChestHeight, eyC = gyE + CombatFrame.ChestHeight;
                 // fix/px-combat-camera-3: the ladder: each side at 48, 24 and 12 deg (the smaller swings only when needed),
                 // then the closer-and-higher fallback
@@ -922,6 +943,7 @@ namespace CriticalMass.Runtime.Camera
         {
             if (_fadeSet) { Shader.SetGlobalVector(FadeCamId, Vector4.zero); _fadeSet = false; }
             if (_keepSet) { Shader.SetGlobalVector(FadeKeepId, Vector4.zero); _keepSet = false; }
+            ClearVolumes();
             Mode = GroundViewMode.Off;
             _lodValid = false;
             if (_brain != null) _brain.enabled = true;
@@ -1005,6 +1027,108 @@ namespace CriticalMass.Runtime.Camera
             }
         }
 
+        // ---------------------------------------------------------------- fix/px-camera-in-editor: fades
+
+        /// <summary>Fade volume i this frame (captures, tests): the cylinder and how faded it is (0..1).</summary>
+        public int FadeVolumes => _fadeCount;
+        public SeeThroughCylinder FadeVolume(int i, out float amount) { amount = _fadeAmt[i]; return _fadeCyl[i]; }
+
+        /// <summary>
+        /// The third-person camera never dodges scenery by moving in: what stands in the way is faded instead. A tree, a
+        /// grove or a prop is faded (FadeInWay) while the line from the lens to my head or chest (or to the framed enemy's
+        /// chest) crosses it or I stand inside its crown; gone (1) while the lens is inside it. Each fade eases at
+        /// FadeRate per second. Sent to the toon shaders as up to eight cylinders (CMFadeVolumes.hlsl), with the lens
+        /// sphere and my keep capsule. target &lt; 0: everything off (first person, watching).
+        /// </summary>
+        void UpdateFades(World w, int target, double px, double py, double pz, double dt)
+        {
+            for (int k = 0; k < _fadeCount; k++) _fadeWant[k] = 0f;
+            if (target >= 0 && w != null)
+            {
+                double lx = _follow.CamX, ly = _follow.CamY, lz = _follow.CamZ;
+                bool duel = _combat.K > 0.3 && _duelTarget >= 0 && _duelTarget < w.ActorCount;
+                double ex = 0, ey = 0, ez = 0;
+                if (duel)
+                {
+                    double a = Driver.Alpha;
+                    ex = w.PrevX[_duelTarget] + (w.X[_duelTarget] - w.PrevX[_duelTarget]) * a;
+                    ez = w.PrevZ[_duelTarget] + (w.Z[_duelTarget] - w.PrevZ[_duelTarget]) * a;
+                    ey = GroundHeight.At(w.Map, ex, ez) + 1.1;
+                }
+                for (int i = 0; i < _folCount; i++)
+                {
+                    SeeThroughCylinder c = _fol[i];
+                    if (c.Id == 0) continue;   // the Kaiju is never faded
+                    double dlx = lx - c.X, dlz = lz - c.Z, dpx = px - c.X, dpz = pz - c.Z;
+                    bool lensIn = dlx * dlx + dlz * dlz < (c.R + 0.35) * (c.R + 0.35) && ly > c.Y0 - 0.35 && ly < c.Y1 + 0.35;
+                    bool meIn = dpx * dpx + dpz * dpz < (c.R + 0.2) * (c.R + 0.2) && c.Y1 > py + 1.0 && c.Y0 < py + 2.6;
+                    bool way = meIn
+                               || GroundCollision.Crosses(lx, ly, lz, px, py + 1.0, pz, 0.0, c)
+                               || GroundCollision.Crosses(lx, ly, lz, px, py + 1.8, pz, 0.0, c)
+                               || (duel && GroundCollision.Crosses(lx, ly, lz, ex, ey, ez, 0.3, c));
+                    float want = lensIn ? 1f : way ? FadeInWay : 0f;
+                    if (want <= 0f) continue;
+                    int slot = -1;
+                    for (int k = 0; k < _fadeCount; k++) if (_fadeCyl[k].Id == c.Id) { slot = k; break; }
+                    if (slot < 0)
+                    {
+                        if (_fadeCount >= MaxFades) continue;
+                        slot = _fadeCount++;
+                        _fadeAmt[slot] = 0f;
+                    }
+                    _fadeCyl[slot] = c;
+                    _fadeWant[slot] = Mathf.Max(_fadeWant[slot], want);
+                }
+            }
+            float step = dt > 0 ? (float)dt * FadeRate : 0f;
+            int m = 0;
+            for (int k = 0; k < _fadeCount; k++)
+            {
+                float amt = step > 0f ? Mathf.MoveTowards(_fadeAmt[k], _fadeWant[k], step) : (target >= 0 ? _fadeAmt[k] : 0f);
+                if (amt <= 0f && _fadeWant[k] <= 0f) continue;
+                _fadeCyl[m] = _fadeCyl[k];
+                _fadeAmt[m] = amt;
+                _fadeWant[m] = _fadeWant[k];
+                m++;
+            }
+            _fadeCount = m;
+            if (target < 0) { ClearVolumes(); return; }
+            // the strongest eight go to the shaders
+            int sent = 0;
+            for (int pass = 0; pass < 2 && sent < ShaderFades; pass++)
+                for (int k = 0; k < _fadeCount && sent < ShaderFades; k++)
+                {
+                    bool strong = _fadeAmt[k] >= 0.5f;
+                    if ((pass == 0) != strong || _fadeAmt[k] <= 0f) continue;
+                    SeeThroughCylinder c = _fadeCyl[k];
+                    _volA[sent] = new Vector4((float)c.X, (float)-c.Z, (float)c.R, _fadeAmt[k]);
+                    _volB[sent] = new Vector4((float)c.Y0, (float)c.Y1, 0f, 0f);
+                    sent++;
+                }
+            for (int k = sent; k < ShaderFades; k++) { _volA[k] = Vector4.zero; _volB[k] = Vector4.zero; }
+            Shader.SetGlobalVectorArray(VolId, _volA);
+            Shader.SetGlobalVectorArray(VolYId, _volB);
+            Shader.SetGlobalFloat(VolCountId, sent);
+            Vector3 lens = SimSpace.ToWorld(_follow.CamX, _follow.CamY, _follow.CamZ);
+            Shader.SetGlobalVector(LensId, new Vector4(lens.x, lens.y, lens.z, LensClearU));
+            Vector3 feet = SimSpace.ToWorld(px, py, pz);
+            Shader.SetGlobalVector(SelfId, new Vector4(feet.x, feet.y, feet.z, SelfKeepU));
+            _volSet = true;
+        }
+
+        void ClearVolumes()
+        {
+            if (!_volSet) return;
+            for (int k = 0; k < ShaderFades; k++) { _volA[k] = Vector4.zero; _volB[k] = Vector4.zero; }
+            Shader.SetGlobalVectorArray(VolId, _volA);
+            Shader.SetGlobalVectorArray(VolYId, _volB);
+            Shader.SetGlobalFloat(VolCountId, 0f);
+            Shader.SetGlobalVector(LensId, Vector4.zero);
+            Shader.SetGlobalVector(SelfId, Vector4.zero);
+            _volSet = false;
+            _fadeCount = 0;
+        }
+
         // ---------------------------------------------------------------- collision volumes
 
         void GatherCylinders(World w, double tx, double tz, int target)
@@ -1031,7 +1155,7 @@ namespace CriticalMass.Runtime.Camera
 
         /// <summary>fix/px-combat-camera-2: the scenery cylinders within reach of the framed look point (fx, fz): the lens and
         /// both sight lines stay inside ThirdDistance + shoulder + half the fighters' gap of it. Plus the hatched Kaiju.</summary>
-        int GatherScenery(World w, double fx, double fz, double gap, SeeThroughCylinder[] into, int target = -1)
+        int GatherScenery(World w, double fx, double fz, double gap, SeeThroughCylinder[] into, int target = -1, bool hardOnly = false)
         {
             RefreshStatic();
             SeeThroughCylinder[] _scn = into;
@@ -1039,6 +1163,7 @@ namespace CriticalMass.Runtime.Camera
             double near = FollowCamera.ThirdDistance + CombatFrame.ShoulderU + gap + 1.0;
             for (int i = 0; i < _sceneryCount && n < MaxNearScenery - 1; i++)
             {
+                if (hardOnly && _scenery[i].Soft) continue;   // fix/px-camera-in-editor: a tree fades, it never blocks a framing
                 double dx = _scenery[i].X - fx, dz = _scenery[i].Z - fz, reach = near + _scenery[i].R;
                 if (dx * dx + dz * dz > reach * reach) continue;
                 _scn[n++] = _scenery[i];
@@ -1046,7 +1171,7 @@ namespace CriticalMass.Runtime.Camera
             // Editor review pass 3: the wood groves (DepthWorldView.Grove: up to four trees, crowns to ~2 u, within ~1.2 u of
             // the source) are sim sources drawn in the Depth Solid mesh, not dressing, so they were missing from the set
             // above and the framing parked the lens inside one beside the 28.5:58.5 grove. A standing grove counts like a tree.
-            int sources = CriticalMass.Runtime.View.Mechanics.DepthRead.SourceCount(w);
+            int sources = hardOnly ? 0 : CriticalMass.Runtime.View.Mechanics.DepthRead.SourceCount(w);
             for (int i = 0; i < sources && n < MaxNearScenery - 1; i++)
             {
                 if (!CriticalMass.Runtime.View.Mechanics.DepthRead.Source(w, i, out bool water, out double sx, out double sz, out int ch, out _, out _)) continue;
@@ -1054,7 +1179,7 @@ namespace CriticalMass.Runtime.Camera
                 double dx = sx - fx, dz = sz - fz, reach = near + GroveRadiusU;
                 if (dx * dx + dz * dz > reach * reach) continue;
                 double gy = GroundHeight.At(w.Map, sx, sz);
-                _scn[n++] = new SeeThroughCylinder { X = sx, Z = sz, R = GroveRadiusU, Y0 = gy, Y1 = gy + GroveHeightU };
+                _scn[n++] = new SeeThroughCylinder { X = sx, Z = sz, R = GroveRadiusU, Y0 = gy, Y1 = gy + GroveHeightU, Soft = true, Id = -(i + 1) };
             }
             Kaiju k = w.Kaiju;
             if (target != GroundDirector.KaijuTarget && w.Match.Hatched && k.State != KaijuState.Egg)
@@ -1095,7 +1220,7 @@ namespace CriticalMass.Runtime.Camera
         /// <summary>fix/px-combat-camera-2: one placement's solid volume as cylinders (one per kit mesh: a crown and a trunk
         /// that are separate meshes stay separate), sim space. Without the kit model: the old tree numbers with a crown
         /// radius, rocks and crystals as small cylinders, anything else skipped. Volumes lower than 0.5 u are skipped.</summary>
-        void AddScenery(in WorldPlacement p, Vector3[] corners)
+        void AddScenery(in WorldPlacement p, Vector3[] corners, bool soft)
         {
             for (int b = 0; b + 8 <= corners.Length && _sceneryCount < MaxScenery; b += 8)
             {
@@ -1111,7 +1236,8 @@ namespace CriticalMass.Runtime.Camera
                 double cx = (x0 + x1) * 0.5, cz = (z0 + z1) * 0.5, r = 0;
                 for (int k = 0; k < 8; k++) r = Math.Max(r, Math.Sqrt((pts[k].x - cx) * (pts[k].x - cx) + (-pts[k].z - cz) * (-pts[k].z - cz)));
                 if (r > 8) continue;   // a slab or an island piece, not a prop
-                _scenery[_sceneryCount++] = new SeeThroughCylinder { X = cx, Z = cz, R = r, Y0 = y0, Y1 = y1 };
+                _scenery[_sceneryCount] = new SeeThroughCylinder { X = cx, Z = cz, R = r, Y0 = y0, Y1 = y1, Soft = soft, Id = _sceneryCount + 1 };
+                _sceneryCount++;
             }
         }
 
@@ -1137,14 +1263,15 @@ namespace CriticalMass.Runtime.Camera
                 if (p.Piece != null && (p.Piece.IndexOf("intact", StringComparison.Ordinal) >= 0 || p.Piece.IndexOf("cracked", StringComparison.Ordinal) >= 0
                                         || p.Piece.IndexOf("destroyed", StringComparison.Ordinal) >= 0)) continue;
                 Vector3[] corners = PieceCorners(cat, p.Piece);
-                if (corners.Length > 0) { AddScenery(p, corners); continue; }
+                if (corners.Length > 0) { AddScenery(p, corners, p.Cat == "tree"); continue; }
                 double r, h;
                 if (p.Cat == "tree") { r = SeeThrough.TreeRadius * 1.5; h = p.Piece != null && p.Piece.IndexOf("tall", StringComparison.Ordinal) >= 0 ? SeeThrough.TreeHeightTall : SeeThrough.TreeHeightRound; }
                 else if (p.Cat == "rock_big") { r = 0.8; h = 1.2; }
                 else if (p.Cat == "crystal") { r = 0.6; h = 1.6; }
                 else if (p.Cat == "landmark") { r = 1.6; h = 9.0; }
                 else continue;
-                _scenery[_sceneryCount++] = new SeeThroughCylinder { X = p.SimX, Z = p.SimZ, R = r, Y0 = p.Y - 1, Y1 = p.Y + h };
+                _scenery[_sceneryCount] = new SeeThroughCylinder { X = p.SimX, Z = p.SimZ, R = r, Y0 = p.Y - 1, Y1 = p.Y + h, Soft = p.Cat == "tree", Id = _sceneryCount + 1 };
+                _sceneryCount++;
             }
             for (int i = 0; i < ps.Count && _staticCount < MaxStatic; i++)
             {
@@ -1339,7 +1466,9 @@ namespace CriticalMass.Runtime.Camera
             // Mode line at the bottom centre, quiet (it never covers the fight).
             GUI.color = new Color(1f, 0.97f, 0.88f, 0.75f);
             string line = Mode == GroundViewMode.Play ? PlayHint() : WatchLine;
-            if (GetComponent<GroundViewShots>() == null && GetComponent<FollowCameraShots>() == null) GUI.Label(new Rect(0, Screen.height - 40 * s, Screen.width, 28 * s), line, _style);
+            // readability-4: the view-hint row only while ViewHintGate allows it (not over menus or the banner line, and it
+            // retires once he has learned it)
+            if (CriticalMass.Runtime.Hud.ViewHintGate.Show && GetComponent<GroundViewShots>() == null && GetComponent<FollowCameraShots>() == null) GUI.Label(new Rect(0, Screen.height - 40 * s, Screen.width, 28 * s), line, _style);
             string toast = ToastLane.Current(Time.unscaledTime);
             if (toast != null)
             {

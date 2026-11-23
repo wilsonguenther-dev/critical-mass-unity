@@ -335,7 +335,32 @@ namespace CriticalMass.Runtime.View.Moments
             FitCanvas(_canvas);
             if (_queue.Playing) Animate(now);
             if (_queue.StingerPlaying && _stinger != null) AnimateStinger(now);
+            MvOneBanner();   // mv-6 readability-4 item 6
             if (_slowed && now >= _slowUntil) RestoreSlowMotion();
+        }
+
+        /// <summary>mv-6 readability-4 item 6: the corner stinger is on screen this frame (the kill-confirm lines it covers
+        /// stand aside while it is).</summary>
+        public static bool StingerUp { get; private set; }
+        CanvasGroup _mvStingerGroup;
+
+        /// <summary>mv-6 readability-4 item 6 (pass 4: TWO DOWN under CRIMSON RALLIES, both beside the kill feed): under the
+        /// class moves one banner at a time: while an event banner holds the centre lane (HudZones Callout at Banner
+        /// priority or above, not this takeover) the corner stinger is hidden. Off (switches off): untouched.</summary>
+        void MvOneBanner()
+        {
+            bool playing = _queue.StingerPlaying && _stinger != null && _stinger.gameObject.activeSelf;
+            if (!CriticalMass.Runtime.Hud.Player.WorldWords.MovesCap || _stinger == null)
+            {
+                if (_mvStingerGroup != null && _mvStingerGroup.alpha != 1f) _mvStingerGroup.alpha = 1f;
+                StingerUp = false;
+                return;
+            }
+            bool hide = playing && !_queue.Playing && HudZones.Blocked(HudZone.Callout, HudPriority.Intro);
+            if (_mvStingerGroup == null) { _mvStingerGroup = _stinger.gameObject.GetComponent<CanvasGroup>(); if (_mvStingerGroup == null) _mvStingerGroup = _stinger.gameObject.AddComponent<CanvasGroup>(); _mvStingerGroup.blocksRaycasts = false; }
+            float a = hide ? 0f : 1f;
+            if (_mvStingerGroup.alpha != a) _mvStingerGroup.alpha = a;
+            StingerUp = playing && !hide;
         }
 
         /// <summary>A full-screen panel is up: the knock-out recap, the results screen, or the pause menu and its settings.</summary>

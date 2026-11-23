@@ -97,6 +97,47 @@ namespace CriticalMass.Runtime.Hud.Player
         public int VisibleCount { get; private set; }
         public RectTransform Root => _root;
 
+        // mv-6 readability-4 item 2: the bars placed this frame (canvas units), so a crowd's bars stack instead of overlapping
+        readonly Rect[] _placed = new Rect[MaxBars];
+        int _placedN;
+        public const float BarGapPx = 3f;
+
+        /// <summary>Moves a bar (centre c, half size) up past every bar placed before it this frame; records it.</summary>
+        Vector2 Separate(Vector2 c, Vector2 half)
+        {
+            for (int pass = 0; pass < 6; pass++)
+            {
+                bool moved = false;
+                for (int i = 0; i < _placedN; i++)
+                {
+                    Rect me = new Rect(c - half, 2f * half);
+                    if (!me.Overlaps(_placed[i])) continue;
+                    c.y = _placed[i].yMax + half.y + BarGapPx;
+                    moved = true;
+                }
+                if (!moved) break;
+            }
+            if (_placedN < _placed.Length) _placed[_placedN++] = new Rect(c - half, 2f * half);
+            return c;
+        }
+
+        /// <summary>Pure (tests): the same rule on a list: each box moves up past the ones before it.</summary>
+        public static void SeparateAll(Rect[] boxes, int count)
+        {
+            for (int j = 1; j < count; j++)
+                for (int pass = 0; pass < 6; pass++)
+                {
+                    bool moved = false;
+                    for (int i = 0; i < j; i++)
+                    {
+                        if (!boxes[j].Overlaps(boxes[i])) continue;
+                        boxes[j].y = boxes[i].yMax + BarGapPx;
+                        moved = true;
+                    }
+                    if (!moved) break;
+                }
+        }
+
         public HealthBars(RectTransform world)
         {
             _root = PxUi.Rt(world, "Unit Bars");
@@ -187,6 +228,8 @@ namespace CriticalMass.Runtime.Hud.Player
             int lockT = CriticalMass.Runtime.Input.AimAssist.LockTarget;
             _focus = lockT >= 0 ? lockT : (_lastHitByMe >= 0 && w.Match.Time - _lastHitByMeAt <= FocusSeconds ? _lastHitByMe : -1);
             int n = Mathf.Min(w.ActorCount, MaxBars), shown = 0;
+            bool crowd = CrowdTags.On;   // mv-6 readability-4 item 2
+            _placedN = 0;
             for (int i = 0; i < MaxBars; i++)
             {
                 Bar b = _bars[i];
@@ -219,6 +262,7 @@ namespace CriticalMass.Runtime.Hud.Player
                 if (Mathf.Abs(b.Scale - k) > 0.01f) { b.Scale = k; b.Rt.localScale = new Vector3(k, k, 1f); }
                 float tag = low ? TagLens.Scale(dist) : 1f;
                 b.Rt.anchoredPosition = UnitStack.BarCentre(p / scale, tag, (BaseH + 2f * FramePx) * k);   // review fix: one layout owner
+                if (crowd) b.Rt.anchoredPosition = Separate(b.Rt.anchoredPosition, new Vector2(BaseW * k * 0.5f + FramePx, (BaseH + 2f * FramePx) * k * 0.5f));   // mv-6
                 Color fill = enemy ? PxPalette.Strike : CMTokens.Team(a.Team);
                 if (b.Glow > 0f) fill = Color.Lerp(fill, PxPalette.Heal, b.Glow / HealGlowSeconds);
                 b.Fill.SetFill(fill);

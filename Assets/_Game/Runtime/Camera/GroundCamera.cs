@@ -307,6 +307,11 @@ namespace CriticalMass.Runtime.Camera
         public double SightX, SightY, SightZ;
         /// <summary>Vertical field of view (deg) and aspect for the occluder's screen share.</summary>
         public double VFovDeg, Aspect;
+        /// <summary>fix/px-camera-in-editor: the third-person play camera's simple rules (GroundFollow.StepRobust): the
+        /// boom collides only with what is passed in Cylinders (hard scenery) and the grid, never shorter than RobustMin,
+        /// rises up to RobustMaxSteep over a wall, never goes over the head, and keeps the fighter (SightX/Y/Z) in frame.
+        /// Whatever is still in the way is faded by GroundView, never dodged by moving in.</summary>
+        public bool Robust;
     }
 
     /// <summary>
@@ -419,6 +424,7 @@ namespace CriticalMass.Runtime.Camera
                 oz = _pz.X + rz * sDir * sh;
             }
             double want = baseDist + f.ExtraDistance;
+            if (f.Robust) { StepRobust(f, dt, snap, ox, oy, oz, ux, uz, want); return; }
             double allowed = GroundCollision.Resolve(f.Map, ox, oy, oz, -fx, -fy, -fz, want, f.Cylinders, f.CylinderCount);
             SightBlocked = false;
             SightR = 0;
@@ -464,6 +470,108 @@ namespace CriticalMass.Runtime.Camera
                 OverHead = true;
             }
             else OverHead = false;
+        }
+
+        // ------------------------------------------------------------------ fix/px-camera-in-editor: the robust boom
+
+        /// <summary>Never closer to the boom's pivot than this (u); the lens keeps RobustRadius clear of walls and the
+        /// ground RobustFloor under it (the HUD planes at 0.4-0.6 m never meet geometry); never steeper than RobustMaxSteep
+        /// (deg) looking at the chest; the chest stays RobustFrameMargin (deg) inside the frame.</summary>
+        public const double RobustMin = 1.6, RobustRadius = 0.45, RobustFloor = 0.7, RobustMaxSteep = 55, RobustFrameMargin = 12;
+        /// <summary>Distance: in at once (a wall), out only after RobustHold s clear, then on RobustOutTau (no pumping).
+        /// Wall rise: up on RobustRiseTau, down after RobustHold on RobustFallTau.</summary>
+        public const double RobustHold = 0.6, RobustOutTau = 0.9, RobustRiseTau = 0.08, RobustFallTau = 0.9;
+
+        double _rise, _riseClear, _outClear;
+        /// <summary>fix/px-camera-in-editor: even at RobustMin and the steepest rise the boom touches hard geometry (the
+        /// caller fades what is in the way); the boom's pitch and the drawn look pitch this frame (tests, captures).</summary>
+        public bool Blocked { get; private set; }
+        public double BoomPitch { get; private set; }
+
+        static double ResolveR(MapDef map, double px, double py, double pz, double dx, double dy, double dz, double want,
+            SeeThroughCylinder[] cyl, int n, double radius)
+        {
+            if (!(want > 0)) return 0;
+            int steps = (int)Math.Ceiling(want / GroundCollision.Step);
+            double safe = 0;
+            for (int i = 1; i <= steps; i++)
+            {
+                double t = Math.Min(want, i * GroundCollision.Step);
+                if (GroundCollision.Inside(map, px + dx * t, py + dy * t, pz + dz * t, radius, cyl, n))
+                    return Math.Max(0, Math.Min(safe, t - GroundCollision.Clearance));
+                safe = t;
+            }
+            return want;
+        }
+
+        double BoomAt(in GroundFollowInput f, double ox, double oy, double oz, double ux, double uz, double pitchDeg, double want)
+        {
+            double pr = pitchDeg * Math.PI / 180, cp = Math.Cos(pr), sp = Math.Sin(pr);
+            return ResolveR(f.Map, ox, oy, oz, -ux * cp, sp, -uz * cp, want, f.Cylinders, f.CylinderCount, RobustRadius);
+        }
+
+        double SteepAt(in GroundFollowInput f, double ox, double oy, double oz, double ux, double uz, double pitchDeg, double dist)
+        {
+            double pr = pitchDeg * Math.PI / 180;
+            double cx = ox - ux * Math.Cos(pr) * dist, cy = oy + Math.Sin(pr) * dist, cz = oz - uz * Math.Cos(pr) * dist;
+            double h = Math.Sqrt((cx - f.SightX) * (cx - f.SightX) + (cz - f.SightZ) * (cz - f.SightZ));
+            return Math.Atan2(cy - f.SightY, Math.Max(1e-3, h)) * 180 / Math.PI;
+        }
+
+        void StepRobust(in GroundFollowInput f, double dt, bool snap, double ox, double oy, double oz, double ux, double uz, double want)
+        {
+            OverHead = false;
+            double basePitch = Pitch;
+            want = Math.Max(RobustMin, want);
+            // 1. the wall rise: the smallest extra pitch (5 deg steps) that lets the boom reach RobustMin, within the
+            // steepness limit; none fits: the steepest allowed (what is still in the way is faded by the caller)
+            double riseWant = 0;
+            if (BoomAt(f, ox, oy, oz, ux, uz, basePitch, want) < RobustMin)
+            {
+                riseWant = -1;
+                double last = 0;
+                for (double b = 5; b <= 60; b += 5)
+                {
+                    if (SteepAt(f, ox, oy, oz, ux, uz, basePitch + b, RobustMin) > RobustMaxSteep) break;
+                    last = b;
+                    if (BoomAt(f, ox, oy, oz, ux, uz, basePitch + b, want) >= RobustMin) { riseWant = b; break; }
+                }
+                if (riseWant < 0) riseWant = last;
+            }
+            if (snap || dt <= 0) { _rise = snap ? riseWant : _rise; _riseClear = 0; }
+            else if (riseWant > _rise) { _rise += (riseWant - _rise) * (1 - Math.Exp(-dt / RobustRiseTau)); _riseClear = 0; }
+            else
+            {
+                _riseClear += dt;
+                if (_riseClear >= RobustHold) _rise += (riseWant - _rise) * (1 - Math.Exp(-dt / RobustFallTau));
+            }
+            double boomPitch = basePitch + _rise;
+            BoomPitch = boomPitch;
+            // 2. the distance: in at once, out slowly after a hold; never under RobustMin
+            double allowed = Math.Max(RobustMin, Math.Min(want, BoomAt(f, ox, oy, oz, ux, uz, boomPitch, want)));
+            Allowed = allowed;
+            if (snap || allowed < Dist) { Dist = allowed; _outClear = 0; }
+            else if (dt > 0)
+            {
+                _outClear = allowed > Dist + 0.05 ? _outClear + dt : 0;
+                if (_outClear >= RobustHold) Dist += (allowed - Dist) * (1 - Math.Exp(-dt / RobustOutTau));
+            }
+            Dist = Math.Max(RobustMin, Math.Min(Dist, want));
+            double pr = boomPitch * Math.PI / 180, cp = Math.Cos(pr), sp = Math.Sin(pr);
+            CamX = ox - ux * cp * Dist;
+            CamY = oy + sp * Dist;
+            CamZ = oz - uz * cp * Dist;
+            double floor = GroundCollision.SolidTop(f.Map, CamX, CamZ);
+            if (CamY - RobustFloor < floor) CamY = floor + RobustFloor;
+            Blocked = GroundCollision.Inside(f.Map, CamX, CamY, CamZ, GroundCollision.Radius, f.Cylinders, f.CylinderCount)
+                      || BoomAt(f, ox, oy, oz, ux, uz, boomPitch, want) < RobustMin - 1e-6;
+            SightBlocked = false;
+            SightR = 0;
+            // 3. the drawn look: the fighter's chest stays RobustFrameMargin inside the top and bottom of the frame
+            double h = Math.Sqrt((CamX - f.SightX) * (CamX - f.SightX) + (CamZ - f.SightZ) * (CamZ - f.SightZ));
+            double steep = Math.Atan2(CamY - f.SightY, Math.Max(1e-3, h)) * 180 / Math.PI;
+            double half = Math.Max(10, (f.VFovDeg > 0 ? f.VFovDeg : 60) * 0.5) - RobustFrameMargin;
+            Pitch = Clamp(boomPitch, steep - half, steep + half);
         }
 
         /// <summary>Over-the-head fallback height above the pivot (u).</summary>
