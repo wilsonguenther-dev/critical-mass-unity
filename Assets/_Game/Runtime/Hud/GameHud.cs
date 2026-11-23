@@ -932,6 +932,15 @@ namespace CriticalMass.Runtime.Hud
             if (mvSlot != null) attackName = mvSlot;
             float slotCd = demoTnt && !s.DemoTntReady ? s.DemoTntCd01 : s.AttackCd01, slotSec = demoTnt && !s.DemoTntReady ? s.DemoTntSeconds : 0f;
             ApplyButton(_buttons[0], slotCd, slotSec, UiIcons.Attack[SlotIconRow(cls, demoTnt && s.DemoTntReady), team], attackName, dt);
+            if (mvWorld != null && mvWorld.Moves != null && CriticalMass.Runtime.View.B17.MovesRead.ChainNext(mvWorld, HudBinder.LocalActor) >= 2)
+            {
+                // mv-6 readability item 5: exactly while the next Attack press chains, the slot stands out (larger, strike rim,
+                // a slow 2.5 Hz swell; steady with reduce flashing), so a masher learns the window instead of missing it
+                bool calm = !CriticalMass.Runtime.View.Moments.FlashSafety.IntenseAllowed;
+                float pulse = 1.10f + (calm ? 0f : 0.05f * Mathf.Sin(Time.unscaledTime * 2f * Mathf.PI * 2.5f));
+                _buttons[0].Rt.localScale = Vector3.Scale(_buttons[0].Rt.localScale, new Vector3(pulse, pulse, 1f));
+                _buttons[0].Body.SetRim(CriticalMass.Runtime.Hud.Player.PxPalette.Strike);
+            }
             ApplyButton(_buttons[1], s.AbilityCd01, s.AbilityCdSeconds, UiIcons.Ability[iconRow, team], AbilityNames[cls], dt);
             ApplyDenied(_buttons[1], dt);
             AbilityButton carry = _buttons[2];

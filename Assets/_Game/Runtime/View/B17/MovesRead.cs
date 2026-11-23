@@ -100,6 +100,25 @@ namespace CriticalMass.Runtime.View.B17
             arcDeg = (float)a;
         }
 
+        /// <summary>
+        /// The swing in flight (actor i's SwingTick) is a HEAVY release: its drawn shape (the true reach with the body widening
+        /// and the widened half arc, radians, as HitFeelTuning draws a light) so the wind-up wedge and the slash show the
+        /// heavy's shape, not the light's (review item 6: one telegraph per swing). False for every light swing.
+        /// </summary>
+        public static bool HeavySwing(World w, int i, out float drawnReach, out float drawnHalfArc)
+        {
+            drawnReach = drawnHalfArc = 0f;
+            if (!On(w) || !MovesHooks.Cfg(w).Heavy || i < 0 || i >= w.ActorCount) return false;
+            OffenceMovesState s = w.Moves.Offence;
+            if (i >= s.HeavySwingTick.Length || s.HeavySwingTick[i] == CombatFeel.NoTick || s.HeavySwingTick[i] != w.Actors[i].SwingTick) return false;
+            MovesHooks.OffenceHeavyShape(w, w.Actors[i].Cls, out double r, out double a);
+            double reach = r + CriticalMass.Runtime.View.Anim.HitFeelTuning.BodyWidening;
+            double half = a * 0.5 * System.Math.PI / 180 + System.Math.Asin(System.Math.Min(1, CriticalMass.Runtime.View.Anim.HitFeelTuning.BodyWidening / System.Math.Max(1e-6, reach)));
+            drawnReach = (float)reach;
+            drawnHalfArc = (float)System.Math.Min(System.Math.PI, half);
+            return true;
+        }
+
         /// <summary>The combo step of the swing in flight (2 or 3 = a chain step; 0 or 1 = none / the opener).</summary>
         public static int ComboStep(World w, int i) => On(w) && MovesHooks.Cfg(w).Combos ? MovesHooks.OffenceComboStep(w, i) : 0;
 

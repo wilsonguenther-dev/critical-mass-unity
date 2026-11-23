@@ -33,6 +33,7 @@ namespace CriticalMass.Runtime.Hud.Player
             public bool Row;
             public int Key;
             public bool Active;
+            public int Rank;   // mv-6: the word's priority (Rank) while MovesCap is on
         }
 
         readonly Slot[] _slots;
@@ -98,6 +99,9 @@ namespace CriticalMass.Runtime.Hud.Player
                 bool same = actor >= 0 ? o.Actor == actor : o.Actor < 0 && (o.Point - point).sqrMagnitude < 1.5f;
                 if (same && o.Stack >= stack) stack = o.Stack + 1;
             }
+            int rank = Rank(text);
+            if (MovesCap && !Capped(s, actor, point, rank)) { NextSize = 0; return null; }   // mv-6 (sets s.Stack)
+            s.Rank = rank;
             s.Active = true;
             s.Age = 0f;
             s.Life = seconds;
@@ -105,7 +109,7 @@ namespace CriticalMass.Runtime.Hud.Player
             s.Point = point;
             s.Row = actor >= 0;
             s.Lift = s.Row ? HealthBars.Lift : lift;
-            s.Stack = Mathf.Min(stack, 3);
+            if (!MovesCap) s.Stack = Mathf.Min(stack, 3);
             int size = NextSize > 0 ? NextSize : strong ? StrongSize : SoftSize;   // review fix round 3: PERFECT a little larger
             NextSize = 0;
             s.Key = key;
@@ -124,6 +128,66 @@ namespace CriticalMass.Runtime.Hud.Player
             s.Group.alpha = 1f;   // visible the frame it is raised (the ledger reports it then)
             if (!s.Rt.gameObject.activeSelf) s.Rt.gameObject.SetActive(true);
             return s.Text;
+        }
+
+        /// <summary>
+        /// Class moves readability (Editor review item 2): BLOCKED / STUNNED / PERFECT / SECOND WIND used to pile up on one
+        /// body. While MovesCap is on (MovesViews sets it each frame while World.Moves exists; off = today's stacking exactly),
+        /// at most MaxPerAnchor words show on one body (or one point): a new word pushes out the lowest-ranked one (ties: the
+        /// oldest), a new word ranked below both that already show is not shown, and the two are staggered one row apart with
+        /// the higher rank on top (ties: the newest).
+        /// </summary>
+        public static bool MovesCap;
+        public const int MaxPerAnchor = 2;
+
+        /// <summary>Pure: a word's rank (higher shows first): PARRY / PARRIED 5, GUARD BREAK / GUARD BROKEN 4, FINISHER 3,
+        /// BLOCKED 2, anything else 1.</summary>
+        public static int Rank(string text)
+        {
+            switch (text)
+            {
+                case "PARRY": case "PARRIED": return 5;
+                case "GUARD BREAK": case "GUARD BROKEN": return 4;
+                case "FINISHER": return 3;
+                case "BLOCKED": return 2;
+                default: return 1;
+            }
+        }
+
+        readonly Slot[] _near = new Slot[8];
+
+        /// <summary>MovesCap: makes room for a word of rank on this anchor; false = the word is outranked and not shown.
+        /// Sets s's and the kept neighbour's Stack (higher rank on top).</summary>
+        bool Capped(Slot s, int actor, Vector3 point, int rank)
+        {
+            int n = 0;
+            for (int i = 0; i < _slots.Length && n < _near.Length; i++)
+            {
+                Slot o = _slots[i];
+                if (o == s || !o.Active) continue;
+                bool same = actor >= 0 ? o.Actor == actor : o.Actor < 0 && (o.Point - point).sqrMagnitude < 1.5f;
+                if (same) _near[n++] = o;
+            }
+            while (n >= MaxPerAnchor)
+            {
+                int low = 0;
+                for (int k = 1; k < n; k++)
+                    if (_near[k].Rank < _near[low].Rank || (_near[k].Rank == _near[low].Rank && _near[k].Age > _near[low].Age)) low = k;
+                if (_near[low].Rank > rank) return false;   // both showing outrank the new word
+                _near[low].Active = false;
+                PxUi.Show(_near[low].Rt, false);
+                _near[low] = _near[n - 1];
+                n--;
+            }
+            if (n == 1)
+            {
+                bool newOnTop = rank >= _near[0].Rank;
+                s.Stack = newOnTop ? 1 : 0;
+                _near[0].Stack = newOnTop ? 0 : 1;
+            }
+            else s.Stack = 0;
+            for (int k = 0; k < _near.Length; k++) _near[k] = null;
+            return true;
         }
 
         /// <summary>One-shot font size for the next Show (0 = the strong / soft size).</summary>

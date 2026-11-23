@@ -443,6 +443,9 @@ namespace CriticalMass.Runtime.Input
 
         /// <summary>Lane I: an attack is wanted now (held, latched for the next step, or buffered): the aim help bends.</summary>
         public bool AttackIntent => _attackHeld || _attackLatch || _attackBuffer.Pending;
+        /// <summary>mv-6 (class moves readability): the Guard button is down or a tap is latched (read only, for the view's
+        /// press-frame guard).</summary>
+        public bool GuardIntent => _guardHeld || _guardLatch;   // mv-6
         /// <summary>Lane I: an ability press waits for the next step (latched or buffered).</summary>
         public bool AbilityIntent => _abilityLatch || _abilityBuffer.Pending;
         /// <summary>Lane I: an Interact tap is latched for the next step (tests).</summary>
