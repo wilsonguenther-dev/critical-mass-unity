@@ -295,6 +295,7 @@ namespace CriticalMass.Sim.Core
                 }
                 if (m.Guard) DefenceGuardTick(w, d, s, m, i);
                 DefenceSnapSteer(w, d, i);
+                DefenceLungeLock(w, d, i);
                 if (m.DodgeLunge && d.LungeArmed[i] != 0)
                 {
                     if (Dodge.Active(w, i) && w.Inputs[i].Attack) d.LungePressed[i] = 1;
@@ -431,20 +432,22 @@ namespace CriticalMass.Sim.Core
 
         static double DefenceSpeedScale(World w, int i)
         {
-            // round 3 (pass 3: the Builder lunge whiffed in third person): through his own LUNGE wind-up a player keeps only a
-            // stick that points at the lunge target (within 45 degrees); any other stick (a camera-relative forward that swung with
-            // the combat camera's yaw) holds him where the dash put him, so the swing lands from the stop point
+            // round 4 (pass 4: the Builder lunge still whiffed: the target walked off through the wind-up): a person's LUNGE
+            // wind-up is locked to the target in world space (DefenceLungeLock): the walk holds 0.6 x reach of it
             DefenceMovesState ds = DefenceS(w);
+            if (DefenceLungeLocked(w, ds, i, out int lt)) return DefenceLungeLockScale(w, i, lt);
+            // round 3 rule, kept for a bot (bot-only play unchanged): through its own LUNGE wind-up only a move that points at the
+            // lunge target (within 45 degrees) walks
             Actor la = w.Actors[i];
             if (Cfg(w).DodgeLunge && la.SwingPending && la.SwingTick == ds.LungeSwingTick[i])
             {
-                int lt = ds.LungeTarget[i];
-                InputFrame inp = w.Inputs[i];
-                if (lt >= 0 && lt < w.ActorCount && w.Actors[lt].Alive && inp != null)
+                int bt = ds.LungeTarget[i];
+                InputFrame binp = w.Inputs[i];
+                if (bt >= 0 && bt < w.ActorCount && w.Actors[bt].Alive && binp != null)
                 {
-                    double tx = w.X[lt] - w.X[i], tz = w.Z[lt] - w.Z[i];
-                    double tl = Math.Sqrt(tx * tx + tz * tz), ml = Math.Sqrt(inp.MoveX * inp.MoveX + inp.MoveZ * inp.MoveZ);
-                    if (tl > 1e-9 && ml > 1e-9 && (inp.MoveX * tx + inp.MoveZ * tz) / (tl * ml) < DefenceLungeFollowCos) return 0;
+                    double tx = w.X[bt] - w.X[i], tz = w.Z[bt] - w.Z[i];
+                    double tl = Math.Sqrt(tx * tx + tz * tz), ml = Math.Sqrt(binp.MoveX * binp.MoveX + binp.MoveZ * binp.MoveZ);
+                    if (tl > 1e-9 && ml > 1e-9 && (binp.MoveX * tx + binp.MoveZ * tz) / (tl * ml) < DefenceLungeFollowCos) return 0;
                 }
             }
             double snap = DefenceSnapScale(w, ds, i);
@@ -510,7 +513,11 @@ namespace CriticalMass.Sim.Core
             InputFrame inp = w.Inputs[id];
             bool chasing = inp != null && inp.MoveX * rx + inp.MoveZ * rz > 0;
             double follow = chasing ? DefenceLungeChaseShare * w.Config.Class(a.Cls).MoveSpeed * (lead - (dc != null ? dc.DashTicks : 6)) / w.Config.SimHz : 0;
-            if (rl - arm - follow > distance) return distance;
+            // round 4: for a person, no refusal here any more: a dodge-in at a runner keeps its dash (closing the distance is the
+            // point); the LUNGE claim alone is dropped at the swing start if the target will be out of reach (DefenceLungeStillLands).
+            // A bot's dodge keeps the round 3 refusal (bot-only play unchanged)
+            bool lungePerson = BotAim.IsHumanSeat(w, id) && !(id == 0 && BotBrain.ActorZeroOnAutopilot(w));
+            if (!lungePerson && rl - arm - follow > distance) return distance;
             double go = rl - stop;
             // fix/mv-lunge-stop: never past the target's body where it is at the dash's END (the dash is front-loaded: aimed
             // at a runner's contact point it caught the runner's body mid-dash and shoved it on, out of reach)
@@ -522,13 +529,63 @@ namespace CriticalMass.Sim.Core
             if (go < min) go = min;
             if (go > distance) go = distance;
             // ... and with the stick let go (no chase after the dash), the gap at contact is rl - go: past the arm share, no lunge
-            if (!chasing && rl - go > arm) return distance;
+            if (!lungePerson && !chasing && rl - go > arm) return distance;   // (round 4: a person's let-go refusal moved to the swing start)
             if (rl > 1e-9) { dx = rx / rl; dz = rz / rl; }
             d.LungeArmed[id] = 1;
             d.LungeTarget[id] = best;
             d.LungeDashEnd[id] = CombatFeel.NoTick;
             return go;
         }
+
+        // ================================================================== round 4 lunge lock
+
+        /// <summary>round 4: a person's LUNGE swing is winding up and its target is alive.</summary>
+        static bool DefenceLungeLocked(World w, DefenceMovesState d, int i, out int lt)
+        {
+            lt = d.LungeTarget[i];
+            Actor a = w.Actors[i];
+            return Cfg(w).DodgeLunge && a.Alive && a.SwingPending && a.SwingTick == d.LungeSwingTick[i] && lt >= 0 && lt < w.ActorCount
+                && w.Actors[lt].Alive && BotAim.IsHumanSeat(w, i) && !(i == 0 && BotBrain.ActorZeroOnAutopilot(w));
+        }
+
+        /// <summary>round 4 (pass 4: the Builder's lunge whiffed with the combat camera turning; the target walked off through
+        /// the wind-up): per tick before Movement, through a person's LUNGE wind-up, his move points at the lunge target and his
+        /// swing faces where it will be at contact, in world space (the camera-relative stick is not read): the lunge that
+        /// showed LUNGE is carried to the hit. DefenceLungeLockScale sets the pace.</summary>
+        static void DefenceLungeLock(World w, DefenceMovesState d, int i)
+        {
+            if (!DefenceLungeLocked(w, d, i, out int lt)) return;
+            Actor a = w.Actors[i];
+            InputFrame inp = w.Inputs[i];
+            double ex = w.X[lt] - w.X[i], ez = w.Z[lt] - w.Z[i];
+            double ed = Math.Sqrt(ex * ex + ez * ez);
+            if (inp != null && ed > 1e-6) { inp.MoveX = ex / ed; inp.MoveZ = ez / ed; }
+            int left = a.SwingTick + a.SwingWindup - w.Tick;
+            double ls = (left > 0 ? left : 0) / w.Config.SimHz;
+            double fx = w.X[lt] + w.Vx[lt] * ls - w.X[i], fz = w.Z[lt] + w.Vz[lt] * ls - w.Z[i];
+            if (fx * fx + fz * fz > 1e-12) { a.SwingFacing = JsMath.Atan2(fz, fx); a.Facing = a.SwingFacing; }
+        }
+
+        /// <summary>round 4: the walk scale through a locked LUNGE wind-up: closes to LungeStopShare x reach of the target's body
+        /// edge by contact (at most DefenceLungeLockMaxScale x the walk), 0 once there.</summary>
+        static double DefenceLungeLockScale(World w, int i, int lt)
+        {
+            Actor a = w.Actors[i];
+            LightWeapon lw = LightWeapons.Of(w, a.Cls);
+            double reach = lw != null ? lw.Range : w.Config.Class(a.Cls).AttackRange;
+            double ex = w.X[lt] - w.X[i], ez = w.Z[lt] - w.Z[i];
+            double gap = Math.Sqrt(ex * ex + ez * ez) - w.Config.Class(w.Actors[lt].Cls).Radius - Cfg(w).LungeStopShare * reach;
+            if (gap <= 0) return 0;
+            int left = a.SwingTick + a.SwingWindup - w.Tick;
+            if (left < 1) left = 1;
+            double per = w.Config.Class(a.Cls).MoveSpeed / w.Config.SimHz;
+            if (!(per > 0)) return 1.0;
+            double need = gap / left / per;
+            return need < DefenceLungeLockMaxScale ? need : DefenceLungeLockMaxScale;
+        }
+
+        /// <summary>round 4: the fastest a locked LUNGE wind-up walks, as a share of the walk speed (the windup slow applies too).</summary>
+        const double DefenceLungeLockMaxScale = 1.5;
 
         // ================================================================== round 3 swing snap
 
@@ -624,7 +681,9 @@ namespace CriticalMass.Sim.Core
             InputFrame inp = w.Inputs[i];
             double ml = inp != null ? Math.Sqrt(inp.MoveX * inp.MoveX + inp.MoveZ * inp.MoveZ) : 0;
             double fl = Math.Sqrt(fx * fx + fz * fz);
-            bool follows = ml > 1e-9 && fl > 1e-9 && (inp.MoveX * fx + inp.MoveZ * fz) / (ml * fl) >= DefenceLungeFollowCos;
+            // round 4: a person's lunge wind-up is locked to the target (DefenceLungeLock), so he always follows it in
+            bool person = BotAim.IsHumanSeat(w, i) && !(i == 0 && BotBrain.ActorZeroOnAutopilot(w));
+            bool follows = person || ml > 1e-9 && fl > 1e-9 && (inp.MoveX * fx + inp.MoveZ * fz) / (ml * fl) >= DefenceLungeFollowCos;
             double follow = follows ? DefenceLungeChaseShare * w.Config.Class(a.Cls).MoveSpeed * ls : 0;
             return edge - follow <= DefenceLungeArmMaxShare * reach;
         }

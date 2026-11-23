@@ -1309,6 +1309,7 @@ namespace CriticalMass.Net
             A(ref h, o.ComboDefer);
             A(ref h, o.ComboGo);
             A(ref h, o.ComboKey);
+            A(ref h, o.Dodged);
             A(ref h, o.EventCursor);
             A(ref h, o.GuardUntil);
             A(ref h, o.Guards);
@@ -1318,6 +1319,8 @@ namespace CriticalMass.Net
             A(ref h, o.QuickSeq);
             A(ref h, o.ReadKey);
             A(ref h, o.Reads);
+            A(ref h, o.Seen);
+            A(ref h, o.SeenKey);
             A(ref h, o.SideFrom);
             A(ref h, o.SideSteps);
             A(ref h, o.SideUntil);
