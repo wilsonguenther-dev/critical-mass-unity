@@ -398,7 +398,15 @@ namespace CriticalMass.Runtime.Hud
             _group.alpha = alpha;
             Queue.Motion(now, out float scale, out float lift);
             _root.localScale = new Vector3(scale, scale, 1f);
-            _root.anchoredPosition = new Vector2(0f, -CentreFromTop + 18f * lift);
+            bool slim = CriticalMass.Runtime.Camera.GroundView.Melee && Queue.Current.Style != BannerStyle.Corruption;
+            if (slim != _slim) Slim(slim);
+            if (slim)
+            {
+                if (_reason.gameObject.activeSelf) _reason.gameObject.SetActive(false);
+                if (_iconDisc.gameObject.activeSelf) _iconDisc.gameObject.SetActive(false);
+                if (_badgeDisc.gameObject.activeSelf) _badgeDisc.gameObject.SetActive(false);
+            }
+            _root.anchoredPosition = new Vector2(0f, -CentreFromTop - (slim ? (SlimHeight - Height) * 0.5f : 0f) + 18f * lift);
             if (Queue.Current.Style == BannerStyle.Corruption)
             {
                 // the shards breathe (view only, on the banner clock so a capture replays it)
@@ -408,6 +416,25 @@ namespace CriticalMass.Runtime.Hud
                     _shards[i].rectTransform.localScale = new Vector3(k, k, 1f);
                 }
             }
+        }
+
+        /// <summary>fix/px-rough-spots item 10: the slim strip's height; same top edge as the full banner, no reason line, no
+        /// discs or bands, so it covers 104 px less of the fight under it.</summary>
+        public const float SlimHeight = 64f;
+        private bool _slim;
+        /// <summary>The banner is drawn as the slim strip (tests, captures).</summary>
+        public static bool IsSlim { get; private set; }
+
+        private void Slim(bool on)
+        {
+            _slim = on; IsSlim = on;
+            float h = on ? SlimHeight : Height;
+            _root.sizeDelta = new Vector2(Width, h);
+            _plate.rectTransform.sizeDelta = new Vector2(Width, h);
+            _bandTop.gameObject.SetActive(!on);
+            _bandBottom.gameObject.SetActive(!on);
+            Centre(_headline.rectTransform, on ? Vector2.zero : new Vector2(20f, 22f), new Vector2(Width - 300f, on ? 52f : 64f));
+            if (!on) _seenVersion = -1;   // Apply again: reason, icon and badge back as the spec says
         }
 
         private void Apply(in BannerSpec s)

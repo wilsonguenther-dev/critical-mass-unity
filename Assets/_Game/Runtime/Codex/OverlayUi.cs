@@ -92,6 +92,13 @@ namespace CriticalMass.Runtime.Codex
 
         static CaptionBar _instance;
 
+        /// <summary>fix/px-rough-spots item 10: during a third-person melee the caption is a slim one-line strip just above
+        /// the action bar instead of a two-line plate across the fighters.</summary>
+        const float SlimH = 44f, SlimY = 872f;
+        public static bool IsSlim => _instance != null && _instance._slim;
+        bool _slim;
+        VectorShape _plate;
+
         Canvas _canvas;
         CanvasGroup _group;
         Text _text;
@@ -139,7 +146,7 @@ namespace CriticalMass.Runtime.Codex
             _group.interactable = false;
             _group.blocksRaycasts = false;
             float x = (HudLayout.RefW - PlateW) * 0.5f;
-            VectorShape plate = MenuUi.Panel(space, "Plate", x, PlateY, PlateW, PlateH);
+            VectorShape plate = _plate = MenuUi.Panel(space, "Plate", x, PlateY, PlateW, PlateH);
             plate.Radius = 16f;
             _slot = MenuUi.Rt(space, "Slot");
             MenuUi.Place(_slot, x + 12f, PlateY - 30f, 96f, 96f);
@@ -151,12 +158,22 @@ namespace CriticalMass.Runtime.Codex
         void Update()
         {
             if (!_showing) return;
+            bool slim = CriticalMass.Runtime.Camera.GroundView.Melee && _slot.childCount == 0;
+            if (slim != _slim) Slim(slim);
             _age += Time.unscaledDeltaTime;
             float a = Mathf.Min(1f, _age / FadeSeconds);
             float end = _hold + FadeSeconds;
             if (_age > end) a = Mathf.Max(0f, 1f - (_age - end) / FadeSeconds);
             _group.alpha = a;
             if (_age > end + FadeSeconds) Hide();
+        }
+
+        void Slim(bool on)
+        {
+            _slim = on;
+            float x = (HudLayout.RefW - PlateW) * 0.5f;
+            MenuUi.Place(_plate.rectTransform, x, on ? SlimY : PlateY, PlateW, on ? SlimH : PlateH);
+            MenuUi.Place(_text.rectTransform, x + (on ? 20f : 110f), on ? SlimY : PlateY, PlateW - (on ? 40f : 140f), on ? SlimH : PlateH);
         }
 
         void OnDestroy()

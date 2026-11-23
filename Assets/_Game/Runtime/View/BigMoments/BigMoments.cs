@@ -800,9 +800,10 @@ namespace CriticalMass.Runtime.View.Moments
             float t = (float)(now - m.StartedAt), S = m.Seconds;
             float e = Ease(Mathf.Clamp01(t / 0.16f)), x = Mathf.Clamp01(1f - (S - t) / 0.2f);
             bool motion = _look.Motion;
-            float slide = motion ? (1f - e) * 300f + x * 300f : 0f;
+            // fix/px-rough-spots item 10: a short slide that fades in with it (the 300 px opaque entry showed "MATC" cut by the edge)
+            float slide = motion ? (1f - e) * 90f + x * 90f : 0f;
             _stinger.anchoredPosition = _stingerLeft ? new Vector2(StingerRight - slide, -StingerTop) : new Vector2(-StingerRight + slide, -StingerTop);
-            _stingerGroup.alpha = motion ? 1f - x : e * (1f - x);
+            _stingerGroup.alpha = e * (1f - x);
         }
 
         private void SetTakeoverLayers(bool on)

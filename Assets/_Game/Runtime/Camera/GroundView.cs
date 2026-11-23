@@ -452,7 +452,8 @@ namespace CriticalMass.Runtime.Camera
             if (robust && !snap && !paused && dt > 0)
             {
                 if (extra > _extraSm) { _extraSm += (extra - _extraSm) * (1 - Math.Exp(-dt / ExtraOutTau)); _extraInFor = 0; }
-                else if (_extraSm - extra > (_extraInFor >= ExtraHold ? 0.02 : ExtraDeadband))
+                // item 3: never back in while the fight lasts (the camera's fight window): in a fight the distance only grows
+                else if (Time.unscaledTimeAsDouble >= _fightUntil && _extraSm - extra > (_extraInFor >= ExtraHold ? 0.02 : ExtraDeadband))
                 {
                     _extraInFor += dt;
                     if (_extraInFor >= ExtraHold) _extraSm += (extra - _extraSm) * (1 - Math.Exp(-dt / ExtraInTau));
@@ -719,6 +720,7 @@ namespace CriticalMass.Runtime.Camera
                 // fix/px-rough-spots (D): a bot-played (filmed) round: a steady follow behind the fighter, smoothed and
                 // rate-capped, that never reverses within a second. A human player never gets this path.
                 _sinceLook += dt;
+                InFight(w, id);
                 FilmYaw(dt, behind);
             }
             else if (!rig.FirstPerson && InFight(w, id))
@@ -763,10 +765,14 @@ namespace CriticalMass.Runtime.Camera
         /// <summary>fix/px-rough-spots (B): camera-caused yaw in a fight: drift cap (deg/s), dead band (deg), quiet time after his
         /// look input (s), how long a fight lasts after the last sign of one (s). (D) the filmed round: smoothing (s) and cap.</summary>
         public const double FightDriftDegPerSec = 3, FightDriftDeadDeg = 30, FightDriftAfterRunSeconds = 1.0, FightLookQuietSeconds = 2.0, FightAfterSeconds = 2.0;
-        public const double FilmYawTau = 1.5, FilmYawDegPerSec = 20, FilmDeadDeg = 10, NoReverseSeconds = 1.0;
+        public const double FilmYawTau = 1.5, FilmYawDegPerSec = 20, FilmFightDegPerSec = 8, FilmDeadDeg = 10, NoReverseSeconds = 1.0;
         double _fightUntil = -1, _lastYawSign, _lastYawTurnT = -9, _runFor;
 
         /// <summary>An enemy within KeepRange, the framing on, or a hit traded within RecentSeconds; held FightAfterSeconds.</summary>
+        /// <summary>fix/px-rough-spots item 10: the third-person player is in a melee (the camera's fight window: an enemy
+        /// within KeepRange, the framing on, or a hit traded recently; held FightAfterSeconds). Teaching cards go slim then.</summary>
+        public static bool Melee => PlayActive && Current != null && Time.unscaledTimeAsDouble < Current._fightUntil;
+
         bool InFight(World w, int id)
         {
             double now = Time.unscaledTimeAsDouble;
@@ -788,7 +794,9 @@ namespace CriticalMass.Runtime.Camera
         {
             if (!(dt > 0)) return;
             double err = GroundCamera.DeltaAngle(_yawFollow.Yaw, want);
-            double rate = Math.Abs(err) <= FilmDeadDeg ? 0 : Math.Max(-FilmYawDegPerSec, Math.Min(FilmYawDegPerSec, err / FilmYawTau));
+            // in a fight the filmed follow turns at most FilmFightDegPerSec (the fight stays still on screen; the owner's rule)
+            double cap = Time.unscaledTimeAsDouble < _fightUntil ? FilmFightDegPerSec : FilmYawDegPerSec;
+            double rate = Math.Abs(err) <= FilmDeadDeg ? 0 : Math.Max(-cap, Math.Min(cap, err / FilmYawTau));
             Turn(rate * dt, dt);
         }
 
