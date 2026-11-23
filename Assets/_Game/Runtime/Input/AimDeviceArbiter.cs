@@ -23,6 +23,10 @@ namespace CriticalMass.Runtime.Input
         double _keysAt = double.NegativeInfinity;
         double _keyAttackAt = double.NegativeInfinity;
         bool _pointerEverMoved;
+        /// <summary>Round 4 (pass 4: F30 red with every switch off): the never-moved-mouse rule of NotePointerPressed belongs to the
+        /// class moves (on in the play build, MovesInput.PlayBuildAllOn); off = every click hands the aim to the cursor, exactly
+        /// as shipped in 1.0.1566. Settable for tests.</summary>
+        public bool ClickNeedsMovedMouse = MovesInput.PlayBuildAllOn;
 
         /// <summary>Forget every device (match start: the player has touched nothing yet).</summary>
         public void Reset()
@@ -45,7 +49,7 @@ namespace CriticalMass.Runtime.Input
         /// handing it to a cursor resting wherever the match left it aimed every top-down swing at a stale ground point.</summary>
         public void NotePointerPressed(double now)
         {
-            if (_pointerEverMoved) _pointerAt = now;
+            if (_pointerEverMoved || !ClickNeedsMovedMouse) _pointerAt = now;
         }
         public void NoteStick(double now) => _stickAt = now;
         /// <summary>The move keys were used (attack: a keyboard attack or ability key was pressed).</summary>
