@@ -58,6 +58,18 @@ namespace CriticalMass.Runtime.Hud.Player
             public Vector2 Offset;
             public int Stack;
             public bool Active;
+            public int Value;   // mv-6 readability-3 item 2: the shown amount (merged hits add into it)
+        }
+
+        /// <summary>mv-6 readability-3 item 2: under the class moves (WorldWords.MovesCap), hits on the same body within
+        /// MergeWindow become ONE number (summed, restarted, the stronger kind's colour) instead of stacking.</summary>
+        public const float MergeWindow = 0.25f;
+
+        /// <summary>Pure: the kind a merged number shows (the stronger of the two: Critical &gt; Crit &gt; Heavy &gt; the rest).</summary>
+        public static Kind Stronger(Kind a, Kind b)
+        {
+            int Ra(Kind k) => k == Kind.Critical ? 4 : k == Kind.Crit ? 3 : k == Kind.Heavy ? 2 : 1;
+            return Ra(b) > Ra(a) ? b : a;
         }
 
         readonly Num[] _nums = new Num[Pool];
@@ -132,6 +144,30 @@ namespace CriticalMass.Runtime.Hud.Player
         {
             int v = Mathf.RoundToInt(amount);
             if (v <= 0 || !CriticalMass.Runtime.Menu.GameSettings.DamageNumbers) return false;
+            if (WorldWords.MovesCap && kind != Kind.Heal && actor >= 0)
+            {
+                for (int i = 0; i < Pool; i++)
+                {
+                    Num o = _nums[i];
+                    if (!o.Active || o.Actor != actor || o.Kind == Kind.Heal || o.Age > MergeWindow) continue;
+                    o.Value += v;
+                    o.Age = 0f;
+                    o.Punch = 0f;
+                    Kind k = Stronger(o.Kind, kind);
+                    if (k != o.Kind)
+                    {
+                        o.Kind = k;
+                        o.Life = k == Kind.Heavy || k == Kind.Crit ? HeavyLife : Life;
+                        int sz = SizeFor(k, PxProject.ThirdPerson);
+                        if (o.Text.fontSize != sz) { o.Text.fontSize = sz; ContainedText.Of(o.Text)?.Configure(sz, MinSize, 1); }
+                        o.Text.color = ColourFor(k);
+                    }
+                    HudText.Set(o.Text, NumberCache.Int(o.Value));
+                    o.Group.alpha = 1f;
+                    PlayerFeedback.Report(FeedbackChannel.DamageNumber, actor, v, o.Text);
+                    return true;
+                }
+            }
             int stack = 0;
             for (int i = 0; i < Pool; i++)
             {
@@ -153,6 +189,7 @@ namespace CriticalMass.Runtime.Hud.Player
             n.Text.rectTransform.localScale = Vector3.one;
             n.Stack = Mathf.Min(stack, 2);
             n.Offset = Vector2.zero;
+            n.Value = v;
             if (n.Text.fontSize != size) { n.Text.fontSize = size; ContainedText.Of(n.Text)?.Configure(size, MinSize, 1); }
             n.Text.color = ColourFor(kind);
             HudText.Set(n.Text, kind == Kind.Heal ? HealWord(v) : NumberCache.Int(v));

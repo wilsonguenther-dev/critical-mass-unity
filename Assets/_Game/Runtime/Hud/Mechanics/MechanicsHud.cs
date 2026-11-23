@@ -511,6 +511,7 @@ namespace CriticalMass.Runtime.Hud.Mechanics
         World _mvW;
         int _mvReady = int.MinValue;
         float _mvBackAt = -9f;
+        int _mvBackSeen = -1;
         bool _mvBack;
         /// <summary>Tests / reviewer: the DODGE BACK tick is on the chip.</summary>
         public bool DodgeBackShown => _mvBack;
@@ -520,6 +521,8 @@ namespace CriticalMass.Runtime.Hud.Mechanics
             if (ds == null || ds.Ready == null || me < 0 || me >= ds.Ready.Length) return;
             int ready = ds.Ready[me];
             if (ReferenceEquals(w, _mvW) && ready < _mvReady && _mvReady > w.Tick && ready >= w.Tick) _mvBackAt = Time.unscaledTime;
+            // readability-3 item 7: the second witness: MovesViews saw MY dodge avoid a swing as lane 2 counted a refund
+            if (CriticalMass.Runtime.View.B17.MovesViews.DodgeBackFrame > _mvBackSeen) { _mvBackSeen = CriticalMass.Runtime.View.B17.MovesViews.DodgeBackFrame; _mvBackAt = Time.unscaledTime; }
             _mvW = w;
             _mvReady = ready;
             float k = (Time.unscaledTime - _mvBackAt) / MvBackSeconds;

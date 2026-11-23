@@ -31,7 +31,48 @@ namespace CriticalMass.Runtime.View.B17
         public static float PredictGuard;
 
         /// <summary>The guard pose shows for actor i: the sim holds it, or it is the local press being predicted.</summary>
-        public static bool GuardShown(World w, int i) => MovesRead.GuardHeld(w, i) || (i == PredictActor && PredictGuard > 0.05f);
+        public static bool GuardShown(World w, int i)
+        {
+            if (MovesRead.GuardHeld(w, i)) return true;
+            int me = CriticalMass.Runtime.LocalSeat.Actor;
+            return i == me && LocalGuard(w, me) > 0.05f;
+        }
+
+        static int _lgFrame = -1;
+        static World _lgWorld;
+        static bool _lgPressWas;
+        static float _lgPressAt = -100f;
+        static CriticalMass.Runtime.Input.HumanInputSource _lgHuman;
+        static int _lgLook = int.MinValue;
+
+        /// <summary>
+        /// Readability-3 item 6: the local fighter's predicted guard (MovesViews.GuardPrediction of the Guard button read from
+        /// HumanInputSource on THIS frame), computed once per frame by the first caller, so ActorAnimator (which poses before
+        /// MovesViews runs) sees the press on the press frame itself. Writes PredictActor / PredictGuard. Read only on input.
+        /// </summary>
+        public static float LocalGuard(World w, int me)
+        {
+            int f = UnityEngine.Time.frameCount;
+            if (f == _lgFrame && ReferenceEquals(w, _lgWorld) && me == PredictActor) return PredictGuard;
+            _lgFrame = f;
+            _lgWorld = w;
+            PredictActor = -1;
+            PredictGuard = 0f;
+            if (w == null || me < 0 || me >= w.ActorCount || !w.Actors[me].Alive || !MovesHelp.SwitchOn(w, MovesHelp.Verb.Guard, w.Actors[me].Cls)) { _lgPressWas = false; return 0f; }
+            if (_lgHuman == null && f >= _lgLook)
+            {
+                _lgHuman = UnityEngine.Object.FindFirstObjectByType<CriticalMass.Runtime.Input.HumanInputSource>();
+                _lgLook = f + 30;
+            }
+            bool pressed = _lgHuman != null && _lgHuman.isActiveAndEnabled && _lgHuman.State != null && _lgHuman.State.GuardIntent;
+            float now = UnityEngine.Time.unscaledTime;
+            if (pressed && !_lgPressWas) _lgPressAt = now;
+            _lgPressWas = pressed;
+            float g = MovesViews.GuardPrediction(pressed, MovesRead.GuardHeld(w, me), now - _lgPressAt);
+            PredictActor = me;
+            PredictGuard = g;
+            return g;
+        }
 
         /// <summary>Hold actor i's pose until wall time now + seconds (the parry clang's 80 ms).</summary>
         public static void Hold(int i, double now, double seconds)
