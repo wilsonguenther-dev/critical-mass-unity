@@ -316,11 +316,14 @@ namespace CriticalMass.Runtime.Camera
             }
             double ox = _px.X + rx * shoulder, oy = _py.X, oz = _pz.X + rz * shoulder;
             // The shoulder offset itself must not sit inside a wall: shrink it first (pivot to shoulder segment).
-            double sh = shoulder > 0 ? GroundCollision.Resolve(f.Map, _px.X, _py.X, _pz.X, rx, 0, rz, shoulder, f.Cylinders, f.CylinderCount) : 0;
-            if (sh < shoulder)
+            // fix/px-combat-camera: either side (the combat framing shifts the lens left as well as right; a left shift was
+            // never tested against walls before). A positive shoulder takes exactly the old path.
+            double sAbs = Math.Abs(shoulder), sDir = shoulder >= 0 ? 1 : -1;
+            double sh = sAbs > 0 ? GroundCollision.Resolve(f.Map, _px.X, _py.X, _pz.X, rx * sDir, 0, rz * sDir, sAbs, f.Cylinders, f.CylinderCount) : 0;
+            if (sh < sAbs)
             {
-                ox = _px.X + rx * sh;
-                oz = _pz.X + rz * sh;
+                ox = _px.X + rx * sDir * sh;
+                oz = _pz.X + rz * sDir * sh;
             }
             double want = baseDist + f.ExtraDistance;
             double allowed = GroundCollision.Resolve(f.Map, ox, oy, oz, -fx, -fy, -fz, want, f.Cylinders, f.CylinderCount);

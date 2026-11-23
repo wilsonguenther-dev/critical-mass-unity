@@ -198,7 +198,7 @@ namespace CriticalMass.Runtime.Camera
                     if (dx * dx + dz * dz > (h.R + 2) * (h.R + 2)) return false;
                     if (!EnemyCentre(w, FightRadius, out double ex, out double ez)) return false;
                     GroundView.AimAt = new Vector2((float)ex, (float)ez);
-                    return Math.Abs(GroundCamera.DeltaAngle(View.Follow.Yaw, GroundCamera.YawToward(w.X[0], w.Z[0], ex, ez, 0))) < AimTolerance;
+                    return Math.Abs(GroundCamera.DeltaAngle(GroundView.AimYaw, GroundCamera.YawToward(w.X[0], w.Z[0], ex, ez, 0))) < AimTolerance;   // the own yaw: the combat framing turns the drawn one
                 }
                 case "bridge":
                     foreach (BridgeSpan sp in BridgeSpans.All)
@@ -215,7 +215,7 @@ namespace CriticalMass.Runtime.Camera
                     double dx = kj.X - w.X[0], dz = kj.Z - w.Z[0];
                     if (dx * dx + dz * dz > 45 * 45) return false;
                     GroundView.AimAt = new Vector2((float)kj.X, (float)kj.Z);
-                    return Math.Abs(GroundCamera.DeltaAngle(View.Follow.Yaw, GroundCamera.YawToward(w.X[0], w.Z[0], kj.X, kj.Z, 0))) < AimTolerance;
+                    return Math.Abs(GroundCamera.DeltaAngle(GroundView.AimYaw, GroundCamera.YawToward(w.X[0], w.Z[0], kj.X, kj.Z, 0))) < AimTolerance;
                 }
             }
         }
