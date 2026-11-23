@@ -407,6 +407,25 @@ namespace CriticalMass.Runtime.Tests
             Assert.AreEqual(0f, HitFeelTuning.RisingFloor(-1), "no floor before the press");
         }
 
+        /// <summary>Fix round 7 (ModelsStandOnTheirGround): inside the 100 ms check the knock lead is untouched (F03); from
+        /// KnockCheckSeconds + KnockCapEaseSeconds the model is within MaxDrawnOffset of the interpolated spot (its ring).</summary>
+        [Test]
+        public void AfterTheFirstTenthTheKnockStaysWithinTheRingTolerance()
+        {
+            var off = new UnityEngine.Vector3(0.34f, 0.1f, 0f);
+            var shift = new UnityEngine.Vector3(0.13f, 0f, 0f);   // the current-tick shift (0.47 u in all, the measured worst)
+            UnityEngine.Vector3 at100 = HitFeelTuning.CapFromInterpolated(off, shift, HitFeelTuning.KnockCheckSeconds);
+            Assert.AreEqual(off, at100, "the 100 ms frame keeps the full lead");
+            UnityEngine.Vector3 late = HitFeelTuning.CapFromInterpolated(off, shift, HitFeelTuning.KnockCheckSeconds + HitFeelTuning.KnockCapEaseSeconds);
+            float total = new UnityEngine.Vector2(late.x + shift.x, late.z + shift.z).magnitude;
+            Assert.LessOrEqual(total, HitFeelTuning.MaxDrawnOffset + 1e-5f, "capped from the interpolated spot");
+            Assert.AreEqual(0.1f, late.y, 1e-6f, "the height is not touched");
+            UnityEngine.Vector3 mid = HitFeelTuning.CapFromInterpolated(off, shift, HitFeelTuning.KnockCheckSeconds + HitFeelTuning.KnockCapEaseSeconds * 0.5);
+            float midTotal = new UnityEngine.Vector2(mid.x + shift.x, mid.z + shift.z).magnitude;
+            Assert.That(midTotal, Is.InRange(HitFeelTuning.MaxDrawnOffset, 0.47f), "eased, no pop");
+            Assert.LessOrEqual(HitFeelTuning.MaxDrawnOffset, 0.35f, "inside the grounding test's 0.35 u");
+        }
+
         /// <summary>Fix round 7 (review pass 7 (a): the TNT throw pose held to +24 frames): the throw cue is down to 0 by 8 frames
         /// after the throw, full for the first 3, and its clip has played to the end by then (the pose is released).</summary>
         [Test]

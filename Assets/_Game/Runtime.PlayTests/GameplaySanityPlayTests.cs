@@ -384,6 +384,67 @@ namespace CriticalMass.Runtime.PlayTests
 
         /// <summary>A virtual mouse: clicking 3 u from actor 0 in 4 screen directions attacks toward the cursor each time.</summary>
         [UnityTest]
+        /// <summary>Fix round 7 (owner's call): a mouse player walks with the keys for 3 s and leaves the cursor resting (it moved
+        /// once, before the walk), then clicks: the swing goes AT THE CURSOR (within 10 degrees), past AimDeviceArbiter's
+        /// PointerHoldSeconds, with no mouse move. Through the real devices, HumanInputSource and the sim press tick.</summary>
+        public IEnumerator WalkWithKeysThenClickSwingsAtTheRestingCursor()
+        {
+            _w = new SanityWorld();
+            yield return _w.Load(manualInput: false);
+            RouteInputToGame();
+            _mouse = InputSystem.AddDevice<Mouse>();
+            _kb = InputSystem.AddDevice<Keyboard>();
+            _mouse.MakeCurrent();
+            yield return Frames(30);
+            UnityEngine.Camera cam = UnityEngine.Camera.main;
+            Assert.IsNotNull(cam, "no main camera");
+            World w = _w.W;
+            // the cursor moves once (a real move, with a delta) to the screen right of my fighter, then rests
+            SanityWorld.FromScreenIntent(1, 0, out double rdx, out double rdz);
+            Vector3 p = cam.WorldToScreenPoint(SimSpace.ToWorld(w.X[0] + 3 * rdx, _w.Ground(w.X[0], w.Z[0]), w.Z[0] + 3 * rdz));
+            var pos = new Vector2(p.x, p.y);
+            InputSystem.QueueStateEvent(_mouse, new MouseState { position = pos, delta = pos - _mouse.position.ReadValue() });
+            InputSystem.Update();
+            yield return null;
+            _w.Driver.StepTicks(1);
+            // walk screen-up with W for 3 s, the cursor still (position held, delta 0)
+            int walk = _w.Ticks(3.0);
+            for (int t = 0; t < walk; t++)
+            {
+                InputSystem.QueueStateEvent(_kb, new KeyboardState(Key.W));
+                InputSystem.QueueStateEvent(_mouse, new MouseState { position = pos });
+                InputSystem.Update();
+                yield return null;
+                _w.Driver.StepTicks(1);
+            }
+            // where the resting cursor points on the ground now (the camera followed the walk)
+            Ray ray = cam.ScreenPointToRay(new Vector3(pos.x, pos.y, 0));
+            float gy = (float)_w.Ground(w.X[0], w.Z[0]);
+            Assert.IsTrue(Math.Abs(ray.direction.y) > 1e-4f, "the cursor ray meets the ground");
+            float k = (gy - ray.origin.y) / ray.direction.y;
+            Vector3 cursorGround = ray.origin + ray.direction * k;
+            Vector3 me = SimSpace.ToWorld(w.X[0], gy, w.Z[0]);
+            Vector3 want = new Vector3(cursorGround.x - me.x, 0, cursorGround.z - me.z);
+            // the click, still walking, the cursor still
+            InputSystem.QueueStateEvent(_kb, new KeyboardState(Key.W));
+            InputSystem.QueueStateEvent(_mouse, new MouseState { position = pos }.WithButton(MouseButton.Left));
+            InputSystem.Update();
+            yield return null;
+            _w.Driver.StepTicks(1);
+            Actor a = w.Actors[0];
+            bool attacked = a.AttackCd > 0 && a.AnimAction < 0.1;
+            float err = SanityRig.AngleDeg(SanityRig.SimDir(a.Facing), want);
+            InputSystem.QueueStateEvent(_kb, new KeyboardState());
+            InputSystem.QueueStateEvent(_mouse, new MouseState { position = pos });
+            InputSystem.Update();
+            yield return null;
+            Assert.IsTrue(attacked, "the click after a 3 s keys walk did not attack");
+            Assert.LessOrEqual(err, 10f, $"after 3 s walking with the keys and a resting cursor, the click swings {err:0} degrees away from the cursor (aim {Aim()})");
+        }
+
+        static string Aim() => CriticalMass.Runtime.Input.AimAssist.HasAim ? "on" : "off";
+
+        [UnityTest]
         public IEnumerator AttackInputAttacksTowardTheCursor()
         {
             _w = new SanityWorld();

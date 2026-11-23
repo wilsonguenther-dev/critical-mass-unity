@@ -213,6 +213,28 @@ namespace CriticalMass.Runtime.View.Anim
         /// the sim's swing, the pose floor keeps rising on the PRESS's clock (wall s since the press, plus the press frame's
         /// own rise), so the hand-over never restarts the 0.05 s commit rise from the sim's later start tick. 0 once the
         /// rise is complete and FloorSeconds has passed (the sim's own envelope has long taken over by then).</summary>
+        /// <summary>Fix round 7: how long after KnockCheckSeconds the drawn offset eases back under MaxDrawnOffset from the
+        /// interpolated spot.</summary>
+        public const double KnockCapEaseSeconds = 0.05;
+
+        /// <summary>
+        /// Fix round 7 (pure; tests; ModelsStandOnTheirGround: models 0.38-0.47 u off their rings): drawnOff is the model's
+        /// offset from the (current-tick shifted) knock spot, shift = that spot minus the interpolated one. Past
+        /// KnockCheckSeconds the total (shift + drawnOff) is capped at MaxDrawnOffset from the interpolated spot, the cap
+        /// easing in from the total's own length over KnockCapEaseSeconds. Returns the new drawnOff (vertical kept).
+        /// </summary>
+        public static UnityEngine.Vector3 CapFromInterpolated(UnityEngine.Vector3 drawnOff, UnityEngine.Vector3 shift, double knockAge)
+        {
+            if (!(knockAge > KnockCheckSeconds)) return drawnOff;
+            float tx = drawnOff.x + shift.x, tz = drawnOff.z + shift.z;
+            float len = (float)Math.Sqrt(tx * tx + tz * tz);
+            if (len <= MaxDrawnOffset) return drawnOff;
+            double e = Math.Min(1.0, (knockAge - KnockCheckSeconds) / KnockCapEaseSeconds);
+            float cap = (float)(len + (MaxDrawnOffset - len) * e);
+            float k = cap / len;
+            return new UnityEngine.Vector3(tx * k - shift.x, drawnOff.y, tz * k - shift.z);
+        }
+
         public static float RisingFloor(double wallSincePress)
         {
             if (!(wallSincePress >= 0) || wallSincePress > FloorSeconds) return 0f;
