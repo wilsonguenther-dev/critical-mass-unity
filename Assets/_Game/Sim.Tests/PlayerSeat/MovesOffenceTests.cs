@@ -1201,3 +1201,131 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
         }
     }
 }
+
+namespace CriticalMass.Sim.Tests.PlayerSeat
+{
+    using System;
+    using System.Collections.Generic;
+    using CriticalMass.Sim.Config;
+    using CriticalMass.Sim.Core;
+    using NUnit.Framework;
+    using T = CriticalMass.Sim.Tests.PlayerSeat.PlayerSeatTargets;
+
+    /// <summary>fix/mv-combo-reach-2 (Editor pass 3: "a deliberate second tap after a landed hit whiffs"): the press-timing grid.
+    /// One opener, then each next press at the hit (the contact tick), just after it, in the middle of the chain window or on
+    /// its LAST tick; the stick held toward the victim or let go; a passive Farmer dummy or a Normal Farmer bot that never
+    /// dodges. Every switch on. 8 starts per cell.</summary>
+    [TestFixture]
+    [Category("PlayerSeat")]
+    public sealed class MovesOffenceComboGrid
+    {
+        internal static readonly Dictionary<string, int> Diag = new Dictionary<string, int>();
+        internal static (int s2, int s3, int n) Cell(ClassId me, string when, bool stick, bool bot)
+        {
+            int s2 = 0, s3 = 0, n = 0;
+            int steps = new MovesConfig().ComboSteps[(int)me];
+            for (int k = 0; k < 8; k++)
+            {
+                Action<GameConfig> tweak = c =>
+                {
+                    MovesConfig.PlayBuildAllOn(c.Depth.Moves);
+                    if (!bot) return;
+                    MovesConfig m = c.Depth.Moves;
+                    for (int d = 0; d < m.BotGuardChance.Length; d++) m.BotGuardChance[d] = 0;
+                    for (int d = 0; d < m.BotParryChance.Length; d++) m.BotParryChance[d] = 0;
+                    for (int d = 0; d < m.BotStepOutChance.Length; d++) m.BotStepOutChance[d] = 0;
+                    for (int d = 0; d < c.Depth.CombatFeel.BotMeleeDodgeChance.Length; d++) c.Depth.CombatFeel.BotMeleeDodgeChance[d] = 0;
+                    for (int d = 0; d < c.Depth.Dodge.DodgeChance.Length; d++) c.Depth.Dodge.DodgeChance[d] = 0;
+                };
+                Seat s = PlayerSeatRig.Duel(me, ClassId.Farmer, bot ? TargetMode.RealBot : TargetMode.Passive, PlayerSeatRig.AngleOf(k, 8), k, 0, tweak: tweak);
+                s.NoTnt = true;
+                s.KeepThemAbove = 0.6;
+                s.KeepMeAbove = 0.6;
+                int lastSwing = s.W.Actors[s.Me].SwingTick, curStep = 0, pressAt = -1, opened = 0, got = 0, t0 = s.W.Tick;
+                bool pressedOpener = false, landed = false, done = false;
+                OffRig.Play(s, 6.0, q =>
+                {
+                    World w = q.W;
+                    Actor a = w.Actors[q.Me];
+                    if (a.SwingTick != lastSwing) { lastSwing = a.SwingTick; curStep = w.Moves.Offence.StepOf[q.Me]; landed = false; if (curStep <= 1 && opened > 0) done = true; }
+                    bool justLanded = false;
+                    if (curStep >= 2 && a.SwingPending && a.HitStunTicks > 0) Diag["stunned"] = Diag.GetValueOrDefault("stunned") + 1;
+                    if (curStep >= 2 && a.SwingPending && w.Tick == a.SwingTick + 1) { double ex = w.X[q.Them] - w.X[q.Me], ez = w.Z[q.Them] - w.Z[q.Me]; Diag["gap@start x10 sum"] = Diag.GetValueOrDefault("gap@start x10 sum") + (int)(10 * Math.Sqrt(ex * ex + ez * ez)); Diag["starts"] = Diag.GetValueOrDefault("starts") + 1; Diag["themStun@start>0"] = Diag.GetValueOrDefault("themStun@start>0") + (w.Actors[q.Them].HitStunTicks > 0 ? 1 : 0); Diag["themSwinging@start"] = Diag.GetValueOrDefault("themSwinging@start") + (w.Actors[q.Them].SwingPending ? 1 : 0); }
+                    if (!landed && !a.SwingPending && w.Depth.Feel.LandedSwing[q.Me] == a.SwingTick && pressedOpener)
+                    {
+                        landed = true;
+                        justLanded = true;
+                        if (curStep <= 1) { opened = 1; Diag["L:stun=" + w.Actors[q.Them].HitStunTicks + " cd=" + (int)Math.Ceiling(a.AttackCd * w.Config.SimHz - 1e-9) + " win=" + (w.Moves.Offence.ChainUntil[q.Me] - w.Tick) + " rec=" + a.SwingRecovery] = 1; }
+                        else if (curStep > got && opened > 0) got = curStep;
+                        if (got >= steps) done = true;
+                    }
+                    if (!a.SwingPending && !landed && pressedOpener && w.Tick > a.SwingTick + a.SwingWindup + 1 && opened > 0 && curStep >= 2) done = true;   // a step whiffed
+                    double dx = w.X[q.Them] - w.X[q.Me], dz = w.Z[q.Them] - w.Z[q.Me], d = Math.Sqrt(dx * dx + dz * dz);
+                    InputFrame f = q.Frames[q.Me];
+                    f.AimX = w.X[q.Them]; f.AimZ = w.Z[q.Them];
+                    bool toward = opened == 0 || stick;
+                    f.MoveX = toward && d > 1e-6 ? dx / d : 0; f.MoveZ = toward && d > 1e-6 ? dz / d : 0;
+                    bool press = false;
+                    double reach = w.Config.Class(me).AttackRange + w.Config.Class(ClassId.Farmer).Radius;
+                    // the opener: pressed in reach; pressed again (walking in) until one LANDS, so a trial measures the chain only
+                    if (opened == 0 && pressedOpener && !a.SwingPending && !landed && w.Tick > a.SwingTick + a.SwingWindup + 1) pressedOpener = false;
+                    if (!pressedOpener && opened == 0 && d <= reach - 0.3 && Combat.AttackReady(w, q.Me)) { press = true; pressedOpener = true; }
+                    else if (pressedOpener && !done)
+                    {
+                        int contact = a.SwingTick + a.SwingWindup;
+                        // schedule this chain's next press from the swing that is landing now
+                        if (when == "hit" && a.SwingPending && w.Tick + 1 == contact && (curStep < steps)) press = true;
+                        if (justLanded && curStep < steps)
+                        {
+                            int until = w.Moves.Offence.ChainUntil[q.Me];
+                            if (when == "after") pressAt = contact + 1;
+                            else if (when == "mid") pressAt = (contact + until) / 2;
+                            else if (when == "last") pressAt = until;
+                        }
+                        if (pressAt >= 0 && w.Tick + 1 == pressAt)
+                        {
+                            press = true; pressAt = -1;
+                            string why = a.HitStunTicks > 0 ? "meStunned" : a.SwingPending ? "mePending" : a.AttackCd > 1.5 / w.Config.SimHz ? "meCd" : w.Moves.Offence.ChainNext[q.Me] < 2 ? "chainGone" : "ok";
+                            Diag["press:" + why] = Diag.GetValueOrDefault("press:" + why) + 1;
+                            Diag["press:themStun>0"] = Diag.GetValueOrDefault("press:themStun>0") + (w.Actors[q.Them].HitStunTicks > 0 ? 1 : 0);
+                        }
+                    }
+                    f.Attack = press;
+                }, q => done || q.W.Tick - t0 > 300);
+                if (opened == 0) continue;   // no opener landed in 10 s: not a chain trial
+                n++;
+                if (got >= 2) s2++;
+                if (got >= 3) s3++;
+            }
+            return (s2, s3, n);
+        }
+
+        [Test]
+        public void EveryPressTimingInTheWindowLandsTheNextStep_StickOrNot_DummyAndBot()
+        {
+            var bad = new List<string>();
+            MovesConfig mc = new MovesConfig();
+            foreach (ClassId me in T.Classes)
+            {
+                int steps = mc.ComboSteps[(int)me];
+                if (steps < 2) continue;
+                foreach (bool bot in new[] { false, true })
+                {
+                    var parts = new List<string>();
+                    bool ok = true;
+                    foreach (string when in new[] { "hit", "after", "mid", "last" })
+                        foreach (bool stick in new[] { true, false })
+                        {
+                            Diag.Clear();
+                            var r = Cell(me, when, stick, bot);
+                            if (Environment.GetEnvironmentVariable("CM_L4_GRIDDIAG") != null && bot) PxLog.Line("grid-diag", me + " " + when + (stick ? "+stick" : ""), string.Join(" ", Diag), "-", true);
+                            parts.Add(when + (stick ? "+stick" : "") + " " + r.s2 + (steps >= 3 ? "/" + r.s3 : "") + (r.n < 8 ? " of " + r.n : ""));
+                            if (r.n < 6 || r.s2 < r.n - 1 || (steps >= 3 && r.s3 < r.n - 2)) ok = false;
+                        }
+                    if (!PxLog.Line("combo-grid", me + " vs a " + (bot ? "Normal no-dodge Farmer bot" : "passive Farmer dummy") + " (step 2" + (steps >= 3 ? "/step 3" : "") + " of 8)", string.Join(", ", parts), "step 2 >= 7 of 8" + (steps >= 3 ? ", step 3 >= 6 of 8" : "") + " in every cell", ok)) bad.Add(me + (bot ? " bot" : " dummy"));
+                }
+            }
+            Assert.IsEmpty(bad);
+        }
+    }
+}
