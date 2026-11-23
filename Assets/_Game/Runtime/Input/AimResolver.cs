@@ -113,6 +113,55 @@ namespace CriticalMass.Runtime.Input
             return true;
         }
 
+        // ------------------------------------------------------------------ class moves T1-6 (lane 6): cast distance
+
+        /// <summary>T1-6: stick deflection from MovesStickMin (0.3) to 1.0 maps the cast from MovesCastMin (1.5 u) up to the
+        /// ability's maximum range (SPEC T1-6).</summary>
+        public const double MovesStickMin = 0.3, MovesCastMin = 1.5;
+
+        /// <summary>T1-6: the cast distance for a stick deflection (0..1, already dead-zoned). Under MovesStickMin the stick
+        /// chose no distance: the default StickAimDistance (3 u), never past the range. Pure.</summary>
+        public static double MovesStickCastDistance(double deflection, double maxRange)
+        {
+            if (!(maxRange > 0)) return 0;
+            if (!(deflection >= MovesStickMin)) return Math.Min(StickAimDistance, maxRange);
+            double lo = Math.Min(MovesCastMin, maxRange);
+            double k = Math.Min(1, (deflection - MovesStickMin) / (1 - MovesStickMin));
+            return lo + (maxRange - lo) * k;
+        }
+
+        /// <summary>
+        /// T1-6: a keyboard-only cast lands ON the assisted target (the nearest enemy inside AssistRange 7 u and
+        /// AssistHalfAngleDeg 30 degrees of the facing (dirX, dirZ), never past maxRange), else StickAimDistance (3 u)
+        /// ahead. target = the enemy index or -1. Pure: the sim only ever sees the point.
+        /// </summary>
+        public static void MovesKeysCastPoint(double px, double pz, double dirX, double dirZ, double maxRange,
+            double[] enemyX, double[] enemyZ, int n, out double aimX, out double aimZ, out int target)
+        {
+            double len = Math.Sqrt(dirX * dirX + dirZ * dirZ);
+            if (len < 1e-9) { dirX = 1; dirZ = 0; len = 1; }
+            dirX /= len; dirZ /= len;
+            double ahead = maxRange > 0 ? Math.Min(StickAimDistance, maxRange) : StickAimDistance;
+            aimX = px + dirX * ahead;
+            aimZ = pz + dirZ * ahead;
+            target = -1;
+            if (enemyX == null || enemyZ == null) return;
+            double cosLimit = Math.Cos(AssistHalfAngleDeg * Math.PI / 180), best = AssistRange * AssistRange;
+            for (int i = 0; i < n && i < enemyX.Length && i < enemyZ.Length; i++)
+            {
+                double ex = enemyX[i] - px, ez = enemyZ[i] - pz, d2 = ex * ex + ez * ez;
+                if (d2 < 1e-6 || d2 > best) continue;
+                if ((ex * dirX + ez * dirZ) / Math.Sqrt(d2) < cosLimit) continue;
+                best = d2;
+                target = i;
+            }
+            if (target < 0) return;
+            double tx = enemyX[target] - px, tz = enemyZ[target] - pz, d = Math.Sqrt(tx * tx + tz * tz);
+            double r = maxRange > 0 && d > maxRange ? maxRange / d : 1;
+            aimX = px + tx * r;
+            aimZ = pz + tz * r;
+        }
+
         /// <summary>Screen axes (right, up) to a unit sim XZ direction; false for a zero vector.</summary>
         public static bool ScreenToSimDir(double right, double up, out double x, out double z)
         {
