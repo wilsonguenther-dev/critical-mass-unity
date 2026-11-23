@@ -188,6 +188,38 @@ namespace CriticalMass.Runtime.View.Anim
             return PredictStep.Continue;
         }
 
+        /// <summary>Fix round 7 (review pass 7 (c)): a press the sim refuses because the attack is cooling down still shows a
+        /// short wind-up so the press is acknowledged: the same predicted pose, capped at this weight and held short of the
+        /// strike (PredictHoldShare), gone by PredictTimeout + the 0.06 s fade = 0.12 s. Never a strike, never a SwingCommit.</summary>
+        public const float RefusedPressWeight = 0.5f;
+
+        /// <summary>Fix round 7 (review pass 7 (a)): a Throw cue (TNT, Root Seeds) plays its whole clip over ThrowPoseSeconds
+        /// (8 frames of 60 fps after the throw leaves the hand), full weight for ThrowHoldSeconds, then eases out to 0 by
+        /// ThrowPoseSeconds. Pass 7: the clip ran at its own length, full weight to +24 and still 0.11 at +34.</summary>
+        public const double ThrowPoseSeconds = 8.0 / 60.0, ThrowHoldSeconds = 3.0 / 60.0;
+
+        /// <summary>Fix round 7 (pure; tests): the Throw cue's clip time and weight at `age` sim s after the throw.</summary>
+        public static void ThrowPose(double age, double length, out double clipTime, out float weight)
+        {
+            if (!(age >= 0)) age = 0;
+            double share = Math.Min(1.0, age / ThrowPoseSeconds);
+            clipTime = length * share;
+            if (age <= ThrowHoldSeconds) weight = 1f;
+            else if (age >= ThrowPoseSeconds) weight = 0f;
+            else weight = (float)(1.0 - (age - ThrowHoldSeconds) / (ThrowPoseSeconds - ThrowHoldSeconds));
+        }
+
+        /// <summary>Fix round 7 (pure; tests; review pass 7: Warrior 0.56 at press + 2): after a predicted press hands over to
+        /// the sim's swing, the pose floor keeps rising on the PRESS's clock (wall s since the press, plus the press frame's
+        /// own rise), so the hand-over never restarts the 0.05 s commit rise from the sim's later start tick. 0 once the
+        /// rise is complete and FloorSeconds has passed (the sim's own envelope has long taken over by then).</summary>
+        public static float RisingFloor(double wallSincePress)
+        {
+            if (!(wallSincePress >= 0) || wallSincePress > FloorSeconds) return 0f;
+            return CommitWeight(wallSincePress + 1.0 / 60.0, true);
+        }
+        public const double FloorSeconds = 0.15;
+
         public static bool PredictedSwing(double wall, double windupSeconds, out double age, out float weight)
         {
             age = 0; weight = 0f;

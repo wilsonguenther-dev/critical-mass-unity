@@ -554,6 +554,9 @@ namespace CriticalMass.Runtime.View
                     if (!_swingFromPredict) { _swingSeenFrame = Time.frameCount; _swingReported = false; }
                     _swingFromPredict = false;
                 }
+                // fix round 7 (review pass 7 (a): a SwingCommit at +8 with no melee swing): a predicted press that ended
+                // without the sim's swing (TNT, a refusal, a timeout) reports nothing
+                if (_swingFromPredict && !slot.Anim.Predicting && slot.Anim.LastPredictionEnded) { _swingFromPredict = false; _swingReported = true; }
                 if (!_swingReported && (swingTick >= 0 || _swingFromPredict) && Time.frameCount - _swingSeenFrame >= 2)
                 {
                     _swingReported = true;
@@ -580,6 +583,12 @@ namespace CriticalMass.Runtime.View
             {
                 slot.Anim.PredictSwing(m, actor, cfg, simTime);
                 if (slot.Anim.Predicting) _predStartFrame = Time.frameCount;
+            }
+            else if (intent && !_intentWas && actor != null && actor.Alive && actor.AttackCd > 0 && actor.StandUp <= 0)
+            {
+                // fix round 7 (review pass 7 (c)): a press during the cooldown is acknowledged with a short, capped wind-up
+                // that fades by 0.12 s; it never starts the SwingCommit count (no _predStartFrame)
+                slot.Anim.PredictSwing(m, actor, cfg, simTime, true);
             }
             _intentWas = intent;
         }
