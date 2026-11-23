@@ -514,7 +514,29 @@ namespace CriticalMass.Runtime.Camera
         double BoomAt(in GroundFollowInput f, double ox, double oy, double oz, double ux, double uz, double pitchDeg, double want)
         {
             double pr = pitchDeg * Math.PI / 180, cp = Math.Cos(pr), sp = Math.Sin(pr);
-            return ResolveR(f.Map, ox, oy, oz, -ux * cp, sp, -uz * cp, want, f.Cylinders, f.CylinderCount, RobustRadius);
+            return ResolveR(f.Map, ox, oy, oz, -ux * cp, sp, -uz * cp, want, _bc, _bcN, _br);
+        }
+
+        // the boom's own obstacle set: a prop that already holds the pivot (he stands against it) never cuts the boom to
+        // nothing; it is faded by the caller instead. Against a wall the lens radius shrinks until the pivot is clear.
+        SeeThroughCylinder[] _bc = new SeeThroughCylinder[64];
+        int _bcN;
+        double _br = RobustRadius;
+
+        void BoomSet(in GroundFollowInput f, double ox, double oy, double oz)
+        {
+            int n = f.Cylinders != null ? Math.Min(f.CylinderCount, f.Cylinders.Length) : 0;
+            if (_bc.Length < n) _bc = new SeeThroughCylinder[n];
+            _bcN = 0;
+            for (int k = 0; k < n; k++)
+            {
+                SeeThroughCylinder c = f.Cylinders[k];
+                double dx = ox - c.X, dz = oz - c.Z, rr = c.R + RobustRadius;
+                if (dx * dx + dz * dz < rr * rr && oy + RobustRadius > c.Y0 && oy - RobustRadius < c.Y1) continue;
+                _bc[_bcN++] = c;
+            }
+            _br = RobustRadius;
+            while (_br > 0.2 && GroundCollision.Inside(f.Map, ox, oy, oz, _br, _bc, _bcN)) _br -= 0.1;
         }
 
         double SteepAt(in GroundFollowInput f, double ox, double oy, double oz, double ux, double uz, double pitchDeg, double dist)
@@ -528,6 +550,7 @@ namespace CriticalMass.Runtime.Camera
         void StepRobust(in GroundFollowInput f, double dt, bool snap, double ox, double oy, double oz, double ux, double uz, double want)
         {
             OverHead = false;
+            BoomSet(f, ox, oy, oz);
             double basePitch = Pitch;
             want = Math.Max(RobustMin, want);
             // 1. the wall rise: when the boom is cut short (terrain rising behind, a wall), the smallest extra pitch (5 deg
