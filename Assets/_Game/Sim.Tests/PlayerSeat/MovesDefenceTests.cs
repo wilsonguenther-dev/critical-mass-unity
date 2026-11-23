@@ -72,7 +72,7 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
         /// dodge on each read wind-up in reach), guard (dodge, and a held guard on each read wind-up while the dodge cools down),
         /// strong (the S48 strong model: feints, hit-cancels, dodges). startHp: the human's starting share of health.
         /// </summary>
-        public static MvDefenceTally DuelCell(ClassId me, ClassId them, string variant, Action<GameConfig> tweak, int angles = 8, double startHp = 1, BotDifficulty bots = BotDifficulty.Normal)
+        public static MvDefenceTally DuelCell(ClassId me, ClassId them, string variant, Action<GameConfig> tweak, int angles = 8, double startHp = 1, BotDifficulty bots = BotDifficulty.Normal, Action<Seat> onTick = null, Action<Seat, DuelResult> onEnd = null)
         {
             var t = new MvDefenceTally();
             for (int k = 0; k < angles; k++)
@@ -89,6 +89,7 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
                 s.BeforeTick = q =>
                 {
                     wt.Update(q);
+                    onTick?.Invoke(q);
                     if (variant != "guard") return;
                     int wu = w.Dur.AttackWindup[(int)them];
                     double reach = w.Config.Class(them).AttackRange + w.Config.Class(me).Radius;
@@ -96,6 +97,7 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
                     q.Human.Frame.Guard = w.Tick < guardUntil;
                 };
                 DuelResult r = PlayerSeatRig.Play(s, 30);
+                onEnd?.Invoke(s, r);
                 t.Reps++;
                 if (r.Won) t.Wins++;
                 if (r.Lost) t.Losses++;
@@ -741,6 +743,92 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
             Assert.AreEqual(1, sw.Count, "a guard block below 25% fires SECOND WIND");
             Assert.AreEqual(0.15 * r.seat.W.Actors[0].MaxHp, sw[0].Value, 1e-9, "heals 15% of max HP");
             PxLog.Line("mv2-T2-8", "guard block at 20% HP", "SECOND WIND +" + PxLog.F(sw[0].Value, "0.0"), "once, 15% max HP", true);
+        }
+    }
+
+    /// <summary>
+    /// Healer-ruling diagnosis (fix/mv-healer-ruling): with every switch on (MvCombine.AllOn, CM_MVI_KNOBS honoured), per variant and
+    /// opponent, what the Healer's wins are made of: her dealt and taken damage, heals landed on her, second winds, her criticals by
+    /// kind, her dodges and dodged swings, hit-cancels, and how long the fight ran. Runs only with CM_MVH_DIAG=1.
+    /// </summary>
+    [TestFixture, Category("PlayerSeat")]
+    public class MvHealerDiag
+    {
+        /// <summary>The combine's bot check under CM_MVI_KNOBS (CM_MVH_BOTS=1): which knob moves the own-Kaiju blocking.</summary>
+        [Test, Category("Slow"), Timeout(3000000)]
+        public void BotsLever()
+        {
+            if (Environment.GetEnvironmentVariable("CM_MVH_BOTS") != "1") return;   // CM_MVH_BOTS=1 only
+            try { new MovesCombineTests().Combine_Bots_OwnKaijuBlockAndShiver_EverySwitchOn(); }
+            catch (AssertionException) { }
+        }
+
+        /// <summary>The Warrior escape lever (CM_MVH_ESC=1): Combine_Escape's Warrior row with CM_MVI_KNOBS.</summary>
+        [Test, Category("Slow"), Timeout(3000000)]
+        public void WarriorEscapeLever()
+        {
+            if (Environment.GetEnvironmentVariable("CM_MVH_ESC") != "1") return;   // CM_MVH_ESC=1 only
+            MvDefenceTally varied = MvDefenceRig.Escape(ClassId.Warrior, ClassId.Farmer, true, MvCombine.AllOn, spreadLag: true);
+            MvDefenceTally fixed6 = MvDefenceRig.Escape(ClassId.Warrior, ClassId.Farmer, true, MvCombine.AllOn);
+            PxLog.Line("mvh-escape", "Warrior at 30% from a lunging lag-6 human Farmer [" + MvCombine.Knobs() + "]", varied.Escaped + "/16 (fixed 6-tick eye " + fixed6.Escaped + "/16)", "6 to 13", varied.Escaped >= 6 && varied.Escaped <= 13);
+        }
+
+        [Test, Category("Slow"), Timeout(6000000)]
+        public void HealerWinsAreMadeOf()
+        {
+            if (Environment.GetEnvironmentVariable("CM_MVH_DIAG") != "1") return;   // CM_MVH_DIAG=1 only
+            ClassId me = ClassId.Healer;
+            foreach (string v in MvCombine.Variants())
+            {
+                int totalWins = 0;
+                foreach (ClassId them in MvDefenceRig.All)
+                {
+                    if (them == me) continue;
+                    int wins = 0, losses = 0, n = 0, crits = 0, critC = 0, critP = 0, critB = 0, sw = 0, dodges = 0, dodged = 0, cancels = 0, guards = 0;
+                    double secW = 0, secL = 0, dealtW = 0, takenW = 0, healW = 0, swW = 0, dealtL = 0, healL = 0, critDmg = 0;
+                    int lastCrit = -1, myCrits = 0, myCritC = 0, myCritP = 0, myCritB = 0;
+                    double heal = 0, swHeal = 0;
+                    var lines = new List<string>();
+                    MvDefenceRig.DuelCell(me, them, v, Environment.GetEnvironmentVariable("CM_MVH_OFF") == "1" ? (Action<GameConfig>)MvCombine.AllOff : MvCombine.AllOn, 8, 1, BotDifficulty.Normal,
+                        q =>
+                        {
+                            CombatFeelState st = q.W.Depth.Feel;
+                            if (st != null && st.CritFrom[q.Them] == q.Me && st.CritTick[q.Them] != lastCrit && st.CritTick[q.Them] >= 0)
+                            {
+                                lastCrit = st.CritTick[q.Them];
+                                myCrits++;
+                                if (st.CritKind[q.Them] == 1) myCritC++; else if (st.CritKind[q.Them] == 2) myCritP++; else myCritB++;
+                            }
+                        },
+                        (q, r) =>
+                        {
+                            n++;
+                            heal = q.Spy.Of(SimEventType.HealLanded, e => e.A == q.Me).Sum(e => e.Value);
+                            swHeal = q.Spy.Of(SimEventType.SecondWind, e => e.A == q.Me).Sum(e => e.Value);
+                            int swc = q.Spy.Of(SimEventType.SecondWind, e => e.A == q.Me).Count();
+                            int stag = q.Spy.Of(SimEventType.AttackCancel, e => e.A == q.Them && e.B == q.Me).Count();
+                            int miss = q.Spy.Of(SimEventType.AttackContact, e => e.A == q.Them && e.Value == 0).Count();
+                            int stun = q.Spy.Of(SimEventType.HitStun, e => e.A == q.Them && e.B == q.Me).Count();
+                            dodges += q.Spy.Of(SimEventType.Dodge, e => e.A == q.Me).Count();
+                            dodged += q.Spy.Of(SimEventType.HitBlocked, e => e.A == q.Me && (int)e.Value == PlayerReasons.BlockedDodge).Count();
+                            guards += q.Spy.Of(SimEventType.HitBlocked, e => e.A == q.Me && (int)e.Value == PlayerReasons.BlockedGuard).Count();
+                            cancels += q.Spy.Of(SimEventType.AttackCancel, e => e.A == q.Me).Count();
+                            sw += swc;
+                            crits += myCrits; critC += myCritC; critP += myCritP; critB += myCritB;
+                            if (r.Won) { wins++; secW += r.Seconds; dealtW += r.Dealt; takenW += r.Taken; healW += heal; swW += swHeal; }
+                            if (r.Lost) { losses++; secL += r.Seconds; dealtL += r.Dealt; healL += heal; }
+                            lines.Add((r.Won ? "W" : r.Lost ? "L" : "T") + PxLog.F(r.Seconds, "0.0") + "s d" + PxLog.F(r.Dealt, "0") + " t" + PxLog.F(r.Taken, "0")
+                                + " h" + PxLog.F(heal, "0") + " sw" + PxLog.F(swHeal, "0") + " c" + myCritC + "/" + myCritP + "/" + myCritB + " sw" + r.Swings + "/" + r.Landed + " th" + r.TheirSwings + "/" + r.TheirLanded + " miss" + miss + " cut" + stag + " stun" + stun);
+                            myCrits = myCritC = myCritP = myCritB = 0; lastCrit = -1;
+                        });
+                    totalWins += wins;
+                    PxLog.Line("mvh-diag", "Healer " + v + " vs " + them + " (8)", wins + "W " + losses + "L; wins: mean " + (wins > 0 ? PxLog.F(secW / wins, "0.0") : "-") + " s, dealt "
+                        + (wins > 0 ? PxLog.F(dealtW / wins, "0") : "-") + " taken " + (wins > 0 ? PxLog.F(takenW / wins, "0") : "-") + " healed " + (wins > 0 ? PxLog.F(healW / wins, "0") : "-")
+                        + " secondwind " + (wins > 0 ? PxLog.F(swW / wins, "0") : "-") + "; crits counter/punish/back " + critC + "/" + critP + "/" + critB + ", dodges " + dodges + " dodged " + dodged
+                        + " guarded " + guards + " cancels " + cancels + " secondwinds " + sw + " | " + string.Join(", ", lines), "report", true);
+                }
+                PxLog.Line("mvh-diag", "Healer " + v + " total", totalWins + "/40", "<= 8", totalWins <= 8);
+            }
         }
     }
 }

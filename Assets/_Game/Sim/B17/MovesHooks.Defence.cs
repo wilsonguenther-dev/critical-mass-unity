@@ -237,6 +237,8 @@ namespace CriticalMass.Sim.Core
             if (!On(w, m.SecondWind)) return;
             DefenceMovesState d = DefenceS(w);
             Actor a = w.Actors[i];
+            int[] by = m.SecondWindByClass;   // Healer ruling: a class marked 0 never gets the second wind
+            if (by != null && (int)a.Cls < by.Length && by[(int)a.Cls] == 0) return;
             if (d.SecondWindUsed[i] != 0 || !a.Alive || !(a.MaxHp > 0) || !(a.Hp < m.SecondWindBelowShare * a.MaxHp)) return;
             double heal = m.SecondWindHealShare * a.MaxHp;
             if (a.Hp + heal > a.MaxHp) heal = a.MaxHp - a.Hp;
@@ -502,13 +504,17 @@ namespace CriticalMass.Sim.Core
         {
             if (w.Moves == null) return;
             MovesConfig m = Cfg(w);
-            if (m.DodgeAvoidRefund && m.AvoidRefundShare > 0)
+            double share = m.AvoidRefundShare;
+            double[] byCls = m.AvoidRefundShareByClass;   // Healer ruling: per-class share, -1 = AvoidRefundShare
+            int jc = (int)w.Actors[j].Cls;
+            if (byCls != null && jc < byCls.Length && byCls[jc] >= 0) share = byCls[jc];
+            if (m.DodgeAvoidRefund && share > 0)
             {
                 DodgeState s = w.Dodges;
                 int left = s.Ready[j] - w.Tick;
                 if (left > 0)
                 {
-                    int back = (int)Math.Floor(left * m.AvoidRefundShare + 0.5);
+                    int back = (int)Math.Floor(left * share + 0.5);
                     if (back > 0)
                     {
                         s.Ready[j] -= back;
@@ -534,6 +540,7 @@ namespace CriticalMass.Sim.Core
                 return;
             }
             MovesConfig m = Cfg(w);
+            if (m.GlideStrikeKnockMul != 1 && DefenceGlider(w, source) && DefenceEnemyActor(w, target, source)) knock *= m.GlideStrikeKnockMul;   // Healer ruling
             if (DefenceGuardBlocks(w, target, source, sx, sz, DamageCause.Melee))
             {
                 bool[] footing = m.GuardKeepsFooting;
@@ -599,10 +606,23 @@ namespace CriticalMass.Sim.Core
             return false;
         }
 
+        /// <summary>Healer ruling: true when source is a living actor of a GlideClasses class with Glide on (her strikes pay the
+        /// glide's price: GlideStrikeDamageMul and GlideStrikeKnockMul).</summary>
+        static bool DefenceGlider(World w, int source)
+        {
+            MovesConfig m = Cfg(w);
+            if (!On(w, m.Glide) || source < 0 || source >= w.ActorCount) return false;
+            bool[] g = m.GlideClasses;
+            int c = (int)w.Actors[source].Cls;
+            return g != null && c < g.Length && g[c];
+        }
+
         static double DefenceHitCut(World w, int target, int source, double srcX, double srcZ, DamageCause cause, double dmg, bool report)
         {
-            if (!(dmg > 0) || !DefenceGuardBlocks(w, target, source, srcX, srcZ, cause)) return dmg;
             MovesConfig m = Cfg(w);
+            if (cause == DamageCause.Melee && dmg > 0 && m.GlideStrikeDamageMul != 1 && DefenceGlider(w, source) && DefenceEnemyActor(w, target, source))
+                dmg *= m.GlideStrikeDamageMul;   // Healer ruling: the glider strikes softer
+            if (!(dmg > 0) || !DefenceGuardBlocks(w, target, source, srcX, srcZ, cause)) return dmg;
             DefenceMovesState d = DefenceS(w);
             double cut = DefenceCut(w, target);
             if (cause == DamageCause.Explosion) cut *= m.GuardBlastCutShare;
