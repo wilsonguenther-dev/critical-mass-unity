@@ -93,7 +93,19 @@ namespace CriticalMass.Sim.Core
             if (!a.Alive || a.StandUp > 0 || a.AirLen > 0) return false;
             if (MovesHooks.JumpLocked(w, id)) return false;   // mv-hook: relock after an evading jump (lane 3)
             if (a.UnsupportedTicks > CoyoteTicks(w.Config)) return false;
+            if (w.Moves != null) MovesHooks.MovementJumpTakeoff(w, id);   // class moves T2-4 (lane 3): travel's extra speed stays on the ground
             int k = PlanJump(w, id, w.Vx[id], w.Vz[id], dt);
+            // class moves T2-6 (lane 3): a Healer holding Jump whose plain jump has no full-length landing may take off on a glide plan
+            if (w.Moves != null && k < AirTicks(w.Config) && MovesHooks.MovementGlidePlan(w, id, dt, out int gk, out double gx, out double gz))
+            {
+                a.AirLen = gk;
+                a.AirTick = 0;
+                a.AirFromX = w.X[id];
+                a.AirFromZ = w.Z[id];
+                a.AirToX = gx;
+                a.AirToZ = gz;
+                return true;
+            }
             if (k == 0) return false;
             a.AirLen = k;
             a.AirTick = 0;
