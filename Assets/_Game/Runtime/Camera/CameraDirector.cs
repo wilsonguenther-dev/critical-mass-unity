@@ -42,6 +42,9 @@ namespace CriticalMass.Runtime.Camera
         /// <summary>A hit by me or on me landed now (wall clock).</summary>
         public static void MarkCombat(double now) => _lastCombat = now;
 
+        /// <summary>fix/px-combat-camera: seconds (wall clock, Time.unscaledTimeAsDouble) since a hit by me or on me landed.</summary>
+        public static double SinceCombat(double now) => now - _lastCombat;
+
         public static void Reset()
         {
             InFight = false;

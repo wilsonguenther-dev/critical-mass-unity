@@ -77,6 +77,9 @@ namespace CriticalMass.Runtime.Menu
         // player by default, or manual orbit by mouse / right stick), its sensitivity (x100) and the low views' field of view.
         public const string CameraViewKey = "cm.camera.view", CameraManualKey = "cm.camera.manual",
             CameraSensKey = "cm.camera.sens", CameraFovKey = "cm.camera.fov", CameraInvertYKey = "cm.camera.invertY";
+        /// <summary>fix/px-combat-camera: the third-person COMBAT CAMERA (over-the-shoulder framing in a melee fight, on by
+        /// default) and its strength (0..1, default 1 = the designed framing).</summary>
+        public const string CombatCameraKey = "cm.camera.combat", CombatCameraStrengthKey = "cm.camera.combatStrength";
         /// <summary>DG-53: the settings format version, so a later build can migrate or reset stored keys safely.</summary>
         public const string PrefsVersionKey = "cm.prefsVersion";
         public const int PrefsVersion = 1;
@@ -89,6 +92,7 @@ namespace CriticalMass.Runtime.Menu
             MasterKey, MusicKey, EffectsKey, MuteMusicKey, MuteEffectsKey, MuteInBackgroundKey, AnnouncerKey, LessSoundKey, ColourBlindTeamsKey, WidthKey, HeightKey, FullScreenKey, VSyncKey, QualityKey, ShakeKey,
             DamageNumbersKey, BloodKey, GoreKey, FpsCapKey, BgThrottleKey, MoveAssistKey, KeysFollowMapKey, CancelButtonKey, GroundCameraKey, "cm.camera.heading", CameraViewKey, CameraManualKey, CameraSensKey, CameraFovKey, CameraInvertYKey, PrefsVersionKey,
             ShakeScaleKey, ReduceFlashingKey, IntenseFlashingKey, ReduceMotionKey, IntroAtLaunchKey, IntroSubtitlesKey, HitKickKey,
+            CombatCameraKey, CombatCameraStrengthKey,
         };
 
         public const string MixerResource = "Audio/CMMixer";
@@ -265,6 +269,22 @@ namespace CriticalMass.Runtime.Menu
 
         /// <summary>Manual camera (off by default): the mouse or right stick orbits the low views' camera.</summary>
         public static bool CameraManual { get => GetB(CameraManualKey, false); set => SetB(CameraManualKey, value); }
+
+        /// <summary>fix/px-combat-camera: COMBAT CAMERA on (default) / off; tests may pin it with CombatCameraOverride.</summary>
+        public static bool CombatCamera
+        {
+            get => CombatCameraOverride ?? GetB(CombatCameraKey, true);
+            set => SetB(CombatCameraKey, value);
+        }
+        public static bool? CombatCameraOverride;
+
+        /// <summary>COMBAT CAMERA strength 0..1 (default 1); tests may pin it with CombatCameraStrengthOverride.</summary>
+        public static float CombatCameraStrength
+        {
+            get => CombatCameraStrengthOverride ?? Mathf.Clamp01(GetF(CombatCameraStrengthKey, 1f));
+            set => SetF(CombatCameraStrengthKey, Mathf.Clamp01(value));
+        }
+        public static float? CombatCameraStrengthOverride;
 
         /// <summary>Manual orbit: mouse / stick up looks down (off by default).</summary>
         public static bool CameraInvertY { get => GetB(CameraInvertYKey, false); set => SetB(CameraInvertYKey, value); }

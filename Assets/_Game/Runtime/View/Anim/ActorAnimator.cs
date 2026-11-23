@@ -90,6 +90,13 @@ namespace CriticalMass.Runtime.View.Anim
         float _predFloor;
         double _predFloorT;
         public bool Predicting => _predicting;
+        // fix/px-view-2 (review: Warrior 0.76 at press + 2 in the Editor, whose frames are ~9 ms of wall time): the press's
+        // rise also counts RENDERED frames (1/60 s each), so "0.8 within 2 frames" holds however fast frames come.
+        int _predFrame, _predFloorFrame;
+        bool _actThrow;   // fix/px-view-2: this action is the Demolitions TNT throw (throw timing on whatever clip it plays)
+        /// <summary>fix/px-view-2 (tests): the upper-body action clip and the weight drawn for it this frame.</summary>
+        public float ActionWeightNow => _actClip != null ? _lastActW : 0f;
+        public string ActionClipNow => _actClip;
         // fix round 7: a cooldown press's acknowledgement (capped, never handed over); the press's wall clock for the floor
         bool _predRefused;
         double _predFloorWall = double.NaN;
@@ -150,6 +157,7 @@ namespace CriticalMass.Runtime.View.Anim
             _lastActW = 0f;
             _predicting = true;
             _predWall = Time.unscaledTimeAsDouble;
+            _predFrame = Time.frameCount;
             _predSwingTick = actor.SwingTick;
             _predFloor = 0f;
             _predFloorWall = double.NaN;
@@ -465,6 +473,7 @@ namespace CriticalMass.Runtime.View.Anim
             bool evaluated = m.Evaluate(evaluate);
             if (evaluated) ApplyLegWarp(m);
             if (evaluated && !corpse && !air) ApplyClimb(m, w, i, simTime);
+            if (evaluated && !corpse && _mvGuardW > 0.01f) ApplyGuardRaise(m);   // class moves readability item 1
             {
                 // Breathing: a 2% chest swell at 0.3 Hz while idle. fix/model-scale: set from the chest's rest scale, never
                 // multiplied in place (a clip without a chest scale curve, or a frozen simTime in a hit-stop, compounded it).
@@ -715,7 +724,7 @@ namespace CriticalMass.Runtime.View.Anim
                 else
                 {
                     _actAge = actor.AnimAction + alpha / hz;
-                    if (_actClip == ArtMapping.Throw)
+                    if (_actClip == ArtMapping.Throw || _actThrow)   // fix/px-view-2: or her TNT throw on another clip
                     {
                         // fix round 7: the throw is over 8 frames after it leaves the hand (HitFeelTuning.ThrowPose)
                         HitFeelTuning.ThrowPose(_actAge, len, out t, out actW);
@@ -774,7 +783,8 @@ namespace CriticalMass.Runtime.View.Anim
             // press; CHARGE = the class attack clip held in its raised wind-up (deeper as the charge grows), handed to the
             // swing on release; GLIDE (Healer) = arms out (Cast held). Every weight stays 0 while World.Moves is null.
             {
-                bool mvGuard = !actor.Alive ? false : B17.MovesRead.GuardHeld(w, i) && m.HasClip(ArtMapping.Blocking);
+                bool mvGuard = !actor.Alive ? false : B17.MovesPoses.GuardShown(w, i) && m.HasClip(ArtMapping.Blocking);   // readability item 1: the local press shows on its own frame
+                if (mvGuard && _mvGuardW < 0.5f && i == B17.MovesPoses.PredictActor) _mvGuardW = 0.5f;   // half up on the press frame itself
                 _mvGuardW = B17.MovesPoses.Approach(_mvGuardW, mvGuard ? 1f : 0f, dSim, mvGuard ? B17.MovesPoses.GuardRiseSeconds : B17.MovesPoses.GuardFallSeconds);
                 if (_mvGuardW > 0f && m.HasClip(ArtMapping.Blocking))
                 {
@@ -882,6 +892,7 @@ namespace CriticalMass.Runtime.View.Anim
                 if (actor.SwingTick == _predSwingTick && HitFeelTuning.PredictedSwing(Time.unscaledTimeAsDouble - _predWall, cfgWindup, out double pAge, out float pW))
                 {
                     t = AttackTiming.ClipTime(pAge, ViewContact(_actClip, ClipFacts.Contact(_actClip, (float)(len * 0.5))), len, cfgWindup, _actExtreme);
+                    pW = Math.Max(pW, HitFeelTuning.CommitWeight(HitFeelTuning.RiseAge(0, Time.frameCount - _predFrame) + 1.0 / 60.0, true));   // fix/px-view-2
                     actW = _predRefused ? Math.Min(pW, HitFeelTuning.RefusedPressWeight) : pW;
                     return true;
                 }
@@ -914,7 +925,7 @@ namespace CriticalMass.Runtime.View.Anim
                 // the clip never steps back before the predicted wind-up time, until the sim's own envelope passes them
                 // fix round 7: the floor keeps rising on the press's clock (HitFeelTuning.RisingFloor), so the hand-over does
                 // not hold the press frame's 0.56 while the sim's envelope restarts its own rise (pass 7: 0.56 at press + 2)
-                float floor = double.IsNaN(_predFloorWall) ? _predFloor : Math.Max(_predFloor, HitFeelTuning.RisingFloor(Time.unscaledTimeAsDouble - _predFloorWall));
+                float floor = double.IsNaN(_predFloorWall) ? _predFloor : Math.Max(_predFloor, HitFeelTuning.RisingFloor(HitFeelTuning.RiseAge(Time.unscaledTimeAsDouble - _predFloorWall, Time.frameCount - _predFloorFrame)));
                 if (actW >= floor && t >= _predFloorT) { _predFloor = 0f; _predFloorWall = double.NaN; }
                 else { actW = Math.Max(actW, floor); t = Math.Max(t, _predFloorT); }
             }
@@ -1032,6 +1043,7 @@ namespace CriticalMass.Runtime.View.Anim
         void BeginAction(ModelView m, Actor actor, GameConfig cfg, double simTime, string cue = null, int tick = int.MinValue)
         {
             _feinting = false;
+            _actThrow = false;   // fix/px-view-2
             _whiffTwist = _whiffPitch = 0f;
             ClassConfig cc = cfg.Class(actor.Cls);
             double aa = actor.AnimAction;
@@ -1052,11 +1064,18 @@ namespace CriticalMass.Runtime.View.Anim
             if (clip != null && !m.HasClip(clip)) clip = null;
             // a skill cue (not a melee press this tick) plays its own clip on the ability timing
             if (cue != null && !attack && m.HasClip(cue)) { clip = cue; kind = 2; }
+            // fix/px-view-2 (review: the TNT arm at full weight to +24): a Demolitions kind-1 action that is NOT this tick's
+            // pry-bar swing (Combat sets SwingTick on the tick it resets AnimAction) is her TNT throw: ThrowTnt resets AnimAction
+            // with the attack cooldown still running (or set by ThrowFromAttack), and the Throw cue is noted after this frame's
+            // pose, so the throw took the swing envelope of her Attack clip. It plays on the throw timing (ThrowPose) instead.
+            else if (kind == 1 && actor.Cls == ClassId.Demolitions && tick != int.MinValue
+                     && !(Math.Abs((tick - actor.SwingTick) / cfg.SimHz - aa) < 1.5 / cfg.SimHz))
+            { if (m.HasClip(ArtMapping.Throw)) clip = ArtMapping.Throw; kind = 2; _actThrow = true; }
             // fix round 5 (item 4): the sim took the predicted press: continue the same clip, no crossfade, the pose never dips
             bool fromPredict = _predicting && !_predRefused && kind == 1 && clip != null && clip == _actClip;
             if (_predicting && !fromPredict) LastPredictionEnded = true;
             _predicting = false;
-            if (fromPredict) { _predFloor = Math.Max(_lastActW, 0.01f); _predFloorT = _lastActTime; _predFloorWall = _predWall; }
+            if (fromPredict) { _predFloor = Math.Max(_lastActW, 0.01f); _predFloorT = _lastActTime; _predFloorWall = _predWall; _predFloorFrame = _predFrame; }
             else { _predFloor = 0f; _predFloorWall = double.NaN; }
             if (_actClip != null && _lastActW > 0f && !fromPredict)
             {
@@ -1212,6 +1231,40 @@ namespace CriticalMass.Runtime.View.Anim
         }
 
         float _climbW;
+
+        /// <summary>
+        /// Class moves readability (Editor review item 1): from behind, the Blocking clip barely differs from idle. While the
+        /// guard pose is up, after the clips are evaluated, both arms are turned toward fixed body-space targets: the weapon
+        /// arm's upper arm forward and out with the elbow raised and its forearm upright in front of the face (the weapon above
+        /// the head line), the off arm's forearm across the chest. Absolute targets (FromToRotation of the bone toward its
+        /// child), so nothing compounds; the next evaluation rewrites the arms from the clips. View only.
+        /// </summary>
+        void ApplyGuardRaise(ModelView m)
+        {
+            float k = Mathf.Clamp01(_mvGuardW) * 0.9f;
+            Transform root = m.Transform;
+            Vector3 f = root.forward, u = root.up, r = root.right;
+            Arm(m.Bone("upperarm.r"), m.Bone("lowerarm.r"), m.Bone("hand.r"), true);
+            Arm(m.Bone("upperarm.l"), m.Bone("lowerarm.l"), m.Bone("hand.l"), false);
+
+            void Arm(Transform upper, Transform lower, Transform hand, bool weapon)
+            {
+                if (upper == null || lower == null) return;
+                float side = Vector3.Dot(upper.position - root.position, r) >= 0f ? 1f : -1f;   // this arm's outward side
+                Vector3 elbow = weapon ? f * 0.70f + u * 0.40f + r * (0.45f * side) : f * 0.80f + u * 0.25f + r * (0.35f * side);
+                Aim(upper, lower.position - upper.position, elbow.normalized);
+                if (hand == null) return;
+                Vector3 fore = weapon ? u * 0.90f + f * 0.40f - r * (0.20f * side) : f * 0.45f + u * 0.30f - r * (0.85f * side);
+                Aim(lower, hand.position - lower.position, fore.normalized);
+            }
+
+            void Aim(Transform bone, Vector3 now, Vector3 want)
+            {
+                if (now.sqrMagnitude < 1e-8f) return;
+                Quaternion to = Quaternion.FromToRotation(now, want) * bone.rotation;
+                bone.rotation = Quaternion.Slerp(bone.rotation, to, k);
+            }
+        }
 
         /// <summary>True when actor i stands on a cell of an active ladder piece (BuiltPieces: the cell was a Wall).</summary>
         static bool OnLadder(World w, int i)

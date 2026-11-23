@@ -607,12 +607,12 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
             double reach = W.Config.Class(ClassId.Warrior).AttackRange;
             int e = Isolate(ClassId.Farmer, 3 * reach, dx, dz);
             double fx = W.X[e], fz = W.Z[e];
-            Set(Ms.position, ScreenOf(fx, fz));
+            MoveMouse(ScreenOf(fx, fz));   // fix/px-view-2: a real move (delta), so the aim follows the cursor
             int far = PlayerFeedback.Head;
             for (int t = 0; t < 6; t++) yield return TickFrame(() => Pin(e, fx, fz));
             bool litFar = Ledger(FeedbackChannel.HittableCue, e, out FeedbackEntry lf, far) && lf.Value > 0;
             double nx = W.X[0] + 0.7 * reach * dx, nz = W.Z[0] + 0.7 * reach * dz;
-            Set(Ms.position, ScreenOf(nx, nz));
+            MoveMouse(ScreenOf(nx, nz));   // fix/px-view-2: a real move (delta), so the aim follows the cursor
             int near = PlayerFeedback.Head;
             for (int t = 0; t < 6; t++) yield return TickFrame(() => Pin(e, nx, nz));
             bool litNear = Ledger(FeedbackChannel.HittableCue, e, out FeedbackEntry ln, near) && ln.Value > 0;
@@ -955,33 +955,38 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
             yield return Load(ClassId.Builder, CameraView.TopDown);
             Isolate(ClassId.Farmer, 30, 1, 0);
             W.Walls.Tool[0] = 0;   // DIG
-            double dx = 1, dz = 0;
-            double dd = 1.6;
-            bool found = false;
-            // fix round 7: the sim digs the cell under the aim PULLED BACK to MinerTerraform.Reach (Terraform.TargetCell), not
-            // the cell under a 1.6-2.4 u aim: every check now runs on the cell the sim will really dig for that aim
+            // fix/px-view-2 (review: "cell none of 64 free at aim"): the Builder spawns on his pad, and every cell within his
+            // reach there is inside the pad keep-out (BuilderWalls.CellRefusal: RefusedKeepOut), so nothing could be dug. The rig now finds a cell the
+            // sim will dig anywhere on the map, stands him 0.75 x reach from it on walkable floor, and aims at it.
             double reachT = W.Config.Abilities.MinerTerraform.Reach;
+            double dx = 1, dz = 0, dd = 0.75 * reachT, aimX = 0, aimZ = 0;
+            bool found = false;
             int tcx = -1, tcz = -1, tried = 0;
-            foreach (double dist in new[] { 0.9 * reachT, 0.75 * reachT, reachT + 0.5, 0.6 * reachT })
-            {
-                for (int k = 0; k < 16 && !found; k++)
+            for (int iz = 2; iz < W.Map.Height - 2 && !found; iz++)
+                for (int ix = 2; ix < W.Map.Width - 2 && !found; ix++)
                 {
-                    double a = k * Math.PI / 8, ax = W.X[0] + dist * Math.Cos(a), az = W.Z[0] + dist * Math.Sin(a);
-                    if (!Terraform.TargetCell(W, 0, ax, az, out int ix, out int iz)) continue;
-                    tried++;
-                    if (ix < 1 || iz < 1 || ix >= W.Map.Width - 1 || iz >= W.Map.Height - 1) continue;
-                    if (W.Map.Cells[iz * W.Map.Width + ix] != Cell.Floor || BuilderWalls.CellRefusal(W, ix, iz) != 0) continue;
-                    if (Terraform.DigRefusal(W, ix, iz) != 0) continue;
+                    if (W.Map.Cells[iz * W.Map.Width + ix] != Cell.Floor || BuilderWalls.CellRefusal(W, ix, iz) != 0 || Terraform.DigRefusal(W, ix, iz) != 0) continue;
                     double ccx = ix + 0.5, ccz = iz + 0.5;
-                    bool busy = W.Nodes.Any(nd => Math.Abs(nd.X - ccx) < 1.0 && Math.Abs(nd.Z - ccz) < 1.0)
-                        || (W.Depth.Sources != null && W.Depth.Sources.Any(sn => sn != null && Math.Abs(sn.X - ccx) < 1.0 && Math.Abs(sn.Z - ccz) < 1.0))
-                        || Enumerable.Range(1, W.ActorCount - 1).Any(j => W.Actors[j].Alive && Math.Abs(W.X[j] - ccx) < 1.0 && Math.Abs(W.Z[j] - ccz) < 1.0);
-                    if (busy) continue;
-                    dx = Math.Cos(a); dz = Math.Sin(a); dd = dist; found = true; tcx = ix; tcz = iz;
+                    if (W.Nodes.Any(nd => Math.Abs(nd.X - ccx) < 1.5 && Math.Abs(nd.Z - ccz) < 1.5)) continue;
+                    if (W.Depth.Sources != null && W.Depth.Sources.Any(sn => sn != null && Math.Abs(sn.X - ccx) < 1.5 && Math.Abs(sn.Z - ccz) < 1.5)) continue;
+                    if (Math.Abs(W.X[Enemy] - ccx) < 3 && Math.Abs(W.Z[Enemy] - ccz) < 3) continue;
+                    for (int k = 0; k < 8 && !found; k++)
+                    {
+                        tried++;
+                        double a = k * Math.PI / 4, sx = ccx - dd * Math.Cos(a), sz = ccz - dd * Math.Sin(a);
+                        int scx = (int)Math.Floor(sx), scz = (int)Math.Floor(sz);
+                        if (W.Map.Cells[scz * W.Map.Width + scx] != Cell.Floor) continue;
+                        Put(0, ClassId.Builder, sx, sz);
+                        if (!Terraform.TargetCell(W, 0, ccx, ccz, out int gx, out int gz) || gx != ix || gz != iz) continue;
+                        dx = Math.Cos(a); dz = Math.Sin(a); aimX = ccx; aimZ = ccz; tcx = ix; tcz = iz; found = true;
+                    }
                 }
-                if (found) break;
-            }
-            Set(Ms.position, ScreenOf(W.X[0] + dd * dx, W.Z[0] + dd * dz));
+            Assert.IsTrue(found, "[px-f] F28 rig: no diggable cell with a floor spot beside it on this map (" + tried + " tried)");
+            W.Actors[0].SpawnProtect = 0;
+            W.Walls.Tool[0] = 0;   // DIG
+            for (int f = 0; f < 6; f++) yield return TickFrame();   // the camera follows him to the new spot
+            Put(0, ClassId.Builder, aimX - dd * dx, aimZ - dd * dz);
+            MoveMouse(ScreenOf(aimX, aimZ));
             yield return TickFrame();
             int head = W.EventHead, cursor = PlayerFeedback.Head;
             Press(Kb.fKey);
@@ -991,7 +996,7 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
             var dug = Events(head, SimEventType.Terraform).Where(q => q.A == 0).ToList();
             bool pop = Ledger(FeedbackChannel.WorldActionPop, 0, out FeedbackEntry p, cursor);
             AssertAtControls("the end");
-            Check("F28 WorldActionPop", "Builder DIG with F", "Terraform " + (dug.Count > 0 ? "v" + dug[0].Value : "none") + ", pop " + (pop ? "reason " + p.Reason : "none") + "; cell " + (found ? tcx + "," + tcz : "none of " + tried + " free") + " at aim " + dd.ToString("0.00") + " u (reach " + reachT.ToString("0.00") + ")", "a pop with WorldDig (" + PlayerReasons.WorldDig + ")", pop && p.Reason == PlayerReasons.WorldDig);
+            Check("F28 WorldActionPop", "Builder DIG with F", "Terraform " + (dug.Count > 0 ? "v" + dug[0].Value : "none") + ", pop " + (pop ? "reason " + p.Reason : "none") + "; cell " + (found ? tcx + "," + tcz : "none of " + tried + " free") + " at " + dd.ToString("0.00") + " u (reach " + reachT.ToString("0.00") + ", " + tried + " spots tried)", "a pop with WorldDig (" + PlayerReasons.WorldDig + ")", pop && p.Reason == PlayerReasons.WorldDig);
         }
 
         [UnityTest, Timeout(SeatTestTimeoutMs)]
@@ -1104,23 +1109,145 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
             return x1 < x0 ? Rect.zero : Rect.MinMaxRect(x0, y0, x1, y1);
         }
 
+        /// <summary>fix/px-combat-camera: screen rectangle (pixels) of an upright cylinder standing at sim (x, z), through the live
+        /// camera; empty when any point is behind the lens.</summary>
+        static Rect SilhouetteRect(double x, double z, double ground, double radius, double height)
+        {
+            UnityEngine.Camera cam = UnityEngine.Camera.main;
+            if (cam == null) return Rect.zero;
+            float x0 = float.MaxValue, y0 = float.MaxValue, x1 = float.MinValue, y1 = float.MinValue;
+            for (int k = 0; k < 16; k++)
+            {
+                double a = k * Math.PI / 8;
+                for (int j = 0; j < 2; j++)
+                {
+                    Vector3 sp = cam.WorldToScreenPoint(SimSpace.ToWorld(x + radius * Math.Cos(a), ground + j * height, z + radius * Math.Sin(a)));
+                    if (sp.z <= 0) return Rect.zero;
+                    x0 = Mathf.Min(x0, sp.x); y0 = Mathf.Min(y0, sp.y); x1 = Mathf.Max(x1, sp.x); y1 = Mathf.Max(y1, sp.y);
+                }
+            }
+            return Rect.MinMaxRect(x0, y0, x1, y1);
+        }
+
+        /// <summary>A fighter's class silhouette (FightFrame.Silhouette) on screen.</summary>
+        Rect FighterSilhouette(int i)
+        {
+            ClassId c = W.Actors[i].Cls;
+            CriticalMass.Runtime.Camera.FightFrame.Silhouette(c, W.Config.Class(c).Radius, out double hw, out double h);
+            return SilhouetteRect(W.X[i], W.Z[i], S.Ground(W.X[i], W.Z[i]), hw, h);
+        }
+
+        /// <summary>Share of the enemy's box not covered by mine (boxes over-cover a silhouette, so this is strict).</summary>
+        static double OutsideShare(Rect mine, Rect theirs)
+        {
+            float ox = Mathf.Max(0, Mathf.Min(mine.xMax, theirs.xMax) - Mathf.Max(mine.xMin, theirs.xMin));
+            float oy = Mathf.Max(0, Mathf.Min(mine.yMax, theirs.yMax) - Mathf.Max(mine.yMin, theirs.yMin));
+            float area = theirs.width * theirs.height;
+            return area > 0 ? 1 - ox * oy / area : 0;
+        }
+
+        /// <summary>The player's OWN camera forward (sim unit): the combat framing turns the drawn camera, the aim keeps this yaw,
+        /// so the enemy is placed straight ahead of the player's view (the worst case: unframed, exactly behind my fighter).</summary>
+        static void OwnForward(out double dx, out double dz) =>
+            CriticalMass.Runtime.Camera.GroundCamera.Basis(CriticalMass.Runtime.Camera.GroundView.AimYaw, out dx, out dz, out _, out _);
+
+        /// <summary>The lens is not inside the map's solid grid (walls, terraces, ground), with half the collision radius.</summary>
+        bool CameraInsideGeometry()
+        {
+            UnityEngine.Camera cam = UnityEngine.Camera.main;
+            if (cam == null) return false;
+            Vector3 cp = cam.transform.position;
+            SimSpace.ToSim(cp, out double cx, out double cz);
+            return CriticalMass.Runtime.Camera.GroundCollision.Inside(W.Map, cx, cp.y, cz, CriticalMass.Runtime.Camera.GroundCollision.Radius * 0.5, null, 0);
+        }
+
         [UnityTest, Timeout(SeatTestTimeoutMs)]
         public IEnumerator D2_ThirdPerson_MeleeRange_EnemyNotBehindMe([ValueSource(nameof(Classes))] ClassId x)
         {
-            yield return Load(x, CameraView.ThirdPerson);
-            CameraForward(out double dx, out double dz);
-            int e = Isolate(ClassId.Farmer, T.StandShareOfRange * W.Config.Class(x).AttackRange, dx, dz);
-            double px = W.X[e], pz = W.Z[e];
-            for (int f = 0; f < 10; f++) yield return TickFrame(() => Pin(e, px, pz));
-            Rect mine = ScreenRect(S.ActorModel(0)), theirs = ScreenRect(S.ActorModel(e));
-            Vector2 c = theirs.width > 0 ? theirs.center : ScreenOf(px, pz);
-            // the enemy's screen box minus the part my own box covers (boxes over-cover a silhouette, so this is strict)
-            float ox = Mathf.Max(0, Mathf.Min(mine.xMax, theirs.xMax) - Mathf.Max(mine.xMin, theirs.xMin)), oy = Mathf.Max(0, Mathf.Min(mine.yMax, theirs.yMax) - Mathf.Max(mine.yMin, theirs.yMin));
-            float area = theirs.width * theirs.height;
-            double visibleShare = area > 0 ? 1 - ox * oy / area : 0;
-            bool hidden = visibleShare < T.EnemyVisibleShareMin;
-            AssertAtControls("the end");
-            Check("D2 EnemyNotBehindMe", x + " third person, enemy at 0.8 x range ahead", "my fighter " + mine + ", enemy centre " + c + ", enemy box " + theirs + ", share of the enemy box not covered by my box " + visibleShare.ToString("0.00") + " (target >= " + T.EnemyVisibleShareMin + ")", "the enemy stays mostly visible past my own fighter", mine.width > 0 && theirs.width > 0 && !hidden);
+            bool? keep = GameSettings.CombatCameraOverride;
+            float? keepS = GameSettings.CombatCameraStrengthOverride;
+            try
+            {
+                GameSettings.CombatCameraOverride = true;   // the shipped default, pinned against a tester's stored switch
+                GameSettings.CombatCameraStrengthOverride = 1f;
+                yield return Load(x, CameraView.ThirdPerson);
+                OwnForward(out double dx, out double dz);
+                int e = Isolate(ClassId.Farmer, T.StandShareOfRange * W.Config.Class(x).AttackRange, dx, dz);
+                double px = W.X[e], pz = W.Z[e];
+                // fix/px-combat-camera: real 60 fps frames for the framing to ease in (0.3 s + the yaw chase); the old 10 unpaced
+                // Editor frames (~1-5 ms each) measured the camera before any framing had happened.
+                Paced(true);
+                for (int f = 0; f < T.CombatSettleFrames; f++) yield return TickFrame(() => Pin(e, px, pz));
+                yield return EndOfFrame();
+                Rect mine = FighterSilhouette(0), theirs = FighterSilhouette(e);
+                Rect mineR = ScreenRect(S.ActorModel(0)), theirsR = ScreenRect(S.ActorModel(e));
+                double visibleShare = OutsideShare(mine, theirs), rendererShare = OutsideShare(mineR, theirsR);
+                Paced(false);
+                AssertAtControls("the end");
+                Check("D2 EnemyNotBehindMe", x + " third person, combat camera on, enemy at 0.8 x range ahead of my own view",
+                    "framing " + CriticalMass.Runtime.Camera.GroundView.CombatFraming.ToString("0.00") + ", my silhouette " + mine + ", enemy silhouette " + theirs +
+                    ", share of the enemy box not covered by my box " + visibleShare.ToString("0.00") + " (target >= " + T.EnemyVisibleShareMin + "); renderer boxes (logged only) mine " + mineR + ", enemy " + theirsR + ", share " + rendererShare.ToString("0.00"),
+                    "the enemy stays mostly visible past my own fighter", mine.width > 0 && theirs.width > 0 && visibleShare >= T.EnemyVisibleShareMin);
+            }
+            finally
+            {
+                GameSettings.CombatCameraOverride = keep;
+                GameSettings.CombatCameraStrengthOverride = keepS;
+            }
+        }
+
+        static readonly double[] ReachShares = { 0.8, 1.0 };
+
+        /// <summary>
+        /// fix/px-combat-camera: the combat camera at 0.8 and 1.0 x reach, every class, the same moment measured with the switch
+        /// off then on: at least 0.6 of the enemy's silhouette box clear of mine, the enemy at least 1.4 x as tall on screen as
+        /// with the switch off, my own fighter wholly on screen, the lens outside the map's solid grid, the framing settled.
+        /// </summary>
+        [UnityTest, Timeout(SeatTestTimeoutMs)]
+        public IEnumerator D2b_ThirdPerson_CombatCamera_FramesTheFight([ValueSource(nameof(Classes))] ClassId x, [ValueSource(nameof(ReachShares))] double share)
+        {
+            bool? keep = GameSettings.CombatCameraOverride;
+            float? keepS = GameSettings.CombatCameraStrengthOverride;
+            try
+            {
+                GameSettings.CombatCameraOverride = false;
+                GameSettings.CombatCameraStrengthOverride = 1f;
+                yield return Load(x, CameraView.ThirdPerson);
+                OwnForward(out double dx, out double dz);
+                int e = Isolate(ClassId.Farmer, share * W.Config.Class(x).AttackRange, dx, dz);
+                double px = W.X[e], pz = W.Z[e];
+                Paced(true);
+                for (int f = 0; f < T.CombatReleaseFrames; f++) yield return TickFrame(() => Pin(e, px, pz));
+                yield return EndOfFrame();
+                double offK = CriticalMass.Runtime.Camera.GroundView.CombatFraming;
+                Rect offMine = FighterSilhouette(0), offTheirs = FighterSilhouette(e);
+                double offShare = OutsideShare(offMine, offTheirs);
+                GameSettings.CombatCameraOverride = true;
+                for (int f = 0; f < T.CombatSettleFrames; f++) yield return TickFrame(() => Pin(e, px, pz));
+                yield return EndOfFrame();
+                double k = CriticalMass.Runtime.Camera.GroundView.CombatFraming;
+                Rect mine = FighterSilhouette(0), theirs = FighterSilhouette(e);
+                double visible = OutsideShare(mine, theirs);
+                double gain = offTheirs.height > 0 ? theirs.height / offTheirs.height : 0;
+                UnityEngine.Camera cam = UnityEngine.Camera.main;
+                bool meOnScreen = cam != null && mine.width > 0 && mine.xMin >= 0 && mine.yMin >= 0 && mine.xMax <= cam.pixelWidth && mine.yMax <= cam.pixelHeight;
+                bool inside = CameraInsideGeometry();
+                CriticalMass.Runtime.Camera.CombatFramer fr = CriticalMass.Runtime.Camera.GroundView.Framer;
+                string side = fr != null ? "side " + fr.Turn + ", yaw +" + fr.YawOffset.ToString("0.0") + " deg, wall keep " + fr.WallKeep.ToString("0.00") : "no framer";
+                Paced(false);
+                AssertAtControls("the end");
+                Check("D2b CombatCamera", x + " third person, enemy at " + share + " x range ahead of my own view, switch off then on",
+                    "off: framing " + offK.ToString("0.00") + ", enemy box " + offTheirs + ", clear share " + offShare.ToString("0.00") +
+                    "; on: framing " + k.ToString("0.00") + " (" + side + "), my box " + mine + ", enemy box " + theirs + ", clear share " + visible.ToString("0.00") +
+                    ", enemy height x" + gain.ToString("0.00") + ", me on screen " + meOnScreen + ", lens inside the grid " + inside,
+                    "clear share >= " + T.EnemyVisibleShareMin + ", height >= x" + T.CombatHeightGainMin + ", me on screen, lens clear, framing settled (>= 0.95)",
+                    offK < 0.01 && k >= 0.95 && visible >= T.EnemyVisibleShareMin && gain >= T.CombatHeightGainMin && meOnScreen && !inside);
+            }
+            finally
+            {
+                GameSettings.CombatCameraOverride = keep;
+                GameSettings.CombatCameraStrengthOverride = keepS;
+            }
         }
 
         [UnityTest, Timeout(SeatTestTimeoutMs)]
@@ -1156,6 +1283,49 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
             bool overlapBar = br.width > 0 && nr.Overlaps(br);
             bool overlapName = names.Any(q => q.Overlaps(nr) && Vector2.Distance(q.center, nr.center) < 200);
             Check("D4 NumberClearOfNameAndBar", Tag(ClassId.Warrior, v), r.Hit ? "number " + nr + ", bar " + br + " overlap " + overlapBar + ", name tags found " + names.Count + " overlap " + overlapName : r.Note, "no overlap", r.Hit && r.Seen && bar && !overlapBar && !overlapName);
+        }
+
+        /// <summary>fix/px-view-2 (review: the Demolitions throw arm held full weight to +24 and was down only by +34): the
+        /// DRAWN upper-body action weight after her TNT leaves the hand is full in the first frames, at most 0.1 at +8 and 0 at
+        /// +12 rendered frames (60 fps frames, the sim at its own rate). Read from what ActorViews drew each frame.</summary>
+        [UnityTest, Timeout(SeatTestTimeoutMs)]
+        public IEnumerator D7_Demolitions_TntThrowArmDownBy8Frames([ValueSource(nameof(Views))] CameraView v)
+        {
+            yield return Load(ClassId.Demolitions, v);
+            FrontDir(v, out double dx, out double dz);
+            int e = Isolate(ClassId.Farmer, 6.0, dx, dz);
+            double px = W.X[e], pz = W.Z[e];
+            if (W.Demolitions != null && W.Demolitions.TntReadyTick != null) W.Demolitions.TntReadyTick[0] = W.Tick;
+            // the review's case: a pry-bar swing a moment before, so the attack cooldown still runs when the TNT leaves
+            W.Actors[0].AttackCd = 0.4;
+            MoveMouse(ScreenOf(px, pz));
+            for (int f = 0; f < 3; f++) yield return TickFrame(() => Pin(e, px, pz));
+            int head = W.EventHead;
+            Press(Kb.fKey);   // TNT on F (class moves T1-1: her Attack is always the pry bar)
+            yield return TickUntil(() => Events(head, SimEventType.TntThrown).Any(q => q.A == 0), S.Ticks(1.0), "the TNT leaves on F", () => Pin(e, px, pz));
+            Release(Kb.fKey);
+            int throwFrame = Time.frameCount;   // this frame's LateUpdate draws the throw tick
+            int every = Math.Max(1, (int)Math.Round(60.0 / W.Config.SimHz));
+            var drawn = new Dictionary<int, float>();
+            var clip = new Dictionary<int, string>();
+            Paced(true);
+            for (int f = 1; f <= 16; f++)
+            {
+                yield return null;   // resumes after the previous frame was drawn (its LateUpdate wrote the drawn weight)
+                int at = CriticalMass.Runtime.View.ActorViews.LocalSwingWeightFrame;
+                float arm = CriticalMass.Runtime.View.Skills.SkillPoseOverlay.LastThrowFrame == at ? CriticalMass.Runtime.View.Skills.SkillPoseOverlay.LastThrowWeight : 0f;
+                drawn[at] = Math.Max(arm, CriticalMass.Runtime.View.ActorViews.LocalActionWeightDrawn);   // the clip or the procedural arm
+                clip[at] = CriticalMass.Runtime.View.ActorViews.LocalActionClipDrawn;
+                if (f % every == 0) { Pin(e, px, pz); S.Tick(1); }
+            }
+            Paced(false);
+            float W0(int k) => drawn.TryGetValue(throwFrame + k, out float x) ? x : -1f;
+            string C(int k) => clip.TryGetValue(throwFrame + k, out string c) ? (c ?? "none") : "?";
+            float early = Math.Max(Math.Max(W0(0), W0(1)), W0(2));
+            string seen = string.Join(" ", Enumerable.Range(0, 13).Select(k => "+" + k + ":" + W0(k).ToString("0.00") + "/" + C(k)));
+            AssertAtControls("the end");
+            Check("D7 TntThrowArm", Tag(ClassId.Demolitions, v), "drawn throw weight " + seen, ">= 0.9 in +0..+2, <= 0.1 at +8, 0 at +12",
+                early >= 0.9f && W0(8) >= 0f && W0(8) <= 0.1f && W0(12) >= 0f && W0(12) <= 0.01f);
         }
 
         [UnityTest, Timeout(SeatTestTimeoutMs)]

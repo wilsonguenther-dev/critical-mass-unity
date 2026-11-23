@@ -1364,10 +1364,14 @@ namespace CriticalMass.Runtime.Menu
                 Stepper(tab, 6, "CAMERA FOLLOW", FollowText, StepFollow),
                 Stepper(tab, 7, "LOOK SENSITIVITY", SensText, StepSens),
                 Stepper(tab, 8, "FIELD OF VIEW", FovText, StepFov),
+                // fix/px-combat-camera: third person frames a melee fight over the shoulder (on by default); some players
+                // hate camera assistance, so it has a switch and a strength.
+                Stepper(tab, 9, "COMBAT CAMERA", () => GameSettings.CombatCamera ? "ON" : "OFF", d => GameSettings.CombatCamera = !GameSettings.CombatCamera),
+                Slider(tab, 10, "COMBAT CAMERA STRENGTH", () => GameSettings.CombatCameraStrength, v => GameSettings.CombatCameraStrength = v),
             };
             // DG-62: the safe-start notice lives here, neutral, never on the title screen.
             string safe = CriticalMass.Runtime.Game.FrameGovernor.SafeNotice;
-            Note(tab, 9, safe ?? (GameSettings.CanChangeWindow ? "Changes apply at once and are kept for the next launch." :
+            Note(tab, 11, safe ?? (GameSettings.CanChangeWindow ? "Changes apply at once and are kept for the next launch." :
                 "Video settings are saved here and apply in the built game."));
             ChainInTab(items);
             return tab.gameObject;

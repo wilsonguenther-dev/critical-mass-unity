@@ -398,6 +398,19 @@ namespace CriticalMass.Runtime.Tests
         /// <summary>Fix round 7 (review pass 7: Warrior 0.56 at press + 2): after the hand-over the floor keeps rising on the
         /// press's clock, so two 60 fps frames after the press the drawn weight is >= 0.8 whatever tick the sim started on.</summary>
         [Test]
+        public void TheRiseCountsRenderedFramesWhenFramesComeFast()
+        {
+            // fix/px-view-2: the Editor drew 0.76 at press + 2 with ~5 ms frames (wall-only rise); 2 frames now reach >= 0.8
+            foreach (double frameMs in new[] { 2.0, 5.0, 9.0, 16.7, 33.3 })
+            {
+                double wall2 = 2 * frameMs / 1000.0;
+                Assert.GreaterOrEqual(HitFeelTuning.RisingFloor(HitFeelTuning.RiseAge(wall2, 2)), 0.8f, "hand-over floor at +2 frames of " + frameMs + " ms");
+                Assert.GreaterOrEqual(HitFeelTuning.CommitWeight(HitFeelTuning.RiseAge(wall2, 2) + 1.0 / 60.0, true), 0.8f, "predicted wind-up at +2 frames of " + frameMs + " ms");
+            }
+            Assert.AreEqual(0.0, HitFeelTuning.RiseAge(-1, -3), 1e-9, "never negative");
+        }
+
+        [Test]
         public void TheHandedOverSwingReachesPoint8TwoFramesAfterThePress()
         {
             float atPlus2 = HitFeelTuning.RisingFloor(2.0 / 60.0 - 1.0 / 60.0);   // the press frame is +0 and already drew one frame

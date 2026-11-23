@@ -74,7 +74,7 @@ namespace CriticalMass.Runtime.View.B17
             {
                 case Verb.Guard: return k + "HOLD TO GUARD, TAP AS HE SWINGS TO PARRY";
                 case Verb.Heavy: return "HOLD " + k + "CHARGE A HEAVY";
-                case Verb.Combo: return k + "AGAIN ON A HIT: COMBO";
+                case Verb.Combo: return k + "PRESS AGAIN AS THE HIT LANDS";
                 case Verb.Slide: return "TRAVELLING  " + k + "SLIDE";
                 case Verb.Glide: return "HOLD " + k + "IN THE AIR: GLIDE";
                 case Verb.JumpEvade: return k + "JUMP OVER A GROUND SWING";
@@ -83,16 +83,18 @@ namespace CriticalMass.Runtime.View.B17
             }
         }
 
-        /// <summary>The verb's switch is on in this world (no hint for a verb that is off).</summary>
+        /// <summary>The verb's switch is on in this world AND the verb applies to the class being played (review item 3: no
+        /// hint for a verb that is off or that this class does not have: the Warrior blocks with his SHIELD, not this guard;
+        /// a class with no combo chain gets no combo hint).</summary>
         public static bool SwitchOn(World w, Verb v, ClassId cls)
         {
             if (!MovesRead.On(w)) return false;
             MovesConfig m = MovesHooks.Cfg(w);
             switch (v)
             {
-                case Verb.Guard: return m.Guard;
+                case Verb.Guard: return m.Guard && MovesRead.HasGuardMeter(w, cls);
                 case Verb.Heavy: return m.Heavy;
-                case Verb.Combo: return m.Combos;
+                case Verb.Combo: return m.Combos && MovesRead.ComboSteps(w, cls) >= 2;
                 case Verb.Slide: return m.Travel && m.Slide;
                 case Verb.Glide: return m.Glide && (int)cls < m.GlideClasses.Length && m.GlideClasses[(int)cls];
                 case Verb.JumpEvade: return m.JumpEvade;

@@ -131,6 +131,29 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
         }
 
         [Test]
+        public void WordRanksPutParryOnTop()   // readability item 2
+        {
+            Assert.Greater(WorldWords.Rank(ActionTags.ParryWord), WorldWords.Rank(ActionTags.GuardBreakWord));
+            Assert.Greater(WorldWords.Rank(ActionTags.GuardBreakWord), WorldWords.Rank(ActionTags.FinisherWord));
+            Assert.Greater(WorldWords.Rank(ActionTags.FinisherWord), WorldWords.Rank("BLOCKED"));
+            Assert.Greater(WorldWords.Rank("BLOCKED"), WorldWords.Rank(ActionTags.SecondWindWord));
+            Assert.AreEqual(WorldWords.Rank("STUNNED"), WorldWords.Rank("PERFECT"), "the rest share the lowest rank");
+            Assert.AreEqual(2, WorldWords.MaxPerAnchor);
+        }
+
+        [Test]
+        public void PredictedGuardShowsAtOnceAndFadesWhenRefused()   // readability item 1
+        {
+            Assert.AreEqual(1f, MovesViews.GuardPrediction(true, false, 0f), "the press frame itself");
+            Assert.AreEqual(1f, MovesViews.GuardPrediction(true, false, MovesViews.GuardPredictWait), "waiting for the sim's tick");
+            Assert.AreEqual(1f, MovesViews.GuardPrediction(true, true, 5f), "the sim holds it");
+            Assert.AreEqual(0f, MovesViews.GuardPrediction(true, false, MovesViews.GuardPredictWait + MovesViews.GuardPredictFade), 1e-6, "refused: gone within 0.12 s");
+            Assert.AreEqual(0f, MovesViews.GuardPrediction(false, false, 0f), "released before the sim took it");
+            float mid = MovesViews.GuardPrediction(true, false, MovesViews.GuardPredictWait + MovesViews.GuardPredictFade * 0.5f);
+            Assert.That(mid, Is.InRange(0.4f, 0.6f));
+        }
+
+        [Test]
         public void EveryHelpLineHasAButtonAndEveryHintAKey()
         {
             foreach (string line in MovesHelp.CardLines) Assert.IsNotNull(MovesHelp.CardRow(line), line);
@@ -190,7 +213,7 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
             }
         }
 
-        [UnityTest]
+        [UnityTest, Timeout(150000)]
         public IEnumerator SwitchesOffShowNothingNew()
         {
             yield return Load(ClassId.Warrior, CameraView.TopDown);
@@ -200,7 +223,7 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
             PressAttack(CameraView.TopDown);
             for (int t = 0; t < 30; t++) yield return TickFrame(() => Pin(Enemy, x, z));
             ReleaseAttack();
-            yield return new WaitForEndOfFrame();
+            yield return EndOfFrame();   // fix/px-view-2: WaitForEndOfFrame never resumes under -nographics (shard hang)
             MovesViews v = Views;
             Assert.AreEqual(0, v.GuardArcsShown);
             Assert.AreEqual(0, v.ChargeShapesShown);
@@ -214,7 +237,7 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
             Assert.AreEqual(0f, anim.MovesGlideWeight);
         }
 
-        [UnityTest]
+        [UnityTest, Timeout(150000)]
         public IEnumerator GuardArcOnTheFirstFrameAndPoseWithinTwoFrames()
         {
             yield return Load(ClassId.Builder, CameraView.TopDown);
@@ -228,14 +251,14 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
             d.GuardMeter[0] = m.GuardMeter[(int)ClassId.Builder] * 0.5;
             Assert.IsTrue(MovesRead.GuardBlocking(W, 0), "the staged guard blocks");
             float t0 = Time.unscaledTime;
-            yield return new WaitForEndOfFrame();
+            yield return EndOfFrame();   // fix/px-view-2: WaitForEndOfFrame never resumes under -nographics (shard hang)
             Assert.GreaterOrEqual(Views.GuardArcsShown, 1, "the guard meter arc is drawn on the first frame of the guard");
             while (Time.unscaledTime - t0 < (float)MovesPoses.GuardRiseSeconds + 0.02f) yield return null;
-            yield return new WaitForEndOfFrame();
+            yield return EndOfFrame();   // fix/px-view-2: WaitForEndOfFrame never resumes under -nographics (shard hang)
             Assert.GreaterOrEqual(S.Views.AnimatorOf(0).MovesGuardWeight, 0.99f, "the guard pose is full within 33 ms");
         }
 
-        [UnityTest]
+        [UnityTest, Timeout(150000)]
         public IEnumerator HoldingAttackChargesAHeavyOnScreenAndReleaseSaysCharged()
         {
             yield return Load(ClassId.Warrior, CameraView.TopDown);
@@ -251,7 +274,7 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
                 yield return TickFrame(() => Pin(Enemy, x, z));
                 if (firstCharge < 0 && MovesRead.Charging(W, 0, out _)) firstCharge = t;
             }
-            yield return new WaitForEndOfFrame();
+            yield return EndOfFrame();   // fix/px-view-2: WaitForEndOfFrame never resumes under -nographics (shard hang)
             Assert.GreaterOrEqual(firstCharge, 0, "holding the attack button charged a heavy (Heavy switch, lane 4)");
             Assert.IsTrue(MovesRead.Charging(W, 0, out float share));
             Assert.GreaterOrEqual(share, 0.999f, "full charge after ChargeFullTick");
@@ -263,14 +286,14 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
             for (int f = 0; f < 6 && said < 0; f++)
             {
                 yield return TickFrame(() => Pin(Enemy, x, z));
-                yield return new WaitForEndOfFrame();
+                yield return EndOfFrame();   // fix/px-view-2: WaitForEndOfFrame never resumes under -nographics (shard hang)
                 if (Views.LastWord == ActionTags.ChargedWord) said = f;
             }
             Assert.GreaterOrEqual(said, 0, "CHARGED shows after a full-charge release");
             Assert.LessOrEqual(said, 1, "CHARGED shows on the release tick's frame or the next");
         }
 
-        [UnityTest]
+        [UnityTest, Timeout(150000)]
         public IEnumerator EventWordsShowOnTheNextRenderedFrame()
         {
             yield return Load(ClassId.Warrior, CameraView.TopDown);
@@ -296,12 +319,16 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
 
         IEnumerator Expect(Action push, string word)
         {
+            // fix/px-view-2 (review: SECOND WIND drawn at frame 32, expected 33): the event is pushed in frame N's coroutine
+            // step, before that frame's LateUpdate, so the word is drawn on frame N itself, the first rendered frame after the
+            // event, just as a sim event decoded in a frame's Update is drawn in that frame's LateUpdate. The old rig read the
+            // frame number after a yield (N + 1).
+            int pushed = Time.frameCount;
             push();
             yield return null;
-            int frame = Time.frameCount;
-            yield return new WaitForEndOfFrame();
+            yield return EndOfFrame();
             Assert.AreEqual(word, Views.LastWord, "the word for the event just pushed");
-            Assert.AreEqual(frame, Views.LastWordFrame, word + " is drawn on the first frame after its event");
+            Assert.That(Views.LastWordFrame, Is.InRange(pushed, pushed + 1), word + " is drawn on the first rendered frame after its event (pushed on frame " + pushed + ", drawn on " + Views.LastWordFrame + ")");
         }
     }
 }

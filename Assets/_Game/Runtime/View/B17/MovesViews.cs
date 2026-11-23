@@ -3,9 +3,13 @@
 using CriticalMass.Runtime.Game;
 using CriticalMass.Runtime.Hud;
 using CriticalMass.Runtime.Hud.Player;
+using CriticalMass.Runtime.Hud.Style;
+using CriticalMass.Runtime.Hud.Ui;
+using CriticalMass.Runtime.Menu;
 using CriticalMass.Sim.Config;
 using CriticalMass.Sim.Core;
 using UnityEngine;
+using UnityEngine.UI;
 
 namespace CriticalMass.Runtime.View.B17
 {
@@ -60,6 +64,39 @@ namespace CriticalMass.Runtime.View.B17
         public int LastWordFrame { get; private set; } = -1;
         public string LastWord { get; private set; }
 
+        // ---- readability round (Editor review 2026-11-23)
+        /// <summary>Item 1: a local Guard press shows the guard (arc, shield, pose) on the press frame itself, before the sim's
+        /// tick takes it; if the sim has not raised the guard GuardPredictWait after the press, it fades over GuardPredictFade.</summary>
+        public const float GuardPredictWait = 0.10f, GuardPredictFade = 0.12f;
+        /// <summary>Item 1: the guard SHIELD, a curved see-through band in front of the guarding body (reads from behind):
+        /// radius, bottom, top (u), arc, its base alpha and the raise flash (0.18 s; none with reduce flashing).</summary>
+        public const float ShieldR = 0.62f, ShieldY0 = 0.25f, ShieldY1 = 1.55f, ShieldArc = 130f, ShieldAlpha = 0.26f, ShieldFlash = 0.40f, ShieldFlashSeconds = 0.18f;
+        /// <summary>The local guard's predicted strength this frame (1 = shown, fading to 0 when the sim refused).</summary>
+        public float GuardPredicted01 { get; private set; }
+        public int ShieldsShown { get; private set; }
+        /// <summary>Item 5: the combo-window ring is on the victim (the next Attack press chains).</summary>
+        public bool ChainRingShown { get; private set; }
+        /// <summary>Item 2: the hint line (one fixed HUD row, the prompt stack's free row), its words and row, or null / -1.</summary>
+        public string HintLineText => _hintChip != null && _hintChip.gameObject.activeSelf ? _hintNow : null;
+        public int HintLineSlot { get; private set; } = -1;
+
+        readonly Piece[] _shields = new Piece[Arcs];
+        Piece _chainRing;
+        float[] _guardShownAt = new float[64];
+        bool[] _guardWas = new bool[64];
+        CriticalMass.Runtime.Input.HumanInputSource _human;
+        int _humanLook = int.MinValue;
+        bool _guardPressWas, _wasChain;
+        float _guardPressAt = -100f, _chainAt = -100f;
+        Canvas _hintCanvas;
+        RectTransform _hintChip;
+        Text _hintText;
+        CanvasGroup _hintGroup;
+        string _hintNow;
+        float _hintLeft, _hintWait;
+        GameHud _hud;
+        const float HintChipW = 720f, HintChipH = 46f;
+
         sealed class Piece
         {
             public GameObject Go;
@@ -95,6 +132,14 @@ namespace CriticalMass.Runtime.View.B17
             for (int i = 0; i < Glows; i++) { _glows[i] = Make("Charge Glow " + i, true); Disc(_glows[i].Mesh, 0f, GlowRadius, 360f, ShapeSegments); }
             for (int i = 0; i < Puffs; i++) { _puffs[i] = Make("Moves Dust " + i, true); Disc(_puffs[i].Mesh, 0f, 0.5f, 360f, 12); }
             for (int i = 0; i < Rings; i++) _rings[i] = Make("Moves Ring " + i, true);
+            for (int i = 0; i < Arcs; i++)
+            {
+                _shields[i] = Make("Guard Shield " + i, true);
+                Band(_shields[i].Mesh, ShieldR, ShieldY0, ShieldY1, ShieldArc, 20);
+                if (_shields[i].Mat != null && _shields[i].Mat.HasProperty("_Cull")) _shields[i].Mat.SetFloat("_Cull", 0f);
+            }
+            _chainRing = Make("Combo Window Ring", true);
+            Disc(_chainRing.Mesh, 0.80f, 0.94f, 360f, ArcSegments);
             Current = this;
         }
 
@@ -102,7 +147,10 @@ namespace CriticalMass.Runtime.View.B17
         {
             if (Current == this) Current = null;
             Destroy(_unlit);
-            foreach (Piece[] set in new[] { _arcs, _shapes, _glows, _puffs, _rings })
+            WorldWords.MovesCap = false;
+            if (_hintCanvas != null) Destroy(_hintCanvas.gameObject);
+            if (_chainRing != null) { if (_chainRing.Mat != null) Destroy(_chainRing.Mat); if (_chainRing.Mesh != null) Destroy(_chainRing.Mesh); }
+            foreach (Piece[] set in new[] { _arcs, _shapes, _glows, _puffs, _rings, _shields })
                 foreach (Piece p in set)
                 {
                     if (p == null) continue;
@@ -167,6 +215,43 @@ namespace CriticalMass.Runtime.View.B17
             mesh.RecalculateBounds();
         }
 
+        /// <summary>A vertical band (part of a cylinder) centred on +Z, double-sided (both windings), rebuilt in place.</summary>
+        public static void Band(Mesh mesh, float radius, float y0, float y1, float arcDeg, int segments)
+        {
+            segments = Mathf.Clamp(segments, 3, ArcSegments);
+            float half = Mathf.Clamp(arcDeg, 0f, 360f) * 0.5f * Mathf.Deg2Rad;
+            var verts = new Vector3[(segments + 1) * 2];
+            for (int k = 0; k <= segments; k++)
+            {
+                float a = -half + 2f * half * k / segments;
+                float sx = Mathf.Sin(a) * radius, cz = Mathf.Cos(a) * radius;
+                verts[k * 2] = new Vector3(sx, y0, cz);
+                verts[k * 2 + 1] = new Vector3(sx, y1, cz);
+            }
+            var tris = new int[segments * 12];
+            for (int k = 0; k < segments; k++)
+            {
+                int b = k * 2, t = k * 12;
+                tris[t] = b; tris[t + 1] = b + 1; tris[t + 2] = b + 3; tris[t + 3] = b; tris[t + 4] = b + 3; tris[t + 5] = b + 2;
+                tris[t + 6] = b; tris[t + 7] = b + 3; tris[t + 8] = b + 1; tris[t + 9] = b; tris[t + 10] = b + 2; tris[t + 11] = b + 3;
+            }
+            mesh.Clear();
+            mesh.vertices = verts;
+            mesh.triangles = tris;
+            mesh.RecalculateBounds();
+        }
+
+        /// <summary>Item 1 (pure): the predicted guard strength for a local press. pressed = the Guard button is down (or a
+        /// tap latched), simHeld = the sim has the guard up, age = seconds since the press. 1 while waiting for the sim's tick
+        /// (up to GuardPredictWait), then fading to 0 over GuardPredictFade when the sim refused; 1 once the sim holds it.</summary>
+        public static float GuardPrediction(bool pressed, bool simHeld, float age)
+        {
+            if (simHeld) return 1f;
+            if (!pressed) return 0f;
+            if (age <= GuardPredictWait) return 1f;
+            return Mathf.Clamp01(1f - (age - GuardPredictWait) / GuardPredictFade);
+        }
+
         /// <summary>The meter arc colour: team colour full, red empty (linear by share).</summary>
         public static Color MeterColour(TeamId team, float share)
         {
@@ -199,15 +284,25 @@ namespace CriticalMass.Runtime.View.B17
                 HideAll(_arcs);
                 HideAll(_shapes);
                 HideAll(_glows);
+                HideAll(_shields);
+                if (_chainRing != null) Show(_chainRing, false);
+                WorldWords.MovesCap = false;
+                MovesPoses.PredictActor = -1;
+                MovesPoses.PredictGuard = 0f;
+                _hintLeft = 0f;
+                TickHintLine(Time.unscaledDeltaTime);
                 _world = null;
                 return;
             }
+            WorldWords.MovesCap = true;   // item 2: at most two words per body, by priority
             double alpha = _driver.Alpha;
             bool reduce = !CriticalMass.Runtime.View.Moments.FlashSafety.IntenseAllowed;
             int n = w.ActorCount;
             Grow(n);
             Events(w);
-            int arc = 0, shape = 0, glow = 0, ring = 0;
+            int meG = HudBinder.LocalActor;
+            float pred = PredictGuard(w, meG);
+            int arc = 0, shape = 0, glow = 0, ring = 0, shield = 0;
             for (int i = 0; i < n; i++)
             {
                 Actor a = w.Actors[i];
@@ -221,7 +316,9 @@ namespace CriticalMass.Runtime.View.B17
                 if (arc < Arcs && MovesRead.HasGuardMeter(w, a.Cls))
                 {
                     float share = MovesRead.GuardMeter01(w, i);
-                    bool held = MovesRead.GuardHeld(w, i);
+                    bool simHeld = MovesRead.GuardHeld(w, i);
+                    float strength = simHeld ? 1f : i == meG ? pred : 0f;   // item 1: the local press shows on its own frame
+                    bool held = strength > 0f;
                     if (held || share < 0.999f)
                     {
                         Piece p = _arcs[arc++];
@@ -229,12 +326,28 @@ namespace CriticalMass.Runtime.View.B17
                         if (p.Key != key) { p.Key = key; Disc(p.Mesh, ArcInner, ArcOuter, 360f * Mathf.Max(0.02f, key), ArcSegments); }
                         Color c = MeterColour(a.Team, share);
                         if (!held) c.a *= 0.45f;   // refilling, guard down: dimmer
+                        else c.a *= Mathf.Max(0.45f, strength);
                         Tint(p, c);
                         p.T.localPosition = SimSpace.ToWorld(x, gy + ArcY, z);
                         p.T.localRotation = Quaternion.Euler(0f, yaw, 0f);
                         Show(p, true);
                     }
+                    // item 1: the SHIELD band in front of the guarding body (team colour, a short raise flash), seen from behind
+                    if (held && !_guardWas[i]) _guardShownAt[i] = now;
+                    _guardWas[i] = held;
+                    if (held && shield < Arcs)
+                    {
+                        Piece sp = _shields[shield++];
+                        float flash = reduce ? 0f : ShieldFlash * Mathf.Clamp01(1f - (now - _guardShownAt[i]) / ShieldFlashSeconds);
+                        Color sc = MeterColour(a.Team, share);
+                        sc.a = (ShieldAlpha + flash) * strength;
+                        Tint(sp, sc);
+                        sp.T.localPosition = SimSpace.ToWorld(x, gy, z);
+                        sp.T.localRotation = Quaternion.Euler(0f, yaw, 0f);
+                        Show(sp, true);
+                    }
                 }
+                else if (i < _guardWas.Length) _guardWas[i] = false;
 
                 // CHARGE: glow under the charger + the heavy's real ground shape along the facing (the telegraph)
                 if (MovesRead.Charging(w, i, out float cs))
@@ -298,6 +411,10 @@ namespace CriticalMass.Runtime.View.B17
                 _wasLanding[i] = landing;
             }
             for (int k = arc; k < Arcs; k++) Show(_arcs[k], false);
+            for (int k = shield; k < Arcs; k++) Show(_shields[k], false);
+            ShieldsShown = shield;
+            ComboWindow(w, alpha, reduce);
+            TickHintLine(Time.unscaledDeltaTime);
             for (int k = shape; k < Shapes; k++) Show(_shapes[k], false);
             for (int k = glow; k < Glows; k++) Show(_glows[k], false);
             for (int k = ring; k < Rings; k++) if (_rings[k].Born < 0) Show(_rings[k], false);
@@ -313,6 +430,125 @@ namespace CriticalMass.Runtime.View.B17
             }
         }
 
+        /// <summary>Item 1: the local fighter's Guard press, read on the frame it happens (HumanInputSource's state, read only),
+        /// handed to ActorAnimator through MovesPoses.PredictActor / PredictGuard.</summary>
+        float PredictGuard(World w, int me)
+        {
+            GuardPredicted01 = 0f;
+            MovesPoses.PredictActor = -1;
+            MovesPoses.PredictGuard = 0f;
+            if (me < 0 || me >= w.ActorCount || !w.Actors[me].Alive || !MovesHelp.SwitchOn(w, MovesHelp.Verb.Guard, w.Actors[me].Cls)) { _guardPressWas = false; return 0f; }
+            if (_human == null && Time.frameCount >= _humanLook)
+            {
+                _human = FindFirstObjectByType<CriticalMass.Runtime.Input.HumanInputSource>();
+                _humanLook = Time.frameCount + 30;
+            }
+            bool pressed = _human != null && _human.isActiveAndEnabled && _human.State != null && _human.State.GuardIntent;
+            float now = Time.unscaledTime;
+            if (pressed && !_guardPressWas) _guardPressAt = now;
+            _guardPressWas = pressed;
+            float g = GuardPrediction(pressed, MovesRead.GuardHeld(w, me), now - _guardPressAt);
+            GuardPredicted01 = g;
+            MovesPoses.PredictActor = me;
+            MovesPoses.PredictGuard = g;
+            return g;
+        }
+
+        /// <summary>Item 5: while my next Attack press will chain (the sim's chain window), a ring on the fighter I hit; the
+        /// first time the window opens in a match, the combo hint. The attack slot's pulse is GameHud's (MovesRead.ChainNext).</summary>
+        void ComboWindow(World w, double alpha, bool reduce)
+        {
+            int me = HudBinder.LocalActor;
+            int next = me >= 0 && me < w.ActorCount && w.Actors[me].Alive ? MovesRead.ChainNext(w, me) : 0;
+            bool chain = next >= 2;
+            float now = Time.unscaledTime;
+            if (chain && !_wasChain) { _chainAt = now; Hint(w, me, MovesHelp.Verb.Combo); }
+            _wasChain = chain;
+            int v = _lastVictimOfMe[0];
+            bool on = chain && v >= 0 && v < w.ActorCount && w.Actors[v].Alive;
+            ChainRingShown = on;
+            if (_chainRing == null) return;
+            if (!on) { Show(_chainRing, false); return; }
+            double x = w.PrevX[v] + (w.X[v] - w.PrevX[v]) * alpha, z = w.PrevZ[v] + (w.Z[v] - w.PrevZ[v]) * alpha;
+            float gy = w.Map != null ? (float)GroundHeight.At(w.Map, x, z) : 0f;
+            float k = Mathf.Clamp01((now - _chainAt) / 0.25f);
+            Tint(_chainRing, new Color(1f, 0.86f, 0.30f, reduce ? 0.7f : 0.9f - 0.25f * k));
+            _chainRing.T.localPosition = SimSpace.ToWorld(x, gy + ArcY + 0.01, z);
+            _chainRing.T.localRotation = Quaternion.identity;
+            _chainRing.T.localScale = Vector3.one * (reduce ? 1f : 1.25f - 0.25f * k);   // closes in once, never blinks
+            Show(_chainRing, true);
+        }
+
+        // ------------------------------------------------------------------ item 2: the hint line (one fixed HUD row)
+
+        void BuildHintLine()
+        {
+            var go = new GameObject("Moves Hint Canvas", typeof(RectTransform));
+            go.layer = 5;
+            go.transform.SetParent(transform, false);
+            _hintCanvas = go.AddComponent<Canvas>();
+            _hintCanvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            _hintCanvas.sortingOrder = 11;
+            var root = (RectTransform)go.transform;
+            _hintChip = MenuUi.Rt(root, "Hint Chip");
+            _hintChip.anchorMin = _hintChip.anchorMax = new Vector2(0.5f, 0f);
+            _hintChip.pivot = new Vector2(0.5f, 0f);
+            _hintChip.sizeDelta = new Vector2(HintChipW, HintChipH);
+            _hintGroup = _hintChip.gameObject.AddComponent<CanvasGroup>();
+            _hintGroup.interactable = _hintGroup.blocksRaycasts = false;
+            VectorShape body = MenuUi.Shape(_hintChip, "Body", ShapeKind.RoundRect, 0f, 0f, HintChipW, HintChipH, CMTokens.PanelNavy.Color, -1f);
+            body.OutlinePx = 3f;
+            body.RimPx = 2f;
+            body.SetRim(CMTokens.ToolBrass.Color);
+            _hintText = MenuUi.Fit(MenuUi.Label(_hintChip, "Line", CMTokens.Display, UiScale.TypeBody, CMTokens.WarmCream.Color, TextAnchor.MiddleCenter,
+                12f, 0f, HintChipW - 24f, HintChipH, "", 3f), 16);
+            _hintChip.gameObject.SetActive(false);
+        }
+
+        void ShowHintLine(string text)
+        {
+            if (_hintCanvas == null) BuildHintLine();
+            _hintNow = text;
+            _hintLeft = MovesHelp.HintSeconds;
+            _hintWait = 0f;
+            HudText.Set(_hintText, text);
+        }
+
+        /// <summary>The lowest prompt row (PromptStack) no prompt holds this frame, or -1 (the hint waits, up to 4 s).</summary>
+        public static int FreePromptRow()
+        {
+            int a = PromptStack.SlotOf(PromptStack.Source.Station), b = PromptStack.SlotOf(PromptStack.Source.Pill), c = PromptStack.SlotOf(PromptStack.Source.Strip);
+            int visible = PxFight.Active ? 1 : PromptStack.Visible(HudZones.Blocked(HudZone.Lower, HudPriority.Guide));
+            for (int r = 0; r < visible; r++) if (r != a && r != b && r != c) return r;
+            return -1;
+        }
+
+        void TickHintLine(float dt)
+        {
+            HintLineSlot = -1;
+            if (_hintChip == null) return;
+            if (_hintLeft <= 0f) { if (_hintChip.gameObject.activeSelf) _hintChip.gameObject.SetActive(false); return; }
+            if (_hud == null) _hud = FindAnyObjectByType<GameHud>();
+            bool hudOn = _hud != null && _hud.Canvas != null && _hud.Canvas.enabled && !CriticalMass.Runtime.Menus.MenuGate.AnyOpen;
+            int row = hudOn ? FreePromptRow() : -1;
+            if (row < 0)
+            {
+                if (_hintChip.gameObject.activeSelf) _hintChip.gameObject.SetActive(false);
+                _hintWait += dt;
+                if (_hintWait > 4f) _hintLeft = 0f;   // never queued for long: a stale hint is worse than none
+                return;
+            }
+            float w = Screen.width, h = Screen.height;
+            float s = HudLayout.Scale(w, h);
+            if (s > 0f && Mathf.Abs(_hintCanvas.scaleFactor - s) > 1e-4f) _hintCanvas.scaleFactor = s;
+            _hintLeft -= dt;
+            HintLineSlot = row;
+            var p = new Vector2(0f, PromptStack.Bottom(row, HintChipH));
+            if ((_hintChip.anchoredPosition - p).sqrMagnitude > 0.25f) _hintChip.anchoredPosition = p;
+            _hintGroup.alpha = Mathf.Clamp01(_hintLeft / 0.25f);
+            if (!_hintChip.gameObject.activeSelf) _hintChip.gameObject.SetActive(true);
+        }
+
         /// <summary>A first-use hint over my fighter: once per verb per match, at most MovesHelp.HintShows times ever, one
         /// every 4 s at most, only while that verb's switch is on.</summary>
         void Hint(World w, int me, MovesHelp.Verb v)
@@ -320,15 +556,13 @@ namespace CriticalMass.Runtime.View.B17
             if (me < 0 || me >= w.ActorCount || _hinted[(int)v]) return;
             if (!MovesHelp.SwitchOn(w, v, w.Actors[me].Cls)) return;
             if (Time.unscaledTime - _hintAt < 4f) return;
-            ActionTags tags = PlayerHud.Current != null ? PlayerHud.Current.Tags : null;
-            if (tags == null) return;
             string pref = MovesHelp.PrefKey(v);
             int seen = PlayerPrefs.GetInt(pref, 0);
             _hinted[(int)v] = true;
             if (seen >= MovesHelp.HintShows && !HintsAlways) return;
             string key = CriticalMass.Runtime.Input.InputGlyphs.Words(MovesHelp.HintAction(v));
             string text = MovesHelp.HintText(v, key);
-            if (tags.OnMovesWord(w, text, 5700 + (int)v, me, false, false, PxPalette.Cream, PxPalette.Brass, MovesHelp.HintSeconds, 950 + (int)v) == null) return;
+            ShowHintLine(text);   // item 2: the fixed hint row, never in world space over a fighter
             _hintAt = Time.unscaledTime;
             PlayerPrefs.SetInt(pref, seen + 1);
             Said(text);
@@ -342,6 +576,8 @@ namespace CriticalMass.Runtime.View.B17
             System.Array.Resize(ref _lastZ, n);
             System.Array.Resize(ref _wasLanding, n);
             System.Array.Resize(ref _wasSliding, n);
+            System.Array.Resize(ref _guardShownAt, n);
+            System.Array.Resize(ref _guardWas, n);
         }
 
         static void HideAll(Piece[] set) { for (int i = 0; i < set.Length; i++) Show(set[i], false); }
@@ -448,7 +684,7 @@ namespace CriticalMass.Runtime.View.B17
                 switch (e.Type)
                 {
                     case SimEventType.Hit:
-                        if (e.B == me && e.A != me) { _lastVictimOfMe[0] = e.A; Hint(w, me, MovesHelp.Verb.Combo); }
+                        if (e.B == me && e.A != me) _lastVictimOfMe[0] = e.A;   // item 5: the combo hint waits for the chain window
                         break;
                     case SimEventType.AttackStart:
                         if (e.A == me && e.B == Combat.KindAttack) Hint(w, me, MovesHelp.Verb.Heavy);
@@ -456,7 +692,8 @@ namespace CriticalMass.Runtime.View.B17
                         {
                             double dx = w.X[e.A] - w.X[me], dz = w.Z[e.A] - w.Z[me];
                             double reach = w.Config.Class(w.Actors[e.A].Cls).AttackRange + 1.0;
-                            if (dx * dx + dz * dz <= reach * reach) Hint(w, me, _hinted[(int)MovesHelp.Verb.Guard] ? MovesHelp.Verb.JumpEvade : MovesHelp.Verb.Guard);
+                            bool guardHint = !_hinted[(int)MovesHelp.Verb.Guard] && MovesHelp.SwitchOn(w, MovesHelp.Verb.Guard, w.Actors[me].Cls);   // item 3
+                            if (dx * dx + dz * dz <= reach * reach) Hint(w, me, guardHint ? MovesHelp.Verb.Guard : MovesHelp.Verb.JumpEvade);
                         }
                         break;
                     case SimEventType.TravelChanged:

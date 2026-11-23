@@ -183,7 +183,7 @@ namespace CriticalMass.Sim.Core
             }
             int n = dc.DashTicks < s.Stride ? dc.DashTicks : s.Stride - 1;
             // class moves T1-2 (lane 2, switch DodgeLunge): a dodge-in toward an enemy stops short of it (dc.Distance when off)
-            double dist = MovesHooks.DefenceLungeDash(w, id, dx, dz, dc.Distance);
+            double dist = MovesHooks.DefenceLungeDash(w, id, ref dx, ref dz, dc.Distance);   // guard fix: the lunge also steers the dash at its target
             int b = id * s.Stride;
             double x = w.X[id], z = w.Z[id];
             s.PathX[b] = x;
