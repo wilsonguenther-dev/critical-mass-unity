@@ -498,6 +498,16 @@ namespace CriticalMass.Runtime.Hud.Mechanics
             else if (left > _dodgeMax) _dodgeMax = left;
             _dodgePie.Fill01 = B13Kit.DodgeFill(left, _dodgeMax);
             _dodgePie.SetFill(left <= 0 ? CMTokens.ToolBrass.Color : CMTokens.Stone.Color);
+            // mv-6 (class moves lane 6, T2-4/T2-5): the chip reads SLIDE while a Dodge press would slide (TRAVEL lit)
+            bool mvSlide = CriticalMass.Runtime.View.B17.MovesRead.SlideArmed(w, me);
+            if (mvSlide != _mvSlide) { _mvSlide = mvSlide; HudText.Set(_dodgeKey, MvDodgeLabel()); }
+        }
+
+        bool _mvSlide;   // mv-6
+        string MvDodgeLabel()   // mv-6: the dodge chip word (SLIDE key while TRAVEL is lit, else DODGE key)
+        {
+            string k = B13Kit.KeyOr("Dodge", ControlBindings.ActiveDevice == ControlDevice.Gamepad ? "RB" : "SHIFT");
+            return _mvSlide ? CriticalMass.Runtime.View.B17.MovesRead.DodgeSlotWord(true, k) : B13Kit.DodgeLabel(k);
         }
 
         readonly VectorShape[] _rowKeyChip = new VectorShape[2];
@@ -570,7 +580,7 @@ namespace CriticalMass.Runtime.Hud.Mechanics
                 if (Mathf.Abs(kc.sizeDelta.x - cw) > 0.5f) MenuUi.Place(kc, KitW - 24f - cw, 42f + r * RowH + 9f, cw, 30f);
             }
             // b13-v: the dodge and switch keys from the current bindings (J's defaults while no Dodge binding exists)
-            HudText.Set(_dodgeKey, B13Kit.DodgeLabel(B13Kit.KeyOr("Dodge", ControlBindings.ActiveDevice == ControlDevice.Gamepad ? "RB" : "SHIFT")));
+            HudText.Set(_dodgeKey, MvDodgeLabel());   // mv-6: same words, SLIDE while TRAVEL is lit
             _switchKey = B13Kit.KeyOr("SwitchDigPlace", ControlBindings.ActiveDevice == ControlDevice.Gamepad ? "LB" : "WHEEL");
             string jump = InputGlyphs.Words("Jump");
             HudText.Set(_jumpText, "JUMP IT  " + (string.IsNullOrEmpty(jump) ? "SPACE" : jump.ToUpperInvariant()));

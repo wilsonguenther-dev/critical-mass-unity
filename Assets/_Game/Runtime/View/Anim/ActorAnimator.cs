@@ -236,7 +236,9 @@ namespace CriticalMass.Runtime.View.Anim
             Actor actor = w.Actors[i];
             double hz = cfg.SimHz;
             bool corpse = hasFx && fx.Corpse;
-            bool holding = hasFx && fx.Holding;
+            // class moves lane 6: the parry's 80 ms pose hold (both bodies) and a slide (legs held, no running in place) stop
+            // the loops exactly like the hit-stop hold; both are false while World.Moves is null.
+            bool holding = hasFx && fx.Holding || B17.MovesPoses.Holding(i, Time.unscaledTimeAsDouble) || B17.MovesRead.Sliding(w, i);
             CombatFeed feed = combat != null ? combat.Feed : null;
 
             // fix/animation-reds: ActorViews passes dSim = 0 during a hit-stop hold (loops must not advance), and the facing
@@ -417,6 +419,14 @@ namespace CriticalMass.Runtime.View.Anim
             else { _roll = 0f; _pitch = 0f; }
             Quaternion rot = Quaternion.Euler(0f, (float)_yaw + twist + _whiffTwist, 0f) * Quaternion.Euler(_pitch + _whiffPitch, 0f, _roll);
             if (hasFx) rot = fx.Lean * rot;
+            // class moves lane 6 (T2-5): the slide reads as a slide: low, leaning back along the slide, in fast and out over the end
+            float mvSlide = !corpse ? B17.MovesRead.SlidePhase(w, i, alpha) : -1f;
+            if (mvSlide >= 0f)
+            {
+                B17.MovesPoses.Slide(mvSlide, out float mvLean, out float mvSquash);
+                rot = rot * Quaternion.Euler(mvLean, 0f, 0f);
+                scale = new Vector3(scale.x, scale.y * mvSquash, scale.z);
+            }
             m.SetFacing(rot);
             // fix/hit-feel-5: a brief squash along the blow (80 ms, at most 7%), a little lower and wider across it; the
             // model scale owner below still composes and clamps it.
@@ -485,6 +495,7 @@ namespace CriticalMass.Runtime.View.Anim
         }
 
         double _actStart;
+        float _mvGuardW, _mvChargeW, _mvChargeShare, _mvGlideW;   // class moves lane 6: guard, charge and glide pose weights
 
         // ------------------------------------------------------------------ ground: locomotion, heavy hits, gather, idle
 
@@ -730,6 +741,35 @@ namespace CriticalMass.Runtime.View.Anim
                 m.PoseUpper(set.AbilityHold, simTime, _holdW, true, 0);
                 sum += _holdW;
                 actW = Math.Max(actW, _holdW);
+            }
+
+            // class moves lane 6: GUARD = the Blocking hold on the upper body, full within two frames of the sim taking the
+            // press; CHARGE = the class attack clip held in its raised wind-up (deeper as the charge grows), handed to the
+            // swing on release; GLIDE (Healer) = arms out (Cast held). Every weight stays 0 while World.Moves is null.
+            {
+                bool mvGuard = !actor.Alive ? false : B17.MovesRead.GuardHeld(w, i) && m.HasClip(ArtMapping.Blocking);
+                _mvGuardW = B17.MovesPoses.Approach(_mvGuardW, mvGuard ? 1f : 0f, dSim, mvGuard ? B17.MovesPoses.GuardRiseSeconds : B17.MovesPoses.GuardFallSeconds);
+                if (_mvGuardW > 0f && m.HasClip(ArtMapping.Blocking))
+                {
+                    float gw = _mvGuardW * (1f - Mathf.Clamp01(_holdW));
+                    if (gw > 0f && m.PoseUpper(ArtMapping.Blocking, simTime, gw, true, 0)) { sum += gw; actW = Math.Max(actW, gw); }
+                }
+                bool mvCharge = B17.MovesRead.Charging(w, i, out float mvShare) && set.Attack != null && m.HasClip(set.Attack);
+                if (mvCharge) _mvChargeShare = mvShare;
+                _mvChargeW = B17.MovesPoses.Approach(_mvChargeW, mvCharge ? 1f : 0f, dSim, B17.MovesPoses.ChargeRiseSeconds);
+                if (_mvChargeW > 0f && set.Attack != null && m.HasClip(set.Attack))
+                {
+                    float cw = _mvChargeW * (mvCharge ? 1f : 1f - Mathf.Clamp01(actW));
+                    double ct = m.ClipLength(set.Attack) * B17.MovesPoses.ChargeClipShare(_mvChargeShare);
+                    if (cw > 0f && m.PoseUpper(set.Attack, ct, cw, false, 0)) { sum += cw; actW = Math.Max(actW, cw); }
+                }
+                bool mvGlide = B17.MovesRead.Gliding(w, i) && m.HasClip(ArtMapping.Cast);
+                _mvGlideW = B17.MovesPoses.Approach(_mvGlideW, mvGlide ? B17.MovesPoses.GlideArmsWeight : 0f, dSim, 0.1);
+                if (_mvGlideW > 0f && m.HasClip(ArtMapping.Cast))
+                {
+                    double gt = m.ClipLength(ArtMapping.Cast) * B17.MovesPoses.GlideArmsShare;
+                    if (m.PoseUpper(ArtMapping.Cast, gt, _mvGlideW, false, 0)) { sum += _mvGlideW; actW = Math.Max(actW, _mvGlideW); }
+                }
             }
 
             // fix/kaiju-alive-1 (nothing-glides audit): a dig or a place had no pose at all (the block just appeared or vanished

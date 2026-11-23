@@ -921,8 +921,15 @@ namespace CriticalMass.Runtime.Hud
             // buttons: attack (LMB), class ability (RMB), carry (E)
             // b12 r3: a Demolitionist under the b12-jz rule: TNT (its icon, its own reload) when ready, else PRY BAR with the
             // TNT reload sweeping over the slot and its seconds, so the slot always says what the attack press does now.
-            bool demoTnt = cls == (int)ClassId.Demolitions && s.DemoTntOnAttack;
+            // class moves lane 6 (T1-1): with DemoTntOnDigOnly on her Attack is ALWAYS the pry bar (TNT is on F / U / pad Y),
+            // so the slot never says TNT (HudState.DemoTntOnAttack does not know the switch yet: integrator request).
+            World mvWorld = Driver != null ? Driver.World : null;
+            bool demoTnt = cls == (int)ClassId.Demolitions && s.DemoTntOnAttack && !(mvWorld != null && MovesHooks.OffenceTntOnDigOnly(mvWorld));
             string attackName = AttackName(cls, s.HealerLantern, demoTnt && s.DemoTntReady);
+            // class moves lane 6 (T2-2 / T2-3): CHARGE / CHARGED while the hold charges a heavy, x2 / x3 while the next press is
+            // a chain step; null (every switch off) keeps the slot's own word
+            string mvSlot = mvWorld != null ? CriticalMass.Runtime.View.B17.MovesRead.AttackSlotWord(mvWorld, HudBinder.LocalActor) : null;
+            if (mvSlot != null) attackName = mvSlot;
             float slotCd = demoTnt && !s.DemoTntReady ? s.DemoTntCd01 : s.AttackCd01, slotSec = demoTnt && !s.DemoTntReady ? s.DemoTntSeconds : 0f;
             ApplyButton(_buttons[0], slotCd, slotSec, UiIcons.Attack[SlotIconRow(cls, demoTnt && s.DemoTntReady), team], attackName, dt);
             ApplyButton(_buttons[1], s.AbilityCd01, s.AbilityCdSeconds, UiIcons.Ability[iconRow, team], AbilityNames[cls], dt);
@@ -953,10 +960,15 @@ namespace CriticalMass.Runtime.Hud
         /// <summary>Every word the attack slot can show: the class words plus the Healer's LANTERN (feat/light-weapons-2).</summary>
         static string[] AttackSlotNames()
         {
-            var a = new string[AttackNames.Length + 2];
+            var a = new string[AttackNames.Length + 6];
             Array.Copy(AttackNames, a, AttackNames.Length);
             a[AttackNames.Length] = CriticalMass.Sim.Core.LightWeapons.HealerName;
             a[AttackNames.Length + 1] = DemolitionsTntWord;
+            // class moves lane 6: the attack slot's state words (layout tests check they fit)
+            a[AttackNames.Length + 2] = CriticalMass.Runtime.View.B17.MovesRead.ChargeWord;
+            a[AttackNames.Length + 3] = CriticalMass.Runtime.View.B17.MovesRead.ChargedWord;
+            a[AttackNames.Length + 4] = CriticalMass.Runtime.View.B17.MovesRead.ComboWord(2);
+            a[AttackNames.Length + 5] = CriticalMass.Runtime.View.B17.MovesRead.ComboWord(3);
             return a;
         }
 

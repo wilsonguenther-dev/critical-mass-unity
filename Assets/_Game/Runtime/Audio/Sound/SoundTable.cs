@@ -426,7 +426,17 @@ namespace CriticalMass.Runtime.Audio.Sound
             R(SimEventType.CorruptionRoll, Pick.Fixed, "corruption_roll"),   // px lane F
             R(SimEventType.KaijuPower, Pick.Fixed, "kaiju_power"),
             R(SimEventType.CrystalMined, Pick.Fixed, "crystal_mined"),
-            R(SimEventType.JumpRefused, Pick.Fixed, "refused"),   // b16 [11]: the soft refused cue, the local player's own only (SoundFeed.Fixed)
+            R(SimEventType.JumpRefused, Pick.Fixed, "refused"),
+            // ---- class moves (lane 6): existing code-generated cues only; every event is pushed only while its switch is on
+            R(SimEventType.GuardBreak, Pick.Fixed, "wall_crack"),          // T2-1 the guard cracks (the stagger's Hit plays nothing: no damage)
+            R(SimEventType.FeintBaited, Pick.Fixed, "feint_flick"),        // T1-4a the bait landed (the Feint itself plays "feint")
+            R(SimEventType.Lunge, Pick.Fixed, "effort"),                   // T1-2 the lunge swing's grunt (its swing plays the class swing cue)
+            R(SimEventType.HeavyRelease, Pick.Fixed, "swing_heavy"),       // T2-2 the heavy leaves (over the class swing)
+            R(SimEventType.ComboStep, Pick.Fixed, "hit_confirm"),          // T2-3 the chain step landed (no pitch rise: Pick.Fixed has none)
+            Silent(SimEventType.TravelChanged, "travel is the dust trail and the stride; no sound so a walk never chimes"),
+            R(SimEventType.Slide, Pick.Fixed, "body_land"),                // T2-5 slide start and trip (the trip's Hit plays its impact too)
+            R(SimEventType.Glide, Pick.Fixed, "heal_tick"),                // T2-6 wings open / fold (soft)
+            R(SimEventType.SecondWind, Pick.Fixed, "heartbeat"),           // T2-8 the heartbeat release   // b16 [11]: the soft refused cue, the local player's own only (SoundFeed.Fixed)
             // ---- player-experience wave reporting events (lane F routes; SoundFeed.Blocked / Structure / Refused / WorldAct)
             // HitBlocked by Value: spawn protect, passive, immune = clang; dodge = phew; wall = thud; ward = WardAbsorb's
             // block_heavy; shield = the Hit's own block cue.
