@@ -714,6 +714,24 @@ namespace CriticalMass.Runtime.Camera
                 _yawFollow.Reset(_yawFollow.Yaw + orbitYaw);
                 _ownPitch = Math.Max(rig.MinPitch, Math.Min(rig.MaxPitch, _ownPitch + orbitPitch));
             }
+            else if (Driver != null && Driver.HumanAutopilot && !rig.FirstPerson)
+            {
+                // fix/px-rough-spots (D): a bot-played (filmed) round: a steady follow behind the fighter, smoothed and
+                // rate-capped, that never reverses within a second. A human player never gets this path.
+                _sinceLook += dt;
+                FilmYaw(dt, behind);
+            }
+            else if (!rig.FirstPerson && InFight(w, id))
+            {
+                // fix/px-rough-spots (B): in a fight (and FightAfterSeconds after) the view belongs to the player. Standing
+                // or swinging, the camera does not turn at all (the fighter turns, the camera stays). Running, it drifts
+                // behind the travel at most FightDriftDegPerSec, never within FightLookQuietSeconds of his own look input
+                // and never reversing within a second.
+                _sinceLook += dt;
+                _runFor = moving ? _runFor + dt : 0;
+                if (_runFor >= FightDriftAfterRunSeconds && _sinceLook >= FightLookQuietSeconds) CappedYaw(dt, behind, FightDriftDegPerSec, FightDriftDeadDeg);
+                else _yawFollow.Reset(_yawFollow.Yaw);
+            }
             else
             {
                 _sinceLook += dt;
@@ -740,6 +758,46 @@ namespace CriticalMass.Runtime.Camera
                 tx += lx;
                 tz += lz;
             }
+        }
+
+        /// <summary>fix/px-rough-spots (B): camera-caused yaw in a fight: drift cap (deg/s), dead band (deg), quiet time after his
+        /// look input (s), how long a fight lasts after the last sign of one (s). (D) the filmed round: smoothing (s) and cap.</summary>
+        public const double FightDriftDegPerSec = 3, FightDriftDeadDeg = 30, FightDriftAfterRunSeconds = 1.0, FightLookQuietSeconds = 2.0, FightAfterSeconds = 2.0;
+        public const double FilmYawTau = 1.5, FilmYawDegPerSec = 20, FilmDeadDeg = 10, NoReverseSeconds = 1.0;
+        double _fightUntil = -1, _lastYawSign, _lastYawTurnT = -9, _runFor;
+
+        /// <summary>An enemy within KeepRange, the framing on, or a hit traded within RecentSeconds; held FightAfterSeconds.</summary>
+        bool InFight(World w, int id)
+        {
+            double now = Time.unscaledTimeAsDouble;
+            if (_combat.Active || NearestEnemy(w, id, CombatFrame.KeepRange) >= 0 || FightState.SinceCombat(now) < CombatFrame.RecentSeconds)
+                _fightUntil = now + FightAfterSeconds;
+            return now < _fightUntil;
+        }
+
+        /// <summary>Turn the player's own yaw toward want at most capDegPerSec, nothing inside deadDeg, never reversing the last
+        /// turn's direction within NoReverseSeconds.</summary>
+        void CappedYaw(double dt, double want, double capDegPerSec, double deadDeg)
+        {
+            double err = GroundCamera.DeltaAngle(_yawFollow.Yaw, want);
+            double step = Math.Abs(err) <= deadDeg ? 0 : Math.Max(-capDegPerSec * dt, Math.Min(capDegPerSec * dt, err));
+            Turn(step, dt);
+        }
+
+        void FilmYaw(double dt, double want)
+        {
+            if (!(dt > 0)) return;
+            double err = GroundCamera.DeltaAngle(_yawFollow.Yaw, want);
+            double rate = Math.Abs(err) <= FilmDeadDeg ? 0 : Math.Max(-FilmYawDegPerSec, Math.Min(FilmYawDegPerSec, err / FilmYawTau));
+            Turn(rate * dt, dt);
+        }
+
+        void Turn(double step, double dt)
+        {
+            double now = Time.unscaledTimeAsDouble;
+            if (step != 0 && _lastYawSign != 0 && Math.Sign(step) != Math.Sign(_lastYawSign) && now - _lastYawTurnT < NoReverseSeconds) step = 0;
+            if (step != 0) { _lastYawSign = Math.Sign(step); _lastYawTurnT = now; }
+            _yawFollow.Reset(_yawFollow.Yaw + step);
         }
 
         int WatchTarget(World w, double dt)

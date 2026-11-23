@@ -24,6 +24,12 @@ namespace CriticalMass.Runtime.Camera
         /// closer than the plain camera (it was 3.2 u, which drew my fighter at half the screen height and cut him at the
         /// bottom and the side); the look point sits further toward the enemy and a little higher, and <see cref="FitDistance"/>
         /// pulls the lens back until BOTH whole bodies fit inside the safe frame.</remarks>
+        /// <summary>fix/px-rough-spots (owner, 2026-11-23, on the bot-played round: "why is the camera moving like that ... it's
+        /// like spinning around him"): in a fight the camera's facing belongs to the player. The framing changes distance,
+        /// height, pitch and a small sideways lens shift only; it never turns the view. Orbit = true brings back the old
+        /// 48-degree swing (tests of that logic only; no setting exposes it).</summary>
+        public static bool Orbit = false;
+
         public const double Distance = 4.4, FocusHeight = 1.6, FocusShare = 0.4, PitchDeg = 12, YawDeg = 48, ShoulderU = 0.8;
 
         /// <summary>fix/px-rough-spots: the two-shot fit. Both fighters (upright cylinders FitBodyRadius x FitBodyTall over their
@@ -429,7 +435,7 @@ namespace CriticalMass.Runtime.Camera
             double wantYaw = _lineYaw + Turn * CombatFrame.YawDeg * keep;
             // fix/px-combat-camera-3: respecting his steering, at most RespectYawDeg of rotation (slowly) and a wider shift
             double cap = Respecting ? CombatFrame.RespectYawDeg : CombatFrame.MaxDeviationDeg;
-            double yawGoal = Clamp(GroundCamera.DeltaAngle(f.OwnYaw, wantYaw), -cap, cap) * K;
+            double yawGoal = CombatFrame.Orbit ? Clamp(GroundCamera.DeltaAngle(f.OwnYaw, wantYaw), -cap, cap) * K : 0;
             double shoulderGoal = -Turn * (Respecting ? CombatFrame.RespectShoulderU : CombatFrame.ShoulderU) * K * keep;
             if (f.Snap)
             {

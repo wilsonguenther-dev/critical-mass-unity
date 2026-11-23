@@ -13,6 +13,11 @@ namespace CriticalMass.Runtime.Tests
     /// </summary>
     public sealed class CombatCameraTests
     {
+        // fix/px-rough-spots: the framing no longer turns the view by default (CombatFrame.Orbit = false: the owner's "it's like
+        // spinning around him"). The orbit logic below is kept and tested behind the switch; the default is tested at the end.
+        [SetUp] public void OrbitOnForTheOrbitTests() => CombatFrame.Orbit = true;
+        [TearDown] public void OrbitBackToDefault() => CombatFrame.Orbit = false;
+
         static readonly ClassId[] Six = { ClassId.Warrior, ClassId.Farmer, ClassId.Miner, ClassId.Demolitions, ClassId.Builder, ClassId.Healer };
         /// <summary>Centre-to-centre distances (u): 0.8 x and 1.0 x every class's melee reach in both rule sets (1.4 to 2.3).</summary>
         static readonly double[] Distances = { 1.12, 1.2, 1.28, 1.36, 1.4, 1.44, 1.5, 1.6, 1.7, 1.8, 1.84, 2.0, 2.3 };
@@ -40,7 +45,9 @@ namespace CriticalMass.Runtime.Tests
                         Assert.IsTrue(me.OnScreen, $"{c} at {d} u, FOV {fov}: my own fighter wholly on screen ({me.MinX:0.00}..{me.MaxX:0.00}, {me.MinY:0.00}..{me.MaxY:0.00})");
                         Assert.IsTrue(en.OnScreen, $"{c} at {d} u, FOV {fov}: the enemy wholly on screen");
                         // a narrower lens than the default pulls the framing back to keep me whole (FovFit): never smaller than unframed
-                        Assert.GreaterOrEqual(gain, fov >= FollowCamera.FovDefault ? 1.4 : 1.0, $"{c} at {d} u, FOV {fov}: the enemy drawn bigger");
+                        // fix/px-rough-spots: the framing is no closer than the plain camera now (my fighter about a third of the
+                        // screen at most), so the enemy is drawn about as big as unframed, never smaller
+                        Assert.GreaterOrEqual(gain, fov >= FollowCamera.FovDefault ? 0.95 : 0.8, $"{c} at {d} u, FOV {fov}: the enemy not drawn (much) smaller");
                     }
                 }
                 TestContext.Progress.WriteLine($"[combat camera] FOV {fov}: enemy box clear share >= {minShare:0.00} (unframed worst {worstOld:0.00}), enemy height x{minGain:0.00} or more");
@@ -50,7 +57,7 @@ namespace CriticalMass.Runtime.Tests
         [Test]
         public void TheDesignIsCloserLowerAndEasesInsideTheBrief()
         {
-            Assert.Less(CombatFrame.Distance, FollowCamera.ThirdDistance, "closer");
+            Assert.GreaterOrEqual(CombatFrame.Distance, FollowCamera.ThirdDistance, "never closer than the plain camera (fix/px-rough-spots)");
             Assert.Less(CombatFrame.PitchDeg, FollowCamera.ThirdPitch, "a lower pitch");
             Assert.Greater(CombatFrame.PitchDeg, FollowCamera.ThirdPitch - 10, "only a little lower");
             Assert.That(CombatFrame.InSeconds, Is.InRange(0.25, 0.35), "eases in over 0.25-0.35 s");
@@ -259,7 +266,9 @@ namespace CriticalMass.Runtime.Tests
                 var c = new[] { new SeeThroughCylinder { X = lx + (tx - lx) * 0.8, Z = lz + (tz - lz) * 0.8, R = 0.12, Y0 = 0.9, Y1 = 3.0 } };
                 Assert.IsFalse(GroundCollision.Inside(null, lx, ly, lz, GroundCollision.Radius, c, 1), "the lens itself is clear");
                 Assert.IsTrue(GroundCollision.Occluded(null, lx, ly, lz, tx, Chest, tz, CombatFrame.SightStopU, c, 1), "the sight line meets it");
-                Assert.AreEqual(0.0, Clear(1, c, 1, out _, out _, out _), 1e-9, (enemy ? "the enemy's" : "my") + " chest hidden: that framing is blocked");
+                // fix/px-rough-spots: at the longer framed distance the crown also cuts the pull-back to a sliver (share ~0.01);
+                // either way that framing is blocked (below WallShare)
+                Assert.Less(Clear(1, c, 1, out _, out _, out _), CombatFrame.WallShare, (enemy ? "the enemy's" : "my") + " chest hidden: that framing is blocked");
             }
             Assert.IsFalse(GroundCollision.Occluded(null, lx, ly, lz, EnX, Chest, EnZ, CombatFrame.SightStopU, null, 0), "open ground: seen");
         }
@@ -467,6 +476,35 @@ namespace CriticalMass.Runtime.Tests
             UnityEngine.Vector3 td = CriticalMass.Runtime.View.Anim.AnimLod.FocusPoint(new UnityEngine.Vector3(0f, 20f, -10f), new UnityEngine.Vector3(0f, -0.8f, 0.6f), false, me);
             Assert.AreEqual(5f, td.z, 1e-4f, "top-down keeps the ground-hit rule");
             Assert.IsFalse(CriticalMass.Runtime.View.Anim.AnimLod.Pinned(-1), "no id is never pinned");
+        }
+
+        [Test]
+        public void ByDefaultTheFramingNeverTurnsTheView()
+        {
+            CombatFrame.Orbit = false;
+            var f = new CombatFramer();
+            CombatFrameInput In(bool engaged, double own, double line) => new CombatFrameInput
+            {
+                Dt = 1.0 / 60, Enabled = true, Strength = 1, Engaged = engaged, TargetAlive = true, OwnYaw = own, LineYaw = line, ClearPlus = 1, ClearMinus = 1,
+            };
+            void Run(CombatFramer fr, CombatFrameInput i, double seconds) { for (int k = 0; k < (int)Math.Round(seconds * 60); k++) fr.Step(i); }
+            Run(f, In(true, 100, 130), 1.0);
+            Assert.AreEqual(1.0, f.Weight, 1e-9, "framed");
+            Assert.AreEqual(0.0, f.YawOffset, 1e-12, "no yaw added: the view belongs to the player");
+            Assert.AreNotEqual(0.0, f.Shoulder, "a sideways lens shift instead");
+            Run(f, In(false, 100, 130), 3.0);
+            Assert.AreEqual(0.0, f.TakeFold(), 1e-12, "nothing folded into his yaw either");
+        }
+
+        [Test]
+        public void TheTwoShotFitBacksOffUntilBothBodiesFit()
+        {
+            // me at the origin, the enemy 1.5 u ahead and 1 u to the side; lens looking along +sim -z (yaw 0) from behind me
+            double[] x = { 0, 1.0 }, y = { 0, 0 }, z = { 0, -1.5 };
+            double d = CombatFrame.FitDistance(0.4, 2.2, -0.6, 0, 14, 65, 16.0 / 9.0, 1.0, x, y, z, 2);
+            Assert.That(d, Is.GreaterThan(1.0).And.LessThan(CombatFrame.FitMaxDistance), "found a fitting distance past the start");
+            double d2 = CombatFrame.FitDistance(0.4, 2.2, -0.6, 0, 14, 65, 16.0 / 9.0, d, x, y, z, 2);
+            Assert.AreEqual(d, d2, 1e-9, "starting at the answer keeps it");
         }
     }
 }
