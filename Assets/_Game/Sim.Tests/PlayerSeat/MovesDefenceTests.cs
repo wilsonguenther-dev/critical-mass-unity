@@ -852,7 +852,7 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
                 var parts = new List<string>();
                 foreach (bool on in new[] { true, false })
                 {
-                    int decided = 0, firstWon = 0, timeouts = 0;
+                    int decided = 0, firstWon = 0, timeouts = 0, trades = 0, cleanWon = 0;
                     for (int k = 0; k < 16; k++)
                     {
                         Seat s = PlayerSeatRig.Duel(me, me, TargetMode.HumanVsHuman, PlayerSeatRig.AngleOf(k, 16), k, 6, tweak: on ? MvCombine.AllOn : null);
@@ -865,8 +865,14 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
                         decided++;
                         bool iHitFirst = first[0].B == s.Me;
                         if (iHitFirst == r.Won) firstWon++;
+                        // round 4 item 6: a TRADE = the other side's first hit lands within 3 ticks (both swings were already
+                        // committed); the one who lands a tick later keeps his chain (the earlier hitter's is broken by the counter)
+                        SeatEvent answer = first.FirstOrDefault(e => e.B != first[0].B);
+                        if (answer != null && answer.Tick - first[0].Tick <= 3) trades++;
+                        else if (iHitFirst == r.Won) cleanWon++;
                     }
-                    parts.Add((on ? "on " : "off ") + firstWon + "/" + decided + " (" + PxLog.F(decided > 0 ? (double)firstWon / decided : 0) + ")" + (timeouts > 0 ? ", undecided " + timeouts : ""));
+                    parts.Add((on ? "on " : "off ") + firstWon + "/" + decided + " (" + PxLog.F(decided > 0 ? (double)firstWon / decided : 0) + ")"
+                        + ", clean first hits won " + cleanWon + "/" + (decided - trades) + ", trades " + trades + (timeouts > 0 ? ", undecided " + timeouts : ""));
                 }
                 PxLog.Line("mvg-pvp", me + " vs " + me + ", two ~0.2 s humans (lag 6 vs 5-7, hold 0-3), 16 angles", "first hitter won: " + string.Join("; ", parts), "report", true);
             }
@@ -881,12 +887,14 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
         public void AStationaryClickOnlyNewPlayerLandsOnANormalBot()
         {
             var bad = new List<string>();
+            foreach (ClassId foe in new[] { ClassId.Warrior, ClassId.Farmer })
             foreach (ClassId me in MvDefenceRig.All)
             {
                 int swings = 0, landed = 0, steps = 0, guards = 0;
+                var firstHit = new List<double>();
                 for (int rep = 0; rep < 3; rep++)
                 {
-                    Seat s = PlayerSeatRig.Duel(me, ClassId.Farmer, TargetMode.RealBot, 0, rep, tweak: MvCombine.AllOn);
+                    Seat s = PlayerSeatRig.Duel(me, foe, TargetMode.RealBot, 0, rep, distance: 6.0, tweak: MvCombine.AllOn);
                     s.Human.Fight = false;
                     s.NoTnt = true;
                     World w = s.W;
@@ -917,11 +925,13 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
                     int n = Math.Min(10, starts.Count);
                     swings += n;
                     for (int k = 0; k < Math.Min(n, contacts.Count); k++) if (contacts[k].Value > 0) landed++;
+                    SeatEvent fh = contacts.FirstOrDefault(c => c.Value > 0);
+                    firstHit.Add(fh != null ? fh.Tick / w.Config.SimHz : double.NaN);
                     MovesHooks.BotsCounts(w, s.Them, out int st, out int gu);
                     steps += st; guards += gu;
                 }
                 double rate = swings > 0 ? (double)landed / swings : 0;
-                if (!PxLog.Line("mvg-click", me + " stationary click-only vs a Normal Farmer bot, first 10 swings x 3 seeds, every switch on", landed + " of " + swings + " landed (" + PxLog.F(rate) + "); bot step-outs " + steps + ", guards " + guards, ">= 0.6", rate >= 0.6)) bad.Add(me + " " + PxLog.F(rate));
+                if (!PxLog.Line("mvg-click", me + " click-only from 6 u (walks straight in, stands and clicks) vs a Normal " + foe + " bot, first 10 swings x 3 seeds, every switch on", landed + " of " + swings + " landed (" + PxLog.F(rate) + "); first landed hit at " + string.Join(" / ", firstHit.Select(t => double.IsNaN(t) ? "none" : PxLog.F(t) + " s")) + "; bot step-outs " + steps + ", guards " + guards, ">= 0.6", rate >= 0.6)) bad.Add(me + " vs " + foe + " " + PxLog.F(rate));
             }
             Assert.IsEmpty(bad, "click-only land rate: " + string.Join(", ", bad));
         }
@@ -1065,13 +1075,16 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
             int armed = 0, cells = 0;
             double worst = 0;
             string[] modes = { "standing", "standing, stick let go after the dodge", "standing, stick turned 90 deg after the dodge",
+                "standing, stick turning 40 deg through the dash and wind-up (camera yaw)", "walks off once the swing starts",
                 "stepping away", "stepping away, stick let go at the press", "walking away", "walking away, stick let go at the press" };
             foreach (ClassId me in MvDefenceRig.All)
                 foreach (double start in new[] { 3.0, 3.4, 3.6 })
                     foreach (string mode in modes)
                         foreach (double off in new[] { 0.0, 30.0 })
                         {
-                            bool standing = mode.StartsWith("standing"), walking = mode.StartsWith("walking");
+                            bool walksOff = mode.StartsWith("walks off");
+                            bool standing = mode.StartsWith("standing") || walksOff, walking = mode.StartsWith("walking");
+                            bool yaw = mode.Contains("camera yaw");
                             bool letGoAfter = mode.Contains("let go after"), letGoAtPress = mode.Contains("let go at"), turned = mode.Contains("turned");
                             // walking: 20 ticks of walking away first (at base speed by the dodge), the player chasing; the start gap
                             // is the gap at the press (minus what 20 ticks of the chase close)
@@ -1096,8 +1109,16 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
                                 double mx = cx, mz = cz;
                                 if (letGoAfter && after || letGoAtPress && w.Tick >= t0 + dodgeIn) { mx = 0; mz = 0; }
                                 if (turned && after) { mx = -uz; mz = ux; }
+                                if (yaw && w.Tick >= t0 + dodgeIn)
+                                {
+                                    // the camera-relative stick swings 40 degrees over the dash and the wind-up (about 16 ticks)
+                                    double r = Math.Min(1.0, (w.Tick - t0 - dodgeIn) / 16.0) * 40 * Math.PI / 180;
+                                    double yx = mx * Math.Cos(r) - mz * Math.Sin(r), yz = mx * Math.Sin(r) + mz * Math.Cos(r);
+                                    mx = yx; mz = yz;
+                                }
                                 q.Human.MoveOverrideX = mx; q.Human.MoveOverrideZ = mz;
                                 if (walking || !standing && w.Tick >= t0 + dodgeIn) { q.Dummy.MoveX = ax0; q.Dummy.MoveZ = az0; }
+                                if (walksOff && w.Actors[q.Me].SwingPending) { q.Dummy.MoveX = ax0; q.Dummy.MoveZ = az0; }   // the step-out the engine showed
                                 if (w.Tick == t0 + dodgeIn) q.Human.PressDodge = true;
                                 if (w.Tick >= t0 + dodgeIn + 2 && w.Tick <= t0 + dodgeIn + 4) q.Human.PressAttack = true;
                             };
@@ -1109,17 +1130,47 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
                             double reach = lw != null ? lw.Range : w.Config.Class(me).AttackRange;
                             double edge = contact.Count > 0 && gap.TryGetValue(contact[0].Tick - 1, out double g) ? g : double.NaN;
                             double g0 = gap.TryGetValue(t0 + dodgeIn, out double gp) ? gp : double.NaN;
-                            bool ok = lunges == 0 ? !standing : lunges == 1 && hits >= 1 && edge <= 0.8 * reach + 1e-9;
+                            // a target that walks off AFTER the swing started (the engine's step-out) is followed by the lunge lock; the
+                            // walk's acceleration lets the gap open to about 0.8 x reach: it must land, within 0.9 x reach
+                            // round 4: a runner's dodge-in keeps its dash (item 5) and the lunge lock follows him: a moving target's
+                            // LUNGE must land, within 0.9 x reach; a standing one within 0.8
+                            double bar = walksOff || !standing ? 0.9 : 0.8;
+                            bool ok = lunges == 0 ? !standing : lunges == 1 && hits >= 1 && edge <= bar * reach + 1e-9;
                             cells++;
                             if (lunges == 1) { armed++; if (edge / reach > worst) worst = edge / reach; }
                             if (!ok || lunges == 1 && edge / reach > 0.7)
                                 PxLog.Line("mvg-lunge", me + " dodge-in from " + PxLog.F(g0) + " u, target " + mode + ", stick and aim " + off + " deg off",
                                     "lunges " + lunges + ", body-edge gap at contact " + PxLog.F(edge) + " = " + PxLog.F(edge / reach) + " x reach " + PxLog.F(reach) + ", hits " + hits,
-                                    standing ? "1 lunge, gap <= 0.8 x reach, it lands" : "no lunge, or one that lands within 0.8 x reach", ok);
+                                    standing && !walksOff ? "1 lunge, gap <= 0.8 x reach, it lands" : walksOff ? "1 lunge, gap <= 0.9 x reach, it lands" : "no lunge, or one that lands within 0.9 x reach", ok);
                             if (!ok) fails.Add(me + " " + start + " " + mode + " " + off + " (lunges " + lunges + ", " + PxLog.F(edge / reach) + ", hits " + hits + ")");
                         }
             PxLog.Line("mvg-lunge", "every class, 3.0 / 3.4 / 3.6 u, " + modes.Length + " target and stick modes, 0 / 30 deg", cells + " cells, " + armed + " lunges armed, worst gap at contact " + PxLog.F(worst) + " x reach", "every LUNGE lands within 0.8 x reach", fails.Count == 0);
             Assert.IsEmpty(fails, "lunge stop or whiff: " + string.Join(", ", fails));
+        }
+    }
+}
+
+namespace CriticalMass.Sim.Tests.PlayerSeat
+{
+    /// <summary>Round 4 item 6 (diagnostic, printed only): the Miner mirror with every switch on: the melee hit sequence per duel.</summary>
+    public class MvPvpDiag
+    {
+        [Test]
+        public void MinerMirrorHitSequence()
+        {
+            ClassId me = (ClassId)Enum.Parse(typeof(ClassId), Environment.GetEnvironmentVariable("CM_PVP_CLASS") ?? "Miner");
+            for (int k = 0; k < 16; k++)
+            {
+                Seat s = PlayerSeatRig.Duel(me, me, TargetMode.HumanVsHuman, PlayerSeatRig.AngleOf(k, 16), k, 6, tweak: MvCombine.AllOn);
+                s.Human2.LagTicks = 5 + k % 3;
+                s.Human2.HoldFireTicks = k % 4;
+                s.NoTnt = true;
+                DuelResult r = PlayerSeatRig.Play(s, 30);
+                var seq = s.Spy.All.Where(e => e.Type == SimEventType.Hit && e.Cause == DamageCause.Melee || e.Type == SimEventType.AttackStart && (e.A == s.Me || e.A == s.Them)
+                    || e.Type == SimEventType.AttackContact && (e.A == s.Me || e.A == s.Them) || e.Type == SimEventType.Lunge || e.Type == SimEventType.Death || e.Type == SimEventType.ComboStep || e.Type == SimEventType.GuardBreak)
+                    .Take(40).Select(e => e.Tick + ":" + e.Type + "(" + e.A + "," + e.B + "," + PxLog.F(e.Value) + ")");
+                PxLog.Line("mvg-pvpdiag", me + " k" + k + " me " + s.Me + " them " + s.Them, (r.Won ? "WON" : r.Lost ? "LOST" : "TIMEOUT") + " " + PxLog.F(r.Seconds) + " s: " + string.Join(" ", seq), "report", true);
+            }
         }
     }
 }

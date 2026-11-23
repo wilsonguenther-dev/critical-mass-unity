@@ -4,6 +4,7 @@
 // MovesHooks.On(w, MovesHooks.Cfg(w).<Switch>). Bots are seat fillers: their use of a new verb is capped against a human seat the
 // way call 18 does it (BotMeleeDodgeHumansOnly): every read below is of a HUMAN seat's move, so bot-only matches keep their
 // fights. Contract: LANE1-CONTRACT.md.
+using System;
 using CriticalMass.Sim.Bots;
 using CriticalMass.Sim.Config;
 using CriticalMass.Sim.Grid;
@@ -54,6 +55,10 @@ namespace CriticalMass.Sim.Core
         public int[] Charges = new int[0];
         public int[] Chains = new int[0];
         public int[] SideSteps = new int[0];
+        /// <summary>round 4 beginner rules: the last human swing at this bot counted (key), human swings seen, and dodged.</summary>
+        public int[] SeenKey = new int[0];
+        public int[] Seen = new int[0];
+        public int[] Dodged = new int[0];
 
         public void Init(World w)
         {
@@ -65,6 +70,9 @@ namespace CriticalMass.Sim.Core
             StepFrom = new int[n];
             GuardUntil = new int[n];
             ParryAt = new int[n];
+            SeenKey = new int[n];
+            Seen = new int[n];
+            Dodged = new int[n];
             ChargeKey = new int[n];
             ChargeHold = new int[n];
             ComboKey = new int[n];
@@ -158,6 +166,7 @@ namespace CriticalMass.Sim.Core
             MovesConfig m = Cfg(w);
             int tick = w.Tick;
             bool guardOn = On(w, m.Guard), stepOn = On(w, m.BotStepOut);
+            if (guardOn || stepOn) BotsBeginner(w, b, id, output);
             if ((guardOn || stepOn) && a.AirLen <= 0 && a.Carry != CarryKind.Corruption) BotsRead(w, b, m, id, output, guardOn, stepOn);
 
             bool responding = false;
@@ -215,6 +224,66 @@ namespace CriticalMass.Sim.Core
 
         /// <summary>fix/mv-lunge-stop: an Easy bot guards at most one read swing in this many.</summary>
         const int BotsEasyGuardEvery = 10;
+
+        /// <summary>round 4 (pass 4: a click-only beginner landed 0 of 10: the Normal bot dodged his first click and walked off).
+        /// For an Easy or Normal bot that a person is attacking (a human enemy within BotsEngageUnits who started a swing facing
+        /// it within BotsEngageSeconds): (1) in the first BotsNormalParryFromSeconds of match clock an Easy bot never dodges that
+        /// human's swing and a Normal bot dodges at most one in BotsStepOutEvery; (2) above BotsStayHpShare of its health it
+        /// stays and fights in melee range (its move turns back toward him; inside its reach it stands) instead of disengaging.
+        /// Hard bots, bot-only fights and every switch off: unchanged.</summary>
+        static void BotsBeginner(World w, BotsMovesState b, int id, InputFrame o)
+        {
+            int d = BotReflex.DiffIndex(w, id);
+            if (d != 0 && d != 1) return;
+            Actor me = w.Actors[id];
+            double x = w.X[id], z = w.Z[id];
+            int hum = -1;
+            double best = BotsEngageUnits * BotsEngageUnits;
+            int recent = (int)Math.Round(BotsEngageSeconds * w.Config.SimHz);
+            for (int e = 0; e < w.ActorCount; e++)
+            {
+                Actor en = w.Actors[e];
+                if (e == id || !en.Alive || en.Team == me.Team || !BotsHumanSeat(w, e)) continue;
+                if (en.SwingTick < 0 || w.Tick - en.SwingTick > recent) continue;
+                double ox = x - w.X[e], oz = z - w.Z[e];
+                double d2 = ox * ox + oz * oz;
+                if (d2 > best) continue;
+                double l = Math.Sqrt(d2);
+                if (l > 1e-9 && (JsMath.Cos(en.SwingFacing) * ox + JsMath.Sin(en.SwingFacing) * oz) / l < 0.5) continue;
+                best = d2;
+                hum = e;
+            }
+            if (hum < 0) return;
+            Actor h = w.Actors[hum];
+            // (1) the dodge cap, per human swing at this bot
+            if (h.SwingPending)
+            {
+                int key = h.SwingTick * 64 + hum + 1;
+                if (b.SeenKey[id] != key) { b.SeenKey[id] = key; b.Seen[id]++; }
+                if (o.Dodge && w.Match.Time < BotsNormalParryFromSeconds)
+                {
+                    bool may = d == 1 && BotsStepOutEvery * (b.Dodged[id] + 1) <= b.Seen[id];
+                    if (!may) o.Dodge = false;
+                    else b.Dodged[id]++;
+                }
+            }
+            // (2) stay and fight
+            if (me.Hp < BotsStayHpShare * me.MaxHp || me.Carry != CarryKind.None) return;
+            double tx = w.X[hum] - x, tz = w.Z[hum] - z;
+            double tl = Math.Sqrt(tx * tx + tz * tz);
+            if (!(tl > 1e-9)) return;
+            tx /= tl; tz /= tl;
+            double reach = w.Config.Class(me.Cls).AttackRange + w.Config.Class(h.Cls).Radius;
+            double away = o.MoveX * tx + o.MoveZ * tz;
+            if (tl > reach * 0.9) { if (away < 0.5) { o.MoveX = tx; o.MoveZ = tz; } }
+            else if (away < 0) { o.MoveX = 0; o.MoveZ = 0; }
+        }
+
+        /// <summary>round 4: the beginner rules' reach of a person's attack on a bot (units), how recent his swing is (s), and the
+        /// health share below which the bot may still disengage.</summary>
+        const double BotsEngageUnits = 6.0;
+        const double BotsEngageSeconds = 3.0;
+        const double BotsStayHpShare = 0.3;
 
         /// <summary>round 3: Easy always, and Normal in its first minute, step out of at most one read swing in this many.</summary>
         const int BotsStepOutEvery = 4;
@@ -376,6 +445,9 @@ namespace CriticalMass.Sim.Core
                 if ((ox * vx + oz * vz) / l < BotsH) continue;
                 int d = BotReflex.DiffIndex(w, id);
                 b.Reads[id]++;
+                // round 4 (pass 4: TRIPPED never appeared in the engine): the beginner cap of the step-outs: Easy, and Normal in
+                // its first minute, side-step at most one human slide in BotsStepOutEvery reads
+                if ((d == 0 || d == 1 && w.Match.Time < BotsNormalParryFromSeconds) && BotsStepOutEvery * (b.SideSteps[id] + 1) > b.Reads[id]) continue;
                 if (!(BotReflex.Roll(w.Opts.Seed ^ BotsSaltSlide, w.Tick * 64 + slider, id) < BotsChance(m.BotStepOutChance, d))) continue;
                 // perpendicular to the slide line, on the side the bot already stands (ties: id parity)
                 double px = -vz, pz = vx;
