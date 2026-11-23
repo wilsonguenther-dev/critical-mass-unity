@@ -8,6 +8,10 @@ namespace CriticalMass.Runtime.Camera
     public struct SeeThroughCylinder
     {
         public double X, Z, R, Y0, Y1;
+        /// <summary>fix/px-camera-in-editor: a tree or a grove: the third-person camera never collides with it, it fades it.</summary>
+        public bool Soft;
+        /// <summary>fix/px-camera-in-editor: a stable id for the fade (scenery index + 1, a grove -(source + 1), 0 none).</summary>
+        public int Id;
     }
 
     /// <summary>

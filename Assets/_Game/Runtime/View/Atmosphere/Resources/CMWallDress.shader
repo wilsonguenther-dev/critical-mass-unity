@@ -93,6 +93,7 @@ Shader "CM/WallDress"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
             #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Color.hlsl"
             #include "Assets/_Game/Art/Shaders/CMTimeOfDay.hlsl"
+            #include "Assets/_Game/Art/Shaders/CMFadeVolumes.hlsl"   // fix/px-camera-in-editor: lens sphere (all zero = off)
 
             float4 _CMAmbient;     // w: 0 Day, 0.5 Dusk, 1 Night (TimeOfDayDirector)
             float4 _CMFadeCam;     // follow camera's see-through line (GroundView); w = 1 on
@@ -121,6 +122,7 @@ Shader "CM/WallDress"
 
             void FadeClip(float3 positionWS, float4 positionCS)
             {
+                CMFadeVolumesClip(positionWS, positionCS, 0.0);
                 if (_CMFadeCam.w < 0.5) return;
                 float3 a = _CMFadeCam.xyz;
                 float3 s = _CMFadeTarget.xyz - a;
