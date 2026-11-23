@@ -5,6 +5,11 @@
 # (AudioRenderer takes the mix). Actor 0 is the Azure Warrior on autopilot; the camera is the default gameplay camera.
 #   tools/match-video.sh --app PATH.app [--seed N | --scout A-B] [--out DIR] [--final-dir DIR] [--fps 30]
 #                        [--quality High] [--results-seconds 10] [--timeout S] [--keep-frames] [--scout-only] [--camera default|saved]
+# --replay PATH (class moves T1-8, REPLAY.md path B): film a saved .cmreplay of THIS build instead of an autoplay match,
+#   following the recorded player with his gameplay camera, kick-off to the final whistle plus --results-seconds. The file
+#   is copied into OUT and the run uses its own -dataDir and -noReplay, so the owner's saved replays (newest 20) are never
+#   touched or evicted. video.json carries the recorded score, the played-back one and the desync verdict; a desync or a
+#   score that differs fails the run (exit 1). No --seed / --scout with --replay.
 # --encode-only: re-encode OUT/capture (kept with --keep-frames) without recording again.
 # --camera default (the default): the game's own default camera (top-down, default heading) for the film, whatever this
 #   Mac's saved settings say (the cm.camera.* keys are removed for the run, then every saved setting is restored); saved: as saved.
@@ -17,7 +22,7 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 APP=""; SEED=""; SCOUT=""; OUT=""; FINAL="$HOME/Movies/CriticalMass"; FPS=30; QUALITY=High; RESULTS=10; TIMEOUT=1500
-KEEP=0; SCOUT_ONLY=0; VFLIP=0; CAMERA=default; ENCODE_ONLY=0
+KEEP=0; SCOUT_ONLY=0; VFLIP=0; CAMERA=default; ENCODE_ONLY=0; REPLAY=
 usage() { sed -n '6,7p' "${BASH_SOURCE[0]}" | sed 's/^# *//' >&2; exit 64; }
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -26,6 +31,7 @@ while [[ $# -gt 0 ]]; do
     --quality) QUALITY="${2:?}"; shift 2 ;; --results-seconds) RESULTS="${2:?}"; shift 2 ;;
     --timeout) TIMEOUT="${2:?}"; shift 2 ;; --keep-frames) KEEP=1; shift ;; --scout-only) SCOUT_ONLY=1; shift ;;
     --vflip) VFLIP=1; shift ;; --camera) CAMERA="${2:?}"; shift 2 ;; --encode-only) ENCODE_ONLY=1; shift ;;
+    --replay) REPLAY="${2:?}"; shift 2 ;;
     -h|--help) usage ;; *) echo "match-video: unknown flag $1" >&2; usage ;;
   esac
 done
@@ -39,6 +45,12 @@ OUT="${OUT:-$ROOT/Logs/match-video/$(date -u +%Y%m%dT%H%M%SZ)-$VERSION}"
 mkdir -p "$OUT" "$FINAL"; OUT="$(cd "$OUT" && pwd)"
 EXE="$APP/Contents/MacOS/$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$APP/Contents/Info.plist")"
 echo "match-video: build $VERSION ($COMMIT), out $OUT"
+if [[ -n "$REPLAY" ]]; then
+  [[ -f "$REPLAY" ]] || { echo "match-video: no replay file '$REPLAY'" >&2; exit 66; }
+  [[ -z "$SEED" && -z "$SCOUT" ]] || { echo "match-video: --replay takes no --seed / --scout" >&2; exit 64; }
+  REPLAY="$(cd "$(dirname "$REPLAY")" && pwd)/$(basename "$REPLAY")"
+  SEED="replay"
+fi
 
 # 1. Seed scout (sim only, batch mode: no window, no graphics slot).
 if [[ -n "$SCOUT" ]]; then
@@ -70,13 +82,14 @@ CAP="$OUT/capture"
 if (( ! ENCODE_ONLY )); then
 if [[ -z "${CM_HEAVY_HELD:-}" && -x "$HOME/bin/cm-heavy" ]]; then
   set +e
+  SEL=(--seed "$SEED"); [[ -n "$REPLAY" ]] && SEL=(--replay "$REPLAY")
   CM_HEAVY_TIMEOUT=$((TIMEOUT + 120)) CM_HEAVY_HELD=1 "$HOME/bin/cm-heavy" unity env CM_HEAVY_HELD=1 bash "${BASH_SOURCE[0]}" \
-    --app "$APP" --seed "$SEED" --out "$OUT" --final-dir "$FINAL" --fps "$FPS" --quality "$QUALITY" \
+    --app "$APP" "${SEL[@]}" --out "$OUT" --final-dir "$FINAL" --fps "$FPS" --quality "$QUALITY" \
     --results-seconds "$RESULTS" --timeout "$TIMEOUT" --camera "$CAMERA" $( ((KEEP)) && echo --keep-frames ) $( ((VFLIP)) && echo --vflip )
   rc=$?
   set -e
   # cm-heavy can exit 1 from its own cleanup after a good job: judge by the outputs.
-  [[ -f "$FINAL/CriticalMass-match-$VERSION-1080p.mp4" && -f "$OUT/encode.ok" ]] && exit 0
+  [[ -f "$OUT/encode.ok" ]] && exit 0
   exit "$rc"
 fi
 
@@ -88,7 +101,13 @@ restore_prefs() { if (( HAD_PREFS )); then defaults import "$DOMAIN" "$OUT/prefs
                   else defaults delete "$DOMAIN" 2>/dev/null || true; fi; }
 trap restore_prefs EXIT
 if [[ "$CAMERA" == default ]]; then for k in cm.camera.ground cm.camera.view cm.camera.heading cm.camera.manual; do defaults delete "$DOMAIN" "$k" 2>/dev/null || true; done; fi
-open -g -j -n "$APP" --args -autoplay -autoplayTitleSeconds 3 -autoplayTimeout "$TIMEOUT" -seed "$SEED" \
+if [[ -n "$REPLAY" ]]; then
+  cp "$REPLAY" "$OUT/replay.cmreplay"
+  RUN=(-replayFile "$OUT/replay.cmreplay" -noReplay)
+else
+  RUN=(-autoplay -autoplayTitleSeconds 3 -autoplayTimeout "$TIMEOUT" -seed "$SEED")
+fi
+open -g -j -n "$APP" --args "${RUN[@]}" \
   -matchVideo "$CAP" -matchVideoFps "$FPS" -matchVideoResultsSeconds "$RESULTS" -soundVolume 1 -quality "$QUALITY" \
   -screen-fullscreen 0 -screen-width 1920 -screen-height 1080 -dataDir "$OUT/data" -logFile "$LOG"
 pid=""; for _ in $(seq 1 40); do pid="$(pgrep -n -f -- "$LOG" || true)"; [[ -n "$pid" ]] && break; sleep 1; done
@@ -103,11 +122,16 @@ while kill -0 "$pid" 2>/dev/null; do
 done
 grep -q '\[CM.MatchVideo\] DONE' "$LOG" || { echo "match-video: the recording did not finish (see $LOG)" >&2; exit 1; }
 cp "$CAP/video.json" "$OUT/video.json"
+if [[ -n "$REPLAY" ]]; then
+  grep -h '\[CM.Replay\]' "$LOG" | tail -5 || true
+  python3 -I -c 'import json,sys; j=json.load(open(sys.argv[1])); bad=j.get("replay_desync") or not j.get("score_matches_replay") or j.get("replay_problem"); print("match-video: replay", "desync" if j.get("replay_desync") else "in step", "| score", j.get("hill_azure"), "/", j.get("hill_crimson"), "recorded", j.get("recorded_hill_azure"), "/", j.get("recorded_hill_crimson"), "| problem:", j.get("replay_problem") or "none"); sys.exit(1 if bad else 0)' "$OUT/video.json" \
+    || { echo "match-video: the replay film does not match its recording (see $OUT/video.json)" >&2; exit 1; }
+fi
 fi
 read -r RATE CH < <(python3 -I -c 'import json,sys; j=json.load(open(sys.argv[1])); print(j["audio_rate"], j["audio_channels"])' "$OUT/video.json")
 
 # 3. Encode: 1080p master, then a two-pass 720p copy that fits a text message.
-NAME="CriticalMass-match-$VERSION"; M1080="$FINAL/$NAME-1080p.mp4"; M720="$FINAL/$NAME-720p-text.mp4"
+NAME="CriticalMass-match-$VERSION"; [[ -n "$REPLAY" ]] && NAME="CriticalMass-replay-$VERSION-$(basename "${REPLAY%.*}")"; M1080="$FINAL/$NAME-1080p.mp4"; M720="$FINAL/$NAME-720p-text.mp4"
 VF="format=yuv420p"; (( VFLIP )) && VF="vflip,$VF"
 ffmpeg -hide_banner -loglevel error -y -framerate "$FPS" -i "$CAP/frames/f%06d.jpg" -f f32le -ar "$RATE" -ac "$CH" -i "$CAP/audio.f32" \
   -map 0:v -map 1:a -vf "$VF" -c:v libx264 -preset slow -crf 19 -maxrate 14M -bufsize 28M -profile:v high -r "$FPS" \
