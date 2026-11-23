@@ -40,6 +40,12 @@ namespace CriticalMass.Sim.Core
         public int[] LungeSwingTick = new int[0];
         /// <summary>Integrator: the tick actor i took the knock of an enemy's melee LIGHT strike (ComboDodgeOutOfKnock).</summary>
         public int[] LightKnockTick = new int[0];
+        // ---- guard fix (2026-11-23): what the defenders did to attacker i's current swing (keyed by its SwingTick), read by
+        // lane 4's combo advance: a parried swing breaks the chain, a swing every body of which was blocked does not advance it
+        public int[] ChainSwing = new int[0];
+        public int[] ChainBodies = new int[0];
+        public int[] ChainParried = new int[0];
+        public int[] ChainBlocked = new int[0];
         // ---- T2-7 jump evade (lane 3 reads JumpRelockUntil for its jump lock; the landing recovery is LandRecoverUntil)
         /// <summary>1 when the current flight evaded a ground melee swing (BlockedAir).</summary>
         public byte[] FlightEvaded = new byte[0];
@@ -76,6 +82,10 @@ namespace CriticalMass.Sim.Core
             LungePressed = new byte[n];
             LungeSwingTick = new int[n];
             LightKnockTick = new int[n];
+            ChainSwing = new int[n];
+            ChainBodies = new int[n];
+            ChainParried = new int[n];
+            ChainBlocked = new int[n];
             FlightEvaded = new byte[n];
             LandRecoverUntil = new int[n];
             JumpRelockUntil = new int[n];
@@ -102,6 +112,8 @@ namespace CriticalMass.Sim.Core
                 LungePressed[i] = 0;
                 LungeSwingTick[i] = CombatFeel.NoTick;
                 LightKnockTick[i] = CombatFeel.NoTick;
+                ChainSwing[i] = CombatFeel.NoTick;
+                ChainBodies[i] = ChainParried[i] = ChainBlocked[i] = 0;
                 FlightEvaded[i] = 0;
                 LandRecoverUntil[i] = CombatFeel.NoTick;
                 JumpRelockUntil[i] = CombatFeel.NoTick;
@@ -310,16 +322,36 @@ namespace CriticalMass.Sim.Core
                     d.ParryLocked++;
                     PlayerSeat.Refuse(w, i, PlayerReasons.ButtonGuard, PlayerReasons.RefusedParryLockout);
                 }
+                else if (d.ParryPress[i] != CombatFeel.NoTick)
+                {
+                    // guard fix: a new press while the last tap's window is still open and caught nothing is mashing: that tap
+                    // counts as a whiffed parry (the lockout arms) and this press is refused
+                    d.ParryPress[i] = CombatFeel.NoTick;
+                    d.ParryWhiffs++;
+                    d.ParryLockUntil[i] = w.Tick + DefenceTicks(w, m.ParryLockoutSeconds);
+                    d.ParryLocked++;
+                    PlayerSeat.Refuse(w, i, PlayerReasons.ButtonGuard, PlayerReasons.RefusedParryLockout);
+                }
                 else
                 {
+                    // guard fix: the press opens the parry window and arms nothing; only a tap that caught nothing arms the
+                    // lockout (below), so hold, release, tap-to-parry works and mashing is still punished
                     d.ParryPress[i] = w.Tick;
-                    d.ParryLockUntil[i] = w.Tick + DefenceTicks(w, m.ParryLockoutSeconds);
                     // a press holds the guard (the Warrior: his swing) ParryWhiffHoldTicks at least; a parry that lands clears it
                     d.GuardHoldUntil[i] = w.Tick + m.ParryWhiffHoldTicks;
                 }
             }
-            else if (d.ParryPress[i] != CombatFeel.NoTick && w.Tick - d.ParryPress[i] == DefenceParryWindow(w, i) + 1 && d.ParryLockUntil[i] > w.Tick)
-                d.ParryWhiffs++;   // the window passed with no parry (counter only; a parry that landed cleared the lockout)
+            else if (d.ParryPress[i] != CombatFeel.NoTick && w.Tick - d.ParryPress[i] > DefenceParryWindow(w, i))
+            {
+                // the window passed with no parry (a parry clears ParryPress): a guard still HELD is a hold (no lockout); a tap
+                // that was let go caught nothing: a whiffed parry arms the lockout
+                if (!held)
+                {
+                    d.ParryWhiffs++;
+                    d.ParryLockUntil[i] = w.Tick + DefenceTicks(w, m.ParryLockoutSeconds);
+                }
+                d.ParryPress[i] = CombatFeel.NoTick;
+            }
             if (guardClass)
             {
                 if (d.GuardOn[i] != 0)
@@ -402,7 +434,7 @@ namespace CriticalMass.Sim.Core
         /// enemy whose body is within the dash distance plus the dodger's reach is a dodge-in: the dash is clipped to end
         /// LungeStopShare x reach (plus the enemy's body) from it, and an Attack seen during the dash fires as a LUNGE. Returns
         /// distance unchanged otherwise (and always while the switch is off).</summary>
-        internal static double DefenceLungeDash(World w, int id, double dx, double dz, double distance)
+        internal static double DefenceLungeDash(World w, int id, ref double dx, ref double dz, double distance)
         {
             if (w.Moves == null || !Cfg(w).DodgeLunge) return distance;
             MovesConfig m = Cfg(w);
@@ -434,9 +466,13 @@ namespace CriticalMass.Sim.Core
             double leadSec = lead / w.Config.SimHz;
             double rx = w.X[best] + w.Vx[best] * leadSec - w.X[id], rz = w.Z[best] + w.Vz[best] * leadSec - w.Z[id];
             double stop = m.LungeStopShare * reach + w.Config.Class(w.Actors[best].Cls).Radius;
-            double along = rx * dx + rz * dz;
-            double perp2 = rx * rx + rz * rz - along * along;
-            double go = perp2 >= stop * stop ? along : along - Math.Sqrt(stop * stop - perp2);
+            // guard fix (the third-person whiff): the dash steers straight at that point (inside the cone the stick picked), so
+            // it ends LungeStopShare x reach in FRONT of the target, not beside it. The stick direction of a third-person
+            // player is camera-relative and lags; along it, a dash ended at the closest approach (1.7 u to the side, out of the
+            // swing's arc) and whiffed, while a top-down player dashed straight at the target and hit.
+            double rl = Math.Sqrt(rx * rx + rz * rz);
+            if (rl > 1e-9) { dx = rx / rl; dz = rz / rl; }
+            double go = rl - stop;
             double min = distance * DefenceLungeMinShare;
             if (go < min) go = min;
             if (go > distance) go = distance;
@@ -488,13 +524,31 @@ namespace CriticalMass.Sim.Core
             int lunge = (int)Math.Floor(windup * DefenceLungeMul(w, i) + 1e-9);   // x0.75, rounded down (Warrior 12 to 9, Farmer 9 to 6); the Miner x0.6
             if (lunge < 1) lunge = 1;
             d.LungeArmed[i] = 0;
+            // guard fix (T1-2, the third-person whiff): the lunge swing faces where its target will be at contact. Combat locks
+            // SwingFacing = Facing right after this hook; the aim it would otherwise use is the camera's ground point in third
+            // person, which lags the dash, so a lunge that reached its stop point swung past the target.
+            int lt = d.LungeTarget[i];
+            if (lt >= 0 && lt < w.ActorCount && w.Actors[lt].Alive)
+            {
+                double ls = lunge / w.Config.SimHz;
+                double fx = w.X[lt] + w.Vx[lt] * ls - w.X[i], fz = w.Z[lt] + w.Vz[lt] * ls - w.Z[i];
+                if (fx * fx + fz * fz > 1e-12) w.Actors[i].Facing = JsMath.Atan2(fz, fx);
+            }
             d.LungeSwingTick[i] = w.Tick;   // integrator: Combat sets SwingTick = w.Tick right after this hook (LungeArmour)
             d.Lunges++;
             World.PushEvent(w, SimEventType.Lunge, i, d.LungeTarget[i], w.X[i], w.Z[i], lunge);
             return lunge;
         }
 
-        static void DefenceAfterContact(World w, int i, int hits) { }
+        /// <summary>Guard fix: records actor i's swing and the bodies it reached (hits counts a structure or the Kaiju as one more:
+        /// that swing landed on something, so a block of every body then never reaches the count).</summary>
+        static void DefenceAfterContact(World w, int i, int hits)
+        {
+            DefenceMovesState d = DefenceS(w);
+            d.ChainSwing[i] = w.Actors[i].SwingTick;
+            d.ChainBodies[i] = hits;
+            d.ChainParried[i] = d.ChainBlocked[i] = 0;
+        }
 
         // ================================================================== T1-3 refund, T2-8 on a dodge (Dodge.SwingDodges calls it)
 
@@ -581,6 +635,8 @@ namespace CriticalMass.Sim.Core
             if (DefenceParries(w, target, source, srcX, srcZ, cause))
             {
                 d.Parries++;
+                DefenceChainTally(w, source, cause, 1);
+                d.ParryPress[target] = CombatFeel.NoTick;   // guard fix: the tap caught a swing (no whiff lockout)
                 d.ParryLockUntil[target] = w.Tick;   // a parry that lands frees the next attempt
                 d.GuardHoldUntil[target] = w.Tick;   // and the whiff hold (answer with the PUNISH)
                 if (report) World.PushEvent(w, SimEventType.HitBlocked, target, source, w.X[target], w.Z[target], PlayerReasons.BlockedParried, null, DamageCause.None, 0);
@@ -598,12 +654,28 @@ namespace CriticalMass.Sim.Core
             if (DefenceAirEvades(w, target, source, cause))
             {
                 d.AirEvades++;
+                DefenceChainTally(w, source, cause, 2);
                 d.FlightEvaded[target] = 1;
                 MovementNoteAirEvade(w, target);   // integrator: lane 3's landing lock sees the evade even when HitBlocked is not raised
                 if (report) World.PushEvent(w, SimEventType.HitBlocked, target, source, w.X[target], w.Z[target], PlayerReasons.BlockedAir, null, DamageCause.None, 0);
                 return true;
             }
             return false;
+        }
+
+        /// <summary>Guard fix: what the bodies did to actor source's melee swing as its queued hits land (kind 1 = parried,
+        /// 2 = guard-blocked or air-evaded). DefenceAfterContact recorded the swing and the bodies it reached; lane 4's chain
+        /// (advanced at contact) breaks on a parry and does not advance once every body was blocked.</summary>
+        static void DefenceChainTally(World w, int source, DamageCause cause, int kind)
+        {
+            if (cause != DamageCause.Melee || source < 0 || source >= w.ActorCount) return;
+            DefenceMovesState d = DefenceS(w);
+            if (d.ChainSwing[source] != w.Actors[source].SwingTick || d.ChainBodies[source] <= 0) return;
+            if (kind == 1)
+            {
+                if (d.ChainParried[source]++ == 0) OffenceChainUndo(w, source, true);
+            }
+            else if (++d.ChainBlocked[source] >= d.ChainBodies[source] && d.ChainParried[source] == 0) OffenceChainUndo(w, source, false);
         }
 
         /// <summary>Healer ruling: true when source is a living actor of a GlideClasses class with Glide on (her strikes pay the
@@ -623,6 +695,7 @@ namespace CriticalMass.Sim.Core
             if (cause == DamageCause.Melee && dmg > 0 && m.GlideStrikeDamageMul != 1 && DefenceGlider(w, source) && DefenceEnemyActor(w, target, source))
                 dmg *= m.GlideStrikeDamageMul;   // Healer ruling: the glider strikes softer
             if (!(dmg > 0) || !DefenceGuardBlocks(w, target, source, srcX, srcZ, cause)) return dmg;
+            DefenceChainTally(w, source, cause, 2);
             DefenceMovesState d = DefenceS(w);
             double cut = DefenceCut(w, target);
             if (cause == DamageCause.Explosion) cut *= m.GuardBlastCutShare;

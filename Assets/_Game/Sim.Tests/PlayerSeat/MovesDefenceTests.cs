@@ -291,7 +291,7 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
         /// still 0.75 x the attacker's reach away, facing it. plan(seat, swingStartTick) writes the human's frame each tick (guard,
         /// jump). Returns (damage the human took from the swing, the HitBlocked reasons it raised).
         /// </summary>
-        public static (double taken, List<int> blocked, Seat seat) StagedSwing(ClassId defender, ClassId attacker, double angle, int rep, Action<Seat, int> plan, Action<GameConfig> tweak)
+        public static (double taken, List<int> blocked, Seat seat) StagedSwing(ClassId defender, ClassId attacker, double angle, int rep, Action<Seat, int> plan, Action<GameConfig> tweak, int fireIn = 4)
         {
             GameConfig gc = PlayerSeatRig.Config();
             double gap = 0.75 * gc.Class(attacker).AttackRange + gc.Class(defender).Radius;
@@ -300,7 +300,7 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
             s.NoTnt = true;
             World w = s.W;
             if (attacker == ClassId.Demolitions && w.Demolitions != null && w.Demolitions.TntReadyTick != null) w.Demolitions.TntReadyTick[s.Them] = int.MaxValue / 2;
-            int fireAt = w.Tick + 4;
+            int fireAt = w.Tick + fireIn;
             int start = fireAt + 1;   // the frame written before step fireAt + 1 is applied on tick fireAt + 1
             s.BeforeTick = q =>
             {
@@ -829,6 +829,171 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
                 }
                 PxLog.Line("mvh-diag", "Healer " + v + " total", totalWins + "/40", "<= 8", totalWins <= 8);
             }
+        }
+    }
+
+    /// <summary>
+    /// Guard fix (2026-11-23, the Editor reviewer's live-game findings with every switch on): a parried swing breaks the attacker's
+    /// combo chain and a fully blocked one does not advance it; a held guard never arms the parry lockout (hold, release, tap
+    /// parries); the guard cuts damage from the press tick + 2; a lunge whose aim lags (the third-person camera point) still lands.
+    /// </summary>
+    [TestFixture, Category("PlayerSeat")]
+    public sealed class MovesGuardFixTests
+    {
+        /// <summary>Human attacker me (lag 0, fights) vs a passive dummy defender that parries ("tap": a 2-tick press ending the tick
+        /// before contact) or holds its guard ("hold") on every swing. Returns ComboStep events of me whose previous contact was
+        /// parried or blocked, the step events in all, and the parries / blocks seen.</summary>
+        static (int bad, int steps, int parried, int blocked, int contacts) ChainRun(ClassId me, ClassId them, string mode, int angle)
+        {
+            Seat s = PlayerSeatRig.Duel(me, them, TargetMode.Passive, PlayerSeatRig.AngleOf(angle, 4), angle, 0, tweak: MvCombine.AllOn);
+            World w = s.W;
+            s.BeforeTick = q =>
+            {
+                Actor a = w.Actors[q.Me];
+                int contact = a.SwingPending ? a.SwingTick + a.SwingWindup : int.MinValue;
+                int applied = w.Tick + 1;
+                if (mode == "hold") q.Dummy.Frame.Guard = true;
+                else if (mode == "tap") q.Dummy.Frame.Guard = applied == contact - 2 || applied == contact - 1;
+                else q.Dummy.Frame.Guard = false;
+                q.Dummy.AimX = w.X[q.Me]; q.Dummy.AimZ = w.Z[q.Me];
+                w.Actors[q.Them].Hp = w.Actors[q.Them].MaxHp;   // the defender never dies: the chain is what is measured
+            };
+            s.Steps(30 * 12);
+            var contacts = s.Spy.Of(SimEventType.AttackContact, e => e.A == s.Me).Select(e => e.Tick).ToList();
+            var bl = s.Spy.Of(SimEventType.HitBlocked, e => e.B == s.Me && e.A == s.Them);
+            var parriedAt = new HashSet<int>(bl.Where(e => (int)e.Value == PlayerReasons.BlockedParried).Select(e => e.Tick));
+            var blockedAt = new HashSet<int>(bl.Where(e => (int)e.Value == PlayerReasons.BlockedGuard).Select(e => e.Tick));
+            int bad = 0;
+            var steps = s.Spy.Of(SimEventType.ComboStep, e => e.A == s.Me);
+            var stepAt = new Dictionary<int, int>();
+            foreach (SeatEvent st in steps) stepAt[st.Tick] = (int)st.Value;
+            foreach (SeatEvent st in steps)
+            {
+                int prev = contacts.Where(t => t < st.Tick).DefaultIfEmpty(int.MinValue).Max();
+                if (prev == int.MinValue) continue;
+                int prevStep = stepAt.TryGetValue(prev, out int ps) ? ps : 1;
+                // a parried swing breaks the chain (no step follows it); a blocked one does not advance it (at most its own step again)
+                if (parriedAt.Contains(prev) || (blockedAt.Contains(prev) && (int)st.Value > prevStep)) bad++;
+            }
+            return (bad, steps.Count, bl.Count(e => (int)e.Value == PlayerReasons.BlockedParried), bl.Count(e => (int)e.Value == PlayerReasons.BlockedGuard), contacts.Count);
+        }
+
+        [Test]
+        public void AParriedSwingBreaksTheChainAndABlockedOneDoesNotAdvanceIt()
+        {
+            var bad = new List<string>();
+            foreach (ClassId me in new[] { ClassId.Warrior, ClassId.Farmer, ClassId.Miner, ClassId.Builder })
+            {
+                int free = 0, tapBad = 0, tapSteps = 0, tapParried = 0, holdBad = 0, holdSteps = 0, holdBlocked = 0;
+                for (int k = 0; k < 4; k++)
+                {
+                    free += ChainRun(me, ClassId.Farmer, "none", k).steps;
+                    var t = ChainRun(me, ClassId.Farmer, "tap", k);
+                    tapBad += t.bad; tapSteps += t.steps; tapParried += t.parried;
+                    var h = ChainRun(me, ClassId.Farmer, "hold", k);
+                    holdBad += h.bad; holdSteps += h.steps; holdBlocked += h.blocked;
+                }
+                bool ok = tapBad == 0 && holdBad == 0 && free > 0 && tapParried > 0;
+                PxLog.Line("mvg-chain", me + " chains on a passive Farmer, 4 starts x 12 s", "no defence " + free + " steps; parried " + tapParried + ": steps " + tapSteps + " (after a parried swing " + tapBad
+                    + "); held guard, blocked " + holdBlocked + ": steps " + holdSteps + " (after a blocked swing " + holdBad + ")", "0 steps after a parried swing; after a blocked one never a higher step", ok);
+                if (!ok) bad.Add(me.ToString());
+            }
+            Assert.IsEmpty(bad, "a parried or blocked swing still opened the chain: " + string.Join(", ", bad));
+        }
+
+        [Test]
+        public void HoldReleaseTapParriesAndMashingIsStillLockedOut()
+        {
+            var fails = new List<string>();
+            foreach (ClassId def in new[] { ClassId.Farmer, ClassId.Miner, ClassId.Demolitions, ClassId.Builder })
+            {
+                // hold the guard 20 ticks, let go, tap 2 ticks before contact (inside 1 s of the first press)
+                var r = MvDefenceRig.StagedSwing(def, ClassId.Warrior, 0, 0, (q, start) =>
+                {
+                    int contact = start + q.W.Dur.AttackWindup[(int)ClassId.Warrior];
+                    int t = q.W.Tick + 1;
+                    q.Human.Frame.Guard = (t >= contact - 34 && t < contact - 14) || t == contact - 2;
+                }, MvCombine.AllOn, fireIn: 24);
+                bool parried = r.blocked.Contains(PlayerReasons.BlockedParried);
+                // mash: two taps 6 ticks apart (the first caught nothing), then the real one: locked out
+                var m = MvDefenceRig.StagedSwing(def, ClassId.Warrior, 0, 0, (q, start) =>
+                {
+                    int contact = start + q.W.Dur.AttackWindup[(int)ClassId.Warrior];
+                    int t = q.W.Tick + 1;
+                    q.Human.Frame.Guard = t == contact - 14 || t == contact - 8 || t == contact - 2;
+                }, MvCombine.AllOn, fireIn: 24);
+                bool mashParried = m.blocked.Contains(PlayerReasons.BlockedParried);
+                bool ok = parried && !mashParried && m.seat.W.Moves.Defence.ParryLocked > 0;
+                PxLog.Line("mvg-parry", def + " vs a Warrior swing", "hold 20, release, tap: " + (parried ? "PARRIED" : "not parried") + "; mash: " + (mashParried ? "PARRIED" : "locked out (" + m.seat.W.Moves.Defence.ParryLocked + ")"),
+                    "hold-release-tap parries; mashing locked out", ok);
+                if (!ok) fails.Add(def.ToString());
+            }
+            Assert.IsEmpty(fails, string.Join(", ", fails));
+        }
+
+        /// <summary>The first contact tick (relative to the press's applied tick) a held guard cuts: press applied at contact - k.</summary>
+        [Test]
+        public void TheGuardCutsFromThePressTickPlusTwo()
+        {
+            var fails = new List<string>();
+            foreach (ClassId def in new[] { ClassId.Healer, ClassId.Farmer, ClassId.Builder })
+            {
+                var parts = new List<string>();
+                int first = -1;
+                for (int k = 0; k <= 6; k++)
+                {
+                    int kk = k;
+                    var r = MvDefenceRig.StagedSwing(def, ClassId.Warrior, 0, 0, (q, start) =>
+                    {
+                        int contact = start + q.W.Dur.AttackWindup[(int)ClassId.Warrior];
+                        q.Human.Frame.Guard = q.W.Tick + 1 >= contact - kk;
+                    }, MvCombine.AllOn, fireIn: 24);
+                    bool cut = r.blocked.Contains(PlayerReasons.BlockedGuard) || r.blocked.Contains(PlayerReasons.BlockedParried);
+                    parts.Add("+" + k + (r.blocked.Contains(PlayerReasons.BlockedParried) ? " parry" : r.blocked.Contains(PlayerReasons.BlockedGuard) ? " guard" : " -"));
+                    if (cut && first < 0) first = k;
+                }
+                bool ok = first >= 0 && first <= 2;
+                PxLog.Line("mvg-raise", def + " press applied k ticks before a Warrior's contact", string.Join(", ", parts) + "; first cut at press + " + first, "<= press + 2", ok);
+                if (!ok) fails.Add(def + " " + first);
+            }
+            Assert.IsEmpty(fails, string.Join(", ", fails));
+        }
+
+        /// <summary>A dodge-in at a standing target 3.4 u away, the attack buffered in the dash. Top-down (off 0): stick and aim on
+        /// the target. Third person (off +-30): the stick and the aim both point along the lagging camera, 30 degrees off the target
+        /// (inside the 35-degree lunge cone): before the fix that dash ended 1.7 u BESIDE the target, facing past it, and whiffed.</summary>
+        [Test]
+        public void ALungeThatReachesItsStopPointLandsWhateverTheAim()
+        {
+            var fails = new List<string>();
+            foreach (ClassId me in new[] { ClassId.Miner, ClassId.Warrior, ClassId.Farmer, ClassId.Builder })
+                foreach (double off in new[] { 0.0, 30.0, -30.0 })
+                {
+                    Seat s = PlayerSeatRig.Duel(me, ClassId.Farmer, TargetMode.Passive, 0, 0, 0, distance: 3.4, tweak: MvCombine.AllOn);
+                    s.Human.Fight = false;
+                    World w = s.W;
+                    int t0 = w.Tick;
+                    double end = -1;
+                    s.BeforeTick = q =>
+                    {
+                        double rd = MvDefenceWatch.Dist(w, q.Me, q.Them);
+                        double ux = (w.X[q.Them] - w.X[q.Me]) / rd, uz = (w.Z[q.Them] - w.Z[q.Me]) / rd;
+                        double a = off * Math.PI / 180;
+                        q.Human.AimOverrideX = w.X[q.Me] + 4 * (ux * Math.Cos(a) - uz * Math.Sin(a));
+                        q.Human.AimOverrideZ = w.Z[q.Me] + 4 * (ux * Math.Sin(a) + uz * Math.Cos(a));
+                        q.Human.MoveOverrideX = ux * Math.Cos(a) - uz * Math.Sin(a); q.Human.MoveOverrideZ = ux * Math.Sin(a) + uz * Math.Cos(a);
+                        if (w.Tick == t0 + 2) q.Human.PressDodge = true;
+                        if (w.Tick >= t0 + 4 && w.Tick <= t0 + 6) q.Human.PressAttack = true;
+                        if (w.Moves != null && w.Moves.Defence.LungeSwingTick[q.Me] == w.Tick && end < 0) end = rd;
+                    };
+                    s.Steps(30);
+                    int lunges = s.Spy.Of(SimEventType.Lunge, e => e.A == s.Me).Count;
+                    int hits = s.Spy.Of(SimEventType.Hit, e => e.A == s.Them && e.B == s.Me && e.Cause == DamageCause.Melee).Count;
+                    bool ok = lunges == 1 && hits >= 1;
+                    PxLog.Line("mvg-lunge", me + " dodge-in at 3.4 u, stick and aim " + off + " deg off the target", "lunges " + lunges + ", gap at the swing " + PxLog.F(end) + ", hits " + hits, "1 lunge, it lands", ok);
+                    if (!ok) fails.Add(me + " " + off);
+                }
+            Assert.IsEmpty(fails, "lunge whiffed: " + string.Join(", ", fails));
         }
     }
 }

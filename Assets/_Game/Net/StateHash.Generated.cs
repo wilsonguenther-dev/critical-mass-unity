@@ -1332,6 +1332,10 @@ namespace CriticalMass.Net
         {
             if (o == null) { M(ref h, 0x4E554C4CL); return; }
             M(ref h, o.AirEvades);
+            A(ref h, o.ChainBlocked);
+            A(ref h, o.ChainBodies);
+            A(ref h, o.ChainParried);
+            A(ref h, o.ChainSwing);
             M(ref h, o.FeintBaits);
             A(ref h, o.FeintDone);
             A(ref h, o.FeintTick);

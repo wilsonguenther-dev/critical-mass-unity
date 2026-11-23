@@ -662,6 +662,18 @@ namespace CriticalMass.Sim.Core
             s.ChainUntil[i] = until < cap ? until : cap;
         }
 
+        /// <summary>Guard fix (2026-11-23; lane 2 calls it when the queued hit lands, after OffenceAfterContact advanced the chain):
+        /// actor i's current swing was parried (the chain breaks: the next swing is an opener) or every body it reached was
+        /// guard-blocked (no advance: the next swing repeats this step).</summary>
+        internal static void OffenceChainUndo(World w, int i, bool parried)
+        {
+            if (w.Moves == null || !On(w, Cfg(w).Combos)) return;
+            OffenceMovesState s = w.Moves.Offence;
+            if (s.StepSwingTick[i] != w.Actors[i].SwingTick) return;
+            int step = s.StepOf[i];
+            s.ChainNext[i] = parried || step < 2 ? 0 : step;
+        }
+
         /// <summary>The cooldown never ends before the (longer) recovery: CombatFeel.AfterContact's rule on the new recovery.</summary>
         static void OffenceCooldownFloor(World w, Actor a)
         {

@@ -99,7 +99,7 @@ namespace CriticalMass.Sim.Config
         /// <summary>The Warrior's parry window while his shield is down (3 with it up is ParryWindowTicks[0]).</summary>
         public int WarriorParryWindowShieldDown = 2;
         public double GuardFrontalDeg = 60;
-        public int GuardRaiseTicks = 3;
+        public int GuardRaiseTicks = 2;   // guard fix: 3 -> 2, the guard cuts from the press tick + 2 (the Healer, who has no parry, cut from + 3)
         public int GuardReleaseTicks = 2;
         public double GuardRefillPerSecond = 15;
         public double GuardRefillDelaySeconds = 1.0;
@@ -153,7 +153,7 @@ namespace CriticalMass.Sim.Config
         /// fell 0.170 at 1.35 (band 0.05 to 0.15).</summary>
         public double[] FinisherDamageMulByClass = { -1, -1, -1, 1.3, -1, -1 };
         /// <summary>Healer ruling (fix/mv-healer-ruling): per-class AvoidRefundShare, -1 = AvoidRefundShare. Read with DodgeAvoidRefund.</summary>
-        public double[] AvoidRefundShareByClass = { 0.2, -1, -1, -1, -1, -1 };   // Warrior 0.2: his refund spent the dodge into the next lunge (escape vs a lunging Farmer 4 -> 7 of 16; dodge-alone answered 0.41 -> 0.31). Healer 0 measured 1/4/1/5 with the two below but flipped the bot check (Kaiju blocking 38 s, 9 shiver flags): left at -1
+        public double[] AvoidRefundShareByClass = { -1, -1, -1, -1, -1, -1 };   // measured: Warrior 0.2 = escape 4 -> 7 of 16 but a noisier bot check (owner: kept at 0.4); Healer 0 = 1/4/1/5 with the damage knob, flipped the bot checknd spent the dodge into the next lunge (escape vs a lunging Farmer 4 -> 7 of 16; dodge-alone answered 0.41 -> 0.31). Healer 0 measured 1/4/1/5 with the two below but flipped the bot check (Kaiju blocking 38 s, 9 shiver flags): left at -1
         /// <summary>Healer ruling: 1 = the class may get the second wind (read with SecondWind), 0 = never.</summary>
         public int[] SecondWindByClass = { 1, 1, 1, 1, 1, 1 };   // Healer 0 was measured (see AvoidRefundShareByClass) and left at 1
         /// <summary>Healer ruling: with Glide on, a melee strike by a GlideClasses class on an enemy actor deals this share of its
