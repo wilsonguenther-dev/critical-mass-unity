@@ -449,7 +449,7 @@ namespace CriticalMass.Runtime.Camera
                 SlowOut = Mode == GroundViewMode.Play,
                 SightOn = !robust && Mode == GroundViewMode.Play && target >= 0,
                 Robust = robust,
-                BodyRule = 1 - Math.Max(0, Math.Min(1, _combat.K)),
+                BodyRule = 1,   // pass 5: the whole fighter stays in frame in a framed fight too (the chest-only rule cut his legs)
                 SightX = tx0,
                 SightY = gy0 + 1.2,
                 SightZ = tz0,
