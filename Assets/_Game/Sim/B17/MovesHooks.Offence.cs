@@ -30,7 +30,7 @@ namespace CriticalMass.Sim.Core
     public sealed class OffenceMovesState
     {
         /// <summary>Ticks of the current ready hold of Attack (human seats; a bot's OffenceBotCharge hold). 0 = not holding.</summary>
-        public int[] HoldTicks = new int[0];
+        public int[] HoldCount = new int[0];
         /// <summary>1 = this hold was used (heavy fired on its own, the charge broke or was cancelled): nothing until released.</summary>
         public byte[] HoldSpent = new byte[0];
         /// <summary>1 while charging (hold at or past ChargeStartTick): view (CHARGE slot, glow, the heavy's ground arc).</summary>
@@ -71,7 +71,7 @@ namespace CriticalMass.Sim.Core
         public void Init(World w)
         {
             int n = World.ActorCapacity(w.Config);
-            HoldTicks = new int[n];
+            HoldCount = new int[n];
             HoldSpent = new byte[n];
             Charging = new byte[n];
             ChargeShare = new double[n];
@@ -94,9 +94,9 @@ namespace CriticalMass.Sim.Core
 
         public void Reset(World w)
         {
-            for (int i = 0; i < HoldTicks.Length; i++)
+            for (int i = 0; i < HoldCount.Length; i++)
             {
-                HoldTicks[i] = 0;
+                HoldCount[i] = 0;
                 HoldSpent[i] = 0;
                 Charging[i] = 0;
                 ChargeShare[i] = 0;
@@ -190,7 +190,7 @@ namespace CriticalMass.Sim.Core
         {
             if (!On(w, Cfg(w).Heavy) || id < 0 || id >= w.ActorCount || OffenceHuman(w, id)) return;
             OffenceMovesState s = w.Moves.Offence;
-            if (s.BotChargeLeft[id] > 0 || s.HoldTicks[id] > 0) return;
+            if (s.BotChargeLeft[id] > 0 || s.HoldCount[id] > 0) return;
             MovesConfig m = Cfg(w);
             int lo = Durations.T30(w.Config, m.ChargeStartTick), hi = Durations.T30(w.Config, m.ChargeAutoReleaseTick);
             int t = Durations.T30(w.Config, ticks);
@@ -294,25 +294,25 @@ namespace CriticalMass.Sim.Core
                         if (human && ms.AttackReleased[i] != 0)
                         {
                             if (s.HoldSpent[i] != 0) s.DropRelease[i] = 1;
-                            else if (s.HoldTicks[i] >= start) OffenceRelease(w, s, i, s.HoldTicks[i], start, full);
+                            else if (s.HoldCount[i] >= start) OffenceRelease(w, s, i, s.HoldCount[i], start, full);
                         }
                         OffenceClearHold(s, i);
                         continue;
                     }
                     if (s.HoldSpent[i] != 0) continue;
-                    bool charging = s.HoldTicks[i] >= start;
+                    bool charging = s.HoldCount[i] >= start;
                     // a dodge, a stagger (a hit at or over the Poise got through the charge armour), a raised guard: the charge breaks
                     bool broken = Dodge.Active(w, i) || a.HitStunTicks > 0 || ms.GuardHeldTicks[i] > 0;
                     if (broken)
                     {
-                        if (s.HoldTicks[i] > 0) { s.HoldSpent[i] = 1; s.HoldTicks[i] = 0; s.Charging[i] = 0; s.ChargeShare[i] = 0; s.BotChargeLeft[i] = 0; }
+                        if (s.HoldCount[i] > 0) { s.HoldSpent[i] = 1; s.HoldCount[i] = 0; s.Charging[i] = 0; s.ChargeShare[i] = 0; s.BotChargeLeft[i] = 0; }
                         continue;
                     }
                     if (charging && w.Inputs[i].Cancel && OffenceCancelCharge(w, s, i)) continue;
                     bool ready = !a.SwingPending && Combat.TickDown(a.AttackCd, dt) <= 0;
-                    if (s.HoldTicks[i] > 0 || ready) s.HoldTicks[i]++;
-                    if (!human && s.BotChargeLeft[i] > 0 && s.HoldTicks[i] > 0) s.BotChargeLeft[i]--;
-                    int h = s.HoldTicks[i];
+                    if (s.HoldCount[i] > 0 || ready) s.HoldCount[i]++;
+                    if (!human && s.BotChargeLeft[i] > 0 && s.HoldCount[i] > 0) s.BotChargeLeft[i]--;
+                    int h = s.HoldCount[i];
                     if (h >= start)
                     {
                         s.Charging[i] = 1;
@@ -323,7 +323,7 @@ namespace CriticalMass.Sim.Core
                     {
                         if (h >= start) OffenceRelease(w, s, i, h, start, full);
                         s.HoldSpent[i] = human ? (byte)1 : (byte)0;
-                        s.HoldTicks[i] = 0;
+                        s.HoldCount[i] = 0;
                         s.Charging[i] = 0;
                         s.ChargeShare[i] = 0;
                         s.BotChargeLeft[i] = 0;
@@ -354,7 +354,7 @@ namespace CriticalMass.Sim.Core
 
         static void OffenceClearHold(OffenceMovesState s, int i)
         {
-            s.HoldTicks[i] = 0;
+            s.HoldCount[i] = 0;
             s.HoldSpent[i] = 0;
             s.Charging[i] = 0;
             s.ChargeShare[i] = 0;
@@ -385,7 +385,7 @@ namespace CriticalMass.Sim.Core
             fs.BufferTick[i] = CombatFeel.NoTick;
             fs.Feints++;
             s.HoldSpent[i] = 1;
-            s.HoldTicks[i] = 0;
+            s.HoldCount[i] = 0;
             s.Charging[i] = 0;
             s.ChargeShare[i] = 0;
             s.BotChargeLeft[i] = 0;
@@ -417,7 +417,7 @@ namespace CriticalMass.Sim.Core
                 return wants;   // a tap: the light swing on the release tick (or buffered)
             }
             // a bot holding a charge for lane 5 swings nothing until the release
-            if (s.BotChargeLeft[i] > 0 || s.HoldTicks[i] > 0) return false;
+            if (s.BotChargeLeft[i] > 0 || s.HoldCount[i] > 0) return false;
             return wants;
         }
 
