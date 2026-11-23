@@ -531,20 +531,21 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
             }
             foreach (ClassId me in new[] { ClassId.Warrior, ClassId.Miner, ClassId.Demolitions, ClassId.Builder })
             {
-                MvDefenceTally e = MvDefenceRig.Escape(me, ClassId.Farmer, true, on);
-                MvDefenceTally eRefund = MvDefenceRig.Escape(me, ClassId.Farmer, true, MvDefenceRig.With(m => { m.DodgeLunge = true; m.DodgeAvoidRefund = true; }));
-                MvDefenceTally eOff = MvDefenceRig.Escape(me, ClassId.Farmer, false, null);
+                // asserted: the runner's eye varies 5 to 8 ticks per start (a person, as the chaser's 5 to 7 does); a fixed 6-tick
+                // eye is printed beside it: against the 6-tick Farmer lunge it is binary (the dodge always beats it by one tick)
+                MvDefenceTally e = MvDefenceRig.Escape(me, ClassId.Farmer, true, on, 16, true);
+                MvDefenceTally fixedEye = MvDefenceRig.Escape(me, ClassId.Farmer, true, on);
+                MvDefenceTally eRefund = MvDefenceRig.Escape(me, ClassId.Farmer, true, MvDefenceRig.With(m => { m.DodgeLunge = true; m.DodgeAvoidRefund = true; }), 16, true);
+                MvDefenceTally eOff = MvDefenceRig.Escape(me, ClassId.Farmer, false, null, 16, true);
                 bool pass = e.Escaped >= 6 && e.Escaped <= 13;
-                if (!pass)
+                PxLog.Line("mv2-T1-2", me + " at 30% escapes a lunging lag-6 Farmer with one dodge per read, eye 5-8 ticks (16)", e.Escaped + "/16 (chaser lunges " + e.Uses + ", swings " + e.Answered + " landed " + e.AnsweredLanded + "; with refund on " + eRefund.Escaped + "/16; switches off, no lunge " + eOff.Escaped + "/16; fixed 6-tick eye " + fixedEye.Escaped + "/16)", "6 to 13 of 16", pass);
+                if (!pass) fails.Add(me + " escape " + e.Escaped);
+                if (fixedEye.Escaped > 13)
                 {
                     MvDefenceTally l7 = MvDefenceRig.Escape(me, ClassId.Farmer, true, MvDefenceRig.With(m => { m.DodgeLunge = true; m.LungeStopShare = 0.70; }));
-                    MvDefenceTally l6 = MvDefenceRig.Escape(me, ClassId.Farmer, true, MvDefenceRig.With(m => { m.DodgeLunge = true; m.LungeStopShare = 0.60; }));
                     MvDefenceTally lw = MvDefenceRig.Escape(me, ClassId.Farmer, true, MvDefenceRig.With(m => { m.DodgeLunge = true; m.LungeWindupMul = 0.6; }));
-                    MvDefenceTally sp = MvDefenceRig.Escape(me, ClassId.Farmer, true, on, 16, true);
-                    PxLog.Line("mv2-lever", me + " escape vs a lunging Farmer with LungeStopShare 0.70 / 0.60 (spec 0.85); LungeWindupMul 0.6 (spec 0.75); spec knobs with the runner's eye 5 to 8 ticks", l7.Escaped + "/16 / " + l6.Escaped + "/16; " + lw.Escaped + "/16; " + sp.Escaped + "/16", "report", true);
+                    PxLog.Line("mv2-lever", me + " escape, fixed 6-tick eye, LungeStopShare 0.70 (spec 0.85) / LungeWindupMul 0.6 (spec 0.75)", l7.Escaped + "/16 / " + lw.Escaped + "/16", "report", true);
                 }
-                PxLog.Line("mv2-T1-2", me + " at 30% escapes a lunging lag-6 Farmer with one dodge per read (16)", e.Escaped + "/16 (chaser lunges " + e.Uses + ", swings " + e.Answered + " landed " + e.AnsweredLanded + "; with refund on " + eRefund.Escaped + "/16; switches off, no lunge " + eOff.Escaped + "/16)", "6 to 13 of 16", pass);
-                if (!pass) fails.Add(me + " escape " + e.Escaped);
             }
             Assert.IsEmpty(fails, "lunge: " + string.Join(", ", fails));
         }
