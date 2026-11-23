@@ -224,5 +224,62 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
         }
 
         static void AllOnCfg(GameConfig c) => MvCombine.AllOn(c);
+
+        /// <summary>Diagnostic (decision 6): what a dodge-in chase does, per class: lunges fired, the chaser's swings cancelled by a
+        /// stagger, contacts that hit or whiffed, the runner's hits on the chaser. Printed only (CM_MVI_CLASSES narrows it).</summary>
+        [Test, Category("Slow"), Timeout(3000000)]
+        public void Combine_Diag_DodgeInChase()
+        {
+            foreach (ClassId me in MvCombine.Classes())
+            {
+                int lunges = 0, cancels = 0, hit = 0, whiff = 0, theirHits = 0, dodges = 0, caught = 0, reps = 0;
+                GameConfig gc = PlayerSeatRig.Config();
+                foreach (ClassId runner in MvDefenceRig.All)
+                {
+                    if (runner == me) continue;
+                    double gap = gc.Class(me).AttackRange + gc.Class(runner).Radius + PlayerSeatTargets.ChaseStartBeyondReach;
+                    for (int k = 0; k < 8; k++)
+                    {
+                        Seat s = PlayerSeatRig.Duel(me, runner, TargetMode.RealBot, PlayerSeatRig.AngleOf(k, 8), k, MvDefenceRig.Lag, distance: gap, tweak: MvCombine.AllOn);
+                        s.Human.AimHelp = MvDefenceRig.Help;
+                        s.W.Actors[s.Them].Hp = PlayerSeatTargets.ChaseRunnerHpShare * s.W.Actors[s.Them].MaxHp;
+                        bool started = false;
+                        s.BeforeTick = q =>
+                        {
+                            World qw = q.W;
+                            if (!started)
+                            {
+                                started = true;
+                                BotsState bs = BotBrain.GetBotsState(qw);
+                                qw.Actors[q.Them].AiState = AiState.Retreat;
+                                if (bs != null) bs.StateSince[q.Them] = qw.Match.Time;
+                                double ux = qw.X[q.Them] - qw.X[q.Me], uz = qw.Z[q.Them] - qw.Z[q.Me], ud = Math.Sqrt(ux * ux + uz * uz);
+                                double sp = qw.Config.Class(runner).MoveSpeed;
+                                qw.Vx[q.Them] = ux / ud * sp;
+                                qw.Vz[q.Them] = uz / ud * sp;
+                            }
+                            double rd = MvDefenceWatch.Dist(qw, q.Me, q.Them);
+                            double reach = qw.Config.Class(me).AttackRange + qw.Config.Class(runner).Radius;
+                            if (rd > reach && rd < reach + 3.2 && Dodge.CanStart(qw, q.Me))
+                            {
+                                q.Human.PressDodge = true;
+                                q.Human.MoveOverrideX = (qw.X[q.Them] - qw.X[q.Me]) / rd;
+                                q.Human.MoveOverrideZ = (qw.Z[q.Them] - qw.Z[q.Me]) / rd;
+                            }
+                        };
+                        DuelResult r = PlayerSeatRig.Play(s, PlayerSeatTargets.ChaseSeconds);
+                        reps++;
+                        if (r.Won) caught++;
+                        lunges += s.Spy.Of(SimEventType.Lunge, e => e.A == s.Me).Count;
+                        cancels += s.Spy.Of(SimEventType.AttackCancel, e => e.A == s.Me).Count;
+                        dodges += s.Spy.Of(SimEventType.Dodge, e => e.A == s.Me).Count;
+                        foreach (SeatEvent e in s.Spy.Of(SimEventType.AttackContact, e => e.A == s.Me)) { if (e.Value > 0) hit++; else whiff++; }
+                        theirHits += s.Spy.Of(SimEventType.Hit, e => e.A == s.Me && e.B == s.Them).Count;
+                    }
+                }
+                PxLog.Line("mvi-diag-chase", me + " dodge-in chase, every switch ON" + (MvCombine.Knobs().Length > 0 ? " [" + MvCombine.Knobs() + "]" : ""),
+                    "caught " + caught + "/" + reps + ", dodges " + dodges + ", lunges " + lunges + ", contacts hit " + hit + " / whiff " + whiff + ", my swings cancelled " + cancels + ", runner hits on me " + theirHits, "report", true);
+            }
+        }
     }
 }

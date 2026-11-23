@@ -570,7 +570,7 @@ namespace CriticalMass.Runtime.Input
             int n = BuildCandidates(w, me, px, pz);
             LightWeapon lw = LightWeapons.Of(w, self.Cls);
             ClassConfig cc = cfg.Class(self.Cls);
-            bool tnt = CombatFeel.On(w) && self.Cls == ClassId.Demolitions && cfg.Abilities.DemolitionsTnt.ThrowOnAttack && w.Tick >= w.Demolitions.TntReadyTick[me];
+            bool tnt = CombatFeel.On(w) && self.Cls == ClassId.Demolitions && cfg.Abilities.DemolitionsTnt.ThrowOnAttack && !MovesHooks.OffenceConfigTntOnDigOnly(cfg) && w.Tick >= w.Demolitions.TntReadyTick[me];   // class moves T1-1 (integrator)
             bool abilityPress = (State.AbilityIntent || _castHolding || _castRelease) && self.Cls == ClassId.Farmer && !State.AttackIntent;
             double now = Time.unscaledTimeAsDouble;
             double dt = _lastAssistTime >= 0 ? Math.Max(0, Math.Min(0.25, now - _lastAssistTime)) : 0;

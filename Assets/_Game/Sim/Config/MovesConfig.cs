@@ -206,6 +206,9 @@ namespace CriticalMass.Sim.Config
         /// <summary>T1-2 (decision 6): a LUNGE wind-up shrugs off a hit under the lunger's class Poise (no stagger, the swing goes
         /// on), so a fleeing target's light hit does not cancel the lunge it ran into.</summary>
         public bool LungeArmour = true;
+        /// <summary>T1-2 (decision 6): per-class lunge wind-up multiplier, -1 = LungeWindupMul. The Miner's 0.6: his lunges whiffed
+        /// 61 of 115 contacts on a fleeing runner at 0.75 (dodge-in caught 15 of 40, plain walking 25 of 40); at 0.6, 30 of 40.</summary>
+        public double[] LungeWindupMulByClass = { -1, -1, 0.6, -1, -1, -1 };
         /// <summary>T2-5 (lane 3's constant, now a knob): after TRAVEL ends because an enemy came within TravelEnemyRadius, Dodge
         /// stays the SLIDE for this many ticks unless a press, a hit or an enemy wind-up within 8 u ends it.</summary>
         public int SlideCarryTicks = 30;
@@ -277,6 +280,7 @@ namespace CriticalMass.Sim.Config
             c.BotChargeChance = (double[])BotChargeChance.Clone();
             c.GuardKeepsFooting = (bool[])GuardKeepsFooting.Clone();
             c.GuardReleaseTicksByClass = (int[])GuardReleaseTicksByClass.Clone();
+            c.LungeWindupMulByClass = (double[])LungeWindupMulByClass.Clone();
             c.BotComboChance = (double[])BotComboChance.Clone();
             return c;
         }

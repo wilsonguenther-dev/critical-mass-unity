@@ -20,7 +20,7 @@ namespace CriticalMass.Runtime.View.Affordance
         /// <summary>b12 r3: true when the Demolitionist's ATTACK press throws TNT under these rules (the b12-jz rule:
         /// DemolitionsTnt.ThrowOnAttack, Full rules only, as Demolitions.AttackThrowsNow). Every HUD word reads this.</summary>
         public static bool AttackThrows(CriticalMass.Sim.Config.GameConfig c) =>
-            c != null && c.Abilities.DemolitionsTnt.ThrowOnAttack && !c.Depth.Classic;
+            c != null && c.Abilities.DemolitionsTnt.ThrowOnAttack && !c.Depth.Classic && !MovesHooks.OffenceConfigTntOnDigOnly(c);   // class moves T1-1 (integrator)
 
         // ------------------------------------------------------------------ aim arc
         /// <summary>Points on the aim arc (hand to landing), pooled once.</summary>

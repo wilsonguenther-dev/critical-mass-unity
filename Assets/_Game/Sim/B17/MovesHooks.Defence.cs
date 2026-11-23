@@ -428,7 +428,7 @@ namespace CriticalMass.Sim.Core
             // the stop point is measured from where the enemy will be at the lunge's contact (its velocity over the dash and the
             // lunge wind-up), so a dodge-in on a runner ends in reach at contact, not where the runner was at the press
             DodgeConfig dc = w.Config.Depth.Dodge;
-            int lead = (dc != null ? dc.DashTicks : 6) + (int)Math.Floor(w.Dur.AttackWindup[(int)a.Cls] * m.LungeWindupMul + 1e-9);
+            int lead = (dc != null ? dc.DashTicks : 6) + (int)Math.Floor(w.Dur.AttackWindup[(int)a.Cls] * DefenceLungeMul(w, id) + 1e-9);
             double leadSec = lead / w.Config.SimHz;
             double rx = w.X[best] + w.Vx[best] * leadSec - w.X[id], rz = w.Z[best] + w.Vz[best] * leadSec - w.Z[id];
             double stop = m.LungeStopShare * reach + w.Config.Class(w.Actors[best].Cls).Radius;
@@ -442,6 +442,15 @@ namespace CriticalMass.Sim.Core
             d.LungeTarget[id] = best;
             d.LungeDashEnd[id] = CombatFeel.NoTick;
             return go;
+        }
+
+        /// <summary>Integrator: actor i's lunge wind-up multiplier (LungeWindupMulByClass, else LungeWindupMul).</summary>
+        static double DefenceLungeMul(World w, int i)
+        {
+            MovesConfig m = Cfg(w);
+            double[] row = m.LungeWindupMulByClass;
+            int c = DefenceCls(w, i);
+            return row != null && c < row.Length && row[c] >= 0 ? row[c] : m.LungeWindupMul;
         }
 
         /// <summary>The shortest dodge-in dash, as a share of the dodge distance (an enemy already inside the stop distance).</summary>
@@ -474,7 +483,7 @@ namespace CriticalMass.Sim.Core
             if (d.LungeArmed[i] == 0) return windup;
             bool pressed = d.LungePressed[i] != 0 || w.Inputs[i].Attack;
             if (!pressed || w.Tick < d.LungeDashEnd[i] || w.Tick > d.LungeDashEnd[i] + 2) return windup;
-            int lunge = (int)Math.Floor(windup * m.LungeWindupMul + 1e-9);   // x0.75, rounded down (Warrior 12 to 9, Farmer 9 to 6)
+            int lunge = (int)Math.Floor(windup * DefenceLungeMul(w, i) + 1e-9);   // x0.75, rounded down (Warrior 12 to 9, Farmer 9 to 6); the Miner x0.6
             if (lunge < 1) lunge = 1;
             d.LungeArmed[i] = 0;
             d.LungeSwingTick[i] = w.Tick;   // integrator: Combat sets SwingTick = w.Tick right after this hook (LungeArmour)

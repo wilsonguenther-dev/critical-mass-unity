@@ -545,6 +545,7 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
         {
             GameConfig cfg = Config();
             tweak?.Invoke(cfg);
+            if (tweak != null) MvCombine.ApplyKnobs(cfg.Depth.Moves, Environment.GetEnvironmentVariable("CM_MVI_KNOBS"));   // integrator lever probes (unset: nothing)
             var opts = new WorldOptions { Seed = 4242 + rep, TeamSize = 5, HumanTeam = TeamId.Azure, HumanClass = me, Config = cfg, BotDifficulty = bots };
             int ib0 = 5; // TeamSize 5: the enemy team holds ids 5..9
             if (mode == TargetMode.HumanVsHuman)
