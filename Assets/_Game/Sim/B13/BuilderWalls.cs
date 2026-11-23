@@ -381,7 +381,11 @@ namespace CriticalMass.Sim.Core
         // Placement
 
         /// <summary>Every per-cell rule: 0 = a piece cell may stand on (cx, cz), else a Refused* code.</summary>
-        public static int CellRefusal(World w, int cx, int cz)
+        public static int CellRefusal(World w, int cx, int cz) => CellRefusal(w, cx, cz, w.Config.Depth.Build.HillKeepout, -1);
+
+        /// <summary>CellRefusal with the hill keep-out given and an actor whose own body is not in the way (-1 = none). mv-5 T1-5:
+        /// the QUICK WALL keeps out only QuickWallHillKeepOut, and at 1.5 u its cells never overlap the Builder who builds it.</summary>
+        public static int CellRefusal(World w, int cx, int cz, double hillKeepOut, int self)
         {
             MapDef map = w.Map;
             if (!MapGrid.InBounds(map, cx, cz)) return RefusedOutside;
@@ -397,7 +401,7 @@ namespace CriticalMass.Sim.Core
                 if (Near(x, z, map.Pads[k].X, map.Pads[k].Z, r)) return RefusedKeepOut;
             }
             if (Near(x, z, map.Shrine.X, map.Shrine.Z, S.ShrineKeepOut)) return RefusedKeepOut;
-            if (Near(x, z, map.Hill.X, map.Hill.Z, b.HillKeepout)) return RefusedKeepOut;
+            if (Near(x, z, map.Hill.X, map.Hill.Z, hillKeepOut)) return RefusedKeepOut;
             for (int k = 0; k < w.Nodes.Length; k++)
             {
                 ResourceNode nd = w.Nodes[k];
@@ -415,7 +419,7 @@ namespace CriticalMass.Sim.Core
             for (int j = 0; j < w.ActorCount; j++)
             {
                 Actor a = w.Actors[j];
-                if (!a.Alive) continue;
+                if (!a.Alive || j == self) continue;
                 if (Near(w.X[j], w.Z[j], x, z, b.ActorClearance + cfg.Class(a.Cls).Radius)) return RefusedOccupied;
             }
             Kaiju kj = w.Kaiju;
@@ -441,7 +445,10 @@ namespace CriticalMass.Sim.Core
             Actor a = w.Actors[id];
             double ox = w.X[id];
             double oz = w.Z[id];
-            Abilities.ClampToRange(ox, oz, aimX, aimZ, a.Facing, b.Reach, out double tx, out double tz);
+            bool quick = QuickWall(w, id);
+            double tx, tz;
+            if (quick) QuickWallPoint(w, id, aimX, aimZ, out tx, out tz);   // mv-5 T1-5: across his aim at QuickWallDistance
+            else Abilities.ClampToRange(ox, oz, aimX, aimZ, a.Facing, b.Reach, out tx, out tz);
             cx = MirrorCellX(w, tx, ox, a.Team);
             cz = JsMath.FloorToInt(tz);
             double vx = tx - ox;
@@ -492,22 +499,24 @@ namespace CriticalMass.Sim.Core
             else
             {
                 len = tall && tier >= 2 ? (int)b.WallCellsTier2 : (int)b.WallCells;
+                if (quick) len = MovesHooks.Cfg(w).QuickWallCells;   // mv-5 T1-5
                 if (len < 1) len = 1;
                 if (len > ProofIdx.Length) len = ProofIdx.Length;
             }
             int half = len / 2;
+            double keepOut = quick ? MovesHooks.Cfg(w).QuickWallHillKeepOut : b.HillKeepout;   // mv-5 T1-5: 3 u, not 7 u
             // b13 r3: every cell is checked and the most basic refusal wins (outside, ground, keep-out, then occupied), so a
             // mirrored piece gets the same word for both teams (first-found depended on which end the scan started from).
             int worst = 0;
             for (int k = -half; k < len - half; k++)
             {
-                int why = CellRefusal(w, cx + k * dx, cz + k * dz);
+                int why = CellRefusal(w, cx + k * dx, cz + k * dz, keepOut, quick ? id : -1);
                 // b15 terrain height: walls stand on level-0 ground only (stacks and pits are for blocks).
                 if (why == 0 && TerrainHeight.LiftAt(map, cx + k * dx, cz + k * dz) != 0) why = TerrainHeight.RefusedLevelOnly;
                 if (why != 0 && (worst == 0 || why > worst)) worst = why;
             }
             if (worst != 0) return worst;
-            if (Wood(w, a.Team) < Cost(b, piece, tall, false)) return RefusedWood;
+            if (Wood(w, a.Team) < (quick ? MovesHooks.Cfg(w).QuickWallWood : Cost(b, piece, tall, false))) return RefusedWood;
             if (w.Tick < s.ReadyTick[id]) return RefusedLock;
             if (!RouteOk(w, cx, cz, dx, dz, len)) return RefusedRoute;
             return 0;
@@ -627,6 +636,9 @@ namespace CriticalMass.Sim.Core
                 return Built;
             }
 
+            // mv-5 T1-5: one QUICK WALL at a time (QuickWallMaxPerBuilder): a new one crumbles his standing quick walls first.
+            bool quick = QuickWall(w, id);
+            if (quick) QuickWallCap(w, id);
             // The cap: building past MaxCellsPerBuilder crumbles his oldest pieces; first prove the pool can take the piece.
             int max = (int)b.MaxCellsPerBuilder;
             int owned = OwnedCells(w, id);
@@ -653,12 +665,18 @@ namespace CriticalMass.Sim.Core
                 owned -= s.PAlive[p];
                 CrumblePiece(w, p);
             }
-            Spend(w, a.Team, Cost(b, piece, tall, false));
+            Spend(w, a.Team, quick ? MovesHooks.Cfg(w).QuickWallWood : Cost(b, piece, tall, false));
             byte cell = tall ? Cell.Barricade : Cell.LowWall;
             double hp = !tall ? b.ShortHp : Tier(w, a.Team) >= 2 ? b.TallHp2 : b.TallHp;
             double life = Durations.T30(w.Config, tall ? b.TallLifeTicks : b.ShortLifeTicks) / w.Config.SimHz;
             double tough = HutChoices.WallScale(w, a.Team);   // b15-hook: TOUGH WALLS (exactly 1 with the rule off)
             if (tough != 1.0) { hp *= tough; life *= tough; }
+            if (quick)
+            {
+                // mv-5 T1-5: the QUICK WALL is a fixed fight tool: QuickWallHp, QuickWallSeconds (TOUGH WALLS does not stretch it)
+                hp = MovesHooks.Cfg(w).QuickWallHp;
+                life = MovesHooks.Cfg(w).QuickWallSeconds;
+            }
             int half = len / 2;
             int first = (cz - half * dz) * map.Width + (cx - half * dx);
             s.POwner[pieceSlot] = id;
@@ -697,8 +715,71 @@ namespace CriticalMass.Sim.Core
             s.Built[id]++;
             s.BuiltByRule[(int)a.Team * 4 + (s.BotRule[id] & 3)]++;
             s.BotRule[id] = 0;
+            if (quick) MovesHooks.BotsQuickWallBuilt(w, id, pieceSlot, s.PSeq[pieceSlot]);
             World.PushEvent(w, SimEventType.WallBuilt, id, first, cx + 0.5, cz + 0.5, len);
             return Built;
+        }
+
+        // -----------------------------------------------------------------------------------------------------------
+        // mv-5 T1-5: the QUICK WALL (MovesConfig.BuilderQuickWall, Full rules only; every switch off: never true, so Plan and
+        // Commit are the base branch's). The wheel's SHORT WALL becomes the quick wall: QuickWallCells across his aim (facing
+        // when he aims under AimAxisMin) centred QuickWallDistance out, QuickWallWood, no build time beyond the shared 0.6 s
+        // lock, QuickWallSeconds of life, QuickWallHp per cell, hill keep-out QuickWallHillKeepOut. Still F, same wheel.
+
+        /// <summary>mv-5 T1-5: Builder id's selected piece is the QUICK WALL now (switch on, WALL piece, not tall in effect).</summary>
+        public static bool QuickWall(World w, int id)
+        {
+            if (!MovesHooks.On(w, MovesHooks.Cfg(w).BuilderQuickWall) || !Valid(w, id)) return false;
+            WallsState s = w.Walls;
+            if (s.Piece[id] != (byte)BuildPiece.Wall) return false;
+            return !(s.Tall[id] == 1 && Tier(w, w.Actors[id].Team) >= 1);
+        }
+
+        /// <summary>mv-5 T1-5 (view: the "WALL 8" countdown reads Barricade.Ttl): barricade slot `slot` is a standing quick-wall cell.</summary>
+        public static bool QuickSlot(World w, int slot)
+        {
+            if (!IsWallSlot(w, slot)) return false;
+            WallsState s = w.Walls;
+            int p = s.PieceOf[slot];
+            return p >= 0 && p < s.PSeq.Length && MovesHooks.BotsIsQuickWall(w, s.SlotOwner[slot], p, s.PSeq[p]);
+        }
+
+        /// <summary>mv-5 T1-5: the quick wall's centre point: QuickWallDistance from him along his aim (facing under AimAxisMin or
+        /// without an aim).</summary>
+        private static void QuickWallPoint(World w, int id, double aimX, double aimZ, out double tx, out double tz)
+        {
+            double ox = w.X[id], oz = w.Z[id];
+            double vx = aimX - ox, vz = aimZ - oz;
+            double min = w.Config.Depth.Build.AimAxisMin;
+            if (!double.IsFinite(aimX) || !double.IsFinite(aimZ) || vx * vx + vz * vz < min * min)
+            {
+                vx = JsMath.Cos(w.Actors[id].Facing);
+                vz = JsMath.Sin(w.Actors[id].Facing);
+            }
+            double l = Math.Sqrt(vx * vx + vz * vz);
+            double d = MovesHooks.Cfg(w).QuickWallDistance;
+            tx = ox + vx / l * d;
+            tz = oz + vz / l * d;
+        }
+
+        /// <summary>mv-5 T1-5: before a new quick wall, crumble his standing quick walls beyond QuickWallMaxPerBuilder - 1.</summary>
+        private static void QuickWallCap(World w, int id)
+        {
+            int keep = MovesHooks.Cfg(w).QuickWallMaxPerBuilder - 1;
+            if (keep < 0) keep = 0;
+            WallsState s = w.Walls;
+            for (int guard = 0; guard < 8; guard++)
+            {
+                int standing = 0, oldest = -1;
+                for (int p = 0; p < s.PAlive.Length; p++)
+                {
+                    if (s.PAlive[p] <= 0 || s.POwner[p] != id || !MovesHooks.BotsIsQuickWall(w, id, p, s.PSeq[p])) continue;
+                    standing++;
+                    if (oldest < 0 || s.PSeq[p] < s.PSeq[oldest]) oldest = p;
+                }
+                if (standing <= keep || oldest < 0) return;
+                CrumblePiece(w, oldest);
+            }
         }
 
         /// <summary>Wall cells Builder id has standing.</summary>
