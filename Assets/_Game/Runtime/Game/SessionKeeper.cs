@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
 using UnityEngine;
@@ -26,8 +27,11 @@ namespace CriticalMass.Runtime.Game
     /// memory, render size, window mode, displays, focus, battery and quality.</para>
     /// <para>Hang watchdog: a background thread watches the frame counter. 5 s without a frame writes
     /// DATA/hang-UTC.txt (last 300 frame times, match tick, phase); 60 s writes a final record and calls
-    /// Environment.FailFast so the OS writes a crash report and the next launch knows. A machine sleep (the watchdog's own
-    /// 0.5 s nap taking over 3 s) resets the clock, so waking a laptop never kills the game.</para>
+    /// Environment.FailFast so the OS writes a crash report and the next launch knows. Only frameless time in which frames
+    /// were expected counts (HangWatchdogRule): paused, screen locked, display asleep, minimised, a debugger, declared
+    /// LongWork, a machine sleep (the 0.5 s nap taking over 3 s by either clock) or a main thread that still answers the
+    /// watchdog's run-loop probe hold the clock at zero, and it stays at zero for 15 s after the excuse ends. Tool runs
+    /// (-exportReport, -simHashOut, -simScout) are never watched; the final record is also written to DATA/logs/.</para>
     /// </summary>
     public static class SessionKeeper
     {
@@ -38,8 +42,8 @@ namespace CriticalMass.Runtime.Game
         public const string LockFile = "instance.lock";
         public const int HistoryVersion = 1;
         public const int KeepSessionLogs = 10;
-        public const double HangSeconds = 5;
-        public const double KillSeconds = 60;
+        public const double HangSeconds = HangWatchdogRule.HangSeconds;
+        public const double KillSeconds = HangWatchdogRule.KillSeconds;
         public const double HeartbeatSeconds = 5;
         public const int RingFrames = 300;
         public const long MaxCopiedReportBytes = 4 * 1024 * 1024;
@@ -89,9 +93,17 @@ namespace CriticalMass.Runtime.Game
             Started = true;
             if (Application.isEditor) return;
             string[] args = Environment.GetCommandLineArgs();
-            ToolRun = GamePaths.HasFlag(args, "-exportReport") || GamePaths.HasFlag(args, "-simHashOut");
+            // -simScout steps whole matches inside one Start (minutes, zero frames): a tool run, never watched (the
+            // 2026-11-22 23:23 abort was a scout batch killed at 60 s; see HangWatchdogRule).
+            ToolRun = GamePaths.HasFlag(args, "-exportReport") || GamePaths.HasFlag(args, "-simHashOut") ||
+                      GamePaths.HasFlag(args, MatchVideo.ScoutFlag);
             _diag = GamePaths.HasFlag(args, "-diag");
             _dir = GamePaths.DataDir;
+            _logsDir = GamePaths.LogsDir;
+            _focused = Application.isFocused;
+            _runInBackground = Application.runInBackground;
+            _noFramesTestSeconds = ArgSeconds(args, "-cmNoFramesTest");
+            _hangTestSeconds = ArgSeconds(args, "-cmHangTest");
             _startedUtc = DateTime.UtcNow;
             if (GamePaths.Translocated)
                 Debug.LogWarning("[CM.Session] running from a translocated (quarantined) copy; move Critical Mass to Applications to keep it stable");
@@ -315,7 +327,7 @@ namespace CriticalMass.Runtime.Game
         /// <summary>Called by FrameGovernor.Update: frame counter, frame-time ring, frame timings, long-frame flag, heartbeat.</summary>
         public static void Tick(float unscaledDt)
         {
-            Interlocked.Increment(ref _frameCounter);
+            if (!WatchdogTestSkipsFrame()) Interlocked.Increment(ref _frameCounter);
             float ms = unscaledDt * 1000f;
             Ring[_ringHead] = ms;
             _ringHead = (_ringHead + 1) % RingFrames;
@@ -384,15 +396,18 @@ namespace CriticalMass.Runtime.Game
         static void Watch()
         {
             var clock = Stopwatch.StartNew();
-            int seen = Volatile.Read(ref _frameCounter);
-            double lastProgress = 0, lastLoop = 0;
-            bool hangWritten = false;
+            DateTime lastUtc = DateTime.UtcNow;
+            double lastLoop = 0;
+            var state = HangWatchdogRule.Start(0, Volatile.Read(ref _frameCounter));
+            WatchdogVerdict was = WatchdogVerdict.Ok;
             while (!_stopWatchdog)
             {
                 Thread.Sleep(500);
                 double now = clock.Elapsed.TotalSeconds;
-                if (now - lastLoop > 3.0) lastProgress = now;   // the machine slept: not a hang
+                DateTime utc = DateTime.UtcNow;
+                double gap = Math.Max(now - lastLoop, (utc - lastUtc).TotalSeconds);
                 lastLoop = now;
+                lastUtc = utc;
                 string hb = _pendingHeartbeat;
                 if (hb != null)
                 {
@@ -400,26 +415,317 @@ namespace CriticalMass.Runtime.Game
                     SafeFile.TryWriteAtomic(Path.Combine(_dir, HeartbeatFile), hb, false, out _);
                 }
                 int f = Volatile.Read(ref _frameCounter);
-                if (f != seen)
+                bool pumped = WatchdogNative.MainThreadAnswered(now);
+                // The excuses are only gathered when no frame came since the last look (the native queries cost a little).
+                NoFrameExcuse why = f != state.SeenFrames ? NoFrameExcuse.None : Excuses(pumped);
+                var sample = new WatchdogSample { Now = now, LoopGap = gap, Frames = f, Excuses = why };
+                WatchdogVerdict v = HangWatchdogRule.Step(ref state, sample);
+                LogTransition(was, v, state, now);
+                was = v;
+                if (v == WatchdogVerdict.HangRecord) WriteHang(state.Stalled, false, why, now);
+                else if (v == WatchdogVerdict.Kill)
                 {
-                    seen = f;
-                    lastProgress = now;
-                    hangWritten = false;
-                    continue;
-                }
-                double stalled = now - lastProgress;
-                if (stalled >= HangSeconds && !hangWritten)
-                {
-                    hangWritten = true;
-                    WriteHang(stalled, false);
-                }
-                if (stalled >= KillSeconds)
-                {
-                    WriteHang(stalled, true);
+                    WriteHang(state.Stalled, true, why, now);
                     Flag("hang");
-                    Environment.FailFast("Critical Mass: the main thread did not finish a frame for " + KillSeconds + " s");
+                    Environment.FailFast("Critical Mass: the main thread did not finish a frame for " + KillSeconds +
+                                         " s and did not answer the watchdog's probe (a real hang; hang record in " + (_logsDir ?? _dir) + ")");
                 }
             }
+        }
+
+        /// <summary>What currently excuses missing frames (watchdog thread; every native query guarded inside WatchdogNative).</summary>
+        static NoFrameExcuse Excuses(bool mainThreadPumped)
+        {
+            NoFrameExcuse e = NoFrameExcuse.None;
+            if (mainThreadPumped) e |= NoFrameExcuse.MainThreadPumping;
+            if (_paused || (!_focused && !_runInBackground)) e |= NoFrameExcuse.Paused;
+            if (Volatile.Read(ref _longWork) > 0) e |= NoFrameExcuse.LongWork;
+            try { if (Debugger.IsAttached) e |= NoFrameExcuse.Debugger; } catch (Exception) { }
+            e |= WatchdogNative.SystemExcuses();
+            return e;
+        }
+
+        static double _excusedSince = -1;
+
+        /// <summary>One Player.log line when frames stop being expected and when the watchdog arms again (never per look).</summary>
+        static void LogTransition(WatchdogVerdict was, WatchdogVerdict v, WatchdogState s, double now)
+        {
+            if (v == WatchdogVerdict.Excused && was != WatchdogVerdict.Excused)
+            {
+                _excusedSince = now;
+                Debug.Log($"[CM.Session] watchdog: no frames, none expected ({HangWatchdogRule.Describe(s.LastExcuses)}); not counting");
+            }
+            else if (v == WatchdogVerdict.Grace && was == WatchdogVerdict.Excused)
+                Debug.Log($"[CM.Session] watchdog: frames expected again after {now - _excusedSince:0} s (last excuse {HangWatchdogRule.Describe(s.LastExcuses)}); " +
+                          $"armed again in {HangWatchdogRule.GraceSeconds:0} s");
+        }
+
+        // ── what the watchdog is told by the main thread ──
+
+        static volatile bool _paused, _focused = true, _runInBackground = true;
+        static int _longWork;
+        static volatile string _longWorkWhat = "";
+        static string _logsDir;
+
+        /// <summary>FrameGovernor.OnApplicationFocus (main thread).</summary>
+        public static void NoteFocus(bool focused)
+        {
+            _focused = focused;
+            _runInBackground = Application.runInBackground;
+        }
+
+        /// <summary>FrameGovernor.OnApplicationPause (main thread).</summary>
+        public static void NotePause(bool paused)
+        {
+            _paused = paused;
+            _runInBackground = Application.runInBackground;
+        }
+
+        /// <summary>Ends a LongWork declaration (dispose once).</summary>
+        public readonly struct LongWorkScope : IDisposable
+        {
+            public void Dispose() => Interlocked.Decrement(ref _longWork);
+        }
+
+        /// <summary>Declares a long synchronous job on the main thread (a blocking load, a batch of sim matches): the watchdog
+        /// does not count the frameless time while any is open. <c>using (SessionKeeper.LongWork("what")) { ... }</c></summary>
+        public static LongWorkScope LongWork(string what)
+        {
+            _longWorkWhat = what ?? "";
+            Interlocked.Increment(ref _longWork);
+            return default;
+        }
+
+        // ── reviewer proofs (player builds; inert unless the flag is given) ──
+
+        /// <summary>Seconds after start before a test flag acts (the title is on screen by then).</summary>
+        const double TestStartsAfter = 20;
+        static double _noFramesTestSeconds, _hangTestSeconds, _noFramesUntil = -1;
+
+        static double ArgSeconds(string[] args, string flag)
+        {
+            for (int i = 0; i + 1 < args.Length; i++)
+                if (string.Equals(args[i], flag, StringComparison.OrdinalIgnoreCase) &&
+                    double.TryParse(args[i + 1], NumberStyles.Float, CultureInfo.InvariantCulture, out double v) && v > 0)
+                    return Math.Min(v, 3600);
+            return 0;
+        }
+
+        /// <summary>
+        /// -cmNoFramesTest S: from 20 s after start, the frame counter stops for S seconds while the game keeps running and
+        /// pumping (what a locked screen or an occluded window looks like to the watchdog); the game must not abort.
+        /// -cmHangTest S: at 20 s the main thread sleeps S seconds inside a frame (a real hang, nothing answers the probe):
+        /// a hang record at 5 s and, for S over 60, the final record and the abort.
+        /// </summary>
+        static bool WatchdogTestSkipsFrame()
+        {
+            if (_noFramesTestSeconds <= 0 && _hangTestSeconds <= 0 && _noFramesUntil < 0) return false;
+            double t = Time.realtimeSinceStartupAsDouble;
+            if (t < TestStartsAfter) return false;
+            if (_hangTestSeconds > 0)
+            {
+                double h = _hangTestSeconds;
+                _hangTestSeconds = 0;
+                Debug.LogWarning($"[CM.Session] -cmHangTest: the main thread now sleeps {h:0} s (expect a hang record at 5 s, the abort at 60 s)");
+                Thread.Sleep((int)(h * 1000));
+                Debug.Log("[CM.Session] -cmHangTest: the main thread is back");
+            }
+            if (_noFramesTestSeconds > 0)
+            {
+                _noFramesUntil = t + _noFramesTestSeconds;
+                Debug.LogWarning($"[CM.Session] -cmNoFramesTest: the frame counter stops for {_noFramesTestSeconds:0} s while the game keeps pumping (expect no abort)");
+                _noFramesTestSeconds = 0;
+            }
+            if (_noFramesUntil < 0) return false;
+            if (t < _noFramesUntil) return true;
+            _noFramesUntil = -1;
+            Debug.Log("[CM.Session] -cmNoFramesTest: the frame counter runs again");
+            return false;
+        }
+
+        /// <summary>
+        /// The watchdog's OS queries, without a native plugin (P/Invoke into system libraries, like AutomationWindow). Every
+        /// query is guarded: the first failure turns that query off for the run and the watchdog falls back to the rest.
+        /// <para>macOS: the probe is dispatch_async_f onto the main dispatch queue (AppKit's main run loop drains it, Unity's
+        /// player loop does not need to run); a stuck main thread never runs it. Screen lock from CGSessionCopyCurrentDictionary
+        /// (kCGSSessionScreenIsLocked), display sleep from CGDisplayIsAsleep.</para>
+        /// <para>Windows: the probe is SendMessageTimeout(WM_NULL, SMTO_ABORTIFHUNG) to the game window (answered only by a
+        /// thread pumping messages); lock or switch-user from OpenInputDesktop failing; minimised or hidden from IsIconic /
+        /// IsWindowVisible.</para>
+        /// </summary>
+        static class WatchdogNative
+        {
+            static bool _probeOff, _lockOff, _sleepOff, _windowOff;
+            static int _answers, _inFlight;
+            static int _lastAnswers;
+            public static long Posted;
+            public static double LastAnswerAt = -1;
+
+            static void Off(ref bool off, string what, Exception e)
+            {
+                off = true;
+                Debug.LogWarning($"[CM.Session] watchdog: {what} unavailable ({e.GetType().Name}); using the other signals");
+            }
+
+            /// <summary>true when the main thread answered a probe since the last look; posts the next probe.</summary>
+            public static bool MainThreadAnswered(double now)
+            {
+                int a = Volatile.Read(ref _answers);
+                bool answered = a != _lastAnswers;
+                _lastAnswers = a;
+                if (answered) LastAnswerAt = now;
+                if (!_probeOff)
+                {
+                    try { Post(); }
+                    catch (Exception e) { Off(ref _probeOff, "the main-thread probe", e); }
+                }
+                return answered;
+            }
+
+            public static string Describe(double now) =>
+                $"probe={(_probeOff ? "off" : "on")} posted={Posted} answered={Volatile.Read(ref _answers)} in_flight={Volatile.Read(ref _inFlight)} " +
+                $"last_answer_s_ago={(LastAnswerAt < 0 ? "never" : (now - LastAnswerAt).ToString("0.0", CultureInfo.InvariantCulture))} " +
+                $"lock_query={(_lockOff ? "off" : "on")} sleep_query={(_sleepOff ? "off" : "on")} window_query={(_windowOff ? "off" : "on")}";
+
+            public static NoFrameExcuse SystemExcuses()
+            {
+                NoFrameExcuse e = NoFrameExcuse.None;
+                if (!_lockOff)
+                {
+                    try { if (ScreenLocked()) e |= NoFrameExcuse.ScreenLocked; }
+                    catch (Exception x) { Off(ref _lockOff, "the screen-lock query", x); }
+                }
+                if (!_sleepOff)
+                {
+                    try { if (DisplayAsleep()) e |= NoFrameExcuse.DisplayAsleep; }
+                    catch (Exception x) { Off(ref _sleepOff, "the display-sleep query", x); }
+                }
+                if (!_windowOff)
+                {
+                    try { if (Minimised()) e |= NoFrameExcuse.Minimised; }
+                    catch (Exception x) { Off(ref _windowOff, "the window query", x); }
+                }
+                return e;
+            }
+
+#if UNITY_STANDALONE_OSX && !UNITY_EDITOR
+            const string CF = "/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation";
+            const string CG = "/System/Library/Frameworks/CoreGraphics.framework/CoreGraphics";
+            const string LibSystem = "/usr/lib/libSystem.B.dylib";
+            const uint Utf8 = 0x08000100;   // kCFStringEncodingUTF8
+            static readonly IntPtr RtldDefault = new IntPtr(-2);
+
+            [DllImport(CG)] static extern IntPtr CGSessionCopyCurrentDictionary();
+            [DllImport(CG)] static extern uint CGMainDisplayID();
+            [DllImport(CG)] static extern int CGDisplayIsAsleep(uint display);
+            [DllImport(CF)] static extern IntPtr CFDictionaryGetValue(IntPtr dict, IntPtr key);
+            [DllImport(CF)] static extern IntPtr CFStringCreateWithCString(IntPtr alloc, [MarshalAs(UnmanagedType.LPStr)] string s, uint encoding);
+            [DllImport(CF)] static extern byte CFBooleanGetValue(IntPtr b);
+            [DllImport(CF)] static extern UIntPtr CFGetTypeID(IntPtr cf);
+            [DllImport(CF)] static extern UIntPtr CFBooleanGetTypeID();
+            [DllImport(CF)] static extern void CFRelease(IntPtr cf);
+            [DllImport(LibSystem)] static extern IntPtr dlsym(IntPtr handle, [MarshalAs(UnmanagedType.LPStr)] string name);
+            [DllImport(LibSystem)] static extern void dispatch_async_f(IntPtr queue, IntPtr context, IntPtr work);
+
+            [UnmanagedFunctionPointer(CallingConvention.Cdecl)] delegate void DispatchWork(IntPtr context);
+            static readonly DispatchWork Work = OnMainThread;   // kept alive for the process lifetime
+            static IntPtr _workPtr, _mainQueue, _lockedKey;
+
+            [AOT.MonoPInvokeCallback(typeof(DispatchWork))]
+            static void OnMainThread(IntPtr context)
+            {
+                Interlocked.Increment(ref _answers);
+                Volatile.Write(ref _inFlight, 0);
+            }
+
+            static void Post()
+            {
+                if (_mainQueue == IntPtr.Zero)
+                {
+                    _mainQueue = dlsym(RtldDefault, "_dispatch_main_q");
+                    if (_mainQueue == IntPtr.Zero) throw new EntryPointNotFoundException("_dispatch_main_q");
+                    _workPtr = Marshal.GetFunctionPointerForDelegate(Work);
+                }
+                if (Interlocked.CompareExchange(ref _inFlight, 1, 0) != 0) return;   // one probe queued at a time
+                Posted++;
+                dispatch_async_f(_mainQueue, IntPtr.Zero, _workPtr);
+            }
+
+            static bool ScreenLocked()
+            {
+                IntPtr d = CGSessionCopyCurrentDictionary();
+                if (d == IntPtr.Zero) return true;   // no window-server session for this process right now (switched-out user)
+                try
+                {
+                    if (_lockedKey == IntPtr.Zero) _lockedKey = CFStringCreateWithCString(IntPtr.Zero, "CGSSessionScreenIsLocked", Utf8);
+                    IntPtr v = CFDictionaryGetValue(d, _lockedKey);
+                    return v != IntPtr.Zero && CFGetTypeID(v) == CFBooleanGetTypeID() && CFBooleanGetValue(v) != 0;
+                }
+                finally { CFRelease(d); }
+            }
+
+            static bool DisplayAsleep() => CGDisplayIsAsleep(CGMainDisplayID()) != 0;
+
+            static bool Minimised() => false;   // AppKit window state is main-thread only; the probe covers minimised/occluded
+#elif UNITY_STANDALONE_WIN && !UNITY_EDITOR
+            const string U32 = "user32.dll";
+            const uint WmNull = 0x0000, SmtoAbortIfHung = 0x0002, SmtoErrorOnExit = 0x0020, DesktopSwitchDesktop = 0x0100;
+
+            [DllImport(U32, CharSet = CharSet.Unicode)] static extern IntPtr FindWindowExW(IntPtr parent, IntPtr after, string cls, string title);
+            [DllImport(U32)] static extern uint GetWindowThreadProcessId(IntPtr hwnd, out uint pid);
+            [DllImport(U32)] static extern IntPtr SendMessageTimeoutW(IntPtr hwnd, uint msg, IntPtr w, IntPtr l, uint flags, uint timeoutMs, out IntPtr result);
+            [DllImport(U32)] static extern bool IsIconic(IntPtr hwnd);
+            [DllImport(U32)] static extern bool IsWindowVisible(IntPtr hwnd);
+            [DllImport(U32)] static extern IntPtr OpenInputDesktop(uint flags, bool inherit, uint access);
+            [DllImport(U32)] static extern bool CloseDesktop(IntPtr desktop);
+
+            static IntPtr _hwnd;
+            static uint _pid;
+
+            static IntPtr Window()
+            {
+                if (_hwnd != IntPtr.Zero) return _hwnd;
+                if (_pid == 0) using (Process p = Process.GetCurrentProcess()) _pid = (uint)p.Id;
+                IntPtr w = IntPtr.Zero;
+                while ((w = FindWindowExW(IntPtr.Zero, w, "UnityWndClass", null)) != IntPtr.Zero)
+                {
+                    GetWindowThreadProcessId(w, out uint pid);
+                    if (pid == _pid) return _hwnd = w;
+                }
+                return IntPtr.Zero;
+            }
+
+            // Synchronous: the answer is known before this returns (at most 1 s; at once when Windows already counts the window hung).
+            static void Post()
+            {
+                IntPtr w = Window();
+                if (w == IntPtr.Zero) return;
+                Posted++;
+                if (SendMessageTimeoutW(w, WmNull, IntPtr.Zero, IntPtr.Zero, SmtoAbortIfHung | SmtoErrorOnExit, 1000, out _) != IntPtr.Zero)
+                    Interlocked.Increment(ref _answers);
+            }
+
+            static bool ScreenLocked()
+            {
+                IntPtr d = OpenInputDesktop(0, false, DesktopSwitchDesktop);
+                if (d == IntPtr.Zero) return true;   // the secure desktop has the input: locked, switch user, a UAC prompt
+                CloseDesktop(d);
+                return false;
+            }
+
+            static bool DisplayAsleep() => false;   // Windows keeps presenting to a sleeping monitor; nothing to excuse
+
+            static bool Minimised()
+            {
+                IntPtr w = Window();
+                return w != IntPtr.Zero && (IsIconic(w) || !IsWindowVisible(w));
+            }
+#else
+            static void Post() { _probeOff = true; Posted = 0; }   // the editor and other platforms: no probe
+            static bool ScreenLocked() => false;
+            static bool DisplayAsleep() => false;
+            static bool Minimised() => false;
+#endif
         }
 
         /// <summary>The hang record (pure text; tests).</summary>
@@ -443,12 +749,43 @@ namespace CriticalMass.Runtime.Game
             return sb.ToString();
         }
 
-        static void WriteHang(double stalled, bool final)
+        /// <summary>The watchdog's own view for a hang record (pure text; tests): what was checked and what the stacks are.</summary>
+        public static string WatchdogText(NoFrameExcuse excusesNow, string probe, bool debugger, int longWork, string longWorkWhat, string platform)
         {
+            var sb = new StringBuilder(1024);
+            sb.Append("excuses_now=").Append(HangWatchdogRule.Describe(excusesNow)).Append('\n')
+              .Append("watchdog=").Append(probe ?? "").Append('\n')
+              .Append("debugger=").Append(debugger ? 1 : 0).Append('\n')
+              .Append("long_work=").Append(longWork).Append(longWork > 0 ? " (" + (longWorkWhat ?? "") + ")" : "").Append('\n')
+              .Append("platform=").Append(platform ?? "").Append('\n')
+              .Append("rule=no frame for ").Append(KillSeconds.ToString("0", CultureInfo.InvariantCulture))
+              .Append(" s while expected (not paused, locked, asleep, minimised, debugged, declared long work, machine sleep), and the main thread ")
+              .Append("answered no probe; grace ").Append(HangWatchdogRule.GraceSeconds.ToString("0", CultureInfo.InvariantCulture)).Append(" s after any excuse\n")
+              .Append("stacks=Mono cannot walk another thread's managed stack from managed code; the main thread's stack (thread 0, JIT frames ")
+              .Append("under mono_runtime_invoke) is in the OS crash report the abort writes, copied to logs/os-crash-* on the next launch; ")
+              .Append("Player.log holds the watchdog thread's FailFast stack. phase= above says where the main thread was.\n");
+            return sb.ToString();
+        }
+
+        static void WriteHang(double stalled, bool final, NoFrameExcuse excusesNow, double now)
+        {
+            string text;
             try
             {
-                string name = "hang-" + DateTime.UtcNow.ToString("yyyyMMddTHHmmssZ", CultureInfo.InvariantCulture) + (final ? "-final" : "") + ".txt";
-                File.WriteAllText(Path.Combine(_dir, name), HangText(stalled, final, Ring, _ringHead, _ringCount, MatchTick, Phase));
+                bool dbg = false;
+                try { dbg = Debugger.IsAttached; } catch (Exception) { }
+                text = HangText(stalled, final, Ring, _ringHead, _ringCount, MatchTick, Phase) +
+                       WatchdogText(excusesNow, WatchdogNative.Describe(now), dbg, Volatile.Read(ref _longWork), _longWorkWhat,
+                                    Environment.OSVersion.ToString());
+            }
+            catch (Exception) { return; }
+            string name = "hang-" + DateTime.UtcNow.ToString("yyyyMMddTHHmmssZ", CultureInfo.InvariantCulture) + (final ? "-final" : "") + ".txt";
+            try { File.WriteAllText(Path.Combine(_dir, name), text); } catch (Exception) { }   // SupportReport bundles DATA/hang-*.txt
+            if (!final || _logsDir == null) return;
+            try
+            {
+                Directory.CreateDirectory(_logsDir);
+                File.WriteAllText(Path.Combine(_logsDir, name), text);   // the game's log folder keeps the final record too
             }
             catch (Exception) { }
         }
