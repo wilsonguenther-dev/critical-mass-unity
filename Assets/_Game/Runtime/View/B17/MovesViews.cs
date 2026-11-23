@@ -126,8 +126,7 @@ namespace CriticalMass.Runtime.View.B17
         void Awake()
         {
             _driver = GetComponentInParent<SimDriverBehaviour>();
-            Shader sh = Shader.Find("Universal Render Pipeline/Unlit");
-            if (sh == null) sh = Shader.Find("Unlit/Color");
+            Shader sh = CriticalMass.Runtime.View.UnlitKeep.Get();   // fix/px-rough-spots: kept in the build (was magenta)
             _unlit = sh != null ? new Material(sh) { name = "Moves Unlit" } : null;
             if (_unlit != null)
             {

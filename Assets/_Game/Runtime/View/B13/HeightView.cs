@@ -36,8 +36,7 @@ namespace CriticalMass.Runtime.View.B13
             _crimson = new MaterialPropertyBlock();
             _crimson.SetColor("_BaseColor", CrimsonTint);
             _crimson.SetColor("_Color", CrimsonTint);
-            Shader sh = Shader.Find("Universal Render Pipeline/Unlit");
-            if (sh == null) sh = Shader.Find("Unlit/Color");
+            Shader sh = CriticalMass.Runtime.View.UnlitKeep.Get();   // fix/px-rough-spots: kept in the build (was magenta)
             _mat = sh != null ? new Material(sh) { name = "b15 height pip" } : null;
         }
 

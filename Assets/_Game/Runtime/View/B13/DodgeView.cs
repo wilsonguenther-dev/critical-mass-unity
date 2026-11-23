@@ -53,8 +53,7 @@ namespace CriticalMass.Runtime.View.B13
         void Awake()
         {
             _driver = GetComponentInParent<SimDriverBehaviour>();
-            Shader sh = Shader.Find("Universal Render Pipeline/Unlit");
-            if (sh == null) sh = Shader.Find("Unlit/Color");
+            Shader sh = CriticalMass.Runtime.View.UnlitKeep.Get();   // fix/px-rough-spots: kept in the build (was magenta)
             _mat = sh != null ? new Material(sh) { name = "Dodge Streak Azure" } : null;
             _matCrimson = sh != null ? new Material(sh) { name = "Dodge Streak Crimson" } : null;
             Tint(_mat, AzureTint);
