@@ -141,7 +141,10 @@ namespace CriticalMass.Runtime.Camera
         {
             RefreshTrees();
             int n = 0;
-            for (int i = 0; i < _treeCount && n < MaxCylinders - 1; i++)
+            // fix/px-camera-in-editor: the robust third-person camera fades a tree in the way instead (GroundView fade
+            // volumes); a 25% crown must not paint the fighter as a striped silhouette
+            int trees = GroundView.RobustThirdPerson ? 0 : _treeCount;
+            for (int i = 0; i < trees && n < MaxCylinders - 1; i++)
             {
                 if (WorldDresser.SegDist(_treeX[i], _treeZ[i], cx, cz, px, pz) > TreeBand + TreeRadius) continue;
                 _cyl[n++] = new SeeThroughCylinder { X = _treeX[i], Z = _treeZ[i], R = TreeRadius, Y0 = _treeY[i], Y1 = _treeY[i] + _treeH[i] };
