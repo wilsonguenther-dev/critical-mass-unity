@@ -1402,6 +1402,7 @@ namespace CriticalMass.Net
             A(ref h, o.ChainVictim);
             A(ref h, o.ChargeShare);
             A(ref h, o.Charging);
+            A(ref h, o.ComboPressTick);
             A(ref h, o.Counts);
             A(ref h, o.DropRelease);
             A(ref h, o.FuseOwner);

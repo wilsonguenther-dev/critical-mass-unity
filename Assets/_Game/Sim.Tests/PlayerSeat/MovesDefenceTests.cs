@@ -843,7 +843,7 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
         /// <summary>Human attacker me (lag 0, fights) vs a passive dummy defender that parries ("tap": a 2-tick press ending the tick
         /// before contact) or holds its guard ("hold") on every swing. Returns ComboStep events of me whose previous contact was
         /// parried or blocked, the step events in all, and the parries / blocks seen.</summary>
-        static (int bad, int steps, int parried, int blocked, int contacts) ChainRun(ClassId me, ClassId them, string mode, int angle)
+        static (int bad, int steps, int parried, int blocked, int contacts) ChainRun(ClassId me, ClassId them, string mode, int angle, bool mash = false)
         {
             Seat s = PlayerSeatRig.Duel(me, them, TargetMode.Passive, PlayerSeatRig.AngleOf(angle, 4), angle, 0, tweak: MvCombine.AllOn);
             World w = s.W;
@@ -852,6 +852,7 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
                 Actor a = w.Actors[q.Me];
                 int contact = a.SwingPending ? a.SwingTick + a.SwingWindup : int.MinValue;
                 int applied = w.Tick + 1;
+                if (mash) q.Human.PressAttack = true;   // a person mashing Attack: fresh presses through every recovery (the combo buffer)
                 if (mode == "hold") q.Dummy.Frame.Guard = true;
                 else if (mode == "tap") q.Dummy.Frame.Guard = applied == contact - 2 || applied == contact - 1;
                 else q.Dummy.Frame.Guard = false;
@@ -884,6 +885,7 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
             var bad = new List<string>();
             foreach (ClassId me in new[] { ClassId.Warrior, ClassId.Farmer, ClassId.Miner, ClassId.Builder })
             {
+                int mashBad = 0, mashSteps = 0, mashFree = 0;
                 int free = 0, tapBad = 0, tapSteps = 0, tapParried = 0, holdBad = 0, holdSteps = 0, holdBlocked = 0;
                 for (int k = 0; k < 4; k++)
                 {
@@ -892,10 +894,14 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
                     tapBad += t.bad; tapSteps += t.steps; tapParried += t.parried;
                     var h = ChainRun(me, ClassId.Farmer, "hold", k);
                     holdBad += h.bad; holdSteps += h.steps; holdBlocked += h.blocked;
+                    var tm = ChainRun(me, ClassId.Farmer, "tap", k, true);
+                    mashBad += tm.bad; mashSteps += tm.steps; mashFree += ChainRun(me, ClassId.Farmer, "none", k, true).steps;
+                    var hm = ChainRun(me, ClassId.Farmer, "hold", k, true);
+                    mashBad += hm.bad; mashSteps += hm.steps;
                 }
-                bool ok = tapBad == 0 && holdBad == 0 && free > 0 && tapParried > 0;
+                bool ok = tapBad == 0 && holdBad == 0 && mashBad == 0 && free > 0 && tapParried > 0;
                 PxLog.Line("mvg-chain", me + " chains on a passive Farmer, 4 starts x 12 s", "no defence " + free + " steps; parried " + tapParried + ": steps " + tapSteps + " (after a parried swing " + tapBad
-                    + "); held guard, blocked " + holdBlocked + ": steps " + holdSteps + " (after a blocked swing " + holdBad + ")", "0 steps after a parried swing; after a blocked one never a higher step", ok);
+                    + "); held guard, blocked " + holdBlocked + ": steps " + holdSteps + " (after a blocked swing " + holdBad + "); mashing Attack (buffer): free " + mashFree + " steps, parried / held " + mashSteps + " (bad " + mashBad + ")", "0 steps after a parried swing; after a blocked one never a higher step", ok);
                 if (!ok) bad.Add(me.ToString());
             }
             Assert.IsEmpty(bad, "a parried or blocked swing still opened the chain: " + string.Join(", ", bad));

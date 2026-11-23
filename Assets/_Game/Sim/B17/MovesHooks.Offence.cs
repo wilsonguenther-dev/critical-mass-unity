@@ -709,6 +709,7 @@ namespace CriticalMass.Sim.Core
             if (s.StepSwingTick[i] != w.Actors[i].SwingTick) return;
             int step = s.StepOf[i];
             s.ChainNext[i] = parried || step < 2 ? 0 : step;
+            s.ComboPressTick[i] = CombatFeel.NoTick;   // fix/mv-combo-buffer: a press remembered for this swing is dropped too
         }
 
         /// <summary>The cooldown never ends before the (longer) recovery: CombatFeel.AfterContact's rule on the new recovery.</summary>
