@@ -30,6 +30,9 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
     [TestFixture, Category("PlayerSeat")]
     public sealed class PlayerSeatFeedbackTests : PlayerSeatFixture
     {
+        /// <summary>Fix round 7: every seat test fails after this long instead of hanging the shard (the slowest took 31 s).</summary>
+        const int SeatTestTimeoutMs = 150000;
+
         static readonly ClassId[] Classes = { ClassId.Warrior, ClassId.Farmer, ClassId.Miner, ClassId.Demolitions, ClassId.Builder, ClassId.Healer };
         static readonly CameraView[] Views = { CameraView.TopDown, CameraView.ThirdPerson };
 
@@ -118,7 +121,8 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
                     r.Hit = true;
                     r.Dealt = hits[0].Value;
                     r.HitTick = W.Tick;
-                    r.HitFrame = Time.frameCount;   // the hit is decoded in this frame's sim step: its LateUpdate presents it
+                    r.HitFrame = Time.frameCount;
+                    Paced(true);   // fix round 7: the measured window runs at 60 fps (PlayerSeatFixture.SeatFps)   // the hit is decoded in this frame's sim step: its LateUpdate presents it
                     r.LedgerAtHit = pre;   // only cues reported from the hit's own tick on
                     r.HitX = px; r.HitZ = pz;   // where the pinned victim stood when the blow landed
                     List<SimEvent> kn = Events(head, SimEventType.Knock).Where(x => x.A == e).ToList();
@@ -130,7 +134,7 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
             // fix round 6 (F03 / D3): the hit frame itself, sampled AFTER it rendered (its LateUpdates set the flash material
             // and added the kick; the next frame's Update takes the kick off again), so rendered frame 0 is measured, not
             // skipped by the loop's real-time waits
-            yield return new WaitForEndOfFrame();
+            yield return EndOfFrame();   // fix round 7: never WaitForEndOfFrame directly (hangs with -nographics)
             if (Time.frameCount == r.HitFrame)
             {
                 if (model != null && FlashShare(model) >= CriticalMass.Runtime.View.Anim.HitFeelTuning.FlashShareSafe) r.FlashFrame = 0;
@@ -184,6 +188,7 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
                 if (model != null) r.ModelMovedFull = Math.Max(r.ModelMovedFull, Vector3.Distance(model.position, m0));
                 r.SimMovedFull = Math.Max(r.SimMovedFull, Math.Sqrt((W.X[e] - sx0) * (W.X[e] - sx0) + (W.Z[e] - sz0) * (W.Z[e] - sz0)));
             }
+            Paced(false);
             r.Dump = LedgerDump(r.LedgerAtHit);
             AssertAtControls("the end of the watch");
         }
@@ -205,7 +210,7 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
 
         // ------------------------------------------------------------------ F1-F4 (per class, both views)
 
-        [UnityTest]
+        [UnityTest, Timeout(SeatTestTimeoutMs)]
         public IEnumerator F01_Mouse_ClickOnEnemy_DamageNumberWithin100ms([ValueSource(nameof(Classes))] ClassId x, [ValueSource(nameof(Views))] CameraView v)
         {
             var r = new Watch();
@@ -213,7 +218,7 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
             Check("F01 DamageNumber", Tag(x, v), r.Hit ? (r.Seen ? "DamageNumber " + Math.Round(r.Dealt) + " reported at frame " + r.SeenFrame : "hit " + Math.Round(r.Dealt) + ", no DamageNumber entry with that value on the victim in 6 frames [" + r.Dump + "]") : r.Note, "within 6 frames", r.Hit && r.Seen);
         }
 
-        [UnityTest]
+        [UnityTest, Timeout(SeatTestTimeoutMs)]
         public IEnumerator F02_Mouse_ClickOnEnemy_HealthBarDrops([ValueSource(nameof(Classes))] ClassId x, [ValueSource(nameof(Views))] CameraView v)
         {
             var r = new Watch();
@@ -225,7 +230,7 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
             Check("F02 EnemyHealthBar", Tag(x, v), r.Hit ? (r.Seen ? "bar fill " + got.Value.ToString("0.00") + " (hp share " + share.ToString("0.00") + ")" : "no EnemyHealthBar ledger entry after the hit [" + r.Dump + "]") : r.Note, "bar = hp share +-0.1 within 6 frames", r.Hit && r.Seen && Math.Abs(got.Value - share) <= 0.1);
         }
 
-        [UnityTest]
+        [UnityTest, Timeout(SeatTestTimeoutMs)]
         public IEnumerator F03_Mouse_ClickOnEnemy_VictimFlashAndKnockVisible([ValueSource(nameof(Classes))] ClassId x, [ValueSource(nameof(Views))] CameraView v)
         {
             var r = new Watch();
@@ -237,7 +242,7 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
             Check("F03 VictimFlashAndKnock", Tag(x, v), r.Hit ? "flash " + (r.Seen ? "at frame " + r.SeenFrame : "none") + ", drawn flash share on rendered frame " + r.FlashFrame + " (0 = the hit frame), at 100 ms model " + r.ModelMoved100.ToString("0.00") + " u vs sim body " + r.SimMoved100.ToString("0.00") + " u; whole slide model " + r.ModelMovedFull.ToString("0.00") + " u (sim " + r.SimMovedFull.ToString("0.00") + ") vs sim knock " + r.Knock.ToString("0.00") + " u, KnockVisual " + knockLedger + (r.Seen && knockLedger ? "" : " [" + r.Dump + "]") : r.Note, "flash and knock >= 0.8 x sim within 6 frames", r.Hit && r.Seen && r.FlashFrame == 0 && knockOk && knockLedger);
         }
 
-        [UnityTest]
+        [UnityTest, Timeout(SeatTestTimeoutMs)]
         public IEnumerator F04_Mouse_ClickOnEnemy_ImpactSound([ValueSource(nameof(Classes))] ClassId x, [ValueSource(nameof(Views))] CameraView v)
         {
             var r = new Watch();
@@ -247,7 +252,7 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
 
         // ------------------------------------------------------------------ F25 / F26 / F30 / F33 (both views)
 
-        [UnityTest]
+        [UnityTest, Timeout(SeatTestTimeoutMs)]
         public IEnumerator F25_HitMarker_AtReticle([ValueSource(nameof(Views))] CameraView v)
         {
             var r = new Watch();
@@ -255,7 +260,7 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
             Check("F25 HitMarker", Tag(ClassId.Warrior, v), r.Hit ? (r.Seen ? "marker at frame " + r.SeenFrame : "no HitMarker") : r.Note, "a hit marker within 6 frames", r.Hit && r.Seen);
         }
 
-        [UnityTest]
+        [UnityTest, Timeout(SeatTestTimeoutMs)]
         public IEnumerator F26_Whiff_DiffersFromHit([ValueSource(nameof(Views))] CameraView v)
         {
             yield return Load(ClassId.Warrior, v);
@@ -274,14 +279,14 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
             }
             bool whiffCue = Ledger(FeedbackChannel.WhiffCue, 0, out _, cursor) || Ledger(FeedbackChannel.WhiffCue, -1, out _, cursor);
             bool whiffImpact = Ledger(FeedbackChannel.ImpactSound, -1, out _, cursor);
-            while (!Combat.AttackReady(W, 0)) yield return TickFrame(() => Pin(e, px, pz));
+            yield return TickUntil(() => Combat.AttackReady(W, 0), S.Ticks(5), "my attack ready again after the whiff", () => Pin(e, px, pz));
             var r = new Watch();
             yield return HitAndWatch(ClassId.Warrior, v, q => Ledger(FeedbackChannel.ImpactSound, -1, out _, q.LedgerAtHit), r, loaded: true);
             bool hitWhiffCue = Ledger(FeedbackChannel.WhiffCue, 0, out _, r.LedgerAtHit);
             Check("F26 WhiffDiffersFromHit", Tag(ClassId.Warrior, v), "whiff: WhiffCue " + whiffCue + ", impact sound " + whiffImpact + "; hit: impact sound " + r.Seen + ", WhiffCue " + hitWhiffCue, "a whiff cue only on the whiff, an impact only on the hit", whiffCue && !whiffImpact && r.Hit && r.Seen && !hitWhiffCue);
         }
 
-        [UnityTest]
+        [UnityTest, Timeout(SeatTestTimeoutMs)]
         public IEnumerator F30_SwingPose_Within2Frames([ValueSource(nameof(Views))] CameraView v)
         {
             yield return Load(ClassId.Warrior, v);
@@ -295,6 +300,7 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
             // fix round 5 (item 4): a virtual-device press queued now is delivered by the Input System's next update, at
             // the start of the next frame: that frame is the press frame the player sees
             int pressFrame = Time.frameCount + 1;
+            Paced(true);   // fix round 7: the press window runs at 60 fps
             // fix round 6: the drawn pose weight on each rendered frame from the press to press + 2, read at the end of
             // that frame (ActorViews.LocalSwingWeightDrawn), so the rig measures what was rendered, not a later loop pass
             float drawnBest = 0f;
@@ -303,12 +309,13 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
             {
                 yield return null;   // the next frame, after its Update (where TickFrame steps the sim)
                 if (Time.frameCount == pressFrame) { Pin(e, px, pz); S.Tick(1); }   // the press frame's sim step, as TickFrame
-                yield return new WaitForEndOfFrame();
+                yield return EndOfFrame();   // fix round 7: never WaitForEndOfFrame directly (hangs with -nographics)
                 drawnFrames++;
                 if (CriticalMass.Runtime.View.ActorViews.LocalSwingWeightFrame == Time.frameCount && Time.frameCount >= pressFrame)
                     drawnBest = Math.Max(drawnBest, CriticalMass.Runtime.View.ActorViews.LocalSwingWeightDrawn);
             }
             ReleaseAttack();
+            Paced(false);
             bool started = Events(head, SimEventType.AttackStart).Any(q => q.A == 0);
             float best = 0;
             for (int f = 0; f < T.CueFrames; f++)
@@ -324,7 +331,7 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
             Check("F30 SwingPose", Tag(ClassId.Warrior, v), "sim accepted " + started + ", drawn pose weight by press + 2 " + drawnBest.ToString("0.00") + "; SwingCommit ledger weight " + best.ToString("0.00") + " at " + framesAfterPress + " frames after the press [" + LedgerDump(cursor) + "]", ">= 0.8 drawn within 2 frames of the press", started && Math.Max(drawnBest, best) >= T.SwingPoseWeight && reported && framesAfterPress >= 0 && framesAfterPress <= 2);
         }
 
-        [UnityTest]
+        [UnityTest, Timeout(SeatTestTimeoutMs)]
         public IEnumerator F33_CameraKick_OnMyHit([ValueSource(nameof(Views))] CameraView v)
         {
             var r = new Watch();
@@ -333,7 +340,7 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
             Check("F33 CameraKick_MyHit", Tag(ClassId.Warrior, v), r.Hit ? "CameraKick reported " + kick.ToString("0.000") + " u (shake offset " + r.KickPeak.ToString("0.000") + ")" : r.Note, ">= " + T.CameraKickMine + " u", r.Hit && kick >= T.CameraKickMine);
         }
 
-        [UnityTest]
+        [UnityTest, Timeout(SeatTestTimeoutMs)]
         public IEnumerator F33_CameraKick_ReduceMotion_IsZero([ValueSource(nameof(Views))] CameraView v)
         {
             var r = new Watch();
@@ -393,7 +400,7 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
             AssertAtControls("after the hit on me");
         }
 
-        [UnityTest]
+        [UnityTest, Timeout(SeatTestTimeoutMs)]
         public IEnumerator F20_HitOnMe_DirectionIndicator([ValueSource(nameof(Views))] CameraView v)
         {
             var r = new Taken();
@@ -404,7 +411,7 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
             Check("F20 DamageDirection", "Farmer " + v, r.Hit ? (shown ? "indicator " + dd.Value.ToString("0") + " deg, attacker on screen at " + r.ScreenBearing.ToString("0") + " deg clockwise from up (sim bearing " + r.Bearing.ToString("0") + ")" : "no DamageDirection") : r.Note, "within " + T.DirectionMaxDegrees + " deg, 6 frames", shown && gap <= T.DirectionMaxDegrees);
         }
 
-        [UnityTest]
+        [UnityTest, Timeout(SeatTestTimeoutMs)]
         public IEnumerator F21_HitOnMe_HurtVignetteAndSound([ValueSource(nameof(Views))] CameraView v)
         {
             var r = new Taken();
@@ -414,7 +421,7 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
             Check("F21 OwnHurt", "Farmer " + v, r.Hit ? "vignette " + vig + ", hurt sound " + snd : r.Note, "both within 6 frames", vig && snd);
         }
 
-        [UnityTest]
+        [UnityTest, Timeout(SeatTestTimeoutMs)]
         public IEnumerator F33_CameraKick_OnHitOnMe([ValueSource(nameof(Views))] CameraView v)
         {
             var r = new Taken();
@@ -424,7 +431,7 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
 
         // ------------------------------------------------------------------ F22 / F23 (both views)
 
-        [UnityTest]
+        [UnityTest, Timeout(SeatTestTimeoutMs)]
         public IEnumerator F22_LowHealth_PulseAndHeartbeat([ValueSource(nameof(Views))] CameraView v)
         {
             yield return Load(ClassId.Warrior, v);
@@ -438,7 +445,7 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
             Check("F22 LowHealth", "Warrior " + v, "LowHealthCue entries in 2 s: " + pulses, "1 to " + (2 * T.LowHealthMaxHz + 1) + " (a pulse at most 2 Hz)", pulses >= 1 && pulses <= 2 * T.LowHealthMaxHz + 1);
         }
 
-        [UnityTest]
+        [UnityTest, Timeout(SeatTestTimeoutMs)]
         public IEnumerator F23_HealthBars_OverUnitsInView([ValueSource(nameof(Views))] CameraView v)
         {
             yield return Load(ClassId.Warrior, v);
@@ -541,7 +548,7 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
             AssertAtControls("the end");
         }
 
-        [UnityTest]
+        [UnityTest, Timeout(SeatTestTimeoutMs)]
         public IEnumerator F31_StickOnly_LandsOnBot([ValueSource(nameof(Views))] CameraView v)
         {
             var c = new Chase();
@@ -550,7 +557,7 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
             Check("F31 StickOnly", "Warrior " + v + " vs a Normal Farmer bot", c.Landed + " of " + c.Swings + " swings landed (" + share.ToString("0.00") + ")" + (c.Died ? ", died" : ""), ">= " + T.AssistLandMin, c.Swings >= 4 && share >= T.AssistLandMin);
         }
 
-        [UnityTest]
+        [UnityTest, Timeout(SeatTestTimeoutMs)]
         public IEnumerator F31_KeysOnly_LandsOnBot([ValueSource(nameof(Views))] CameraView v)
         {
             var c = new Chase();
@@ -561,7 +568,7 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
 
         // ------------------------------------------------------------------ top-down only (a fresh install): F5-F19, F24, F27-F29, F32, F34
 
-        [UnityTest]
+        [UnityTest, Timeout(SeatTestTimeoutMs)]
         public IEnumerator F05_Gamepad_RightTrigger_NoStick_HitsEnemyInFront([ValueSource(nameof(Classes))] ClassId x)
         {
             yield return Load(x, CameraView.TopDown);
@@ -574,7 +581,7 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
             Check("F05 Gamepad_RT_NoStick", x.ToString(), r.Hit ? "hit " + Math.Round(r.Dealt) : r.Note, "a Hit within wind-up + 3", r.Hit);
         }
 
-        [UnityTest]
+        [UnityTest, Timeout(SeatTestTimeoutMs)]
         public IEnumerator F06_Gamepad_StrafingEnemy_AssistLands()
         {
             var c = new Chase();
@@ -583,7 +590,7 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
             Check("F06 Gamepad_StickOff20", "Warrior vs a Normal Farmer bot, stick 20 deg off", c.Landed + " of " + c.Swings + " (" + share.ToString("0.00") + ")", ">= " + T.AssistLandMin, c.Swings >= 4 && share >= T.AssistLandMin);
         }
 
-        [UnityTest]
+        [UnityTest, Timeout(SeatTestTimeoutMs)]
         public IEnumerator F07_Mouse_StrafingEnemy_AssistLands()
         {
             var c = new Chase();
@@ -592,7 +599,7 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
             Check("F07 Mouse_CursorLag0.2s", "Warrior vs a Normal Farmer bot, cursor 6 ticks behind", c.Landed + " of " + c.Swings + " (" + share.ToString("0.00") + ")", ">= " + T.AssistLandMin, c.Swings >= 4 && share >= T.AssistLandMin);
         }
 
-        [UnityTest]
+        [UnityTest, Timeout(SeatTestTimeoutMs)]
         public IEnumerator F08_ReachPreview_LitOnlyWhenHittable()
         {
             yield return Load(ClassId.Warrior, CameraView.TopDown);
@@ -614,7 +621,7 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
             Check("F08 HittableCue", "Warrior, enemy at 3x then 0.7x reach under the cursor", "lit far " + litFar + ", lit near " + litNear + "; " + aimSays, "off far, on near", !litFar && litNear);
         }
 
-        [UnityTest]
+        [UnityTest, Timeout(SeatTestTimeoutMs)]
         public IEnumerator F09_Kill_ConfirmLineAndSting()
         {
             yield return Load(ClassId.Warrior, CameraView.TopDown);
@@ -640,7 +647,7 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
             Check("F09 KillConfirm", "Warrior kills a Farmer", "death " + died + ", confirm " + confirm + ", sting " + sting, "both within 6 frames", died && confirm && sting);
         }
 
-        [UnityTest]
+        [UnityTest, Timeout(SeatTestTimeoutMs)]
         public IEnumerator F10_Kill_FeedLineNeverDropped()
         {
             yield return Load(ClassId.Warrior, CameraView.TopDown);
@@ -693,7 +700,7 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
             done(died, ok);
         }
 
-        [UnityTest]
+        [UnityTest, Timeout(SeatTestTimeoutMs)]
         public IEnumerator F11_PlayerCard_ShowsLiveKills()
         {
             int cursor = 0;
@@ -703,7 +710,7 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
             Check("F11 PersonalTally", "after one kill", "kill " + died + ", tally reported = Actor.Kills (" + W.Actors[0].Kills + ") " + ok, "the card counts it", died && ok);
         }
 
-        [UnityTest]
+        [UnityTest, Timeout(SeatTestTimeoutMs)]
         public IEnumerator F32_Kill_ConfirmForEveryKill()
         {
             yield return Load(ClassId.Warrior, CameraView.TopDown);
@@ -716,7 +723,7 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
                 Put(e, ClassId.Farmer, W.X[0] + dist * dx, W.Z[0] + dist * dz);
                 double px = W.X[e], pz = W.Z[e];
                 W.Actors[e].Hp = 1;
-                while (!Combat.AttackReady(W, 0)) yield return TickFrame(() => Pin(e, px, pz));
+                yield return TickUntil(() => Combat.AttackReady(W, 0), S.Ticks(5), "my attack ready for round " + round, () => Pin(e, px, pz));
                 int head = W.EventHead, cursor = PlayerFeedback.Head;
                 PressAttack(CameraView.TopDown);
                 bool died = false;
@@ -735,7 +742,7 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
             Check("F32 KillConfirmEveryKill", "three kills in a row", confirms + " confirms for " + kills + " kills", "one per kill, none dropped", kills == 3 && confirms == 3);
         }
 
-        [UnityTest]
+        [UnityTest, Timeout(SeatTestTimeoutMs)]
         public IEnumerator F12_Scoreboard_ShowsDamageAndHealing()
         {
             yield return Load(ClassId.Warrior, CameraView.TopDown);
@@ -753,7 +760,7 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
             Check("F12 ScoreboardDmgHeal", "TAB held", "DMG column " + dmg + ", HEAL column " + heal, "both", dmg && heal);
         }
 
-        [UnityTest]
+        [UnityTest, Timeout(SeatTestTimeoutMs)]
         public IEnumerator F13_BlockedHit_ShowsReason()
         {
             yield return Load(ClassId.Warrior, CameraView.TopDown);
@@ -781,7 +788,7 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
             Check("F13 BlockedTag", "hit a spawn-protected Farmer", "HitBlocked event " + blocked + ", BlockedTag " + (tag ? "reason " + b.Reason : "none") + ", hits " + Events(head, SimEventType.Hit).Count(q => q.A == e) + ", contacts " + Events(head, SimEventType.AttackContact).Count(q => q.A == 0) + " [" + LedgerDump(cursor) + "]", "IMMUNE (reason " + PlayerReasons.BlockedSpawnProtect + ") within 100 ms", tag && b.Reason == PlayerReasons.BlockedSpawnProtect);
         }
 
-        [UnityTest]
+        [UnityTest, Timeout(SeatTestTimeoutMs)]
         public IEnumerator F14_Death_RecapNamesKiller()
         {
             yield return Load(ClassId.Warrior, CameraView.TopDown);
@@ -796,7 +803,7 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
             Check("F14 DeathRecap", "killed by a Farmer bot", "FARMER on screen " + named, "the recap names the killer", named);
         }
 
-        [UnityTest]
+        [UnityTest, Timeout(SeatTestTimeoutMs)]
         public IEnumerator F15_Objective_PointerToHill()
         {
             yield return Load(ClassId.Warrior, CameraView.TopDown);
@@ -814,7 +821,7 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
             Check("F15 ObjectivePointer", "at the home pad, hill off screen", "a distance on screen " + shown, "a pointer with a distance", shown);
         }
 
-        [UnityTest]
+        [UnityTest, Timeout(SeatTestTimeoutMs)]
         public IEnumerator F16_Feed_ShowsMyAllegiance()
         {
             yield return Load(ClassId.Farmer, CameraView.TopDown);
@@ -833,7 +840,7 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
             Check("F16 FeedPop", "Farmer feeds 3 with E", "delivered " + fed + ", pop " + (pop ? p.Value.ToString("0.0") : "none"), "+" + T.DeliveryAllegiance + " where it happens", fed && pop && Math.Abs(p.Value - T.DeliveryAllegiance) < 1);
         }
 
-        [UnityTest]
+        [UnityTest, Timeout(SeatTestTimeoutMs)]
         public IEnumerator F17_Ability_CastCueForEveryClass([ValueSource(nameof(Classes))] ClassId x)
         {
             yield return Load(x, CameraView.TopDown);
@@ -864,7 +871,7 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
             Check("F17 AbilityCastCue", x.ToString(), "a new sound or particle system within 6 frames " + cue + " (" + (ev.Length > 0 ? ev : "no Ability event") + "; " + audio + ")", "a cast cue", cue);
         }
 
-        [UnityTest]
+        [UnityTest, Timeout(SeatTestTimeoutMs)]
         public IEnumerator F18_Prompts_BindingsMatchVerbs([ValueSource(nameof(Classes))] ClassId x)
         {
             yield return Load(x, CameraView.TopDown);
@@ -876,7 +883,7 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
             Check("F18 PromptsMatchVerbs", x.ToString(), bad != null ? "prompt \"" + bad.Replace("\n", " ") + "\" for a verb the class lacks" : "no stray dig prompt", "every prompt maps to a real verb", bad == null);
         }
 
-        [UnityTest, Category("PlayerSeat.Graphics")]
+        [UnityTest, Timeout(SeatTestTimeoutMs), Category("PlayerSeat.Graphics")]
         public IEnumerator F19_Screenshot_HitFrameShowsNumber()
         {
             if (SystemInfo.graphicsDeviceType == UnityEngine.Rendering.GraphicsDeviceType.Null) Assert.Ignore("F19 needs a graphics run (loop/gates/remote playmode --graphics software)");
@@ -905,7 +912,7 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
             Check("F19 HitFramePixels", "the frame 4 ticks after a hit, 80 px around the victim", changed + " of " + n + " samples changed", "the number's pixels show (>= 5%)", changed >= n / 20);
         }
 
-        [UnityTest]
+        [UnityTest, Timeout(SeatTestTimeoutMs)]
         public IEnumerator F24_H_NeverHidesHudByAccident()
         {
             yield return Load(ClassId.Warrior, CameraView.TopDown);
@@ -918,7 +925,7 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
             Check("F24 H_KeepsHud", "one H press in a match (H also dismisses tips)", "clean HUD " + before + " -> " + after, "the HUD stays (one job per button)", !after);
         }
 
-        [UnityTest]
+        [UnityTest, Timeout(SeatTestTimeoutMs)]
         public IEnumerator F27_WallHit_ShowsChipsBarAndSound()
         {
             yield return Load(ClassId.Warrior, CameraView.TopDown);
@@ -942,7 +949,7 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
             Check("F27 WallHitCue", "Warrior swings at an enemy barricade", "chipped " + chipped + " (" + hp0.ToString("0") + " -> " + b.Hp.ToString("0") + "), chips/bar cue " + burst + ", knock sound " + sound, "chips and a sound within 100 ms", chipped && burst && sound);
         }
 
-        [UnityTest]
+        [UnityTest, Timeout(SeatTestTimeoutMs)]
         public IEnumerator F28_WorldVerb_PopsWhereItHappens()
         {
             yield return Load(ClassId.Builder, CameraView.TopDown);
@@ -987,7 +994,7 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
             Check("F28 WorldActionPop", "Builder DIG with F", "Terraform " + (dug.Count > 0 ? "v" + dug[0].Value : "none") + ", pop " + (pop ? "reason " + p.Reason : "none") + "; cell " + (found ? tcx + "," + tcz : "none of " + tried + " free") + " at aim " + dd.ToString("0.00") + " u (reach " + reachT.ToString("0.00") + ")", "a pop with WorldDig (" + PlayerReasons.WorldDig + ")", pop && p.Reason == PlayerReasons.WorldDig);
         }
 
-        [UnityTest]
+        [UnityTest, Timeout(SeatTestTimeoutMs)]
         public IEnumerator F29_Refusal_ShowsReasonWord()
         {
             yield return Load(ClassId.Warrior, CameraView.TopDown);
@@ -1004,7 +1011,7 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
             Check("F29 RefusalTag", "ability pressed on cooldown", "ActionRefused " + refused + ", RefusalTag " + (tag ? "reason " + r.Reason : "none"), "COOLDOWN (" + PlayerReasons.RefusedCooldown + ") shown", tag && r.Reason == PlayerReasons.RefusedCooldown);
         }
 
-        [UnityTest]
+        [UnityTest, Timeout(SeatTestTimeoutMs)]
         public IEnumerator F34_Autopilot_TakeoverIsShown()
         {
             yield return Load(ClassId.Warrior, CameraView.TopDown);
@@ -1034,7 +1041,7 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
 
         // ------------------------------------------------------------------ Editor review defects (review/DEFECTS.txt), fix-round claims
 
-        [UnityTest]
+        [UnityTest, Timeout(SeatTestTimeoutMs)]
         public IEnumerator D0_FiveRestarts_ThenLeftShift_NoErrors()
         {
             // defect 0: any error or exception logged fails a UnityTest by itself (LogAssert); this states it at the end too
@@ -1056,7 +1063,7 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
             Check("D0 RestartsThenShift", "5 match loads then a left Shift press", errors == 0 ? "no error or exception logged" : errors + " error(s), first: " + firstError, "none", errors == 0);
         }
 
-        [UnityTest]
+        [UnityTest, Timeout(SeatTestTimeoutMs)]
         public IEnumerator D1_P_InMatch_OpensNoPanel()
         {
             yield return Load(ClassId.Warrior, CameraView.TopDown);
@@ -1097,7 +1104,7 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
             return x1 < x0 ? Rect.zero : Rect.MinMaxRect(x0, y0, x1, y1);
         }
 
-        [UnityTest]
+        [UnityTest, Timeout(SeatTestTimeoutMs)]
         public IEnumerator D2_ThirdPerson_MeleeRange_EnemyNotBehindMe([ValueSource(nameof(Classes))] ClassId x)
         {
             yield return Load(x, CameraView.ThirdPerson);
@@ -1116,7 +1123,7 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
             Check("D2 EnemyNotBehindMe", x + " third person, enemy at 0.8 x range ahead", "my fighter " + mine + ", enemy centre " + c + ", enemy box " + theirs + ", share of the enemy box not covered by my box " + visibleShare.ToString("0.00") + " (target >= " + T.EnemyVisibleShareMin + ")", "the enemy stays mostly visible past my own fighter", mine.width > 0 && theirs.width > 0 && !hidden);
         }
 
-        [UnityTest]
+        [UnityTest, Timeout(SeatTestTimeoutMs)]
         public IEnumerator D3_Hit_MovesCamera6px([ValueSource(nameof(Views))] CameraView v)
         {
             var r = new Watch();
@@ -1136,7 +1143,7 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
             return Rect.MinMaxRect(Mathf.Min(a.x, b.x), Mathf.Min(a.y, b.y), Mathf.Max(a.x, b.x), Mathf.Max(a.y, b.y));
         }
 
-        [UnityTest]
+        [UnityTest, Timeout(SeatTestTimeoutMs)]
         public IEnumerator D4_DamageNumber_DoesNotOverlapNameOrBar([ValueSource(nameof(Views))] CameraView v)
         {
             var r = new Watch();
@@ -1151,7 +1158,7 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
             Check("D4 NumberClearOfNameAndBar", Tag(ClassId.Warrior, v), r.Hit ? "number " + nr + ", bar " + br + " overlap " + overlapBar + ", name tags found " + names.Count + " overlap " + overlapName : r.Note, "no overlap", r.Hit && r.Seen && bar && !overlapBar && !overlapName);
         }
 
-        [UnityTest]
+        [UnityTest, Timeout(SeatTestTimeoutMs)]
         public IEnumerator D6_Dodge_And_Shield_ReportCues()
         {
             yield return Load(ClassId.Warrior, CameraView.TopDown);
