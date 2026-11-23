@@ -465,6 +465,7 @@ namespace CriticalMass.Runtime.View.Anim
             bool evaluated = m.Evaluate(evaluate);
             if (evaluated) ApplyLegWarp(m);
             if (evaluated && !corpse && !air) ApplyClimb(m, w, i, simTime);
+            if (evaluated && !corpse && _mvGuardW > 0.01f) ApplyGuardRaise(m);   // class moves readability item 1
             {
                 // Breathing: a 2% chest swell at 0.3 Hz while idle. fix/model-scale: set from the chest's rest scale, never
                 // multiplied in place (a clip without a chest scale curve, or a frozen simTime in a hit-stop, compounded it).
@@ -774,7 +775,8 @@ namespace CriticalMass.Runtime.View.Anim
             // press; CHARGE = the class attack clip held in its raised wind-up (deeper as the charge grows), handed to the
             // swing on release; GLIDE (Healer) = arms out (Cast held). Every weight stays 0 while World.Moves is null.
             {
-                bool mvGuard = !actor.Alive ? false : B17.MovesRead.GuardHeld(w, i) && m.HasClip(ArtMapping.Blocking);
+                bool mvGuard = !actor.Alive ? false : B17.MovesPoses.GuardShown(w, i) && m.HasClip(ArtMapping.Blocking);   // readability item 1: the local press shows on its own frame
+                if (mvGuard && _mvGuardW < 0.5f && i == B17.MovesPoses.PredictActor) _mvGuardW = 0.5f;   // half up on the press frame itself
                 _mvGuardW = B17.MovesPoses.Approach(_mvGuardW, mvGuard ? 1f : 0f, dSim, mvGuard ? B17.MovesPoses.GuardRiseSeconds : B17.MovesPoses.GuardFallSeconds);
                 if (_mvGuardW > 0f && m.HasClip(ArtMapping.Blocking))
                 {
@@ -1212,6 +1214,40 @@ namespace CriticalMass.Runtime.View.Anim
         }
 
         float _climbW;
+
+        /// <summary>
+        /// Class moves readability (Editor review item 1): from behind, the Blocking clip barely differs from idle. While the
+        /// guard pose is up, after the clips are evaluated, both arms are turned toward fixed body-space targets: the weapon
+        /// arm's upper arm forward and out with the elbow raised and its forearm upright in front of the face (the weapon above
+        /// the head line), the off arm's forearm across the chest. Absolute targets (FromToRotation of the bone toward its
+        /// child), so nothing compounds; the next evaluation rewrites the arms from the clips. View only.
+        /// </summary>
+        void ApplyGuardRaise(ModelView m)
+        {
+            float k = Mathf.Clamp01(_mvGuardW) * 0.9f;
+            Transform root = m.Transform;
+            Vector3 f = root.forward, u = root.up, r = root.right;
+            Arm(m.Bone("upperarm.r"), m.Bone("lowerarm.r"), m.Bone("hand.r"), true);
+            Arm(m.Bone("upperarm.l"), m.Bone("lowerarm.l"), m.Bone("hand.l"), false);
+
+            void Arm(Transform upper, Transform lower, Transform hand, bool weapon)
+            {
+                if (upper == null || lower == null) return;
+                float side = Vector3.Dot(upper.position - root.position, r) >= 0f ? 1f : -1f;   // this arm's outward side
+                Vector3 elbow = weapon ? f * 0.70f + u * 0.40f + r * (0.45f * side) : f * 0.80f + u * 0.25f + r * (0.35f * side);
+                Aim(upper, lower.position - upper.position, elbow.normalized);
+                if (hand == null) return;
+                Vector3 fore = weapon ? u * 0.90f + f * 0.40f - r * (0.20f * side) : f * 0.45f + u * 0.30f - r * (0.85f * side);
+                Aim(lower, hand.position - lower.position, fore.normalized);
+            }
+
+            void Aim(Transform bone, Vector3 now, Vector3 want)
+            {
+                if (now.sqrMagnitude < 1e-8f) return;
+                Quaternion to = Quaternion.FromToRotation(now, want) * bone.rotation;
+                bone.rotation = Quaternion.Slerp(bone.rotation, to, k);
+            }
+        }
 
         /// <summary>True when actor i stands on a cell of an active ladder piece (BuiltPieces: the cell was a Wall).</summary>
         static bool OnLadder(World w, int i)
