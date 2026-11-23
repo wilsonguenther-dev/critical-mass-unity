@@ -418,7 +418,7 @@ namespace CriticalMass.Runtime.View
                 float d = (float)(2 * cfg.Class(actor.Cls).Radius);
                 if (i == 0) d *= HumanScale;
                 slot.Capsule.localScale = new Vector3(d, (float)(charHeight / 2), d);
-                slot.Capsule.localPosition += JumpLift.Offset(w, map, i, a, x, z) + B16.JumpRefusedView.Offset(w, i, a); // DG-02 jump arc; b16 [11] stumble
+                slot.Capsule.localPosition += JumpLift.Offset(w, map, i, a, x, z) + Vector3.up * B17.MovesPoses.GlideLift(w, i, a) + B16.JumpRefusedView.Offset(w, i, a); // DG-02 jump arc; b16 [11] stumble
                 SetMaterial(slot.CapsuleRenderer, ToonMaterials.Character(actor.Team == TeamId.Azure ? Palette.Azure : Palette.Crimson));
                 return false;
             }
@@ -473,6 +473,7 @@ namespace CriticalMass.Runtime.View
             if (knockCheck) knockDrawn = KnockDrawnNow(i, x, z, drawnOff);
             m.Transform.localPosition = basePos + drawnOff
                 + JumpLift.Offset(w, map, i, a, x, z) // DG-02 jump arc
+                + Vector3.up * B17.MovesPoses.GlideLift(w, i, a) // class moves T2-6 glide apex hold (lane 6, integrator)
                 + B16.JumpRefusedView.Offset(w, i, a); // b16 [11]: the refused-jump stumble
             Material teamMat = CriticalMass.Runtime.Progression.TrimMaterials.ForActor(ArtMaterials.ForTeam(m.Spec, actor.Team), i);   // b15 profile: colour trim (fixed colours only; cached, no allocation)
             m.SetMaterial(hasFx && fx.Flash ? _fx.FlashMaterial(teamMat, fx.FlashOwn) : teamMat);

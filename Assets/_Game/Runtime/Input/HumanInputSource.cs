@@ -435,8 +435,22 @@ namespace CriticalMass.Runtime.Input
                     // Lane I: no built-in 30 degree snap any more (it skipped actor 0); AimAssistBrain below does it for every
                     // device, with the KEYS strength setting.
                     Aim.ResolveKeys(dx, dz, w.X[me], w.Z[me], w.Actors[me].Facing, FacingLocked, null, null, 0, out double kx, out double kz);
+                    // Class moves T1-6 (lane 6, wired by the integrator): a keyboard-only cast lands ON the assisted enemy (7 u, 30 deg),
+                    // else 3 u ahead; a held key still extends the distance (the hold rule below). Off = today's behaviour.
+                    bool movesKeysPoint = false;
+                    if (MovesInput.StickCastDistance && (State.AbilityIntent || _castHolding || _castRelease))
+                    {
+                        double heldNow = _castHolding ? Time.unscaledTimeAsDouble - _castDownAt : (_castRelease ? _castHeldFor : 0);
+                        if (heldNow < CastDistance.TapSeconds)
+                        {
+                            int ne = CollectEnemies(w);
+                            AimResolver.MovesKeysCastPoint(w.X[me], w.Z[me], kx - w.X[me], kz - w.Z[me], AbilityMaxRange(w, me), _enemyX, _enemyZ, ne,
+                                out kx, out kz, out _);
+                            movesKeysPoint = true;
+                        }
+                    }
                     // Item 2: hold the ability key to throw farther (release casts); a tap casts at the default.
-                    if (_castHolding || _castRelease)
+                    if ((_castHolding || _castRelease) && !movesKeysPoint)
                     {
                         double held = _castHolding ? Time.unscaledTimeAsDouble - _castDownAt : _castHeldFor;
                         if (held < CastDistance.TapSeconds) held = 0;
@@ -454,7 +468,9 @@ namespace CriticalMass.Runtime.Input
                 {
                     // Item 2: with the right stick pushed, its deflection picks the cast distance (1 u .. the ability's range).
                     float mag = stick.magnitude;
-                    if (mag > 0f) ScaleAim(w.X[me], w.Z[me], ref ax, ref az, CastDistance.FromStick(Math.Min(1.0, mag), AbilityMaxRange(w, me)));
+                    if (mag > 0f) ScaleAim(w.X[me], w.Z[me], ref ax, ref az, MovesInput.StickCastDistance   // class moves T1-6 (integrator)
+                        ? AimResolver.MovesStickCastDistance(Math.Min(1.0, mag), AbilityMaxRange(w, me))
+                        : CastDistance.FromStick(Math.Min(1.0, mag), AbilityMaxRange(w, me)));
                     State.SetAim(ax, az);
                 }
                 else State.ClearAim();
