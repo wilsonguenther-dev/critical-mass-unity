@@ -144,7 +144,7 @@ namespace CriticalMass.Sim.Config
         // ---- T2-3 combos
         /// <summary>Steps per class (the last step is the finisher; 1 = no combo). Integrator (decision 1, the Healer ruling): the
         /// Healer has no chain (2 -> 1; with it her duel variants reached 10 to 14 of 40).</summary>
-        public int[] ComboSteps = { 2, 3, 2, 2, 3, 1 };   // integrator: Miner and Demolitions 2 (strong-with-combos 31->29 and 34->32 at 3; 31->33 and 34->35 at 2), Builder 3, Healer 1 (none)
+        public int[] ComboSteps = { 2, 3, 3, 2, 3, 1 };   // integrator: Demolitions 2 (strong-with-combos 34->32 at 3, 34->34 at 2 with finisher 1.3); Miner stays 3 (at 2 his combos went 31->33 but the Healer strong row rose to 9 of 40, over the ruling); Builder 3; Healer 1 (none)
         public double ComboStepWindupMul = 0.7;
         public double ComboStepDamageMul = 1.1;
         public double FinisherDamageMul = 1.35;
