@@ -230,7 +230,7 @@ namespace CriticalMass.Sim.Core
             for (int e = 0; e < w.ActorCount; e++)
             {
                 Actor en = w.Actors[e];
-                if (e == id || !en.Alive || en.Team == me.Team || !BotAim.IsHumanSeat(w, e)) continue;
+                if (e == id || !en.Alive || en.Team == me.Team || !BotsHumanSeat(w, e)) continue;
                 int contact = en.SwingTick + en.SwingWindup;
                 bool live = en.SwingPending;
                 bool feinted = !live && feel != null && feel.CancelUsed != null && e < feel.CancelUsed.Length
@@ -323,7 +323,7 @@ namespace CriticalMass.Sim.Core
         /// </summary>
         static void BotsReadSlide(World w, BotsMovesState b, int slider)
         {
-            if (slider < 0 || slider >= w.ActorCount || !BotAim.IsHumanSeat(w, slider)) return;
+            if (slider < 0 || slider >= w.ActorCount || !BotsHumanSeat(w, slider)) return;
             MovesConfig m = Cfg(w);
             double vx = w.Vx[slider], vz = w.Vz[slider];
             double vl = System.Math.Sqrt(vx * vx + vz * vz);
@@ -377,7 +377,7 @@ namespace CriticalMass.Sim.Core
             if (a.Cls == ClassId.Demolitions && w.Demolitions != null && w.Config.Abilities.DemolitionsTnt.ThrowOnAttack
                 && w.Tick >= w.Demolitions.TntReadyTick[id] && !On(w, m.DemoTntOnDigOnly)) return;
             int target = BotsTarget(w, id);
-            bool human = target >= 0 && BotAim.IsHumanSeat(w, target) && w.Actors[target].Alive && w.Actors[target].Team != a.Team;
+            bool human = target >= 0 && BotsHumanSeat(w, target) && w.Actors[target].Alive && w.Actors[target].Team != a.Team;
             int d = BotReflex.DiffIndex(w, id);
             if (heavy && b.ChargeHold[id] > 0)
             {
@@ -445,6 +445,10 @@ namespace CriticalMass.Sim.Core
                 b.ComboDefer[id] = w.Tick + 1;
             }
         }
+
+        /// <summary>A seat a PERSON is playing: BotAim.IsHumanSeat (call 18's test), and not actor 0 while the bots drive it (the idle
+        /// autopilot, or a bot-only soak's null human frame): a seat on autopilot is a bot, so bot-only matches keep today's fights.</summary>
+        static bool BotsHumanSeat(World w, int t) => BotAim.IsHumanSeat(w, t) && !(t == 0 && BotBrain.ActorZeroOnAutopilot(w));
 
         /// <summary>Bot id's current target (BotsState.Target), -1 = none; read without creating or touching the bot state.</summary>
         static int BotsTarget(World w, int id)

@@ -442,28 +442,60 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
             Assert.IsTrue(ok);
         }
 
+        /// <summary>The bot verbs are capped against a person's seat: in a bot-only 16v16 (actor 0 on autopilot) with step-out,
+        /// guard, heavy, combos and the slide read on, every body moves exactly as with only a lane-2 identity switch on (tap
+        /// and chain discipline replay every held-back press inside the attack buffer), tick for tick for 2:00.</summary>
+        [Test]
+        public void BotVerbsOn_ABotOnly16v16MovesTickForTickAsToday()
+        {
+            GameConfig ca = GameConfig.CreateBrowser5v5().ApplyRules(RulesProfile.Full);
+            ca.Depth.Moves.FeintBait = true;   // World.Moves allocated, every stub an identity
+            GameConfig cb = GameConfig.CreateBrowser5v5().ApplyRules(RulesProfile.Full);
+            Switches(true, false, true, true, true, true)(cb);
+            World a = World.CreateWorld(new WorldOptions { Seed = 1, TeamSize = 16, HumanTeam = TeamId.Azure, HumanClass = ClassId.Warrior, Config = ca });
+            World b = World.CreateWorld(new WorldOptions { Seed = 1, TeamSize = 16, HumanTeam = TeamId.Azure, HumanClass = ClassId.Warrior, Config = cb });
+            InputFrame sa = SimInput.EmptyInput(), sb = SimInput.EmptyInput();
+            int diverged = -1, who = -1;
+            for (int t = 0; t < 3600 && diverged < 0; t++)
+            {
+                MatchTick.Advance(a, null, sa);
+                MatchTick.Advance(b, null, sb);
+                for (int i = 0; i < a.ActorCount && diverged < 0; i++)
+                    if (a.X[i] != b.X[i] || a.Z[i] != b.Z[i] || a.Actors[i].Hp != b.Actors[i].Hp) { diverged = a.Tick; who = i; }
+            }
+            bool ok = PxLog.Line("mv5 bot-only identity", "16v16 seed 1, 2:00, actor 0 on autopilot: bot verbs on vs a lane-2 identity switch",
+                diverged < 0 ? "identical for 3600 ticks" : "diverged at tick " + diverged + " on actor " + who + " (" + a.Actors[who].Cls + ")", "identical", diverged < 0);
+            Assert.IsTrue(ok);
+        }
+
         // ------------------------------------------------------------------ known bot problems: not made worse (Slow)
 
-        static GameConfig Full16(bool on)
+        static GameConfig Full16(bool on) => Full16(on ? 3 : 0);
+
+        /// <summary>arm 0 every switch off; 1 the quick wall alone; 2 the bot verbs alone (step-out, guard, heavy, combos, slide
+        /// read); 3 every lane-5 switch.</summary>
+        static GameConfig Full16(int arm)
         {
             GameConfig cfg = GameConfig.CreateBrowser5v5().ApplyRules(RulesProfile.Full);
-            if (on) Switches(true, true, true, true, true, true)(cfg);
+            if (arm == 1) Switches(quickWall: true)(cfg);
+            if (arm == 2) Switches(true, false, true, true, true, true)(cfg);
+            if (arm == 3) Switches(true, true, true, true, true, true)(cfg);
             return cfg;
         }
 
         [Test, Category("Slow"), Timeout(3000000)]
         public void KnownBotProblems_OwnKaijuBlockAndShiver_NotWorseWithLane5On()
         {
-            int[] seeds = { 1, 7, 1337, 4242 };
-            var lines = new List<string>();
-            double[] blocked = new double[2];
-            int[] flags = new int[2];
-            for (int arm = 0; arm < 2; arm++)
+            int[] seeds = WinShare.Seeds16;
+            string[] names = { "off", "quick wall", "bot verbs", "all lane 5" };
+            double[] blocked = new double[4];
+            int[] flags = new int[4];
+            for (int arm = 0; arm < 4; arm++)
             {
                 double ticks = 0;
                 foreach (int seed in seeds)
                 {
-                    GameConfig cfg = Full16(arm == 1);
+                    GameConfig cfg = Full16(arm);
                     World w = World.CreateWorld(new WorldOptions { Seed = seed, TeamSize = 16, HumanTeam = TeamId.Azure, HumanClass = ClassId.Warrior, Config = cfg });
                     InputFrame scratch = SimInput.EmptyInput();
                     int max = (int)Math.Ceiling(cfg.MatchSeconds * cfg.SimHz) + (int)cfg.SimHz;
@@ -474,7 +506,7 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
                     }
                 }
                 blocked[arm] = ticks / 30.0 / seeds.Length;
-                GameConfig sc = Full16(arm == 1);
+                GameConfig sc = Full16(arm);
                 sc.HatchSeconds = 30;
                 World sw = World.CreateWorld(new WorldOptions { Seed = 7, TeamSize = 16, HumanTeam = TeamId.Azure, HumanClass = ClassId.Warrior, Config = sc });
                 var watch = new ShiverWatch();
@@ -485,10 +517,11 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
                     watch.Observe(sw);
                 }
                 flags[arm] = watch.Count;
+                Console.WriteLine("[px] mv5 known bot problems arm " + names[arm] + ": own-Kaiju blocking " + PxLog.F(blocked[arm], "0.0") + " s/match over " + seeds.Length + " 16v16 seeds; shiver flags " + flags[arm]);
             }
-            bool ok = PxLog.Line("mv5 known bot problems", "16v16 Full x4 seeds own-Kaiju blocking s/match; 16v16 seed 7 2:00 Kaiju out at 0:30 shiver flags",
-                "blocking off " + PxLog.F(blocked[0], "0.0") + " / on " + PxLog.F(blocked[1], "0.0") + " s; shiver off " + flags[0] + " / on " + flags[1],
-                "on <= off + 1.0 s and on <= off + 3 flags (not made worse)", blocked[1] <= blocked[0] + 1.0 && flags[1] <= flags[0] + 3);
+            bool ok = PxLog.Line("mv5 known bot problems", "16v16 Full x" + seeds.Length + " seeds own-Kaiju blocking s/match; 16v16 seed 7 2:00 Kaiju out at 0:30 shiver flags",
+                "blocking off " + PxLog.F(blocked[0], "0.0") + " / quick wall " + PxLog.F(blocked[1], "0.0") + " / bot verbs " + PxLog.F(blocked[2], "0.0") + " / all " + PxLog.F(blocked[3], "0.0") + " s; shiver " + flags[0] + " / " + flags[1] + " / " + flags[2] + " / " + flags[3],
+                "all <= off + 1.0 s and all <= off + 3 flags (not made worse)", blocked[3] <= blocked[0] + 1.0 && flags[3] <= flags[0] + 3);
             Assert.IsTrue(ok);
         }
 
