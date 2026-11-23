@@ -156,6 +156,21 @@ namespace CriticalMass.Runtime.Hud.Player
 
         readonly Slot[] _near = new Slot[8];
 
+        /// <summary>Readability-2 item 3: the top of the play area for words, reference units from the screen top: the top band,
+        /// and the callout lane (objective banner) while anything holds it.</summary>
+        public static float TopReserve(bool calloutHeld) => calloutHeld ? Mathf.Max(HudZones.TopBand.yMax, HudZones.Callout.yMax) : HudZones.TopBand.yMax;
+
+        /// <summary>Pure: the highest centre y (canvas units from the bottom) a word of stack row `stack` may sit at.</summary>
+        public static float TopLimit(float canvasH, float reserve, int stack) => canvasH - reserve - PillH * 0.5f - 4f - (stack >= 1 ? 0f : PillH + 4f);
+
+        void KeepBelowTop(Slot s, UnityEngine.Camera cam, float scale)
+        {
+            float h = (cam != null ? cam.pixelHeight : Screen.height) / Mathf.Max(1e-4f, scale);
+            float lim = TopLimit(h, TopReserve(HudZones.Blocked(HudZone.Callout, (HudPriority)(-1))), s.Stack);
+            Vector2 p = s.Rt.anchoredPosition;
+            if (p.y > lim) { p.y = lim; s.Rt.anchoredPosition = p; }
+        }
+
         /// <summary>MovesCap: makes room for a word of rank on this anchor; false = the word is outranked and not shown.
         /// Sets s's and the kept neighbour's Stack (higher rank on top).</summary>
         bool Capped(Slot s, int actor, Vector3 point, int rank)
@@ -231,6 +246,7 @@ namespace CriticalMass.Runtime.Hud.Player
                     if (!PxProject.Screen(cam, at, 0f, out Vector2 p)) { PxUi.Alpha(s.Group, 0f); continue; }
                     s.Rt.anchoredPosition = p / scale + new Vector2(0f, s.Stack * (PillH + 4f));
                 }
+                if (MovesCap) KeepBelowTop(s, cam, scale);   // mv-6 readability-2 item 3
                 float a = Mathf.Clamp01((s.Life - s.Age) / FadeOut);
                 PxUi.Alpha(s.Group, a);
             }
