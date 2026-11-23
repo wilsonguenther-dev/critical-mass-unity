@@ -338,6 +338,7 @@ namespace CriticalMass.Runtime.Game
                 Debug.Log($"[CriticalMass] {BuildInfo.Label} built {BuildInfo.BuiltUtc}; Player.log {Application.consoleLogPath}; " +
                           $"crash log {_crashLogPath}; {SystemInfo.operatingSystem}; {SystemInfo.processorType} x{SystemInfo.processorCount}; " +
                           $"{SystemInfo.systemMemorySize} MB; {SystemInfo.graphicsDeviceName} ({SystemInfo.graphicsDeviceType}, {SystemInfo.graphicsDeviceVersion})");
+                Debug.Log("[CriticalMass] moves: " + (CriticalMass.Runtime.Input.MovesInput.PlayBuildAllOn ? "all on" : "off"));
                 if (SupportReport.HandleBootFlags()) { _quitting = true; return; }
             }
             Options o = Current;

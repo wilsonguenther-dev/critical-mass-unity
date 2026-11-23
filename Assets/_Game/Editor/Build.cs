@@ -138,6 +138,12 @@ namespace CriticalMass.Editor
                     targetGroup = group,
                     options = development ? BuildOptions.Development : BuildOptions.None,
                 };
+                // moves play-test: -movesOn adds CM_MOVES_ON for this player build only (ProjectSettings stay untouched).
+                if (Flag("-movesOn"))
+                {
+                    options.extraScriptingDefines = new[] { "CM_MOVES_ON" };
+                    Debug.Log("[CriticalMass.Build] -movesOn: extra scripting define CM_MOVES_ON for this build");
+                }
 
                 WriteStamp(target, development);
                 BuildReport report;
