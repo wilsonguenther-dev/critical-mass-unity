@@ -23,10 +23,10 @@ namespace CriticalMass.Runtime.Input
         double _keysAt = double.NegativeInfinity;
         double _keyAttackAt = double.NegativeInfinity;
         bool _pointerEverMoved;
-        /// <summary>Round 4 (pass 4: F30 red with every switch off): the never-moved-mouse rule of NotePointerPressed belongs to the
-        /// class moves (on in the play build, MovesInput.PlayBuildAllOn); off = every click hands the aim to the cursor, exactly
-        /// as shipped in 1.0.1566. Settable for tests.</summary>
-        public bool ClickNeedsMovedMouse = MovesInput.PlayBuildAllOn;
+        /// <summary>fix/px-base-seat-reds (pass 5: F31 keys-only top-down 0 of 7 with switches off): the never-moved-mouse rule
+        /// of NotePointerPressed is a plain bug fix, on for every build and every switch (a mouse user moves his mouse before
+        /// he clicks, so a click still takes the aim for him). False = the 1.0.1566 rule. Settable for tests.</summary>
+        public bool ClickNeedsMovedMouse = true;
 
         /// <summary>Forget every device (match start: the player has touched nothing yet).</summary>
         public void Reset()
