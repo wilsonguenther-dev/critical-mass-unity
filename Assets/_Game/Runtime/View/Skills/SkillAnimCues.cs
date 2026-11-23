@@ -55,7 +55,9 @@ namespace CriticalMass.Runtime.View.Skills
             age = 0f;
             if (actor < 0 || actor >= MaxActors || _proc[actor] == ProcNone || _tick[actor] == int.MinValue) return false;
             double a = now - _t0[actor];
-            if (a < 0 || a > ProcSeconds) return false;
+            // fix/px-view-2: the TNT / Root Seeds throw arm is released on the throw timing (HitFeelTuning.ThrowPose: full 3
+            // frames, gone by 8), not held for the 0.75 s of the raise overlay
+            if (a < 0 || a > (_proc[actor] == ProcThrow ? HitFeelTuning.ThrowPoseSeconds : ProcSeconds)) return false;
             kind = _proc[actor];
             age = (float)a;
             return true;
@@ -88,6 +90,10 @@ namespace CriticalMass.Runtime.View.Skills
         readonly Transform[] _root = new Transform[SkillAnimCues.MaxActors];
         readonly Transform[] _arm = new Transform[SkillAnimCues.MaxActors];
 
+        /// <summary>fix/px-view-2 (tests): the weight of the last procedural throw arm drawn.</summary>
+        public static float LastThrowWeight;
+        public static int LastThrowFrame = -1;
+
         /// <summary>Overlays applied since start (capture log).</summary>
         public int Applied { get; private set; }
 
@@ -110,10 +116,13 @@ namespace CriticalMass.Runtime.View.Skills
             if (kind == SkillAnimCues.ProcRaise) angle = -140f * w;
             else
             {
-                // wind back 35 degrees, then sweep forward 110 degrees and follow through
-                float k = Mathf.Clamp01(age / 0.45f);
-                angle = (k < 0.3f ? 35f * (k / 0.3f) : Mathf.Lerp(35f, -110f, (k - 0.3f) / 0.7f)) * w;
+                // fix/px-view-2: the cue is noted when the TNT leaves the hand, so the overlay is the release: the arm sweeps
+                // forward 110 degrees over the hold (3 frames) and eases back to the clip pose by 8 frames (ThrowPose)
+                HitFeelTuning.ThrowPose(age, 1.0, out _, out w);
+                float k = Mathf.Clamp01(age / (float)HitFeelTuning.ThrowHoldSeconds);
+                angle = Mathf.Lerp(35f, -110f, k) * w;
             }
+            if (kind == SkillAnimCues.ProcThrow) { LastThrowWeight = w; LastThrowFrame = Time.frameCount; }
             arm.rotation = Quaternion.AngleAxis(angle, root.right) * arm.rotation;
             Applied++;
         }

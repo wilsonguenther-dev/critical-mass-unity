@@ -254,6 +254,11 @@ namespace CriticalMass.Runtime.View.Anim
         public const float CommitAtCheck = 0.8f;
         /// <summary>The render rate the frame counts are written against.</summary>
         public const double RenderHz = 60;
+
+        /// <summary>fix/px-view-2 (review: Warrior 0.76 at press + 2 in the Editor, whose frames are a few ms of wall time):
+        /// the age a press's rise is drawn at: its wall seconds, or its rendered frames at 60 fps when frames come faster,
+        /// so the pose is past 0.8 two rendered frames after the press at any frame rate.</summary>
+        public static double RiseAge(double wallSeconds, int framesSince) => Math.Max(wallSeconds, Math.Max(0, framesSince) / RenderHz);
         /// <summary>The strike (wind-up extreme to the contact frame) plays over this many 60 fps frames, ending on the contact
         /// tick (was ONE sim tick = 2 frames).</summary>
         public const double StrikeFrames = 5;

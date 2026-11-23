@@ -102,6 +102,16 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
         /// D2(Healer), in D3, the first test that reached HitAndWatch's end-of-frame sample): WaitForEndOfFrame never resumes
         /// in a -batchmode -nographics player (nothing is rendered, so there is no end of frame). With no graphics device this
         /// waits one frame instead (the views' LateUpdate of the frame has run by then); with graphics, the real end of frame.</summary>
+        /// <summary>fix/px-view-2: moves the virtual mouse like a hand does, the position WITH its delta. Since AimDeviceArbiter
+        /// (82f00b6b) only a real move (> 2 px delta) or a button press hands the aim to the cursor; a bare position event
+        /// left the aim where it was (F08: HittableTarget -1 with the enemy under the cursor).</summary>
+        protected void MoveMouse(Vector2 to)
+        {
+            Vector2 from = Ms.position.ReadValue();
+            Set(Ms.delta, to - from);
+            Set(Ms.position, to);
+        }
+
         protected static object EndOfFrame() =>
             SystemInfo.graphicsDeviceType == UnityEngine.Rendering.GraphicsDeviceType.Null ? null : new WaitForEndOfFrame();
 
