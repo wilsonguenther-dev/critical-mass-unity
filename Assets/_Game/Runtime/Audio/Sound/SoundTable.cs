@@ -431,7 +431,9 @@ namespace CriticalMass.Runtime.Audio.Sound
             R(SimEventType.GuardBreak, Pick.Fixed, "wall_crack"),          // T2-1 the guard cracks (the stagger's Hit plays nothing: no damage)
             R(SimEventType.FeintBaited, Pick.Fixed, "feint_flick"),        // T1-4a the bait landed (the Feint itself plays "feint")
             R(SimEventType.Lunge, Pick.Fixed, "effort"),                   // T1-2 the lunge swing's grunt (its swing plays the class swing cue)
-            R(SimEventType.HeavyRelease, Pick.Fixed, "swing_heavy"),       // T2-2 the heavy leaves (over the class swing)
+            // fix/px-rough-spots (item 8): a heavy release pushes HeavyRelease AND AttackStart on the same tick
+            // (MovesHooks.Offence), so "swing_heavy" here played a second whoosh over the class swing. One swing per release.
+            Silent(SimEventType.HeavyRelease, "the release's AttackStart already plays the class swing (one whoosh per heavy)"),
             R(SimEventType.ComboStep, Pick.Fixed, "hit_confirm"),          // T2-3 the chain step landed (no pitch rise: Pick.Fixed has none)
             Silent(SimEventType.TravelChanged, "travel is the dust trail and the stride; no sound so a walk never chimes"),
             R(SimEventType.Slide, Pick.Fixed, "body_land"),                // T2-5 slide start and trip (the trip's Hit plays its impact too)
