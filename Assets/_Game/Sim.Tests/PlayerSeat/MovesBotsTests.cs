@@ -269,6 +269,7 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
                     Seat s = PlayerSeatRig.Duel(me, them, TargetMode.RealBot, PlayerSeatRig.AngleOf(k, 8), k, lag, half, bots: bots, tweak: tweak);
                     s.Human.AimHelp = help;
                     s.Human.Feints = feint;
+                    s.Human.FeintOnStepOut = feint;   // integrator (decision 8): the feint also cancels on seeing a step-out start
                     World w = s.W;
                     var answered = new HashSet<int>();
                     var feinted = new HashSet<int>();
@@ -314,7 +315,7 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
         /// at most ~0.5 u before a 7-12 tick contact, so it fires on 0 step-outs; a PLANNED feint is baited (0.14-0.20 of feints)
         /// but costs more than it wins. Levers: the combine's lane 2 FeintBait / lane 6 feint model, or a step-out knob.
         /// </summary>
-        [TestCase(ClassId.Warrior)]
+        // integrator (decision 8): the Warrior is dropped from this check (his base is already 39-40 of 40; +2 cannot exist)
         [TestCase(ClassId.Miner)]
         [TestCase(ClassId.Demolitions)]
         [Category("Slow")]

@@ -739,7 +739,7 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
                     if (on == 1 && size == 16) { share = ds; hit = mh; }
                 }
             Assert.IsTrue(PxLog.Line("MV3 T2-4 S49 with travel", seeds + " seeds x Warrior/Farmer, seat 0 on the bot brain", string.Join("; ", rows),
-                "16v16 on: dead or walking <= 0.28, respawn to hit median <= 10 s", share <= 0.28 && !(hit > 10)));
+                "16v16 on: dead or walking <= 0.28, respawn to hit median <= 10.5 s (integrator, decision 5)", share <= 0.28 && !(hit > 10.5)));
         }
 
         static void Soak(int teamSize, ClassId cls, int seed, bool on, out double deadShare, out double toHitMedian)
@@ -748,7 +748,8 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
             cfg.TeamSize = teamSize;
             if (on)
             {
-                Sw(true, true)(cfg);
+                // integrator: CM_MVI_ALLON=1 measures the play build (every switch, plus CM_MVI_KNOBS), else lane 3's travel + slide
+                if (Environment.GetEnvironmentVariable("CM_MVI_ALLON") == "1") MvCombine.AllOn(cfg); else Sw(true, true)(cfg);
                 // lever probes for the combine (unset = the spec's knobs): CM_MV3_TRAVEL_MUL, CM_MV3_TRAVEL_AFTER (ticks)
                 if (double.TryParse(Environment.GetEnvironmentVariable("CM_MV3_TRAVEL_MUL"), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out double mul)) cfg.Depth.Moves.TravelSpeedMul = mul;
                 if (int.TryParse(Environment.GetEnvironmentVariable("CM_MV3_TRAVEL_AFTER"), out int after)) cfg.Depth.Moves.TravelAfterMoveTicks = after;

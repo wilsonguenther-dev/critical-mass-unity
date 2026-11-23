@@ -327,7 +327,9 @@ namespace CriticalMass.Sim.Core
                     else if (!held && w.Tick >= d.GuardHoldUntil[i])
                     {
                         d.GuardOn[i] = 0;
-                        d.GuardReleaseUntil[i] = w.Tick + m.GuardReleaseTicks;
+                        int[] rel = m.GuardReleaseTicksByClass;   // integrator: per-class release (the Healer's is slow)
+                        int rc = DefenceCls(w, i);
+                        d.GuardReleaseUntil[i] = w.Tick + (rel != null && rc < rel.Length && rel[rc] >= 0 ? rel[rc] : m.GuardReleaseTicks);
                     }
                 }
                 else if ((held || w.Tick < d.GuardHoldUntil[i]) && !busy && w.Tick >= d.GuardReleaseUntil[i])
@@ -449,6 +451,7 @@ namespace CriticalMass.Sim.Core
         internal static void DefenceDodgeBegan(World w, int id, int start, int len)
         {
             if (w.Moves == null) return;
+            OffenceVictimDodged(w, id);   // integrator (decision 2): a dodge breaks the chains that last hit this body
             Actor ka = w.Actors[id];
             if ((ka.KVx != 0 || ka.KVz != 0) && DefenceDodgeOutOfKnock(w, id))
             {
@@ -521,12 +524,17 @@ namespace CriticalMass.Sim.Core
                 stun = 0;
                 return;
             }
+            MovesConfig m = Cfg(w);
             if (DefenceGuardBlocks(w, target, source, sx, sz, DamageCause.Melee))
             {
-                stun = 0;
-                knock *= 1 - DefenceCut(w, target);
+                bool[] footing = m.GuardKeepsFooting;
+                int gc = DefenceCls(w, target);
+                if (footing == null || gc >= footing.Length || footing[gc])   // integrator: the Healer's guard only cuts damage
+                {
+                    stun = 0;
+                    knock *= 1 - DefenceCut(w, target);
+                }
             }
-            MovesConfig m = Cfg(w);
             Actor t = w.Actors[target];
             // integrator (decision 6): a LUNGE wind-up shrugs off a hit under the lunger's Poise (the swing goes on)
             if (m.DodgeLunge && m.LungeArmour && t.SwingPending && t.SwingTick == DefenceS(w).LungeSwingTick[target]

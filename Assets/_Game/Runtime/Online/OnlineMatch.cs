@@ -125,6 +125,9 @@ namespace CriticalMass.Runtime.Online
             Transport = t;
             Code = code;
             Host = new RoomHost(t, GameConfig.CreateDefault(), name, OnlineConfig.Build) { LookFor = CriticalMass.Runtime.Progression.LookRegistry.Local };   // b15 profile: cosmetic look, outside the sim
+#if CM_MOVES_ON
+            Host.MovesMask = MovesConfig.PlayBuildAllOn(new MovesConfig()).Mask();   // class moves (integrator): the play build hosts with every switch on; START carries it
+#endif
             if (Direct != null)
             {
                 try { _beacon = new LanBeacon(Direct.Port, code, name, 1, OnlineConfig.Build); } catch (Exception) { _beacon = null; }

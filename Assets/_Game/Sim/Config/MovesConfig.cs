@@ -86,8 +86,8 @@ namespace CriticalMass.Sim.Config
         // ================================================================== Tier 2 knobs
 
         // ---- T2-1 guard and parry (per class; the Warrior's guard row is unused: he parries only)
-        /// <summary>Damage share a frontal guard cuts (Warrior 0 = no guard).</summary>
-        public double[] GuardCut = { 0, 0.40, 0.45, 0.35, 0.55, 0.35 };
+        /// <summary>Damage share a frontal guard cuts (Warrior 0 = no guard). Integrator (decision 1): the Healer's cut 0.35 -> 0.20.</summary>
+        public double[] GuardCut = { 0, 0.40, 0.45, 0.35, 0.55, 0.20 };
         /// <summary>Damage the guard absorbs before it breaks.</summary>
         public double[] GuardMeter = { 0, 40, 50, 35, 60, 35 };
         /// <summary>Move speed multiplier while guarding.</summary>
@@ -142,8 +142,9 @@ namespace CriticalMass.Sim.Config
         public double DemoFuseRadius = 1.0;
 
         // ---- T2-3 combos
-        /// <summary>Steps per class (the last step is the finisher).</summary>
-        public int[] ComboSteps = { 2, 3, 3, 3, 2, 2 };
+        /// <summary>Steps per class (the last step is the finisher; 1 = no combo). Integrator (decision 1, the Healer ruling): the
+        /// Healer has no chain (2 -> 1; with it her duel variants reached 10 to 14 of 40).</summary>
+        public int[] ComboSteps = { 2, 3, 3, 3, 3, 1 };
         public double ComboStepWindupMul = 0.7;
         public double ComboStepDamageMul = 1.1;
         public double FinisherDamageMul = 1.35;
@@ -191,7 +192,17 @@ namespace CriticalMass.Sim.Config
         /// start a dodge during the knock slide of an enemy's melee LIGHT strike (not a heavy) taken in the last
         /// ComboKnockDodgeTicks; the dodge ends the slide. Without it the Farmer's thrust slide outlasts the gap between steps.</summary>
         public bool ComboDodgeOutOfKnock = true;
+        /// <summary>T2-1 (decision 1, ruling "Healer loses nearly every one-on-one"): a guard-blocked melee hit neither staggers nor
+        /// fully knocks a class marked true here. The Healer's guard only cuts damage: she still staggers and slides.</summary>
+        public bool[] GuardKeepsFooting = { true, true, true, true, true, false };
+        /// <summary>T2-1 (decision 1): per-class recovery after the guard drops, -1 = GuardReleaseTicks. The Healer's guard is slow
+        /// to drop (her weakest guard): block-then-punish is not her game.</summary>
+        public int[] GuardReleaseTicksByClass = { -1, -1, -1, -1, -1, 16 };
         public int ComboKnockDodgeTicks = 20;
+        /// <summary>T2-3 (decision 2): a victim's dodge breaks every chain whose last landed strike hit it, so the next swing is an
+        /// opener (no step bonus, no finisher). Without it the fastest class (the Farmer) walks a dodged victim down inside the
+        /// chain window and the dodge never escapes the combo.</summary>
+        public bool ComboBreaksOnDodge = true;
         /// <summary>T1-2 (decision 6): a LUNGE wind-up shrugs off a hit under the lunger's class Poise (no stagger, the swing goes
         /// on), so a fleeing target's light hit does not cancel the lunge it ran into.</summary>
         public bool LungeArmour = true;
@@ -264,6 +275,8 @@ namespace CriticalMass.Sim.Config
             c.ComboSteps = (int[])ComboSteps.Clone();
             c.GlideClasses = (bool[])GlideClasses.Clone();
             c.BotChargeChance = (double[])BotChargeChance.Clone();
+            c.GuardKeepsFooting = (bool[])GuardKeepsFooting.Clone();
+            c.GuardReleaseTicksByClass = (int[])GuardReleaseTicksByClass.Clone();
             c.BotComboChance = (double[])BotComboChance.Clone();
             return c;
         }

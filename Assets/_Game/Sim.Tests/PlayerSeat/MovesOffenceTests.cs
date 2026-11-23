@@ -583,7 +583,9 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
                 int fin = 0, maxStep = 0;
                 foreach (SeatEvent e in steps) { if (e.Tier == 1) fin++; if (e.Value > maxStep) maxStep = (int)e.Value; }
                 int want = mc.ComboSteps[(int)me];
-                if (!PxLog.Line("T2-3 Steps", me + " swinging at a passive dummy for 6 s", "steps " + steps.Count + ", finishers " + fin + ", highest step " + maxStep, "finishers > 0, highest step " + want, fin > 0 && maxStep == want)) bad.Add(me.ToString());
+                // integrator (decision 1): a class with ComboSteps 1 (the Healer) has no chain: no step, no finisher
+                bool ok = want < 2 ? steps.Count == 0 : fin > 0 && maxStep == want;
+                if (!PxLog.Line("T2-3 Steps", me + " swinging at a passive dummy for 6 s", "steps " + steps.Count + ", finishers " + fin + ", highest step " + maxStep, want < 2 ? "no chain (ComboSteps 1)" : "finishers > 0, highest step " + want, ok)) bad.Add(me.ToString());
             }
             Assert.IsEmpty(bad);
         }
@@ -596,7 +598,7 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
             var bad = new List<string>();
             foreach (ClassId me in T.Classes)
             {
-                int esc = 0, reps = 0, escStart = 0, escWalk = 0;
+                int esc = 0, reps = 0, escStart = 0, escWalk = 0, again = 0;
                 foreach (int side in new[] { -1, 1 })
                     for (int k = 0; k < 4; k++)
                         foreach (int mode in new[] { 0, 1, 2 })
@@ -631,7 +633,7 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
                                 if (at >= 0 && w.Tick >= at && !dodged)
                                 {
                                     dodged = q.Spy.Of(SimEventType.Dodge, e => e.A == q.Them).Count > 0;
-                                    if (dodged || !Dodge.CanStart(w, q.Them)) return;
+                                                    if (dodged || !Dodge.CanStart(w, q.Them)) return;
                                     double ux = w.X[q.Them] - w.X[0], uz = w.Z[q.Them] - w.Z[0], ul = Math.Sqrt(ux * ux + uz * uz);
                                     b.Dodge = true;
                                     b.MoveX = (ux / ul + -uz / ul * side) * 0.7071; b.MoveZ = (uz / ul + ux / ul * side) * 0.7071;
@@ -639,15 +641,18 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
                             }, q => firstHit >= 0 && q.W.Tick > firstHit + 45);
                             if (firstHit < 0) continue;
                             reps++;
-                            bool step2 = s.Spy.Of(SimEventType.ComboStep, e => e.A == 0 && e.Value == 2).Count > 0;
+                            // integrator (decision 2): escaped = the attacker's NEXT hit after step 1 is not that chain's step 2 (a fresh
+                            // opener after the dodge broke the chain is a new string, counted apart as "a second hit")
+                            var later = s.Spy.Of(SimEventType.Hit, e => e.A == s.Them && e.B == 0 && e.Tick - 1 > firstHit + 1 && e.Tick - 1 <= firstHit + 45);
+                            bool step2 = later.Count > 0 && s.Spy.Of(SimEventType.ComboStep, e => e.A == 0 && e.Value == 2 && Math.Abs(e.Tick - later[0].Tick) <= 1).Count > 0;
                             if (!step2) { if (onStart) escStart++; else if (rhythm) esc++; else escWalk++; }
+                            if (later.Count > 0) again++;
                         }
                 int third = reps / 3;
-                // KNOWN (not lane 4's rule; reported to the integrator for lane 2): after a Farmer thrust the victim's knock slide
-                // (Actor.KVx / KVz != 0) refuses Dodge.CanStart for about 19 ticks, longer than the Farmer's 12 ticks from contact to
-                // his next swing, so no dodge fits between ANY two Farmer swings, combo or not. Printed, not asserted.
-                bool known = me == ClassId.Farmer;
-                if (!PxLog.Line("T2-3a EscapeStep2" + (known ? " (KNOWN: knock slide blocks the dodge)" : ""), me + " chain vs a lag-6 victim's dodge (2 sides x 4 angles)", "dodge 6 ticks after step 1 lands (or once the stagger ends): escaped " + OffRig.Of(esc, third) + " (rhythm press), " + OffRig.Of(escWalk, third) + " (attacker walks back in); dodge 6 ticks into step 2's wind-up: " + OffRig.Of(escStart, third), ">= 0.50 (dodge between steps, both attackers)", third > 0 && (double)esc / third >= 0.50 && (double)escWalk / third >= 0.50) && !known) bad.Add(me.ToString());
+                // integrator (decision 2): the knock slide no longer refuses the dodge (MovesConfig.ComboDodgeOutOfKnock) and a dodge
+                // breaks the chain that last hit the dodger (ComboBreaksOnDodge), so the Farmer is asserted like every class. The
+                // combine's target is at least 6 of 8 per mode; "any second hit" counts the attacker's fresh openers as well.
+                if (!PxLog.Line("T2-3a EscapeStep2", me + " chain vs a lag-6 victim's dodge (2 sides x 4 angles)", "dodge 6 ticks after step 1 lands (or once the stagger ends): escaped " + OffRig.Of(esc, third) + " (rhythm press), " + OffRig.Of(escWalk, third) + " (attacker walks back in); dodge 6 ticks into step 2's wind-up: " + OffRig.Of(escStart, third) + "; any second hit within 1.5 s " + again + "/" + reps, ">= 6 of 8 (dodge between steps, both attackers)", third > 0 && esc * 8 >= 6 * third && escWalk * 8 >= 6 * third)) bad.Add(me.ToString());
             }
             Assert.IsEmpty(bad);
         }
@@ -677,8 +682,9 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
                 // KNOWN (a knob, lane 1's MovesConfig; reported): the Builder's 2-step chain makes the finisher every other hit
                 // (x1.35), which turns 5-hit kills into 4-hit kills on 115 to 120 HP bodies (-18%). Lever: FinisherDamageMul for
                 // 2-step classes, or ComboSteps[Builder] = 3. Printed, not asserted.
-                bool known = me == ClassId.Builder;
-                if (!PxLog.Line("T2-3c PassiveTtk" + (known ? " (KNOWN: knob)" : ""), me + " on passive Warrior / Farmer / Builder dummies, combos off -> on", "fall " + PxLog.F(fall, "0.000") + " (" + string.Join(", ", parts) + ")", "0.05 to 0.15", fall >= 0.05 && fall <= 0.15) && !known) bad.Add(me + " " + PxLog.F(fall));
+                // integrator: decision 3 set ComboSteps[Builder] = 3 (asserted now); decision 1 gave the Healer no chain (fall 0, printed)
+                bool noChain = new MovesConfig().ComboSteps[(int)me] < 2;
+                if (!PxLog.Line("T2-3c PassiveTtk" + (noChain ? " (no chain: ComboSteps 1)" : ""), me + " on passive Warrior / Farmer / Builder dummies, combos off -> on", "fall " + PxLog.F(fall, "0.000") + " (" + string.Join(", ", parts) + ")", noChain ? "0 (no chain)" : "0.05 to 0.15", noChain ? fall == 0 : fall >= 0.05 && fall <= 0.15)) bad.Add(me + " " + PxLog.F(fall));
             }
             Assert.IsEmpty(bad);
         }

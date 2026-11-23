@@ -8,8 +8,10 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Reflection;
+using CriticalMass.Sim.Bots;
 using CriticalMass.Sim.Config;
 using CriticalMass.Sim.Core;
+using CriticalMass.Sim.Tests.Harness;
 using NUnit.Framework;
 
 namespace CriticalMass.Sim.Tests.PlayerSeat
@@ -173,5 +175,54 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
             }
             Assert.IsEmpty(bad, "lunge chase under plain + 0.10: " + string.Join("; ", bad));
         }
+
+        /// <summary>
+        /// The bots' known problems with every switch on (decision 9): own-Kaiju blocking seconds per match over the 24 16v16 Full
+        /// seeds (all-on target at most 35.0 s; lane 5 measured off 34.1, its all-lane-5 arm 38.1) and the shiver flags of the
+        /// 16v16 seed 7 2:00 Kaiju-out-at-0:30 run (not worse than off + 3). Bot-only matches: actor 0 is on the autopilot.
+        /// CM_MVI_KNOBS applies to the on arm (to find which switch costs the seconds).
+        /// </summary>
+        [Test, Category("Slow"), Timeout(6000000)]
+        public void Combine_Bots_OwnKaijuBlockAndShiver_EverySwitchOn()
+        {
+            double[] blocked = new double[2];
+            int[] flags = new int[2];
+            for (int arm = 0; arm < 2; arm++)
+            {
+                double ticks = 0;
+                foreach (int seed in WinShare.Seeds16)
+                {
+                    GameConfig cfg = GameConfig.CreateBrowser5v5().ApplyRules(RulesProfile.Full);
+                    if (arm == 1) AllOnCfg(cfg);
+                    World w = World.CreateWorld(new WorldOptions { Seed = seed, TeamSize = 16, HumanTeam = TeamId.Azure, HumanClass = ClassId.Warrior, Config = cfg });
+                    InputFrame scratch = SimInput.EmptyInput();
+                    int max = (int)Math.Ceiling(cfg.MatchSeconds * cfg.SimHz) + (int)cfg.SimHz;
+                    for (int t = 0; t < max && w.Match.Phase != MatchPhase.Ended; t++)
+                    {
+                        MatchTick.Advance(w, null, scratch);
+                        if (Comeback.KaijuBlocking(w) >= 0) ticks++;
+                    }
+                }
+                blocked[arm] = ticks / 30.0 / WinShare.Seeds16.Length;
+                GameConfig sc = GameConfig.CreateBrowser5v5().ApplyRules(RulesProfile.Full);
+                if (arm == 1) AllOnCfg(sc);
+                sc.HatchSeconds = 30;
+                World sw = World.CreateWorld(new WorldOptions { Seed = 7, TeamSize = 16, HumanTeam = TeamId.Azure, HumanClass = ClassId.Warrior, Config = sc });
+                var watch = new ShiverWatch();
+                InputFrame s2 = SimInput.EmptyInput();
+                for (int t = 0; t < 3600 && sw.Match.Phase != MatchPhase.Ended; t++)
+                {
+                    MatchTick.Advance(sw, null, s2);
+                    watch.Observe(sw);
+                }
+                flags[arm] = watch.Count;
+            }
+            bool ok = PxLog.Line("mvi-bots", "16v16 Full x" + WinShare.Seeds16.Length + " seeds own-Kaiju blocking s/match; seed 7 shiver flags" + (MvCombine.Knobs().Length > 0 ? " [" + MvCombine.Knobs() + "]" : ""),
+                "off " + PxLog.F(blocked[0], "0.0") + " s, " + flags[0] + " flags | every switch ON " + PxLog.F(blocked[1], "0.0") + " s, " + flags[1] + " flags",
+                "on <= 35.0 s and flags <= off + 3", blocked[1] <= 35.0 + 1e-9 && flags[1] <= flags[0] + 3);
+            Assert.IsTrue(ok);
+        }
+
+        static void AllOnCfg(GameConfig c) => MvCombine.AllOn(c);
     }
 }

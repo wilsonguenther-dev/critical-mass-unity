@@ -51,6 +51,8 @@ namespace CriticalMass.Sim.Core
         /// <summary>The next combo step (0 = none) and the last tick a swing may start as that step.</summary>
         public int[] ChainNext = new int[0];
         public int[] ChainUntil = new int[0];
+        /// <summary>Integrator (decision 2): the body the actor's last landed strike hit (its dodge breaks the chain), -1 = none.</summary>
+        public int[] ChainVictim = new int[0];
         /// <summary>Demolitions' fuse strike: the tick a fuse stuck on this body blows (NoTick = none) and who lit it.</summary>
         public int[] FuseTick = new int[0];
         public int[] FuseOwner = new int[0];
@@ -84,6 +86,7 @@ namespace CriticalMass.Sim.Core
             StepOf = new int[n];
             ChainNext = new int[n];
             ChainUntil = new int[n];
+            ChainVictim = new int[n];
             FuseTick = new int[n];
             FuseOwner = new int[n];
             BotChargeLeft = new int[n];
@@ -109,6 +112,7 @@ namespace CriticalMass.Sim.Core
                 StepOf[i] = 0;
                 ChainNext[i] = 0;
                 ChainUntil[i] = CombatFeel.NoTick;
+                ChainVictim[i] = -1;
                 FuseTick[i] = CombatFeel.NoTick;
                 FuseOwner[i] = -1;
                 BotChargeLeft[i] = 0;
@@ -210,6 +214,18 @@ namespace CriticalMass.Sim.Core
             w.Moves.Offence.BotChains[id] = mode;
         }
 
+        /// <summary>Integrator (decision 2, "every combo is dodgeable"): actor id started a dodge; every chain whose last landed
+        /// strike hit id is broken (the next swing is an opener). Lane 2's DefenceDodgeBegan calls it.</summary>
+        public static void OffenceVictimDodged(World w, int id)
+        {
+            if (w.Moves == null) return;
+            MovesConfig m = Cfg(w);
+            if (!m.Combos || !m.ComboBreaksOnDodge) return;
+            OffenceMovesState s = w.Moves.Offence;
+            for (int i = 0; i < w.ActorCount; i++)
+                if (s.ChainNext[i] != 0 && s.ChainVictim[i] == id) s.ChainNext[i] = 0;
+        }
+
         /// <summary>May actor i take the combo step it is entitled to now (human seats always; bots by the cap above).</summary>
         static bool OffenceMayChain(World w, OffenceMovesState s, int i)
         {
@@ -243,6 +259,7 @@ namespace CriticalMass.Sim.Core
             if (w.Moves == null || !(dealt > 0) || source < 0 || source >= w.ActorCount || target < 0 || target >= w.ActorCount) return;
             OffenceMovesState s = w.Moves.Offence;
             s.LastHitHuman[source] = w.Actors[target].IsHuman ? (byte)1 : (byte)0;
+            s.ChainVictim[source] = target;
             if (!On(w, Cfg(w).Heavy) || !OffenceIsHeavy(w, source)) return;
             s.Counts[OffenceCountHeavyHits]++;
             ClassId cls = w.Actors[source].Cls;

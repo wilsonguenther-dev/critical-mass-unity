@@ -31,6 +31,18 @@ namespace CriticalMass.Net
         /// <summary>Ticks between state-hash checks (30 = once a second).</summary>
         public int HashEvery = 30;
         public HumanSlot[] Humans = new HumanSlot[0];
+        /// <summary>Class moves (integrator, combine 2026-11-22): the host's MovesConfig switch set (MovesConfig.Mask, bits 0..13).
+        /// Every machine builds its config from it (BuildConfig), so peers with moves ON stay in lockstep; 0 = every switch off.</summary>
+        public int MovesMask;
+
+        /// <summary>The config every machine builds this match from: a fresh default config plus the host's class-moves switches
+        /// (knobs are the build's defaults; ConfigHash sees the switches and every knob, so a client that differs refuses).</summary>
+        public GameConfig BuildConfig()
+        {
+            GameConfig c = GameConfig.CreateDefault();
+            if (MovesMask != 0 && c.Depth != null && c.Depth.Moves != null) c.Depth.Moves.SetMask(MovesMask);
+            return c;
+        }
 
         public int SlotOfPeer(int peer)
         {
@@ -105,6 +117,8 @@ namespace CriticalMass.Net
             }
             w.U64(ConfigHash);
             w.U64(WorldHash0);
+            w.U8(MovesMask & 0xFF);   // class moves: the switch set (two bytes, low first)
+            w.U8((MovesMask >> 8) & 0xFF);
         }
 
         /// <summary>Reads and validates a setup; null if anything is out of range (a hostile or broken host).</summary>
@@ -140,6 +154,9 @@ namespace CriticalMass.Net
             }
             s.ConfigHash = r.U64();
             s.WorldHash0 = r.U64();
+            int lo = r.U8(), hi = r.U8();
+            s.MovesMask = lo | (hi << 8);
+            if (s.MovesMask >> 14 != 0) return null;   // only bits 0..13 are switches
             if (r.Bad || s.Humans[0].Actor != 0 || s.Humans[0].Peer != Peers.Host) return null;
             return s;
         }

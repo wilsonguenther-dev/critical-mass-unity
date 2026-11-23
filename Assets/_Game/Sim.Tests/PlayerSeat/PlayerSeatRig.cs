@@ -147,6 +147,10 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
         /// old held Attack (a test that wants the charge). Switch off: no effect at all.</summary>
         public bool HoldAttack;
         private bool _tapPrev;
+        /// <summary>Class moves (integrator, decision 8): with Feints, also cancel the wind-up on SEEING the target bot start a
+        /// step-out (lane 5's BotStepOut), the way a player cancels when the target dodges. Off by default.</summary>
+        public bool FeintOnStepOut;
+        private int _theirStepOut = -100000, _lastStepUntil = int.MinValue;
         /// <summary>Optional move override for the next frame (NaN = the model's own move).</summary>
         public double MoveOverrideX = double.NaN, MoveOverrideZ = double.NaN;
         public int StationBuy;
@@ -274,11 +278,18 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
                     double rx = w.X[t] - w.X[Me], rz = w.Z[t] - w.Z[Me], rd = Math.Sqrt(rx * rx + rz * rz);
                     int wu = w.Dur.AttackWindup[(int)w.Actors[Me].Cls];
                     bool inWind = w.Tick - _mySwing < wu && w.Tick - _mySwing >= 1;
+                    if (FeintOnStepOut && w.Moves != null && t < w.Moves.Bots.StepUntil.Length)
+                    {
+                        int su = w.Moves.Bots.StepUntil[t];
+                        if (su > w.Tick && su != _lastStepUntil) _theirStepOut = w.Tick;
+                        _lastStepUntil = su;
+                    }
                     if (Feints && inWind && _cancelAt < _mySwing)
                     {
                         double gap = Math.Abs(Math.IEEERemainder(Math.Atan2(rz, rx) - w.Actors[Me].SwingFacing, 2 * Math.PI)) * 180 / Math.PI;
                         bool outOfArc = gap > FeintArcDegrees || rd > reach + 0.3;
-                        if (w.Tick - _theirDodge <= 3 || outOfArc) { PressCancel = true; _cancelAt = w.Tick; FeintCount++; want = false; }
+                        bool steppedOut = FeintOnStepOut && w.Tick - _theirStepOut <= 3;
+                        if (w.Tick - _theirDodge <= 3 || steppedOut || outOfArc) { PressCancel = true; _cancelAt = w.Tick; FeintCount++; want = false; }
                     }
                     if (HitCancels && w.Tick - _landed == 1) PressCancel = true;
                     double theirReach = w.Config.Class(w.Actors[t].Cls).AttackRange + cc.Radius;
