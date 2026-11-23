@@ -1226,9 +1226,12 @@ namespace CriticalMass.Runtime.Hud
             // fix/hud-edge-markers-1: the whole marker (badge and distance label) slides along the free edge clear of every
             // HUD panel (was: only its centre point pushed up or down, so the label could still sit on a panel).
             pos = HudEdgeMarkers.PlaceLive(pos, HudEdgeMarkers.MarkerHalf, sw, sh, scale, 1f, pad);
+            double dx = tx - s.PlayerX, dz = tz - s.PlayerZ;
+            // mv-6 readability-4 item 1: spread along the edge from the other markers (class moves only)
+            pos = EdgeSpread.Spread(100 + i, pos, HudEdgeMarkers.MarkerHalf * scale, sw, sh, (float)Math.Sqrt(dx * dx + dz * dz), out bool spreadShown);
+            if (!spreadShown) { p.gameObject.SetActive(false); return; }
             p.anchoredPosition = pos / scale;
             _ptrArrow[i].localRotation = Quaternion.Euler(0, 0, Mathf.Atan2(d.y, d.x) * Mathf.Rad2Deg);
-            double dx = tx - s.PlayerX, dz = tz - s.PlayerZ;
             HudText.Set(_ptrDist[i], Metres[Math.Min(999, (int)Math.Round(Math.Sqrt(dx * dx + dz * dz)))]);
         }
 

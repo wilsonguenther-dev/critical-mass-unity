@@ -859,6 +859,7 @@ namespace CriticalMass.Runtime.Hud.Mechanics
                     if (global::CriticalMass.Runtime.View.Fog.FogOfWar.Hides(id)) continue;
                     double dx = w.X[id] - mx, dz = w.Z[id] - mz;
                     if (dx * dx + dz * dz > TagRange * TagRange) continue;
+                    if (!CriticalMass.Runtime.Hud.Player.CrowdTags.NameShown(w, me, id)) continue;   // mv-6 readability-4 item 2: bar only in a crowd
                     Vector3 head = CriticalMass.Runtime.Camera.GroundView.TagPoint(w, id, Head(w, id, _driver.Alpha, 2.65f), 2.65f);   // fix/px-combat-camera-2: just above his head while framed
                     if (!ToLocal(cam, head, out Vector2 at)) continue;
                     // owner walk 1: a tag that would sit on a HUD panel (the Kaiju panel, the feed, the minimap) waits
@@ -958,9 +959,13 @@ namespace CriticalMass.Runtime.Hud.Mechanics
                     Vector2 edge = DamageDirection.EdgePoint(dir, size * 0.5f, 60f) + size * 0.5f;
                     float sf = Mathf.Max(1e-4f, _canvas.scaleFactor);
                     float k = HudLayout.Scale(size.x * sf, size.y * sf) / sf;
-                    _pointer.anchoredPosition = HudEdgeMarkers.PlaceLive(edge, HudEdgeMarkers.MarkerHalf, size.x, size.y, k, sf, 60f) - size * 0.5f;
+                    Vector2 spot = HudEdgeMarkers.PlaceLive(edge, HudEdgeMarkers.MarkerHalf, size.x, size.y, k, sf, 60f);
+                    int me = CriticalMass.Runtime.LocalSeat.Actor;   // mv-6 readability-4 item 1: spread from the other edge markers
+                    float dist = me >= 0 && me < w.ActorCount ? (float)System.Math.Sqrt((x - w.X[me]) * (x - w.X[me]) + (z - w.Z[me]) * (z - w.Z[me])) : 999f;
+                    spot = EdgeSpread.Spread(200, spot, HudEdgeMarkers.MarkerHalf * k, size.x, size.y, dist, out bool spreadShown);
+                    _pointer.anchoredPosition = spot - size * 0.5f;
                     _pointer.localEulerAngles = new Vector3(0f, 0f, DamageDirection.AngleDeg(dir) + 180f);
-                    show = true;
+                    show = spreadShown;
                 }
             }
             if (_pointer.gameObject.activeSelf != show) _pointer.gameObject.SetActive(show);

@@ -4,6 +4,7 @@
 // "on screen" means drawn on that frame, not merely queued.
 using System;
 using System.Collections;
+using CriticalMass.Runtime.Hud;
 using CriticalMass.Runtime.Hud.Player;
 using CriticalMass.Runtime.Input;
 using CriticalMass.Runtime.View.B17;
@@ -139,6 +140,32 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
             Assert.Greater(WorldWords.Rank("BLOCKED"), WorldWords.Rank(ActionTags.SecondWindWord));
             Assert.AreEqual(WorldWords.Rank("STUNNED"), WorldWords.Rank("PERFECT"), "the rest share the lowest rank");
             Assert.AreEqual(1, WorldWords.MaxPerAnchor, "readability-3: one word per body");
+        }
+
+        [Test]
+        public void CrowdAndEdgeRules()   // readability-4 items 1, 2, 4, 5
+        {
+            Assert.IsTrue(CrowdTags.Pick(5, 0, 5, -1, false, 400.0), "my opponent is named");
+            Assert.IsTrue(CrowdTags.Pick(6, 0, -1, 6, false, 400.0), "the enemy under my aim is named");
+            Assert.IsFalse(CrowdTags.Pick(7, 0, 5, 6, false, 1.0), "another enemy: bar only");
+            Assert.IsTrue(CrowdTags.Pick(8, 0, -1, -1, true, 5.9 * 5.9), "an ally within 6 u");
+            Assert.IsFalse(CrowdTags.Pick(9, 0, -1, -1, true, 6.1 * 6.1), "an ally further away: bar only");
+            var bars = new[] { new Rect(0f, 0f, 50f, 10f), new Rect(10f, 4f, 50f, 10f), new Rect(20f, 2f, 50f, 10f) };
+            HealthBars.SeparateAll(bars, 3);
+            for (int i = 0; i < 3; i++) for (int j = i + 1; j < 3; j++) Assert.IsFalse(bars[i].Overlaps(bars[j]), "bars " + i + " and " + j + " de-overlap");
+            Assert.IsTrue(ViewHintGate.Rule(0, 500.0) && ViewHintGate.Rule(1, 500.0), "first two matches: always");
+            Assert.IsTrue(ViewHintGate.Rule(2, 30.0), "third match: the first minute");
+            Assert.IsFalse(ViewHintGate.Rule(2, 61.0), "third match after a minute: hidden");
+            Assert.AreEqual("SPRINTING: SHIFT TO SLIDE", MovesHelp.HintText(MovesHelp.Verb.Slide, "Shift"));
+            bool was = WorldWords.MovesCap;
+            try
+            {
+                WorldWords.MovesCap = false;
+                EdgeSpread.Reset();
+                Assert.AreEqual(new Vector2(1900f, 500f), EdgeSpread.Spread(1, new Vector2(1900f, 500f), new Vector2(44f, 60f), 1920f, 1080f, 10f, out bool off), "off: unchanged");
+                Assert.IsTrue(off);
+            }
+            finally { WorldWords.MovesCap = was; EdgeSpread.Reset(); }
         }
 
         [Test]
