@@ -746,7 +746,13 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
         {
             GameConfig cfg = teamSize >= 16 ? GameConfig.CreateDefault().ApplyRules(RulesProfile.Full) : GameConfig.CreateBrowser5v5().ApplyRules(RulesProfile.Full);
             cfg.TeamSize = teamSize;
-            if (on) Sw(true, true)(cfg);
+            if (on)
+            {
+                Sw(true, true)(cfg);
+                // lever probes for the combine (unset = the spec's knobs): CM_MV3_TRAVEL_MUL, CM_MV3_TRAVEL_AFTER (ticks)
+                if (double.TryParse(Environment.GetEnvironmentVariable("CM_MV3_TRAVEL_MUL"), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out double mul)) cfg.Depth.Moves.TravelSpeedMul = mul;
+                if (int.TryParse(Environment.GetEnvironmentVariable("CM_MV3_TRAVEL_AFTER"), out int after)) cfg.Depth.Moves.TravelAfterMoveTicks = after;
+            }
             World w = World.CreateWorld(new WorldOptions { Seed = 7000 + seed, TeamSize = teamSize, HumanTeam = TeamId.Azure, HumanClass = cls, Config = cfg, BotDifficulty = BotDifficulty.Normal, AllyBotDifficulty = BotDifficulty.Normal });
             var scratch = new InputFrame();
             double hz = w.Config.SimHz;
