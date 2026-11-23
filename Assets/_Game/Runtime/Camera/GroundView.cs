@@ -792,13 +792,26 @@ namespace CriticalMass.Runtime.Camera
             Turn(step, dt);
         }
 
+        /// <summary>
+        /// rough-spots pass 2 (item 2: a bot-filmed round still turned 199 degrees a minute by itself): the filmed follow
+        /// looks at the bot's settled heading (its travel low-passed over FilmWantTau), not every swerve; it starts turning
+        /// only when that heading is more than FilmStartDeg off and then turns until within FilmStopDeg (hysteresis, no
+        /// stutter), at most FilmYawDegPerSec; in a fight it does not turn at all, like the human path. Bot rounds only.
+        /// </summary>
+        public const double FilmWantTau = 1.2, FilmStartDeg = 45, FilmStopDeg = 12;
+        double _filmWant = double.NaN;
+        bool _filmTurning;
+
         void FilmYaw(double dt, double want)
         {
             if (!(dt > 0)) return;
-            double err = GroundCamera.DeltaAngle(_yawFollow.Yaw, want);
-            // in a fight the filmed follow turns at most FilmFightDegPerSec (the fight stays still on screen; the owner's rule)
-            double cap = Time.unscaledTimeAsDouble < _fightUntil ? FilmFightDegPerSec : FilmYawDegPerSec;
-            double rate = Math.Abs(err) <= FilmDeadDeg ? 0 : Math.Max(-cap, Math.Min(cap, err / FilmYawTau));
+            if (double.IsNaN(_filmWant)) _filmWant = _yawFollow.Yaw;
+            _filmWant = GroundCamera.Normalize(_filmWant + GroundCamera.DeltaAngle(_filmWant, want) * (1 - Math.Exp(-dt / FilmWantTau)));
+            if (Time.unscaledTimeAsDouble < _fightUntil) { _filmTurning = false; _yawFollow.Reset(_yawFollow.Yaw); return; }
+            double err = GroundCamera.DeltaAngle(_yawFollow.Yaw, _filmWant);
+            if (!_filmTurning && Math.Abs(err) > FilmStartDeg) _filmTurning = true;
+            else if (_filmTurning && Math.Abs(err) < FilmStopDeg) _filmTurning = false;
+            double rate = _filmTurning ? Math.Max(-FilmYawDegPerSec, Math.Min(FilmYawDegPerSec, err / FilmYawTau)) : 0;
             Turn(rate * dt, dt);
         }
 
