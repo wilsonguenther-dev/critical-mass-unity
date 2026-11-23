@@ -144,7 +144,7 @@ namespace CriticalMass.Sim.Config
         // ---- T2-3 combos
         /// <summary>Steps per class (the last step is the finisher; 1 = no combo). Integrator (decision 1, the Healer ruling): the
         /// Healer has no chain (2 -> 1; with it her duel variants reached 10 to 14 of 40).</summary>
-        public int[] ComboSteps = { 2, 3, 3, 3, 3, 1 };
+        public int[] ComboSteps = { 2, 3, 2, 2, 3, 1 };   // integrator: Miner and Demolitions 2 (strong-with-combos 31->29 and 34->32 at 3; 31->33 and 34->35 at 2), Builder 3, Healer 1 (none)
         public double ComboStepWindupMul = 0.7;
         public double ComboStepDamageMul = 1.1;
         public double FinisherDamageMul = 1.35;
@@ -153,10 +153,10 @@ namespace CriticalMass.Sim.Config
         public double ComboResetSeconds = 1.0;
 
         // ---- T2-4 travel
-        public int TravelAfterMoveTicks = 30;
+        public int TravelAfterMoveTicks = 15;   // integrator decision 5: x1.5 after 15 (16v16 respawn-to-first-hit 12.1 s -> 9.8 s; Warrior slowest, S58 0 stuck, bands hold)
         public double TravelEnemyRadius = 8;
         public double TravelNoCombatSeconds = 3;
-        public double TravelSpeedMul = 1.30;
+        public double TravelSpeedMul = 1.5;
         public int TravelRampTicks = 9;
 
         // ---- T2-5 slide

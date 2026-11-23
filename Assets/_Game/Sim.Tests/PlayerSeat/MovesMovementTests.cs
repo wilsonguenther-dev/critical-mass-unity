@@ -76,14 +76,14 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
                 }
                 double speed = (w.X[0] - x30) / 30 * w.Config.SimHz, walk = w.Config.Class(c).MoveSpeed, ratio = speed / walk;
                 lit[c] = speed;
-                bool row = litAt == T30(w, 30) && Math.Abs(ratio - 1.30) <= 0.02 && s.Spy.Of(SimEventType.TravelChanged, e => e.A == 0 && e.Value == 1).Count == 1;
+                bool row = litAt == T30(w, w.Config.Depth.Moves.TravelAfterMoveTicks) && Math.Abs(ratio - w.Config.Depth.Moves.TravelSpeedMul) <= 0.02   /* integrator: decision 5 reads the knobs (x1.5 after 15) */ && s.Spy.Of(SimEventType.TravelChanged, e => e.A == 0 && e.Value == 1).Count == 1;
                 ok &= row;
                 rows.Add(c + " lit at tick " + litAt + ", " + PxLog.F(speed) + " u/s = x" + PxLog.F(ratio, "0.000"));
             }
             bool slowest = lit.Where(p => p.Key != ClassId.Warrior).All(p => p.Value > lit[ClassId.Warrior]);
             ok &= slowest;
             Assert.IsTrue(PxLog.Line("MV3 T2-4 Travel lights and ramps", "hold a move 3 s in the open, no enemy", string.Join("; ", rows) + "; Warrior slowest " + slowest,
-                "lit at tick 30, x1.30 +-0.02, the Warrior the slowest", ok));
+                "lit at TravelAfterMoveTicks, x TravelSpeedMul +-0.02, the Warrior the slowest", ok));
         }
 
         [Test]

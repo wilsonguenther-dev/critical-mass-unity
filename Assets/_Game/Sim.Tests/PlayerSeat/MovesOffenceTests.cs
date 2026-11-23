@@ -544,7 +544,7 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
         public void T2_2c_HeavyPolicyDuels_StayWithinTheBand()
         {
             var bad = new List<string>();
-            foreach (ClassId me in T.Classes)
+            foreach (ClassId me in MvCombine.Classes())   // integrator: CM_MVI_CLASSES narrows a lever probe
             {
                 OffTally b0 = OffRig.Row(me, "base", null, false, false);
                 OffTally tap = OffRig.Row(me, "base", HeavyOn, true, false);
@@ -694,7 +694,7 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
         public void T2_3b_StrongWithCombos_BeatsStrongWithout()
         {
             var bad = new List<string>();
-            foreach (ClassId me in T.Classes)
+            foreach (ClassId me in MvCombine.Classes())   // integrator: CM_MVI_CLASSES narrows a lever probe
             {
                 OffTally s0 = OffRig.Row(me, "strong", null, false, false);
                 OffTally s1 = OffRig.Row(me, "strong", ComboOn, false, false);
