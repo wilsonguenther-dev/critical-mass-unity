@@ -131,6 +131,8 @@ namespace CriticalMass.Runtime.Tests
                 // Main Camera (FOV 60) won, so the kick was sized for another lens (0.297 u vs 0.162 u expected).
                 foreach (UnityEngine.Camera other in UnityEngine.Camera.allCameras) if (other != cam) { other.enabled = false; offCams.Add(other); }
                 Assert.AreSame(cam, UnityEngine.Camera.main, "the test camera is the main camera");
+                // Editor only: AddComponent in edit mode sends Unity's Reset message, which meets CameraShake's static Reset().
+                UnityEngine.TestTools.LogAssert.Expect(UnityEngine.LogType.Error, "Failed to call static function Reset because an object was provided");
                 var shake = go.AddComponent<CameraShake>();
                 var flags = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic;
                 typeof(CameraShake).GetMethod("OnEnable", flags).Invoke(shake, null);
