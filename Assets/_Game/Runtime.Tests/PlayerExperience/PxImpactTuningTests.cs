@@ -119,6 +119,7 @@ namespace CriticalMass.Runtime.Tests
             Assume.That(!FeelGate.ReduceMotion, "reduce motion is on on this machine: the kick is rightly zero");
             var go = new UnityEngine.GameObject("px-kick-cam");
             float? keep = GameSettings.HitKickOverride;
+            var offCams = new System.Collections.Generic.List<UnityEngine.Camera>();
             try
             {
                 go.tag = "MainCamera";
@@ -126,6 +127,10 @@ namespace CriticalMass.Runtime.Tests
                 cam.fieldOfView = (float)GameplayCamera.FovDeg;
                 go.transform.position = new UnityEngine.Vector3(3, 20, -10);
                 go.transform.rotation = UnityEngine.Quaternion.Euler(60, 0, 0);
+                // review pass 7: Camera.main must be THIS camera (CameraShake.Kick reads Camera.main's FOV); the test scene's own
+                // Main Camera (FOV 60) won, so the kick was sized for another lens (0.297 u vs 0.162 u expected).
+                foreach (UnityEngine.Camera other in UnityEngine.Camera.allCameras) if (other != cam) { other.enabled = false; offCams.Add(other); }
+                Assert.AreSame(cam, UnityEngine.Camera.main, "the test camera is the main camera");
                 var shake = go.AddComponent<CameraShake>();
                 var flags = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic;
                 typeof(CameraShake).GetMethod("OnEnable", flags).Invoke(shake, null);
@@ -145,6 +150,7 @@ namespace CriticalMass.Runtime.Tests
             }
             finally
             {
+                foreach (UnityEngine.Camera other in offCams) if (other != null) other.enabled = true;
                 GameSettings.HitKickOverride = keep;
                 var flags = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic;
                 var s = go.GetComponent<CameraShake>();

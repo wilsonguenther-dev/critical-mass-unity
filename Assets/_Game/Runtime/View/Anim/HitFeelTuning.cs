@@ -52,7 +52,7 @@ namespace CriticalMass.Runtime.View.Anim
         /// <summary>Fix round 6: the share of the safe strength the reduce-flashing copy moves its albedo toward the cream.</summary>
         public const float FlashSafeColourShare = 0.6f;
         public static double FlashSeconds(bool own, bool thirdPerson, bool reduceFlashing) =>
-            FlashSeconds(own, thirdPerson) * (reduceFlashing ? FlashSafeLengthShare : 1.0);
+            reduceFlashing ? System.Math.Max(4 / 60.0, FlashSeconds(own, thirdPerson) * FlashSafeLengthShare) : FlashSeconds(own, thirdPerson);   // review pass 7: never under 4 frames (other was 60 ms = 3.6)
         /// <summary>A new flash may start on a victim whose last flash began `sinceLast` wall seconds ago.</summary>
         public static bool FlashAllowed(double sinceLast) => !(sinceLast < FlashMinGapSeconds);
         public static double MaxFlashesPerSecond => 1.0 / FlashMinGapSeconds;
