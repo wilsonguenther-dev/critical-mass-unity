@@ -1121,6 +1121,7 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
             var contacts = new List<string>();
             double gapSum = 0;
             bool landed = false, inTrial = false, got2 = false, gotFin = false;
+            int openLand = -100;
             OffRig.Play(s, 40.0, q =>
             {
                 Actor a = q.W.Actors[q.Me];
@@ -1142,11 +1143,14 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
                     while (ang < -Math.PI) ang += 2 * Math.PI;
                     contacts.Add(Math.Sqrt(cx * cx + cz * cz).ToString("0.00") + "@" + (ang * 180 / Math.PI).ToString("0") + "deg" + (q.W.Actors[q.Them].SwingPending ? "S" : ""));
                 }
+                // fix/mv-trade-neutral: an opener traded with the victim's own hit opens no chain by rule: not a chain trial
+                int took = q.W.Moves.Offence.HitTakenTick[q.Me];
+                if (inTrial && !got2 && took != CombatFeel.NoTick && Math.Abs(took - openLand) <= MovesHooks.OffenceTradeTicks) { trials--; inTrial = false; }
                 if (inTrial && curStep == 2 && !a.SwingPending && !landed && q.W.Tick == a.SwingTick + a.SwingWindup + 1) whiff2++;
                 if (!landed && !a.SwingPending && q.W.Depth.Feel.LandedSwing[q.Me] == a.SwingTick)
                 {
                     landed = true;
-                    if (curStep <= 1) { trials++; inTrial = true; got2 = gotFin = false; }
+                    if (curStep <= 1) { trials++; inTrial = true; got2 = gotFin = false; openLand = q.W.Tick; }
                     else if (inTrial)
                     {
                         if (curStep == 2 && !got2) { got2 = true; s2++; }
@@ -1192,10 +1196,12 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
                     parts.Add((bot ? "Normal no-dodge bot " : "passive dummy ") + them + ": step 2 " + a2 + "/" + tr + ", finisher " + af + "/" + tr + " {" + Diag + "}");
                     // KNOWN (accepted by the orchestrator, 2026-11-23): Demolitions' chain vs the Normal fighting bot lands step 2
                     // 6 of 10 (the bot's own swing trades into the pry bar's reach); asserted at 6 for that one cell
+                    // fix/mv-trade-neutral: an opener traded with the victim's own hit opens no chain by rule, so the trial is
+                    // dropped (a fighting bot trades a share of them): the shares are of the clean openers, at least 3
                     int need2 = bot && me == ClassId.Demolitions ? 6 : 8;
-                    if (tr < 10 || a2 < need2 || af < 6) ok = false;
+                    if (tr < (bot ? 3 : 10) || a2 * 10 < need2 * tr || af * 10 < 6 * tr) ok = false;
                 }
-                if (!PxLog.Line("combo-reach", me + " taps every 8 ticks holding toward the target, every switch on", string.Join("; ", parts), "step 2 >= 8 of 10, finisher >= 6 of 10", ok)) bad.Add(me.ToString());
+                if (!PxLog.Line("combo-reach", me + " taps every 8 ticks holding toward the target, every switch on", string.Join("; ", parts), "step 2 >= 8 of 10, finisher >= 6 of 10 of the clean (untraded) openers", ok)) bad.Add(me.ToString());
             }
             Assert.IsEmpty(bad);
         }
@@ -1242,20 +1248,23 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
                 s.KeepThemAbove = 0.6;
                 s.KeepMeAbove = 0.6;
                 int lastSwing = s.W.Actors[s.Me].SwingTick, curStep = 0, pressAt = -1, opened = 0, got = 0, t0 = s.W.Tick;
-                bool pressedOpener = false, landed = false, done = false;
+                bool pressedOpener = false, landed = false, done = false, traded = false;
+                int openerLand = -100;
                 OffRig.Play(s, 6.0, q =>
                 {
                     World w = q.W;
                     Actor a = w.Actors[q.Me];
                     if (a.SwingTick != lastSwing) { lastSwing = a.SwingTick; curStep = w.Moves.Offence.StepOf[q.Me]; landed = false; if (curStep <= 1 && opened > 0) done = true; }
                     bool justLanded = false;
+                    int took = w.Moves.Offence.HitTakenTick[q.Me];   // fix/mv-trade-neutral: a traded opener opens no chain by rule
+                    if (opened > 0 && took != CombatFeel.NoTick && Math.Abs(took - openerLand) <= MovesHooks.OffenceTradeTicks) { traded = true; done = true; }
                     if (curStep >= 2 && a.SwingPending && a.HitStunTicks > 0) Diag["stunned"] = Diag.GetValueOrDefault("stunned") + 1;
                     if (curStep >= 2 && a.SwingPending && w.Tick == a.SwingTick + 1) { double ex = w.X[q.Them] - w.X[q.Me], ez = w.Z[q.Them] - w.Z[q.Me]; Diag["gap@start x10 sum"] = Diag.GetValueOrDefault("gap@start x10 sum") + (int)(10 * Math.Sqrt(ex * ex + ez * ez)); Diag["starts"] = Diag.GetValueOrDefault("starts") + 1; Diag["themStun@start>0"] = Diag.GetValueOrDefault("themStun@start>0") + (w.Actors[q.Them].HitStunTicks > 0 ? 1 : 0); Diag["themSwinging@start"] = Diag.GetValueOrDefault("themSwinging@start") + (w.Actors[q.Them].SwingPending ? 1 : 0); }
                     if (!landed && !a.SwingPending && w.Depth.Feel.LandedSwing[q.Me] == a.SwingTick && pressedOpener)
                     {
                         landed = true;
                         justLanded = true;
-                        if (curStep <= 1) { opened = 1; Diag["L:stun=" + w.Actors[q.Them].HitStunTicks + " cd=" + (int)Math.Ceiling(a.AttackCd * w.Config.SimHz - 1e-9) + " win=" + (w.Moves.Offence.ChainUntil[q.Me] - w.Tick) + " rec=" + a.SwingRecovery] = 1; }
+                        if (curStep <= 1) { opened = 1; openerLand = w.Tick; Diag["L:stun=" + w.Actors[q.Them].HitStunTicks + " cd=" + (int)Math.Ceiling(a.AttackCd * w.Config.SimHz - 1e-9) + " win=" + (w.Moves.Offence.ChainUntil[q.Me] - w.Tick) + " rec=" + a.SwingRecovery] = 1; }
                         else if (curStep > got && opened > 0) got = curStep;
                         if (got >= steps) done = true;
                     }
@@ -1292,7 +1301,7 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
                     }
                     f.Attack = press;
                 }, q => done || q.W.Tick - t0 > 300);
-                if (opened == 0) continue;   // no opener landed in 10 s: not a chain trial
+                if (opened == 0 || traded) continue;   // no opener landed in 10 s, or it was a trade (no chain by rule): not a chain trial
                 n++;
                 if (got >= 2) s2++;
                 if (got >= 3) s3++;
@@ -1324,6 +1333,108 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
                         }
                     if (!PxLog.Line("combo-grid", me + " vs a " + (bot ? "Normal no-dodge Farmer bot" : "passive Farmer dummy") + " (step 2" + (steps >= 3 ? "/step 3" : "") + " of 8)", string.Join(", ", parts), "step 2 >= 7 of 8" + (steps >= 3 ? ", step 3 >= 6 of 8" : "") + " in every cell", ok)) bad.Add(me + (bot ? " bot" : " dummy"));
                 }
+            }
+            Assert.IsEmpty(bad);
+        }
+    }
+}
+
+namespace CriticalMass.Sim.Tests.PlayerSeat
+{
+    using System;
+    using System.Collections.Generic;
+    using CriticalMass.Sim.Config;
+    using CriticalMass.Sim.Core;
+    using NUnit.Framework;
+    using T = CriticalMass.Sim.Tests.PlayerSeat.PlayerSeatTargets;
+
+    /// <summary>fix/mv-trade-neutral: person vs person mirror duels (every switch on). Both walk in; A presses on reach, B d
+    /// ticks later (d 0..3), then each presses at every ready swing in reach after a seeded 0-3 tick reaction (same skill), 4 reaction seeds per start.
+    /// A trade = both sides' first hits within OffenceTradeTicks: the earlier hitter's win share must sit in 0.35-0.65.
+    /// A clean first hit (B presses 12 ticks late) must still chain.</summary>
+    [TestFixture]
+    [Category("PlayerSeat")]
+    public sealed class MovesOffenceTradeNeutral
+    {
+        sealed class Side { public int Id, Foe, PressAt = -1, FirstHit = CombatFeel.NoTick, Steps; public bool WasReady; }
+
+        static (bool traded, bool earlierWon, bool decided, int aSteps) Duel(ClassId cls, int k, int d, int rep = 0)
+        {
+            Seat s = PlayerSeatRig.Duel(cls, cls, TargetMode.HumanVsHuman, PlayerSeatRig.AngleOf(k, 8), k, 0, tweak: c =>
+            {
+                MovesConfig.PlayBuildAllOn(c.Depth.Moves);
+                if (Environment.GetEnvironmentVariable("CM_L4_NOCRIT") != null) c.Depth.CombatFeel.CritEnabled = false;   // probe only
+            });
+            s.NoTnt = true;
+            var rng = new Random(1000 * k + 17 * d + 7919 * rep + (int)cls);
+            var A = new Side { Id = s.Me, Foe = s.Them };
+            var B = new Side { Id = s.Them, Foe = s.Me };
+            bool opened = false;
+            int openTick = -1;
+            DuelResult r = OffRig.Play(s, 25.0, q =>
+            {
+                World w = q.W;
+                foreach (Side x in new[] { A, B })
+                {
+                    Actor a = w.Actors[x.Id];
+                    if (x.FirstHit == CombatFeel.NoTick && w.Depth.Feel.LandedSwing[x.Id] == a.SwingTick && !a.SwingPending && a.SwingTick != CombatFeel.NoTick) x.FirstHit = w.Tick;
+                    double dx = w.X[x.Foe] - w.X[x.Id], dz = w.Z[x.Foe] - w.Z[x.Id], dist = Math.Sqrt(dx * dx + dz * dz);
+                    double reach = w.Config.Class(cls).AttackRange + w.Config.Class(cls).Radius;
+                    InputFrame f = q.Frames[x.Id];
+                    f.MoveX = f.MoveZ = 0; f.Attack = f.Dodge = f.Guard = f.Cancel = false;
+                    f.AimX = w.X[x.Foe]; f.AimZ = w.Z[x.Foe];
+                    if (dist > reach - 0.3 && dist > 1e-6) { f.MoveX = dx / dist; f.MoveZ = dz / dist; }
+                    bool inReach = dist <= reach - 0.3;
+                    if (!opened)
+                    {
+                        if (x == A && inReach && Combat.AttackReady(w, A.Id)) { opened = true; openTick = w.Tick; A.PressAt = w.Tick; B.PressAt = w.Tick + d; }
+                    }
+                    bool ready = Combat.AttackReady(w, x.Id) || (w.Moves.Offence.ChainNext[x.Id] >= 2 && !a.SwingPending);
+                    if (opened && ready && !x.WasReady && x.PressAt < w.Tick) x.PressAt = w.Tick + rng.Next(0, 4);
+                    x.WasReady = ready;
+                    if (opened && x.PressAt == w.Tick && inReach) f.Attack = true;
+                    else if (opened && x.PressAt == w.Tick) x.PressAt = w.Tick + 1;   // walk in, press on reach
+                }
+            });
+            A.Steps = s.Spy.Of(SimEventType.ComboStep, e => e.A == A.Id).Count;
+            string dg = Environment.GetEnvironmentVariable("CM_L4_TRADEDIAG");
+            if (dg != null && dg == cls + "/" + k + "/" + d)
+            {
+                var sb = new System.Text.StringBuilder();
+                foreach (var e in s.Spy.All)
+                    if (e.Tick <= openTick + 90 && (e.Type == SimEventType.AttackStart || e.Type == SimEventType.HitStun || e.Type == SimEventType.AttackCancel || e.Type == SimEventType.ComboStep || e.Type == SimEventType.Hit))
+                        sb.Append(e.Type).Append(' ').Append(e.A).Append('>').Append(e.B).Append(" v").Append(e.Value.ToString("0.#")).Append(" t").Append(e.Tick - openTick).Append("; ");
+                PxLog.Line("trade-diag", cls + " k" + k + " d" + d + " A=" + A.Id + " firstA " + (A.FirstHit - openTick) + " firstB " + (B.FirstHit - openTick) + " won " + r.Won + " lost " + r.Lost, sb.ToString(), "-", true);
+            }
+            bool traded = A.FirstHit != CombatFeel.NoTick && B.FirstHit != CombatFeel.NoTick && Math.Abs(A.FirstHit - B.FirstHit) <= MovesHooks.OffenceTradeTicks;
+            bool aEarlier = A.FirstHit <= B.FirstHit;
+            bool earlierWon = aEarlier ? r.Won : r.Lost;
+            return (traded, earlierWon, r.Won || r.Lost, A.Steps);
+        }
+
+        [Test]
+        public void ATradeOpensNoChain_EarlierHitterWinsAboutHalf_ACleanHitStillChains()
+        {
+            var bad = new List<string>();
+            MovesConfig mc = new MovesConfig();
+            foreach (ClassId cls in T.Classes)
+            {
+                if (mc.ComboSteps[(int)cls] < 2) continue;
+                int trades = 0, earlierWins = 0, decided = 0;
+                for (int d = 0; d <= 3; d++)
+                    for (int k = 0; k < 8; k++)
+                    for (int rp = 0; rp < 4; rp++)
+                    {
+                        var r = Duel(cls, k, d, rp);
+                        if (!r.traded || !r.decided) continue;
+                        trades++; decided++;
+                        if (r.earlierWon) earlierWins++;
+                    }
+                int clean = 0;
+                for (int k = 0; k < 8; k++) if (Duel(cls, k, 12).aSteps > 0) clean++;
+                double share = decided > 0 ? (double)earlierWins / decided : -1;
+                bool ok = trades >= 24 && share >= 0.35 && share <= 0.65 && clean >= 6;
+                if (!PxLog.Line("trade-neutral", cls + " mirror, person vs person", "trades " + trades + " of 128, earlier hitter won " + earlierWins + " (" + share.ToString("0.00") + "); clean first hit chained " + clean + "/8", "trades >= 24, share 0.35-0.65, clean >= 6 of 8", ok)) bad.Add(cls.ToString());
             }
             Assert.IsEmpty(bad);
         }

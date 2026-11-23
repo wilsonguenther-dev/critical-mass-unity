@@ -57,6 +57,11 @@ namespace CriticalMass.Sim.Core
         /// <summary>fix/mv-combo-reach: cooldown ticks a person's open chain borrowed (the next step may start when the recovery
         /// ends); paid back on the finisher, a step's whiff, or the next opener, so a whole chain keeps the class's swing rate.</summary>
         public int[] ChainDebt = new int[0];
+        /// <summary>fix/mv-trade-neutral: the tick the actor last took a strike from (or with) a person's seat, NoTick = none; and who struck it.</summary>
+        public int[] HitTakenTick = new int[0];
+        public int[] HitTakenBy = new int[0];
+        /// <summary>fix/mv-trade-neutral: the tick the actor's last landed swing opened or advanced its chain, NoTick = none.</summary>
+        public int[] ChainOpenTick = new int[0];
         /// <summary>Integrator (decision 2): the body the actor's last landed strike hit (its dodge breaks the chain), -1 = none.</summary>
         public int[] ChainVictim = new int[0];
         /// <summary>Demolitions' fuse strike: the tick a fuse stuck on this body blows (NoTick = none) and who lit it.</summary>
@@ -94,6 +99,9 @@ namespace CriticalMass.Sim.Core
             ChainUntil = new int[n];
             ComboPressTick = new int[n];
             ChainDebt = new int[n];
+            HitTakenTick = new int[n];
+            HitTakenBy = new int[n];
+            ChainOpenTick = new int[n];
             ChainVictim = new int[n];
             FuseTick = new int[n];
             FuseOwner = new int[n];
@@ -122,6 +130,9 @@ namespace CriticalMass.Sim.Core
                 ChainUntil[i] = CombatFeel.NoTick;
                 ComboPressTick[i] = CombatFeel.NoTick;
                 ChainDebt[i] = 0;
+                HitTakenTick[i] = CombatFeel.NoTick;
+                HitTakenBy[i] = -1;
+                ChainOpenTick[i] = CombatFeel.NoTick;
                 ChainVictim[i] = -1;
                 FuseTick[i] = CombatFeel.NoTick;
                 FuseOwner[i] = -1;
@@ -274,6 +285,38 @@ namespace CriticalMass.Sim.Core
         {
             if (w.Moves == null || !(dealt > 0) || source < 0 || source >= w.ActorCount || target < 0 || target >= w.ActorCount) return;
             OffenceMovesState s = w.Moves.Offence;
+            if (On(w, Cfg(w).Combos) && (OffenceHuman(w, source) || OffenceHuman(w, target)))
+            {
+                // fix/mv-trade-neutral, the other order: the target's chain opened on this source within OffenceTradeTicks before
+                // this counter-hit is a trade, so it closes (neutral; what it borrowed is paid back).
+                bool trade = false;
+                if (s.ChainNext[target] >= 2 && s.ChainVictim[target] == source && s.ChainOpenTick[target] != CombatFeel.NoTick
+                    && w.Tick - s.ChainOpenTick[target] <= OffenceTradeTicks)
+                {
+                    OffenceTradeNeutral(w, s, target);
+                    trade = true;
+                }
+                // this order (Editor: the hitter one tick LATER kept his chain and always won): a strike landed within
+                // OffenceTradeTicks of being struck by this target opens or advances no chain. Here, not in OffenceAfterContact:
+                // with the fair hit queue the strike (and ChainVictim) lands after the contact hook.
+                if (s.ChainNext[source] >= 2 && s.HitTakenBy[source] == target && s.HitTakenTick[source] != CombatFeel.NoTick
+                    && w.Tick - s.HitTakenTick[source] <= OffenceTradeTicks && s.ChainOpenTick[source] == w.Tick)
+                {
+                    OffenceTradeNeutral(w, s, source);
+                    trade = true;
+                }
+                // neutral means level: after a trade both are ready on the same tick (the later one), so the earlier hitter's
+                // head start of a tick or three does not decide the next exchange either.
+                if (trade)
+                {
+                    Actor at = w.Actors[target], asrc = w.Actors[source];
+                    double cd = at.AttackCd > asrc.AttackCd ? at.AttackCd : asrc.AttackCd;
+                    at.AttackCd = cd;
+                    asrc.AttackCd = cd;
+                }
+                s.HitTakenTick[target] = w.Tick;
+                s.HitTakenBy[target] = source;
+            }
             s.LastHitHuman[source] = OffenceHuman(w, target) ? (byte)1 : (byte)0;   // a person's seat (an autopiloted seat is a bot)
             s.ChainVictim[source] = target;
             if (!On(w, Cfg(w).Heavy) || !OffenceIsHeavy(w, source)) return;
@@ -702,6 +745,7 @@ namespace CriticalMass.Sim.Core
                 return;
             }
             s.ChainNext[i] = step + 1;
+            s.ChainOpenTick[i] = w.Tick;
             // fix/mv-combo-reach: a person's next step may start as soon as this swing's recovery ends (never sooner than
             // OffenceMinStepGapTicks after the hit, so a lag-6 victim's dodge still fits), not after the full class cooldown: the
             // step follows before the staggered victim's own swing can land (the Editor's chain that "never connected" was this
@@ -746,12 +790,25 @@ namespace CriticalMass.Sim.Core
         /// step wind-up, 5 ticks, later).</summary>
         public const int OffenceMinStepGapTicks = 3;
 
+        /// <summary>fix/mv-trade-neutral: two hits between the same pair this many ticks apart or closer are a trade.</summary>
+        public const int OffenceTradeTicks = 3;
+
         /// <summary>fix/mv-combo-reach-2: the knock share of a person's chain hit before the finisher (Farmer opener 1.5 u -> 0.45 u).</summary>
         public const double OffenceChainKnockMul = 0.3;
 
         /// <summary>fix/mv-combo-reach: the most cooldown (30 Hz ticks) one step may borrow, per class. The Farmer borrows less
         /// (his 3-step chain front-loads two borrows: passive time to kill must stay inside the 5-15% band).</summary>
         public static readonly int[] OffenceStepBorrowTicks = { 99, 6, 99, 99, 99, 0 };
+
+        /// <summary>fix/mv-trade-neutral: a trade closes actor i's chain (neutral: the next swing is an opener, the chain hold
+        /// ends, what it borrowed is paid back).</summary>
+        static void OffenceTradeNeutral(World w, OffenceMovesState s, int i)
+        {
+            s.ChainNext[i] = 0;
+            s.ChainOpenTick[i] = CombatFeel.NoTick;
+            s.ComboPressTick[i] = CombatFeel.NoTick;
+            OffencePayChainDebt(w, s, i);
+        }
 
         static void OffencePayChainDebt(World w, OffenceMovesState s, int i)
         {
