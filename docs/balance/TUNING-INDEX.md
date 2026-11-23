@@ -4,7 +4,7 @@ Every tuning field the sim reads from `GameConfig`, found by reflection (`Assets
 
 Regenerate: `tools/balance/balance-report.sh tuning-index (or the balance-report workflow, mode tuning-index)`. `TuningIndexTests` fails when a field has no row here. Paths work as `--set Path=Value` switches for the balance report.
 
-1027 fields.
+1031 fields.
 
 ## (top level)
 
@@ -1071,12 +1071,16 @@ Regenerate: `tools/balance/balance-report.sh tuning-index (or the balance-report
 | `Depth.Moves.DemoFuseDamage` | 12 | double | `Assets/_Game/Sim/Config/MovesConfig.cs` |  |
 | `Depth.Moves.DemoFuseSeconds` | 1 | double | `Assets/_Game/Sim/Config/MovesConfig.cs` |  |
 | `Depth.Moves.DemoFuseRadius` | 1 | double | `Assets/_Game/Sim/Config/MovesConfig.cs` |  |
-| `Depth.Moves.ComboSteps` | [2, 3, 2, 2, 3, 1] | int[] | `Assets/_Game/Sim/Config/MovesConfig.cs` | Steps per class (the last step is the finisher; 1 = no combo). Integrator (decision 1, the Healer ruling): the Healer has no chain (2 -> 1; with it her duel variants reached 10 to 14 of 40). |
+| `Depth.Moves.ComboSteps` | [2, 3, 3, 2, 3, 1] | int[] | `Assets/_Game/Sim/Config/MovesConfig.cs` | Steps per class (the last step is the finisher; 1 = no combo). Integrator (decision 1, the Healer ruling): the Healer has no chain (2 -> 1; with it her duel variants reached 10 to 14 of 40). |
 | `Depth.Moves.ComboStepWindupMul` | 0.7 | double | `Assets/_Game/Sim/Config/MovesConfig.cs` |  |
 | `Depth.Moves.ComboStepDamageMul` | 1.1 | double | `Assets/_Game/Sim/Config/MovesConfig.cs` |  |
 | `Depth.Moves.FinisherDamageMul` | 1.35 | double | `Assets/_Game/Sim/Config/MovesConfig.cs` |  |
 | `Depth.Moves.FinisherKnockMul` | 1.8 | double | `Assets/_Game/Sim/Config/MovesConfig.cs` |  |
 | `Depth.Moves.FinisherDamageMulByClass` | [-1, -1, -1, 1.3, -1, -1] | double[] | `Assets/_Game/Sim/Config/MovesConfig.cs` | Integrator: per-class finisher damage, -1 = FinisherDamageMul. Demolitions on 2 steps: passive time to kill fell 0.170 at 1.35 (band 0.05 to 0.15). |
+| `Depth.Moves.AvoidRefundShareByClass` | [0.2, -1, -1, -1, -1, -1] | double[] | `Assets/_Game/Sim/Config/MovesConfig.cs` | Healer ruling (fix/mv-healer-ruling): per-class AvoidRefundShare, -1 = AvoidRefundShare. Read with DodgeAvoidRefund. |
+| `Depth.Moves.SecondWindByClass` | [1, 1, 1, 1, 1, 1] | int[] | `Assets/_Game/Sim/Config/MovesConfig.cs` | Healer ruling: 1 = the class may get the second wind (read with SecondWind), 0 = never. |
+| `Depth.Moves.GlideStrikeDamageMul` | 0.8 | double | `Assets/_Game/Sim/Config/MovesConfig.cs` | Healer ruling: with Glide on, a melee strike by a GlideClasses class on an enemy actor deals this share of its damage (the glide's price: she escapes, she does not out-fight). 1 = unchanged. |
+| `Depth.Moves.GlideStrikeKnockMul` | 1 | double | `Assets/_Game/Sim/Config/MovesConfig.cs` | Healer ruling: with Glide on, the knock distance of a melee strike by a GlideClasses class (her lantern's shove) is multiplied by this. 1 = unchanged. |
 | `Depth.Moves.FinisherExtraRecoveryTicks` | 6 | int | `Assets/_Game/Sim/Config/MovesConfig.cs` |  |
 | `Depth.Moves.ComboResetSeconds` | 1 | double | `Assets/_Game/Sim/Config/MovesConfig.cs` |  |
 | `Depth.Moves.TravelAfterMoveTicks` | 15 | int | `Assets/_Game/Sim/Config/MovesConfig.cs` | integrator decision 5: x1.5 after 15 (16v16 respawn-to-first-hit 12.1 s -> 9.8 s; Warrior slowest, S58 0 stuck, bands hold) |

@@ -151,7 +151,17 @@ namespace CriticalMass.Sim.Config
         public double FinisherKnockMul = 1.8;
         /// <summary>Integrator: per-class finisher damage, -1 = FinisherDamageMul. Demolitions on 2 steps: passive time to kill
         /// fell 0.170 at 1.35 (band 0.05 to 0.15).</summary>
-        public double[] FinisherDamageMulByClass = { -1, -1, -1, 1.3, -1, -1 };   // Demolitions 1.3: time to kill falls 0.125, strong-with-combos 34 -> 34
+        public double[] FinisherDamageMulByClass = { -1, -1, -1, 1.3, -1, -1 };
+        /// <summary>Healer ruling (fix/mv-healer-ruling): per-class AvoidRefundShare, -1 = AvoidRefundShare. Read with DodgeAvoidRefund.</summary>
+        public double[] AvoidRefundShareByClass = { 0.2, -1, -1, -1, -1, -1 };   // Warrior 0.2: his refund spent the dodge into the next lunge (escape vs a lunging Farmer 4 -> 7 of 16; dodge-alone answered 0.41 -> 0.31). Healer 0 measured 1/4/1/5 with the two below but flipped the bot check (Kaiju blocking 38 s, 9 shiver flags): left at -1
+        /// <summary>Healer ruling: 1 = the class may get the second wind (read with SecondWind), 0 = never.</summary>
+        public int[] SecondWindByClass = { 1, 1, 1, 1, 1, 1 };   // Healer 0 was measured (see AvoidRefundShareByClass) and left at 1
+        /// <summary>Healer ruling: with Glide on, a melee strike by a GlideClasses class on an enemy actor deals this share of its
+        /// damage (the glide's price: she escapes, she does not out-fight). 1 = unchanged.</summary>
+        public double GlideStrikeDamageMul = 0.8;   // the Healer's wins were her lantern out-trading the Miner and Builder (strong 15 of 40; 14 with EVERY switch OFF; no heals, no crits in any duel): at 0.8 base / dodge / guard / strong 1 / 5 / 4 / 7
+        /// <summary>Healer ruling: with Glide on, the knock distance of a melee strike by a GlideClasses class (her lantern's
+        /// shove) is multiplied by this. 1 = unchanged.</summary>
+        public double GlideStrikeKnockMul = 1;   // Demolitions 1.3: time to kill falls 0.125, strong-with-combos 34 -> 34
         public int FinisherExtraRecoveryTicks = 6;
         public double ComboResetSeconds = 1.0;
 
@@ -285,6 +295,8 @@ namespace CriticalMass.Sim.Config
             c.GuardReleaseTicksByClass = (int[])GuardReleaseTicksByClass.Clone();
             c.LungeWindupMulByClass = (double[])LungeWindupMulByClass.Clone();
             c.FinisherDamageMulByClass = (double[])FinisherDamageMulByClass.Clone();
+            c.AvoidRefundShareByClass = (double[])AvoidRefundShareByClass.Clone();
+            c.SecondWindByClass = (int[])SecondWindByClass.Clone();
             c.BotComboChance = (double[])BotComboChance.Clone();
             return c;
         }
