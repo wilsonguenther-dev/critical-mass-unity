@@ -422,7 +422,9 @@ namespace CriticalMass.Runtime.Camera
             _folCount = GatherScenery(w, tx, tz, 0, _fol, target);
             // fix/px-camera-in-editor: the third-person play camera collides only with hard scenery (rocks, props,
             // buildings) and the grid; trees and groves never move it, they fade (UpdateFades)
-            bool robust = Mode == GroundViewMode.Play && _view != CameraView.FirstPerson && !RobustOffForDiagnostics;
+            // fix/px-rough-spots item 5 (the knock-out camera pressed into a team-mate's model / parked low): the watch (death)
+            // camera uses the same hard-scenery-only boom, unless the player plays first person
+            bool robust = (Mode == GroundViewMode.Play || Mode == GroundViewMode.Watch) && _view != CameraView.FirstPerson && !RobustOffForDiagnostics;
             RobustThirdPerson = robust;
             _hardCount = 0;
             for (int i = 0; i < _folCount; i++) if (!robust || !_fol[i].Soft) _hard[_hardCount++] = _fol[i];

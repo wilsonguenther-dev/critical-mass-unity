@@ -15,13 +15,15 @@ namespace CriticalMass.Runtime.Camera
     public static class GroundCamera
     {
         /// <summary>Distance from the pivot to the camera along the view ray (u): about 3 m behind.</summary>
-        public const double Distance = 3.0;
+        /// <summary>fix/px-rough-spots item 5: the watch / knock-out camera (the play views have their own rigs): 4.4 u and 12
+        /// degrees down (was 3.0 u and 7: pressed against the followed fighter, mostly sky at an island edge).</summary>
+        public const double Distance = 4.4;
         /// <summary>Pivot height above the followed fighter's ground (u): his upper chest (CharacterHeight is 2.0).</summary>
         public const double PivotHeight = 1.3;
         /// <summary>Over-the-shoulder offset to the camera's right (u), so the fighter does not cover the reticle.</summary>
         public const double Shoulder = 0.45;
         /// <summary>Default pitch (degrees down): camera 1.3 + 3 x sin 7 = about 1.65 u up, horizon on screen.</summary>
-        public const double PitchDeg = 7;
+        public const double PitchDeg = 12;
         public const double MinPitchDeg = -8, MaxPitchDeg = 38;
         /// <summary>Lens: wider than the high view's 35 (a 35-degree lens at 3 m is a telephoto close-up).</summary>
         public const float FovDeg = 55f;
