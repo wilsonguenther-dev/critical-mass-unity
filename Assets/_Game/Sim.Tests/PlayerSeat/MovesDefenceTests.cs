@@ -173,7 +173,7 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
         /// me at 30% runs down the open lane from a lag-6 HUMAN chaser (aim help Low) for 6 s, 16 starts, and dodges once on each
         /// read wind-up (the audit's "dodge" escape). lunging: the chaser dodges in when the gap is between its reach and reach + 3.2.
         /// </summary>
-        public static MvDefenceTally Escape(ClassId me, ClassId chaser, bool lunging, Action<GameConfig> tweak, int angles = 16)
+        public static MvDefenceTally Escape(ClassId me, ClassId chaser, bool lunging, Action<GameConfig> tweak, int angles = 16, bool spreadLag = false)
         {
             var t = new MvDefenceTally();
             GameConfig gc = PlayerSeatRig.Config();
@@ -196,7 +196,8 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
                     double lx = k % 2 == 0 ? -1 : 1, lz = Math.Max(-0.6, Math.Min(0.6, (w.Map.Hill.Z - w.Z[q.Me]) * 0.8));
                     double ll = Math.Sqrt(lx * lx + lz * lz);
                     q.Human.MoveOverrideX = lx / ll; q.Human.MoveOverrideZ = lz / ll;
-                    if (wt.Since(w) == Lag && Dodge.CanStart(w, q.Me)) q.Human.PressDodge = true;
+                    int lag = spreadLag ? 5 + k % 4 : Lag;   // spreadLag: the runner's eye varies 5 to 8 ticks per start, as the chaser's does
+                    if (wt.Since(w) == lag && Dodge.CanStart(w, q.Me)) q.Human.PressDodge = true;
                     double creach = w.Config.Class(chaser).AttackRange + w.Config.Class(me).Radius;
                     if (lunging && rd > creach && rd < creach + 3.2 && Dodge.CanStart(w, q.Them) && rd > 1e-6)
                     {
@@ -538,7 +539,9 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
                 {
                     MvDefenceTally l7 = MvDefenceRig.Escape(me, ClassId.Farmer, true, MvDefenceRig.With(m => { m.DodgeLunge = true; m.LungeStopShare = 0.70; }));
                     MvDefenceTally l6 = MvDefenceRig.Escape(me, ClassId.Farmer, true, MvDefenceRig.With(m => { m.DodgeLunge = true; m.LungeStopShare = 0.60; }));
-                    PxLog.Line("mv2-lever", me + " escape vs a lunging Farmer with LungeStopShare 0.70 / 0.60 (spec 0.85)", l7.Escaped + "/16 / " + l6.Escaped + "/16", "report", true);
+                    MvDefenceTally lw = MvDefenceRig.Escape(me, ClassId.Farmer, true, MvDefenceRig.With(m => { m.DodgeLunge = true; m.LungeWindupMul = 0.6; }));
+                    MvDefenceTally sp = MvDefenceRig.Escape(me, ClassId.Farmer, true, on, 16, true);
+                    PxLog.Line("mv2-lever", me + " escape vs a lunging Farmer with LungeStopShare 0.70 / 0.60 (spec 0.85); LungeWindupMul 0.6 (spec 0.75); spec knobs with the runner's eye 5 to 8 ticks", l7.Escaped + "/16 / " + l6.Escaped + "/16; " + lw.Escaped + "/16; " + sp.Escaped + "/16", "report", true);
                 }
                 PxLog.Line("mv2-T1-2", me + " at 30% escapes a lunging lag-6 Farmer with one dodge per read (16)", e.Escaped + "/16 (chaser lunges " + e.Uses + ", swings " + e.Answered + " landed " + e.AnsweredLanded + "; with refund on " + eRefund.Escaped + "/16; switches off, no lunge " + eOff.Escaped + "/16)", "6 to 13 of 16", pass);
                 if (!pass) fails.Add(me + " escape " + e.Escaped);
@@ -626,6 +629,12 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
                 MvDefenceTally dodgeOn = MvDefenceRig.DuelRow(me, "dodge", on);
                 MvDefenceTally guardOn = MvDefenceRig.DuelRow(me, "guard", on);
                 string cells = string.Join(" ", cellsOn.Select(kv => kv.Key.ToString().Substring(0, 2) + kv.Value));
+                ClassId[] mid = { ClassId.Farmer, ClassId.Miner, ClassId.Demolitions, ClassId.Builder };
+                if (mid.Contains(me))
+                {
+                    int mo = mid.Where(c => c != me).Sum(c => cellsOff[c]), mn = mid.Where(c => c != me).Sum(c => cellsOn[c]);
+                    PxLog.Line("mv2-S45", me + " vs the other middle three (24), base model", "off " + PxLog.F(mo / 24.0) + " on " + PxLog.F(mn / 24.0), "in [0.30, 0.70] (S45; reported, a known red at base)", mn / 24.0 >= 0.30 && mn / 24.0 <= 0.70);
+                }
                 PxLog.Line("mv2-duel", me + " vs Normal bots (40)", "base off " + baseOff.Wins + " on " + baseOn.Wins + " [" + cells + "] dodge " + dodgeOn.Wins + " guard " + guardOn.Wins + " (uses " + guardOn.Uses + ", saved " + PxLog.F(guardOn.Saved, "0") + ")", "ruling", true);
                 if (me == ClassId.Warrior)
                 {
@@ -662,7 +671,9 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
                     // levers for the Healer ruling (measured, not shipped): her parry window narrowed, and no parry at all
                     MvDefenceTally w3 = MvDefenceRig.DuelRow(me, "guard", c => { MvDefenceRig.Lane2(c); c.Depth.Moves.ParryWindowTicks[(int)ClassId.Healer] = 3; });
                     MvDefenceTally w0 = MvDefenceRig.DuelRow(me, "guard", c => { MvDefenceRig.Lane2(c); c.Depth.Moves.ParryWindowTicks[(int)ClassId.Healer] = 0; });
-                    PxLog.Line("mv2-lever", "Healer guard variant with her parry window 3 / 0 (spec 5)", w3.Wins + "/40 / " + w0.Wins + "/40", "report", true);
+                    MvDefenceTally c0 = MvDefenceRig.DuelRow(me, "guard", c => { MvDefenceRig.Lane2(c); c.Depth.Moves.GuardCut[(int)ClassId.Healer] = 0; });
+                    MvDefenceTally c0sw = MvDefenceRig.DuelRow(me, "guard", c => { MvDefenceRig.Lane2(c); c.Depth.Moves.SecondWind = false; });
+                    PxLog.Line("mv2-lever", "Healer guard variant with her parry window 3 / 0 (spec 5); with no guard cut (parry only, as the Warrior); with second wind off", w3.Wins + "/40 / " + w0.Wins + "/40; " + c0.Wins + "/40; " + c0sw.Wins + "/40", "report", true);
                 }
             }
             double mean = gains.Average();
