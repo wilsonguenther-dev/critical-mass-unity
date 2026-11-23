@@ -546,10 +546,10 @@ namespace CriticalMass.Sim.Core
             }
             Actor t = w.Actors[target];
             // integrator (decision 6): a LUNGE wind-up shrugs off a hit under the lunger's Poise (the swing goes on)
-            if (m.DodgeLunge && m.LungeArmour && t.SwingPending && t.SwingTick == DefenceS(w).LungeSwingTick[target]
+            if (m.DodgeLunge && m.LungeArmour != 0 && t.SwingPending && t.SwingTick == DefenceS(w).LungeSwingTick[target]
                 && w.Moves.Offence.StrikeAmount[0] < w.Config.Class(t.Cls).Poise) stun = 0;
             // integrator (decision 2): the knock of an enemy's melee light strike may be dodged out of (Dodge.CanStart)
-            if (m.Combos && m.ComboDodgeOutOfKnock && !OffenceIsHeavy(w, source) && DefenceEnemyActor(w, target, source)) DefenceS(w).LightKnockTick[target] = w.Tick;
+            if (m.Combos && m.ComboDodgeOutOfKnock != 0 && !OffenceIsHeavy(w, source) && DefenceEnemyActor(w, target, source)) DefenceS(w).LightKnockTick[target] = w.Tick;
         }
 
         /// <summary>Dodge.CanStart (integrator, decision 2): actor id slides on a knock but may dodge out of it: Combos and
@@ -559,7 +559,7 @@ namespace CriticalMass.Sim.Core
         {
             if (w.Moves == null) return false;
             MovesConfig m = Cfg(w);
-            if (!m.Combos || !m.ComboDodgeOutOfKnock) return false;
+            if (!m.Combos || m.ComboDodgeOutOfKnock == 0) return false;
             Actor a = w.Actors[id];
             if (a.HitStunTicks > 0 || a.AirLen > 0) return false;
             int k = DefenceS(w).LightKnockTick[id];

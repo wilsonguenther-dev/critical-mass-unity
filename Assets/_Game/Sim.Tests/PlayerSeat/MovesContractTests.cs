@@ -109,13 +109,13 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
         {
             ulong plain = ConfigHash.Of(GameConfig.CreateDefault());
             GameConfig knob = GameConfig.CreateDefault();
-            knob.Depth.Moves.TravelSpeedMul = 1.5;
+            knob.Depth.Moves.TravelSpeedMul = 1.75;   // integrator: 1.5 is the default since decision 5
             Assert.AreEqual(plain, ConfigHash.Of(knob), "every switch off: the block is not mixed (old replays and peers still match)");
             GameConfig on = GameConfig.CreateDefault();
             on.Depth.Moves.Travel = true;
             ulong h1 = ConfigHash.Of(on);
             Assert.AreNotEqual(plain, h1, "a switch on is seen");
-            on.Depth.Moves.TravelSpeedMul = 1.5;
+            on.Depth.Moves.TravelSpeedMul = 1.75;
             Assert.AreNotEqual(h1, ConfigHash.Of(on), "with a switch on, every knob is seen");
         }
 

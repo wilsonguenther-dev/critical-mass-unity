@@ -151,7 +151,7 @@ namespace CriticalMass.Sim.Config
         public double FinisherKnockMul = 1.8;
         /// <summary>Integrator: per-class finisher damage, -1 = FinisherDamageMul. Demolitions on 2 steps: passive time to kill
         /// fell 0.170 at 1.35 (band 0.05 to 0.15).</summary>
-        public double[] FinisherDamageMulByClass = { -1, -1, -1, -1, -1, -1 };
+        public double[] FinisherDamageMulByClass = { -1, -1, -1, 1.3, -1, -1 };   // Demolitions 1.3: time to kill falls 0.125, strong-with-combos 34 -> 34
         public int FinisherExtraRecoveryTicks = 6;
         public double ComboResetSeconds = 1.0;
 
@@ -194,7 +194,7 @@ namespace CriticalMass.Sim.Config
         /// <summary>T2-3 (lane 2 rule, decision 2 "every combo is dodgeable"): with Combos on, a victim whose stagger is over may
         /// start a dodge during the knock slide of an enemy's melee LIGHT strike (not a heavy) taken in the last
         /// ComboKnockDodgeTicks; the dodge ends the slide. Without it the Farmer's thrust slide outlasts the gap between steps.</summary>
-        public bool ComboDodgeOutOfKnock = true;
+        public int ComboDodgeOutOfKnock = 1;   // int, not bool: every public bool here is a SWITCH (MovesContractTests); 1 = on
         /// <summary>T2-1 (decision 1, ruling "Healer loses nearly every one-on-one"): a guard-blocked melee hit neither staggers nor
         /// fully knocks a class marked true here. The Healer's guard only cuts damage: she still staggers and slides.</summary>
         public bool[] GuardKeepsFooting = { true, true, true, true, true, false };
@@ -205,10 +205,10 @@ namespace CriticalMass.Sim.Config
         /// <summary>T2-3 (decision 2): a victim's dodge breaks every chain whose last landed strike hit it, so the next swing is an
         /// opener (no step bonus, no finisher). Without it the fastest class (the Farmer) walks a dodged victim down inside the
         /// chain window and the dodge never escapes the combo.</summary>
-        public bool ComboBreaksOnDodge = true;
+        public int ComboBreaksOnDodge = 1;   // 1 = on (int: see ComboDodgeOutOfKnock)
         /// <summary>T1-2 (decision 6): a LUNGE wind-up shrugs off a hit under the lunger's class Poise (no stagger, the swing goes
         /// on), so a fleeing target's light hit does not cancel the lunge it ran into.</summary>
-        public bool LungeArmour = true;
+        public int LungeArmour = 1;   // 1 = on (int: see ComboDodgeOutOfKnock)
         /// <summary>T1-2 (decision 6): per-class lunge wind-up multiplier, -1 = LungeWindupMul. The Miner's 0.6: his lunges whiffed
         /// 61 of 115 contacts on a fleeing runner at 0.75 (dodge-in caught 15 of 40, plain walking 25 of 40); at 0.6, 30 of 40.</summary>
         public double[] LungeWindupMulByClass = { -1, -1, 0.6, -1, -1, -1 };

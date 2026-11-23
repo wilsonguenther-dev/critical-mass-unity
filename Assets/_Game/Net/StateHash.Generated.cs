@@ -1302,21 +1302,116 @@ namespace CriticalMass.Net
         private static void H_BotsMovesState(ref ulong h, global::CriticalMass.Sim.Core.BotsMovesState o)
         {
             if (o == null) { M(ref h, 0x4E554C4CL); return; }
+            A(ref h, o.Chains);
+            A(ref h, o.ChargeHold);
+            A(ref h, o.ChargeKey);
+            A(ref h, o.Charges);
+            A(ref h, o.ComboDefer);
+            A(ref h, o.ComboGo);
+            A(ref h, o.ComboKey);
+            A(ref h, o.EventCursor);
+            A(ref h, o.GuardUntil);
+            A(ref h, o.Guards);
+            A(ref h, o.Parries);
+            A(ref h, o.ParryAt);
+            A(ref h, o.QuickNext);
+            A(ref h, o.QuickSeq);
+            A(ref h, o.ReadKey);
+            A(ref h, o.Reads);
+            A(ref h, o.SideFrom);
+            A(ref h, o.SideSteps);
+            A(ref h, o.SideUntil);
+            A(ref h, o.SideX);
+            A(ref h, o.SideZ);
+            A(ref h, o.StepFrom);
+            A(ref h, o.StepOuts);
+            A(ref h, o.StepUntil);
         }
 
         private static void H_DefenceMovesState(ref ulong h, global::CriticalMass.Sim.Core.DefenceMovesState o)
         {
             if (o == null) { M(ref h, 0x4E554C4CL); return; }
+            M(ref h, o.AirEvades);
+            M(ref h, o.FeintBaits);
+            A(ref h, o.FeintDone);
+            A(ref h, o.FeintTick);
+            A(ref h, o.FlightEvaded);
+            M(ref h, o.GuardBlocks);
+            M(ref h, o.GuardBreaks);
+            A(ref h, o.GuardHoldUntil);
+            A(ref h, o.GuardLastBlock);
+            A(ref h, o.GuardMeter);
+            A(ref h, o.GuardOn);
+            A(ref h, o.GuardReleaseUntil);
+            D(ref h, o.GuardSaved);
+            A(ref h, o.GuardSince);
+            A(ref h, o.JumpRelockUntil);
+            A(ref h, o.LandRecoverUntil);
+            A(ref h, o.LightKnockTick);
+            A(ref h, o.LungeArmed);
+            A(ref h, o.LungeDashEnd);
+            M(ref h, o.LungeDashes);
+            A(ref h, o.LungePressed);
+            A(ref h, o.LungeSwingTick);
+            A(ref h, o.LungeTarget);
+            M(ref h, o.Lunges);
+            M(ref h, o.Parries);
+            A(ref h, o.ParryLockUntil);
+            M(ref h, o.ParryLocked);
+            A(ref h, o.ParryPress);
+            M(ref h, o.ParryWhiffs);
+            M(ref h, o.Refunds);
+            A(ref h, o.SecondWindUsed);
+            M(ref h, o.SecondWinds);
         }
 
         private static void H_MovementMovesState(ref ulong h, global::CriticalMass.Sim.Core.MovementMovesState o)
         {
             if (o == null) { M(ref h, 0x4E554C4CL); return; }
+            A(ref h, o.AirEvaded);
+            A(ref h, o.CombatTick);
+            A(ref h, o.EventCursor);
+            A(ref h, o.GlideHit);
+            A(ref h, o.GlidePlanned);
+            A(ref h, o.GlideReady);
+            A(ref h, o.GlideTicks);
+            A(ref h, o.Gliding);
+            A(ref h, o.JumpRelockUntil);
+            A(ref h, o.LandRecoverUntil);
+            A(ref h, o.SlideCarryUntil);
+            A(ref h, o.SlideDirX);
+            A(ref h, o.SlideDirZ);
+            A(ref h, o.SlideRecoverUntil);
+            A(ref h, o.SlideStart);
+            A(ref h, o.Travel);
+            A(ref h, o.TravelTicks);
         }
 
         private static void H_OffenceMovesState(ref ulong h, global::CriticalMass.Sim.Core.OffenceMovesState o)
         {
             if (o == null) { M(ref h, 0x4E554C4CL); return; }
+            A(ref h, o.BotChainFlip);
+            A(ref h, o.BotChains);
+            A(ref h, o.BotChargeLeft);
+            A(ref h, o.ChainNext);
+            A(ref h, o.ChainUntil);
+            A(ref h, o.ChainVictim);
+            A(ref h, o.ChargeShare);
+            A(ref h, o.Charging);
+            A(ref h, o.Counts);
+            A(ref h, o.DropRelease);
+            A(ref h, o.FuseOwner);
+            A(ref h, o.FuseTick);
+            A(ref h, o.HeavySwingShare);
+            A(ref h, o.HeavySwingTick);
+            A(ref h, o.HoldCount);
+            A(ref h, o.HoldSpent);
+            A(ref h, o.LastHitHuman);
+            A(ref h, o.PendingHeavy);
+            A(ref h, o.PendingHeavyUntil);
+            A(ref h, o.StepOf);
+            A(ref h, o.StepSwingTick);
+            A(ref h, o.StrikeAmount);
         }
 
     }

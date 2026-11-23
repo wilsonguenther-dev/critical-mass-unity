@@ -225,7 +225,7 @@ namespace CriticalMass.Sim.Core
         {
             if (w.Moves == null) return;
             MovesConfig m = Cfg(w);
-            if (!m.Combos || !m.ComboBreaksOnDodge) return;
+            if (!m.Combos || m.ComboBreaksOnDodge == 0) return;
             OffenceMovesState s = w.Moves.Offence;
             for (int i = 0; i < w.ActorCount; i++)
                 if (s.ChainNext[i] != 0 && s.ChainVictim[i] == id) s.ChainNext[i] = 0;
