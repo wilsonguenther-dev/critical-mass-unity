@@ -142,6 +142,17 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
         }
 
         [Test]
+        public void WordsStayBelowTheTopHudRows()   // readability-2 item 3
+        {
+            float h = 1080f;
+            float noBanner = WorldWords.TopReserve(false), banner = WorldWords.TopReserve(true);
+            Assert.GreaterOrEqual(banner, noBanner, "the objective banner lane reserves at least the top band");
+            float top = WorldWords.TopLimit(h, banner, 1), low = WorldWords.TopLimit(h, banner, 0);
+            Assert.LessOrEqual(top + WorldWords.PillH * 0.5f, h - banner, "the top word's pill ends under the banner lane");
+            Assert.AreEqual(WorldWords.PillH + 4f, top - low, 1e-4, "the two words keep their stagger at the limit");
+        }
+
+        [Test]
         public void PredictedGuardShowsAtOnceAndFadesWhenRefused()   // readability item 1
         {
             Assert.AreEqual(1f, MovesViews.GuardPrediction(true, false, 0f), "the press frame itself");
@@ -253,6 +264,7 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
             float t0 = Time.unscaledTime;
             yield return EndOfFrame();   // fix/px-view-2: WaitForEndOfFrame never resumes under -nographics (shard hang)
             Assert.GreaterOrEqual(Views.GuardArcsShown, 1, "the guard meter arc is drawn on the first frame of the guard");
+            Assert.GreaterOrEqual(S.Views.AnimatorOf(0).MovesGuardWeight, MovesPoses.GuardFirstFrame, "readability-2: the guard pose is at 0.8 on its first frame, not on the 33 ms edge");
             while (Time.unscaledTime - t0 < (float)MovesPoses.GuardRiseSeconds + 0.02f) yield return null;
             yield return EndOfFrame();   // fix/px-view-2: WaitForEndOfFrame never resumes under -nographics (shard hang)
             Assert.GreaterOrEqual(S.Views.AnimatorOf(0).MovesGuardWeight, 0.99f, "the guard pose is full within 33 ms");

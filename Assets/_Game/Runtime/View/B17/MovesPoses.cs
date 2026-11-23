@@ -14,6 +14,8 @@ namespace CriticalMass.Runtime.View.B17
     public static class MovesPoses
     {
         public const double GuardRiseSeconds = 0.033, GuardFallSeconds = 0.08, ChargeRiseSeconds = 0.05;
+        /// <summary>Readability-2 item 5: the guard pose starts at this weight on its first drawn frame (full one frame later).</summary>
+        public const float GuardFirstFrame = 0.8f;
         /// <summary>The charge pose samples the attack clip at this share of its length (the raised wind-up), from the
         /// first share at the charge start to the last at full charge.</summary>
         public const float ChargeClipShareStart = 0.18f, ChargeClipShareFull = 0.32f;

@@ -97,6 +97,20 @@ namespace CriticalMass.Runtime.View.B17
         GameHud _hud;
         const float HintChipW = 720f, HintChipH = 46f;
 
+        // ---- readability round 2
+        /// <summary>Item 2: SPRINT (travel) speed lines: thin camera-facing streaks beside the body every StreakEvery u, and
+        /// the SPRINT word over the fighter the first SprintWordShows times travel lights up (PlayerPrefs). Stop: a dust
+        /// burst ahead of the feet. Item 4: the combo hint on my first landed hit while I have chained fewer than
+        /// ChainedToLearn times ever.</summary>
+        public const int Streaks = 24, SprintWordShows = 3, ChainedToLearn = 2;
+        public const float StreakEvery = 0.35f, StreakSeconds = 0.28f, StreakLength = 1.1f, StreakWidth = 0.05f;
+        public const string SprintWord = "SPRINT", SprintPref = "cm.moves.sprintword", ChainedPref = "cm.moves.chained";
+        readonly Piece[] _streaks = new Piece[Streaks];
+        int _nextStreak;
+        float[] _streakDist = new float[64];
+        int _streakSide;
+        public int StreaksAlive { get; private set; }
+
         sealed class Piece
         {
             public GameObject Go;
@@ -138,6 +152,7 @@ namespace CriticalMass.Runtime.View.B17
                 Band(_shields[i].Mesh, ShieldR, ShieldY0, ShieldY1, ShieldArc, 20);
                 if (_shields[i].Mat != null && _shields[i].Mat.HasProperty("_Cull")) _shields[i].Mat.SetFloat("_Cull", 0f);
             }
+            for (int i = 0; i < Streaks; i++) { _streaks[i] = Make("Sprint Streak " + i, true); Quad(_streaks[i].Mesh, StreakWidth, StreakLength); }
             _chainRing = Make("Combo Window Ring", true);
             Disc(_chainRing.Mesh, 0.80f, 0.94f, 360f, ArcSegments);
             Current = this;
@@ -150,7 +165,7 @@ namespace CriticalMass.Runtime.View.B17
             WorldWords.MovesCap = false;
             if (_hintCanvas != null) Destroy(_hintCanvas.gameObject);
             if (_chainRing != null) { if (_chainRing.Mat != null) Destroy(_chainRing.Mat); if (_chainRing.Mesh != null) Destroy(_chainRing.Mesh); }
-            foreach (Piece[] set in new[] { _arcs, _shapes, _glows, _puffs, _rings, _shields })
+            foreach (Piece[] set in new[] { _arcs, _shapes, _glows, _puffs, _rings, _shields, _streaks })
                 foreach (Piece p in set)
                 {
                     if (p == null) continue;
@@ -212,6 +227,16 @@ namespace CriticalMass.Runtime.View.B17
             mesh.Clear();
             mesh.vertices = verts;
             mesh.triangles = tris;
+            mesh.RecalculateBounds();
+        }
+
+        /// <summary>A flat double-sided quad in the XZ plane, width along X, length along Z, centred.</summary>
+        public static void Quad(Mesh mesh, float width, float length)
+        {
+            float x = width * 0.5f, z = length * 0.5f;
+            mesh.Clear();
+            mesh.vertices = new[] { new Vector3(-x, 0f, -z), new Vector3(x, 0f, -z), new Vector3(-x, 0f, z), new Vector3(x, 0f, z) };
+            mesh.triangles = new[] { 0, 2, 3, 0, 3, 1, 0, 3, 2, 0, 1, 3 };
             mesh.RecalculateBounds();
         }
 
@@ -278,6 +303,7 @@ namespace CriticalMass.Runtime.View.B17
             float now = Time.time;
             TickPuffs(now);
             TickRings(now);
+            TickStreaks(now);
             GuardArcsShown = ChargeShapesShown = GlideRingsShown = 0;
             if (!MovesRead.On(w))
             {
@@ -285,6 +311,7 @@ namespace CriticalMass.Runtime.View.B17
                 HideAll(_shapes);
                 HideAll(_glows);
                 HideAll(_shields);
+                HideAll(_streaks);
                 if (_chainRing != null) Show(_chainRing, false);
                 WorldWords.MovesCap = false;
                 MovesPoses.PredictActor = -1;
@@ -383,7 +410,19 @@ namespace CriticalMass.Runtime.View.B17
                 bool sliding = MovesRead.Sliding(w, i);
                 if (sliding && !_wasSliding[i]) for (int k = 0; k < 3; k++) Puff(x, gy, z, 0.6f + 0.15f * k, new Color(0.86f, 0.80f, 0.68f, 0.7f));
                 _wasSliding[i] = sliding;
-                if (sliding || MovesRead.Travelling(w, i))
+                bool travel = MovesRead.Travelling(w, i);
+                if (travel && !sliding)
+                {
+                    // item 2: speed lines beside the sprinting body (camera-facing), one side then the other
+                    _streakDist[i] += moved;
+                    if (_streakDist[i] >= StreakEvery && moved > 0f)
+                    {
+                        _streakDist[i] = 0f;
+                        Streak(x, gy, z, ddx / moved, ddz / moved, reduce);
+                    }
+                }
+                else _streakDist[i] = 0f;
+                if (sliding || travel)
                 {
                     _dustDist[i] += moved;
                     float every = sliding ? DustEvery * 0.5f : DustEvery;
@@ -577,6 +616,7 @@ namespace CriticalMass.Runtime.View.B17
             System.Array.Resize(ref _wasLanding, n);
             System.Array.Resize(ref _wasSliding, n);
             System.Array.Resize(ref _guardShownAt, n);
+            System.Array.Resize(ref _streakDist, n);
             System.Array.Resize(ref _guardWas, n);
         }
 
@@ -625,6 +665,52 @@ namespace CriticalMass.Runtime.View.B17
                 if (p.Mat != null && p.Mat.HasProperty("_BaseColor")) p.Mat.SetColor("_BaseColor", new Color(c.r, c.g, c.b, c.a * (1f - k)));
             }
             PuffsAlive = alive;
+        }
+
+        /// <summary>Item 2: one speed line beside a sprinting body, along its motion (dx, dz unit, sim), facing the camera.</summary>
+        void Streak(double x, float gy, double z, double dx, double dz, bool reduce)
+        {
+            Piece p = _streaks[_nextStreak];
+            _nextStreak = (_nextStreak + 1) % Streaks;
+            _streakSide = -_streakSide == 0 ? 1 : -_streakSide;
+            float side = _streakSide * 0.42f, lift = _streakSide > 0 ? 0.55f : 0.95f;
+            // behind the body, out to one side (sim space: the side is the motion turned 90 degrees)
+            double px = x - dx * 0.55 - dz * side, pz = z - dz * 0.55 + dx * side;
+            Vector3 pos = SimSpace.ToWorld(px, gy + lift, pz);
+            Vector3 along = SimSpace.ToWorld(dx, 0, dz) - SimSpace.ToWorld(0, 0, 0);
+            if (along.sqrMagnitude < 1e-6f) return;
+            along.Normalize();
+            UnityEngine.Camera cam = UnityEngine.Camera.main;
+            Vector3 toCam = cam != null ? (cam.transform.position - pos).normalized : Vector3.up;
+            Vector3 n = toCam - Vector3.Dot(toCam, along) * along;
+            if (n.sqrMagnitude < 1e-6f) n = Vector3.up;
+            p.Born = Time.time;
+            p.Life = StreakSeconds;
+            p.Key = reduce ? 0.35f : 0.6f;   // the start alpha
+            p.Colour = Color.clear;
+            Tint(p, new Color(1f, 1f, 0.95f, p.Key));
+            p.T.localPosition = pos;
+            p.T.localRotation = Quaternion.LookRotation(along, n.normalized);
+            p.T.localScale = Vector3.one;
+            Show(p, true);
+        }
+
+        void TickStreaks(float now)
+        {
+            int alive = 0;
+            for (int i = 0; i < Streaks; i++)
+            {
+                Piece p = _streaks[i];
+                if (p == null || p.Born < 0) continue;
+                float age = now - p.Born;
+                if (age >= p.Life) { p.Born = -1f; Show(p, false); continue; }
+                alive++;
+                float k = age / p.Life;
+                p.T.localScale = new Vector3(1f, 1f, 1f + 0.6f * k);   // stretches out as it fades
+                Color c = p.Colour;
+                if (p.Mat != null && p.Mat.HasProperty("_BaseColor")) p.Mat.SetColor("_BaseColor", new Color(c.r, c.g, c.b, p.Key * (1f - k)));
+            }
+            StreaksAlive = alive;
         }
 
         void TickRings(float now)
@@ -684,7 +770,12 @@ namespace CriticalMass.Runtime.View.B17
                 switch (e.Type)
                 {
                     case SimEventType.Hit:
-                        if (e.B == me && e.A != me) _lastVictimOfMe[0] = e.A;   // item 5: the combo hint waits for the chain window
+                        if (e.B == me && e.A != me)
+                        {
+                            _lastVictimOfMe[0] = e.A;
+                            // readability-2 item 4: the combo hint on my first landed hit, until I have chained twice ever
+                            if (PlayerPrefs.GetInt(ChainedPref, 0) < ChainedToLearn) Hint(w, me, MovesHelp.Verb.Combo);
+                        }
                         break;
                     case SimEventType.AttackStart:
                         if (e.A == me && e.B == Combat.KindAttack) Hint(w, me, MovesHelp.Verb.Heavy);
@@ -697,7 +788,25 @@ namespace CriticalMass.Runtime.View.B17
                         }
                         break;
                     case SimEventType.TravelChanged:
-                        if (e.A == me && e.Value > 0.5) Hint(w, me, MovesHelp.Verb.Slide);
+                        if (e.A == me && e.Value > 0.5)
+                        {
+                            // item 2: SPRINT over me the first few times travel lights up (then the speed lines say it)
+                            int seen = PlayerPrefs.GetInt(SprintPref, 0);
+                            if (tags != null && (seen < SprintWordShows || HintsAlways)
+                                && tags.OnMovesWord(w, SprintWord, 5800, me, false, false, PxPalette.Cream, PxPalette.Brass, 0.9f, 900 + (int)e.Type) != null)
+                            {
+                                PlayerPrefs.SetInt(SprintPref, seen + 1);
+                                Said(SprintWord);
+                            }
+                            Hint(w, me, MovesHelp.Verb.Slide);
+                        }
+                        else if (e.Value <= 0.5 && e.A >= 0 && e.A < w.ActorCount && w.Actors[e.A].Alive)
+                        {
+                            // item 2: the stop: a dust burst ahead of the feet (the body brakes out of the sprint)
+                            double fx = System.Math.Cos(w.Actors[e.A].Facing), fz = System.Math.Sin(w.Actors[e.A].Facing);
+                            float sy = w.Map != null ? (float)GroundHeight.At(w.Map, e.X, e.Z) : 0f;
+                            for (int k = 0; k < 3; k++) Puff(e.X + fx * (0.35 + 0.15 * k) + fz * 0.2 * (k - 1), sy, e.Z + fz * (0.35 + 0.15 * k) - fx * 0.2 * (k - 1), 0.7f, new Color(0.86f, 0.80f, 0.68f, 0.75f));
+                        }
                         break;
                     case SimEventType.HitBlocked:
                         if ((int)System.Math.Round(e.Value) == PlayerReasons.BlockedParried)
@@ -723,6 +832,7 @@ namespace CriticalMass.Runtime.View.B17
                         if (tags != null && e.A == me && e.Value >= 0.999 && tags.OnMovesWord(w, ActionTags.ChargedWord, 5300, me, true, false, PxPalette.Cream, PxPalette.Brass, 0.8f, 900 + (int)e.Type) != null) Said(ActionTags.ChargedWord);
                         break;
                     case SimEventType.ComboStep:
+                        if (e.A == me && e.Value >= 2 && !HintsAlways) PlayerPrefs.SetInt(ChainedPref, PlayerPrefs.GetInt(ChainedPref, 0) + 1);   // item 4
                         if (tags != null && e.A == me)
                         {
                             string word = ActionTags.MovesWords(e.Type, e.Value, e.Tier, true, false);
