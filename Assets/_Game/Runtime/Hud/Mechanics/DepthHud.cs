@@ -106,6 +106,9 @@ namespace CriticalMass.Runtime.Hud.Mechanics
         /// <summary>The late tag pass: after CameraShake (150) and GameHud (200), before LowViewTags (1100).</summary>
         public const int LateOrder = 210;
         readonly Vector3[] _tagHead = new Vector3[Tags];
+        /// <summary>pass 2 item 6: each tag's step off a panel plus its declutter step (canvas px). The late reprojection
+        /// used to put every tag back on the head and so undid both: a clashing priority name sat on the other again.</summary>
+        readonly Vector2[] _tagOff = new Vector2[Tags];
 
         /// <summary>Fix round 6: put every shown name tag back on its fighter's head through the camera as it renders now
         /// (after the kick), the same projection the health bars use. Positions only; what shows was decided earlier.</summary>
@@ -117,7 +120,7 @@ namespace CriticalMass.Runtime.Hud.Mechanics
             {
                 RectTransform rt = _tag[i];
                 if (rt == null || _tagActor[i] < 0 || !rt.gameObject.activeSelf) continue;
-                if (ToLocal(cam, _tagHead[i], out Vector2 at)) rt.anchoredPosition = at;
+                if (ToLocal(cam, _tagHead[i], out Vector2 at)) rt.anchoredPosition = at + _tagOff[i];
             }
         }
 
@@ -843,6 +846,10 @@ namespace CriticalMass.Runtime.Hud.Mechanics
 
         // ------------------------------------------------------------------ name tags, speech marks, pops
 
+        /// <summary>pass 2 item 6: rows a priority name may climb (each side) before it gives way.</summary>
+        public const int DeclutterSteps = 5;
+        /// <summary>pass 2 item 6: 28 px steps a priority name may move down off a HUD panel.</summary>
+        public const int PanelStepDown = 8;
         readonly int[] _order = new int[Tags];
         readonly Rect[] _placed = new Rect[Tags];
 
@@ -865,14 +872,20 @@ namespace CriticalMass.Runtime.Hud.Mechanics
                 Vector2 at = rt.anchoredPosition;
                 Rect r = new Rect(at.x - half, at.y - h * 0.5f, half * 2f, h);
                 bool clash = false;
-                for (int step = 0; step < 4; step++)
+                // pass 2 item 6 (target + two nearest named and clear in 47% of fight frames): a priority name tries up to
+                // DeclutterSteps rows above, then the same rows nudged half a name left and right, before it gives way
+                float x0 = r.x;
+                for (int step = 0; step < DeclutterSteps * 3; step++)
                 {
                     clash = false;
-                    for (int j = 0; j < laid; j++) if (_placed[j].Overlaps(r)) { clash = true; if (k < p) r.y = _placed[j].yMax + 1f; break; }
+                    for (int j = 0; j < laid; j++) if (_placed[j].Overlaps(r)) { clash = true; break; }
                     if (!clash || k >= p) break;
+                    int row = step % DeclutterSteps, side = step / DeclutterSteps;   // side 0 centre, 1 left, 2 right
+                    r.x = x0 + (side == 1 ? -half : side == 2 ? half : 0f);
+                    r.y = at.y - h * 0.5f + (row + 1) * (h + 1f);
                 }
                 if (clash) { rt.gameObject.SetActive(false); _tagActor[i] = -1; continue; }
-                if (r.center.y != at.y) rt.anchoredPosition = new Vector2(at.x, r.center.y);
+                if (r.center.y != at.y || r.center.x != at.x) { rt.anchoredPosition = new Vector2(r.center.x, r.center.y); _tagOff[i] += rt.anchoredPosition - at; }
                 _placed[laid++] = r;
             }
         }
@@ -904,6 +917,15 @@ namespace CriticalMass.Runtime.Hud.Mechanics
                     _tagHead[used] = head;
                     // fix/hud-containment-4 (by eye: JUNO over the build bank box): no tag over a HUD panel (tested before
                     // it shows, so a hidden tag does not flick on and off every frame)
+                    // pass 2 item 6: a priority name (my target, my aim, the two nearest enemies) under a panel (the hut vote
+                    // card sits over the middle of a hill fight) steps down toward his body until it is clear, instead of hiding
+                    if (HudZones.OverPanel(rt, _canvas) && CriticalMass.Runtime.Hud.Player.CrowdTags.Priority(w, me, id))
+                    {
+                        for (int st = 1; st <= PanelStepDown && HudZones.OverPanel(rt, _canvas); st++) rt.anchoredPosition = at - new Vector2(0f, st * 28f);
+                        for (int st = 1; st <= PanelStepDown && HudZones.OverPanel(rt, _canvas); st++) rt.anchoredPosition = at + new Vector2(0f, st * 28f);
+                        if (HudZones.OverPanel(rt, _canvas)) rt.anchoredPosition = at;
+                    }
+                    _tagOff[used] = rt.anchoredPosition - at;
                     if (HudZones.OverPanel(rt, _canvas)) { if (rt.gameObject.activeSelf) rt.gameObject.SetActive(false); _tagActor[used] = -1; continue; }
                     if (!rt.gameObject.activeSelf) rt.gameObject.SetActive(true);
                     if (_tagActor[used] != id)
