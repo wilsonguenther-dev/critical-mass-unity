@@ -128,6 +128,27 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
                 "every one ends it the same tick; relit 90 ticks (3 s) after the hit", ok));
         }
 
+        [Test]
+        public void Travel_JumpsTakeOffAtWalkSpeedSoNoNewGapsOpen()
+        {
+            // a x1.30 takeoff would carry 3.2 u instead of 2.5 u and open 2-cell void gaps to every class (the glide's job)
+            double[] flight = new double[2];
+            for (int on = 0; on < 2; on++)
+            {
+                Seat s = PlayerSeatRig.Field(ClassId.Farmer, x: 5.5, z: 15.5, tweak: Sw(on == 1));
+                World w = s.W;
+                Paint(w, Flat);
+                for (int t = 0; t < 60; t++) { s.Human.MoveOverrideX = 1; s.Step(); }
+                bool lit = MovesHooks.MovementTravelling(w, 0);
+                s.Human.MoveOverrideX = 1; s.Human.PressJump = true; s.Step();
+                Actor a = w.Actors[0];
+                flight[on] = a.AirLen > 0 ? a.AirToX - a.AirFromX : -1;
+                if (on == 1) Assert.IsTrue(lit, "travel lit before the jump");
+            }
+            Assert.IsTrue(PxLog.Line("MV3 T2-4 Travel jump length", "Farmer jumps after 2 s of walking, travel off vs lit",
+                "flight " + PxLog.F(flight[0]) + " u vs " + PxLog.F(flight[1]) + " u", "the same (within 0.05 u)", flight[0] > 0 && Math.Abs(flight[0] - flight[1]) <= 0.05));
+        }
+
         // ---- escape and chase bands with the movement switches on (the ruling: a chance of escape, not a certainty)
 
         /// <summary>The probe's ESCAPE staging (MovesAuditProbe.Escape): me at 30% runs down the open east-west lane from a

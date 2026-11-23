@@ -637,7 +637,7 @@ namespace CriticalMass.Sim.Core
         /// that lands on walkable ground is the plan; none = the plain plan stands (the landing guard, as JumpRefused works).
         /// Returns the air ticks to use (full length) and the landing, or false.
         /// </summary>
-        internal static bool MovementGlidePlan(World w, int id, double dt, out int airLen, out double toX, out double toZ)
+        internal static bool MovementGlidePlan(World w, int id, double vx, double vz, double dt, out int airLen, out double toX, out double toZ)
         {
             airLen = 0;
             toX = toZ = 0;
@@ -650,7 +650,7 @@ namespace CriticalMass.Sim.Core
             int air = Jump.AirTicks(w.Config);
             int apex = Durations.T30(w.Config, c.GlideFromAirTick);
             if (apex < 1 || apex >= air) return false;
-            double vx = w.Vx[id], vz = w.Vz[id], vl = System.Math.Sqrt(vx * vx + vz * vz);
+            double vl = System.Math.Sqrt(vx * vx + vz * vz);
             double dx, dz;
             if (vl > 1e-6) { dx = vx / vl; dz = vz / vl; }
             else { dx = JsMath.Cos(a.Facing); dz = JsMath.Sin(a.Facing); }
@@ -675,16 +675,16 @@ namespace CriticalMass.Sim.Core
 
         /// <summary>
         /// Jump.StartJump (lane 3's own file), before the plan: a travelling actor takes off at its walk speed, not the travel
-        /// speed. Without this a x1.30 jump would carry 3.2 u instead of 2.5 u and open 2-cell void gaps to every class, which
+        /// speed (the plan's velocity; written to the actor only when the jump starts). Without this a x1.30 jump would carry 3.2 u instead of 2.5 u and open 2-cell void gaps to every class, which
         /// is the glide's job (Healer only). Identity unless TRAVEL is lit.
         /// </summary>
-        internal static void MovementJumpTakeoff(World w, int id)
+        internal static void MovementJumpTakeoff(World w, int id, ref double vx, ref double vz)
         {
             if (!MovementTravelling(w, id)) return;
             double s = MovementSpeedScale(w, id);
             if (!(s > 1.0)) return;
-            w.Vx[id] = JsMath.F32(w.Vx[id] / s);
-            w.Vz[id] = JsMath.F32(w.Vz[id] / s);
+            vx = JsMath.F32(vx / s);
+            vz = JsMath.F32(vz / s);
         }
 
         // ================================================================== T2-7 the evade event scan
