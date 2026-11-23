@@ -407,7 +407,12 @@ namespace CriticalMass.Runtime.PlayTests
                 double tx = w.X[0] + 3 * dx, tz = w.Z[0] + 3 * dz;
                 Vector3 p = cam.WorldToScreenPoint(SimSpace.ToWorld(tx, _w.Ground(w.X[0], w.Z[0]), tz));
                 var pos = new Vector2(p.x, p.y);
-                InputSystem.QueueStateEvent(_mouse, new MouseState { position = pos });
+                // fix round 7: a real mouse that moves to the target reports a DELTA with the new position. Since px-i-input
+                // (AimDeviceArbiter, 82f00b6b) only a mouse MOVE (> 2 px delta) hands the aim to the cursor and a click is
+                // not aim input, so the old position-only event (delta 0) left the aim where it was: the 50-140 degree reds
+                // were the rig, not a player's mouse.
+                Vector2 from = _mouse.position.ReadValue();
+                InputSystem.QueueStateEvent(_mouse, new MouseState { position = pos, delta = pos - from });
                 InputSystem.Update();
                 yield return null;
                 InputSystem.QueueStateEvent(_mouse, new MouseState { position = pos }.WithButton(MouseButton.Left));
