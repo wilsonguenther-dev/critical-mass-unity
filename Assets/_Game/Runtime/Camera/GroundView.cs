@@ -1198,6 +1198,10 @@ namespace CriticalMass.Runtime.Camera
             !p.Surface && p.Cat != null && (p.Cat == "tree" || p.Cat == "rock_big" || p.Cat == "crystal" || p.Cat == "landmark" || p.Cat == "decor"
                                             || p.Cat == "dress_tall" || p.Cat == "small_tall" || p.Cat == "small" || p.Cat == "base" || p.Cat == "struct" || p.Cat == "deco");
 
+        /// <summary>fix/px-camera-in-editor: only buildings, landmarks and big rocks stop the third-person boom; trees,
+        /// crystals and props fade instead (fewer collisions: no pumping, no steep views over a crystal).</summary>
+        static bool SoftScenery(string cat) => !(cat == "base" || cat == "struct" || cat == "landmark" || cat == "rock_big");
+
         /// <summary>A kit piece's mesh boxes (8 corners per mesh, its own frame), from Mesh.bounds (readable or not).</summary>
         static Vector3[] PieceCorners(WorldKitCatalog cat, string piece)
         {
@@ -1263,14 +1267,14 @@ namespace CriticalMass.Runtime.Camera
                 if (p.Piece != null && (p.Piece.IndexOf("intact", StringComparison.Ordinal) >= 0 || p.Piece.IndexOf("cracked", StringComparison.Ordinal) >= 0
                                         || p.Piece.IndexOf("destroyed", StringComparison.Ordinal) >= 0)) continue;
                 Vector3[] corners = PieceCorners(cat, p.Piece);
-                if (corners.Length > 0) { AddScenery(p, corners, p.Cat == "tree"); continue; }
+                if (corners.Length > 0) { AddScenery(p, corners, SoftScenery(p.Cat)); continue; }
                 double r, h;
                 if (p.Cat == "tree") { r = SeeThrough.TreeRadius * 1.5; h = p.Piece != null && p.Piece.IndexOf("tall", StringComparison.Ordinal) >= 0 ? SeeThrough.TreeHeightTall : SeeThrough.TreeHeightRound; }
                 else if (p.Cat == "rock_big") { r = 0.8; h = 1.2; }
                 else if (p.Cat == "crystal") { r = 0.6; h = 1.6; }
                 else if (p.Cat == "landmark") { r = 1.6; h = 9.0; }
                 else continue;
-                _scenery[_sceneryCount] = new SeeThroughCylinder { X = p.SimX, Z = p.SimZ, R = r, Y0 = p.Y - 1, Y1 = p.Y + h, Soft = p.Cat == "tree", Id = _sceneryCount + 1 };
+                _scenery[_sceneryCount] = new SeeThroughCylinder { X = p.SimX, Z = p.SimZ, R = r, Y0 = p.Y - 1, Y1 = p.Y + h, Soft = SoftScenery(p.Cat), Id = _sceneryCount + 1 };
                 _sceneryCount++;
             }
             for (int i = 0; i < ps.Count && _staticCount < MaxStatic; i++)

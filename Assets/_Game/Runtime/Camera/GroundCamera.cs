@@ -565,6 +565,19 @@ namespace CriticalMass.Runtime.Camera
             CamZ = oz - uz * cp * Dist;
             double floor = GroundCollision.SolidTop(f.Map, CamX, CamZ);
             if (CamY - RobustFloor < floor) CamY = floor + RobustFloor;
+            // never closer than RobustMin to the fighter himself either (the framing's look point sits toward the enemy, and
+            // a knockback can carry him at the lens): out along the ground from his chest
+            {
+                double ddx = CamX - f.SightX, ddy = CamY - f.SightY, ddz = CamZ - f.SightZ;
+                if (ddx * ddx + ddy * ddy + ddz * ddz < RobustMin * RobustMin)
+                {
+                    double hl = Math.Sqrt(ddx * ddx + ddz * ddz);
+                    if (hl < 1e-3) { ddx = -ux; ddz = -uz; hl = 1; }
+                    double need = Math.Sqrt(Math.Max(0, RobustMin * RobustMin - ddy * ddy));
+                    CamX = f.SightX + ddx / hl * need;
+                    CamZ = f.SightZ + ddz / hl * need;
+                }
+            }
             Blocked = GroundCollision.Inside(f.Map, CamX, CamY, CamZ, GroundCollision.Radius, f.Cylinders, f.CylinderCount)
                       || BoomAt(f, ox, oy, oz, ux, uz, boomPitch, want) < RobustMin - 1e-6;
             SightBlocked = false;
