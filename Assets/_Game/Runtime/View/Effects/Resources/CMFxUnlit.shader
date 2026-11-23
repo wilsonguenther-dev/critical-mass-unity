@@ -46,8 +46,8 @@ Shader "CM/FxUnlit"
             Varyings vert(Attributes i)
             {
                 Varyings o;
+                o.positionCS = TransformObjectToHClip(i.positionOS.xyz);   // unchanged maths (top-down pixel-identical)
                 o.positionWS = TransformObjectToWorld(i.positionOS.xyz);
-                o.positionCS = TransformWorldToHClip(o.positionWS);
                 o.color = i.color;
                 o.add = i.ext.x;
                 #if !defined(UNITY_COLORSPACE_GAMMA)
