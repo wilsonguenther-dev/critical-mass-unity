@@ -92,8 +92,10 @@ namespace CriticalMass.Sim.Config
         public double[] GuardMeter = { 0, 40, 50, 35, 60, 35 };
         /// <summary>Move speed multiplier while guarding.</summary>
         public double[] GuardMoveMul = { 1, 0.6, 0.6, 0.6, 0.5, 0.6 };
-        /// <summary>Parry window: ticks before an enemy melee contact in which a Guard press edge parries.</summary>
-        public int[] ParryWindowTicks = { 3, 4, 4, 4, 3, 5 };
+        /// <summary>Parry window: ticks before an enemy melee contact in which a Guard press edge parries (0 = no parry).
+        /// Integrator (combine 2026-11-22, ruling "Healer loses nearly every one-on-one"): the Healer has NO parry (0); her
+        /// guard only cuts damage (a tap of Guard holds her guard ParryWhiffHoldTicks, with no parry lockout).</summary>
+        public int[] ParryWindowTicks = { 3, 4, 4, 4, 3, 0 };
         /// <summary>The Warrior's parry window while his shield is down (3 with it up is ParryWindowTicks[0]).</summary>
         public int WarriorParryWindowShieldDown = 2;
         public double GuardFrontalDeg = 60;
@@ -183,6 +185,24 @@ namespace CriticalMass.Sim.Config
         public double SecondWindBelowShare = 0.25;
         public double SecondWindHealShare = 0.15;
 
+        // ================================================================== integrator knobs (combine 2026-11-22)
+
+        /// <summary>T2-3 (lane 2 rule, decision 2 "every combo is dodgeable"): with Combos on, a victim whose stagger is over may
+        /// start a dodge during the knock slide of an enemy's melee LIGHT strike (not a heavy) taken in the last
+        /// ComboKnockDodgeTicks; the dodge ends the slide. Without it the Farmer's thrust slide outlasts the gap between steps.</summary>
+        public bool ComboDodgeOutOfKnock = true;
+        public int ComboKnockDodgeTicks = 20;
+        /// <summary>T1-2 (decision 6): a LUNGE wind-up shrugs off a hit under the lunger's class Poise (no stagger, the swing goes
+        /// on), so a fleeing target's light hit does not cancel the lunge it ran into.</summary>
+        public bool LungeArmour = true;
+        /// <summary>T2-5 (lane 3's constant, now a knob): after TRAVEL ends because an enemy came within TravelEnemyRadius, Dodge
+        /// stays the SLIDE for this many ticks unless a press, a hit or an enemy wind-up within 8 u ends it.</summary>
+        public int SlideCarryTicks = 30;
+        /// <summary>T2-2 / T2-3 bot use (lane 5's constants, now knobs; Normal, Easy, Hard): the chance a bot charges a heavy at a
+        /// human in heavy reach once per swing cycle, and the chance it chains a LANDED light hit on a human.</summary>
+        public double[] BotChargeChance = { 0.10, 0.0, 0.20 };
+        public double[] BotComboChance = { 0.25, 0.0, 0.50 };
+
         /// <summary>True when any switch is on (World.Moves is allocated only then; ConfigHash mixes this block only then).</summary>
         public bool AnyOn =>
             DemoTntOnDigOnly || DodgeLunge || DodgeAvoidRefund || FeintBait || BotStepOut || BuilderQuickWall
@@ -243,6 +263,8 @@ namespace CriticalMass.Sim.Config
             c.HeavyDamageBonus = (bool[])HeavyDamageBonus.Clone();
             c.ComboSteps = (int[])ComboSteps.Clone();
             c.GlideClasses = (bool[])GlideClasses.Clone();
+            c.BotChargeChance = (double[])BotChargeChance.Clone();
+            c.BotComboChance = (double[])BotComboChance.Clone();
             return c;
         }
     }

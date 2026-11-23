@@ -117,10 +117,7 @@ namespace CriticalMass.Sim.Core
     {
         // ---- lane 5 knobs MovesConfig does not carry (asked for in the lane 5 report; the integrator may move them there).
         // Index order Normal, Easy, Hard (the MovesConfig bot-chance order).
-        /// <summary>T2-2 bot use: chance a bot charges a heavy at a human in heavy reach, once per swing cycle.</summary>
-        static readonly double[] BotsChargeChance = { 0.10, 0.0, 0.20 };
-        /// <summary>T2-3 bot use: chance a bot chains a LANDED light hit on a human into the next combo step.</summary>
-        static readonly double[] BotsComboChance = { 0.25, 0.0, 0.50 };
+        // Integrator: the charge and combo chances are MovesConfig.BotChargeChance / BotComboChance now (same values).
         /// <summary>T1-4b: the step-out lasts at least this, and at most BotsStepMaxTicks, past the read.</summary>
         const int BotsStepMinTicks = 3, BotsStepMaxTicks = 12;
         /// <summary>T1-4b: a FEINTED human swing still reads as a wind-up this many ticks past its would-be contact (the bait).</summary>
@@ -374,8 +371,9 @@ namespace CriticalMass.Sim.Core
             int held = w.Moves.AttackHeldTicks[id];
             bool heavy = On(w, m.Heavy), combos = On(w, m.Combos);
             if (!heavy && !combos) return;
-            if (a.Cls == ClassId.Demolitions && w.Demolitions != null && w.Config.Abilities.DemolitionsTnt.ThrowOnAttack
-                && w.Tick >= w.Demolitions.TntReadyTick[id] && !On(w, m.DemoTntOnDigOnly)) return;
+            // integrator: the same throw rule as Combat and Demolitions.AttackThrowsNow (a bot's press with the TNT ready is its throw)
+            if (a.Cls == ClassId.Demolitions && w.Demolitions != null && OffenceAttackMayThrow(w, id)
+                && w.Tick >= w.Demolitions.TntReadyTick[id]) return;
             int target = BotsTarget(w, id);
             bool human = target >= 0 && BotsHumanSeat(w, target) && w.Actors[target].Alive && w.Actors[target].Team != a.Team;
             int d = BotReflex.DiffIndex(w, id);
@@ -400,7 +398,7 @@ namespace CriticalMass.Sim.Core
                     if (b.ComboKey[id] != a.SwingTick + 1)
                     {
                         b.ComboKey[id] = a.SwingTick + 1;
-                        bool go = human && BotReflex.Roll(w.Opts.Seed ^ BotsSaltCombo, a.SwingTick * 64 + id + 1, id) < BotsChance(BotsComboChance, d);
+                        bool go = human && BotReflex.Roll(w.Opts.Seed ^ BotsSaltCombo, a.SwingTick * 64 + id + 1, id) < BotsChance(Cfg(w).BotComboChance, d);
                         b.ComboGo[id] = go ? (byte)1 : (byte)0;
                         if (go) b.Chains[id]++;
                     }
@@ -432,7 +430,7 @@ namespace CriticalMass.Sim.Core
                 reach += w.Config.Class(w.Actors[target].Cls).Radius;
                 double dx = w.X[target] - w.X[id], dz = w.Z[target] - w.Z[id];
                 if (dx * dx + dz * dz <= reach * reach
-                    && BotReflex.Roll(w.Opts.Seed ^ BotsSaltCharge, a.SwingTick * 64 + id + 1, id) < BotsChance(BotsChargeChance, d))
+                    && BotReflex.Roll(w.Opts.Seed ^ BotsSaltCharge, a.SwingTick * 64 + id + 1, id) < BotsChance(Cfg(w).BotChargeChance, d))
                 {
                     b.ChargeHold[id] = m.ChargeFullTick;
                     b.Charges[id]++;

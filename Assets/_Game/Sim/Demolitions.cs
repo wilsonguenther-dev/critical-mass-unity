@@ -646,10 +646,9 @@ namespace CriticalMass.Sim.Core
             Actor a = w.Actors[id];
             if (a == null || !a.Alive || a.Cls != ClassId.Demolitions || a.StandUp > 0) return false;
             if (Dodge.Active(w, id)) return false;   // b13-jd (routed): no TNT throw mid-dodge
-            if (!w.Config.Abilities.DemolitionsTnt.ThrowOnAttack || w.Config.Depth.Classic) return false;
             // class moves T1-1 (lane 4, switch DemoTntOnDigOnly): a person's Attack is always the pry bar; F / U / pad Y throws.
-            // A bot's attack intent with the TNT ready stays its throw request (read here as its DigPlace throw, unchanged).
-            if (w.Moves != null && MovesHooks.OffenceTntOnDigOnly(w) && MovesHooks.OffenceHuman(w, id)) return false;
+            // A bot's attack intent with the TNT ready stays its throw request. One rule for every reader: OffenceAttackMayThrow.
+            if (!MovesHooks.OffenceAttackMayThrow(w, id) || w.Config.Depth.Classic) return false;
             if (!w.Inputs[id].Attack || w.Tick < w.Demolitions.TntReadyTick[id]) return false;
             if (a.AttackCd > 0 || a.SwingPending) return false;
             if (a.HitStunTicks > 0 && Phys.On(w, true)) return false;

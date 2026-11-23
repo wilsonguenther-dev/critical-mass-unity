@@ -142,6 +142,11 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
         private int _evHead = -1, _mySwing = -100000, _theirDodge = -100000, _theirSwing = -100000, _landed = -100000, _cancelAt = -100000;
         /// <summary>One-tick buttons for the next frame (the test sets them; the model clears them after one tick).</summary>
         public bool PressAttack, PressAbility, PressDigPlace, PressDodge, PressCancel, PressJump, PressSwitch, HoldInteract;
+        /// <summary>Class moves (integrator, lane 4's request): with the Heavy switch on a held Attack is a CHARGE, so by default the
+        /// hands TAP (one tick down, one up: the light swing starts on the release, as a person taps). HoldAttack = true keeps the
+        /// old held Attack (a test that wants the charge). Switch off: no effect at all.</summary>
+        public bool HoldAttack;
+        private bool _tapPrev;
         /// <summary>Optional move override for the next frame (NaN = the model's own move).</summary>
         public double MoveOverrideX = double.NaN, MoveOverrideZ = double.NaN;
         public int StationBuy;
@@ -303,7 +308,13 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
             f.MoveZ = double.IsNaN(MoveOverrideZ) ? mz : MoveOverrideZ;
             f.AimX = double.IsNaN(AimOverrideX) ? ax : AimOverrideX;
             f.AimZ = double.IsNaN(AimOverrideZ) ? az : AimOverrideZ;
-            f.Attack = want || PressAttack;
+            bool atk = want || PressAttack;
+            if (!HoldAttack && w.Moves != null && MovesHooks.On(w, MovesHooks.Cfg(w).Heavy))
+            {
+                if (atk && _tapPrev) atk = false;   // a tap: one tick down, then up
+                _tapPrev = atk;
+            }
+            f.Attack = atk;
             f.Ability = PressAbility;
             f.Terraform = PressDigPlace;
             f.Dodge = PressDodge;

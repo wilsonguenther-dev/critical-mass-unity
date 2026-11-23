@@ -31,6 +31,8 @@ public static class Runner
                 var cases = m.GetCustomAttributes(typeof(TestCaseAttribute), true).Cast<TestCaseAttribute>().Select(c => c.Arguments).ToList();
                 if (cases.Count == 0 && Has<TestAttribute>(m)) cases.Add(new object[0]);
                 if (cases.Count == 0) continue;
+                string onlyMethods = Environment.GetEnvironmentVariable("CM_TEST_METHOD");   // optional: method-name substrings, comma separated
+                if (!string.IsNullOrEmpty(onlyMethods) && !onlyMethods.Split(',').Any(x => m.Name.Contains(x))) continue;
                 bool slow = fixtureSlow || IsSlow(m);
                 if ((mode == "fast" && slow) || (mode == "slow" && !slow) || Has<ExplicitAttribute>(m) || Has<IgnoreAttribute>(m) || Has<IgnoreAttribute>(t)) { skip += cases.Count; continue; }
                 foreach (object[] a in cases)

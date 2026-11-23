@@ -131,6 +131,12 @@ namespace CriticalMass.Sim.Core
         /// <summary>T1-1: Demolitions' Attack is always the pry bar (TNT on F / U / pad Y only).</summary>
         public static bool OffenceTntOnDigOnly(World w) => On(w, Cfg(w).DemoTntOnDigOnly);
 
+        /// <summary>Integrator (combine): the one rule every DemolitionsTnt.ThrowOnAttack reader uses (Combat, Demolitions.AttackThrowsNow,
+        /// the bots' attack shaping): her Attack press may be the TNT throw unless DemoTntOnDigOnly is on and a person holds the
+        /// controls (a bot's attack intent with the TNT ready stays its throw request, so bot TNT use is unchanged).</summary>
+        public static bool OffenceAttackMayThrow(World w, int id) =>
+            w.Config.Abilities.DemolitionsTnt.ThrowOnAttack && !(w.Moves != null && OffenceTntOnDigOnly(w) && OffenceHuman(w, id));
+
         /// <summary>A person at the controls of actor id (not a bot, not the idle autopilot): the hold-to-charge input applies.</summary>
         public static bool OffenceHuman(World w, int id) =>
             id >= 0 && id < w.ActorCount && w.Actors[id].IsHuman && !MechRules.Autopiloted(w, id);

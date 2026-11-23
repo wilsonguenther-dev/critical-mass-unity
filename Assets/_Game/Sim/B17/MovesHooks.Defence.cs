@@ -36,6 +36,10 @@ namespace CriticalMass.Sim.Core
         public int[] LungeDashEnd = new int[0];
         /// <summary>1 once Attack was seen during the dodge-in's dash (the press the lunge fires).</summary>
         public byte[] LungePressed = new byte[0];
+        /// <summary>Integrator: the SwingTick of actor i's current LUNGE swing (LungeArmour), CombatFeel.NoTick = none.</summary>
+        public int[] LungeSwingTick = new int[0];
+        /// <summary>Integrator: the tick actor i took the knock of an enemy's melee LIGHT strike (ComboDodgeOutOfKnock).</summary>
+        public int[] LightKnockTick = new int[0];
         // ---- T2-7 jump evade (lane 3 reads JumpRelockUntil for its jump lock; the landing recovery is LandRecoverUntil)
         /// <summary>1 when the current flight evaded a ground melee swing (BlockedAir).</summary>
         public byte[] FlightEvaded = new byte[0];
@@ -70,6 +74,8 @@ namespace CriticalMass.Sim.Core
             LungeTarget = new int[n];
             LungeDashEnd = new int[n];
             LungePressed = new byte[n];
+            LungeSwingTick = new int[n];
+            LightKnockTick = new int[n];
             FlightEvaded = new byte[n];
             LandRecoverUntil = new int[n];
             JumpRelockUntil = new int[n];
@@ -94,6 +100,8 @@ namespace CriticalMass.Sim.Core
                 LungeTarget[i] = -1;
                 LungeDashEnd[i] = CombatFeel.NoTick;
                 LungePressed[i] = 0;
+                LungeSwingTick[i] = CombatFeel.NoTick;
+                LightKnockTick[i] = CombatFeel.NoTick;
                 FlightEvaded[i] = 0;
                 LandRecoverUntil[i] = CombatFeel.NoTick;
                 JumpRelockUntil[i] = CombatFeel.NoTick;
@@ -108,11 +116,9 @@ namespace CriticalMass.Sim.Core
 
     public static partial class MovesHooks
     {
-        /// <summary>Lane 4 may implement this (MovesHooks.Offence.cs) to tell lane 2 what source's swing landing this tick is: heavy
-        /// = a charged release (T2-2), chargeShare = 0..1 (1 = CHARGED). Lane 2 reads it for "a full-charge Warrior heavy breaks
-        /// any guard at once", "the Miner's heavy drains guard x MinerHeavyGuardDrain" and "the Builder's ground slam still hits
-        /// an airborne body". Unimplemented (a classic partial method), the call compiles away and every swing reads as light.</summary>
-        static partial void DefenceAskHeavy(World w, int source, ref bool heavy, ref double chargeShare);
+        // Integrator (combine 2026-11-22): the heavy questions are lane 4's public queries (MovesHooks.Offence.cs):
+        // OffenceHeavyBreaksGuard (a full-charge Warrior overhead), OffenceGuardDrainMul (the Miner's armour breaker) and
+        // OffenceHitsAirborne (the Builder's ground slam). The partial DefenceAskHeavy placeholder they replace is gone.
 
         static DefenceMovesState DefenceS(World w) => w.Moves.Defence;
 
@@ -151,6 +157,7 @@ namespace CriticalMass.Sim.Core
             Actor a = w.Actors[i];
             if (!a.Alive || a.StandUp > 0 || a.AirLen > 0 || a.SwingPending || a.HitStunTicks > 0) return true;
             if (Dodge.Active(w, i)) return true;
+            if (MovementLanding(w, i)) return true;   // integrator: lane 3's landing recovery blocks the guard too
             return w.Tick < DefenceS(w).LandRecoverUntil[i];
         }
 
@@ -205,16 +212,10 @@ namespace CriticalMass.Sim.Core
         {
             MovesConfig m = Cfg(w);
             if (!On(w, m.JumpEvade) || cause != DamageCause.Melee || !DefenceEnemyActor(w, target, source)) return false;
-            Actor t = w.Actors[target], s = w.Actors[source];
-            if (t.AirLen <= 0 || s.AirLen > 0) return false;
-            if (t.AirTick < m.JumpEvadeFromAirTick || t.AirTick > m.JumpEvadeToAirTick) return false;
-            if (s.Cls == ClassId.Builder)
-            {
-                bool heavy = false;
-                double share = 0;
-                DefenceAskHeavy(w, source, ref heavy, ref share);
-                if (heavy) return false;   // the ground slam hits airborne bodies
-            }
+            if (w.Actors[source].AirLen > 0) return false;
+            // integrator: lane 3's window (air ticks JumpEvadeFromAirTick..ToAirTick, a glider is never inside it)
+            if (!MovementInAirEvadeWindow(w, target)) return false;
+            if (OffenceHitsAirborne(w, source)) return false;   // the Builder's ground slam hits airborne bodies (lane 4)
             return true;
         }
 
@@ -290,7 +291,14 @@ namespace CriticalMass.Sim.Core
             bool held = s.GuardHeldTicks[i] > 0;
             bool busy = DefenceBusy(w, i);
             bool guardClass = DefenceHasGuard(w, i);
-            if (s.GuardPressed[i] != 0)
+            if (s.GuardPressed[i] != 0 && DefenceParryWindow(w, i) <= 0)
+            {
+                // integrator: a class with no parry window (the Healer): the press is only a guard; a tap holds it
+                // ParryWhiffHoldTicks, with no parry attempt and no lockout
+                d.ParryPress[i] = CombatFeel.NoTick;
+                if (!busy) d.GuardHoldUntil[i] = w.Tick + m.ParryWhiffHoldTicks;
+            }
+            else if (s.GuardPressed[i] != 0)
             {
                 // the PARRY press edge (a parry attempt, locked out for ParryLockoutSeconds so mashing does not work)
                 if (busy) d.ParryPress[i] = CombatFeel.NoTick;
@@ -440,7 +448,15 @@ namespace CriticalMass.Sim.Core
         /// <summary>Dodge.Begin, after a dodge started (s.Start and s.Len set): remembers the dodge-in's first recover tick.</summary>
         internal static void DefenceDodgeBegan(World w, int id, int start, int len)
         {
-            if (w.Moves == null || !Cfg(w).DodgeLunge) return;
+            if (w.Moves == null) return;
+            Actor ka = w.Actors[id];
+            if ((ka.KVx != 0 || ka.KVz != 0) && DefenceDodgeOutOfKnock(w, id))
+            {
+                ka.KVx = 0;   // integrator (decision 2): the dodge ends the light knock slide it started out of
+                ka.KVz = 0;
+                DefenceS(w).LightKnockTick[id] = CombatFeel.NoTick;
+            }
+            if (!Cfg(w).DodgeLunge) return;
             DefenceMovesState d = DefenceS(w);
             if (d.LungeArmed[id] == 0) return;
             d.LungeDashEnd[id] = start + len;
@@ -458,6 +474,7 @@ namespace CriticalMass.Sim.Core
             int lunge = (int)Math.Floor(windup * m.LungeWindupMul + 1e-9);   // x0.75, rounded down (Warrior 12 to 9, Farmer 9 to 6)
             if (lunge < 1) lunge = 1;
             d.LungeArmed[i] = 0;
+            d.LungeSwingTick[i] = w.Tick;   // integrator: Combat sets SwingTick = w.Tick right after this hook (LungeArmour)
             d.Lunges++;
             World.PushEvent(w, SimEventType.Lunge, i, d.LungeTarget[i], w.X[i], w.Z[i], lunge);
             return lunge;
@@ -509,6 +526,27 @@ namespace CriticalMass.Sim.Core
                 stun = 0;
                 knock *= 1 - DefenceCut(w, target);
             }
+            MovesConfig m = Cfg(w);
+            Actor t = w.Actors[target];
+            // integrator (decision 6): a LUNGE wind-up shrugs off a hit under the lunger's Poise (the swing goes on)
+            if (m.DodgeLunge && m.LungeArmour && t.SwingPending && t.SwingTick == DefenceS(w).LungeSwingTick[target]
+                && w.Moves.Offence.StrikeAmount[0] < w.Config.Class(t.Cls).Poise) stun = 0;
+            // integrator (decision 2): the knock of an enemy's melee light strike may be dodged out of (Dodge.CanStart)
+            if (m.Combos && m.ComboDodgeOutOfKnock && !OffenceIsHeavy(w, source) && DefenceEnemyActor(w, target, source)) DefenceS(w).LightKnockTick[target] = w.Tick;
+        }
+
+        /// <summary>Dodge.CanStart (integrator, decision 2): actor id slides on a knock but may dodge out of it: Combos and
+        /// ComboDodgeOutOfKnock on, the stagger over, grounded, and the knock is an enemy's melee light strike taken in the last
+        /// ComboKnockDodgeTicks. DefenceDodgeBegan ends the slide when that dodge starts.</summary>
+        internal static bool DefenceDodgeOutOfKnock(World w, int id)
+        {
+            if (w.Moves == null) return false;
+            MovesConfig m = Cfg(w);
+            if (!m.Combos || !m.ComboDodgeOutOfKnock) return false;
+            Actor a = w.Actors[id];
+            if (a.HitStunTicks > 0 || a.AirLen > 0) return false;
+            int k = DefenceS(w).LightKnockTick[id];
+            return k != CombatFeel.NoTick && w.Tick - k <= m.ComboKnockDodgeTicks;
         }
 
         static bool DefenceHitNegated(World w, int target, int source, double srcX, double srcZ, DamageCause cause, bool report)
@@ -536,6 +574,7 @@ namespace CriticalMass.Sim.Core
             {
                 d.AirEvades++;
                 d.FlightEvaded[target] = 1;
+                MovementNoteAirEvade(w, target);   // integrator: lane 3's landing lock sees the evade even when HitBlocked is not raised
                 if (report) World.PushEvent(w, SimEventType.HitBlocked, target, source, w.X[target], w.Z[target], PlayerReasons.BlockedAir, null, DamageCause.None, 0);
                 return true;
             }
@@ -555,11 +594,11 @@ namespace CriticalMass.Sim.Core
             if (cause == DamageCause.Melee)
             {
                 ClassId sc = w.Actors[source].Cls;
-                bool heavy = false;
-                double share = 0;
-                DefenceAskHeavy(w, source, ref heavy, ref share);
-                if (sc == ClassId.Warrior) { drain = m.GuardDrainWarriorCleave; if (heavy && share >= 1) breakNow = true; }
-                else if (sc == ClassId.Miner) drain = heavy ? m.MinerHeavyGuardDrain : m.GuardDrainMinerPick;
+                if (sc == ClassId.Warrior) drain = m.GuardDrainWarriorCleave;
+                else if (sc == ClassId.Miner) drain = m.GuardDrainMinerPick;
+                double heavyDrain = OffenceGuardDrainMul(w, source);   // lane 4: the Miner's armour breaker (0 = no rule)
+                if (heavyDrain > 0) drain = heavyDrain;
+                if (OffenceHeavyBreaksGuard(w, source)) breakNow = true;   // lane 4: a full-charge Warrior overhead
             }
             double meter = DefenceMeter(w, target);
             bool broke = breakNow;

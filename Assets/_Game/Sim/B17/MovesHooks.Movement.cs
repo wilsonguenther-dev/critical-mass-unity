@@ -95,7 +95,7 @@ namespace CriticalMass.Sim.Core
         /// interact press, or an enemy within 8 u starting a swing wind-up, ends it first. Without it no slide could ever reach a body: travel ends 8 u out and the slide covers 4.5 u.
         /// 1.0 s lets the slowest class (the Warrior, 3.61 u/s) close from 8 u to slide range with a 0.2 s reaction.
         /// </summary>
-        public const int MovementSlideCarryTicks = 30;
+        public static int MovementSlideCarryTicks(World w) => Cfg(w).SlideCarryTicks;   // integrator: MovesConfig.SlideCarryTicks
 
         /// <summary>T2-5: extra slack (u) on the slide's body-contact test (bodies touch at the sum of the two radii).</summary>
         const double MovementTripSlack = 0.05;
@@ -345,7 +345,10 @@ namespace CriticalMass.Sim.Core
         static bool MovementJumpLocked(World w, int id)
         {
             if (!On(w, Cfg(w).JumpEvade)) return false;
-            if (w.Tick >= w.Moves.Movement.JumpRelockUntil[id]) return false;
+            // integrator: lane 2's relock (Defence.JumpRelockUntil, set when its hit test saw the evade) counts as well
+            int until = w.Moves.Movement.JumpRelockUntil[id], d2 = w.Moves.Defence.JumpRelockUntil[id];
+            if (d2 > until) until = d2;
+            if (w.Tick >= until) return false;
             PlayerSeat.Refuse(w, id, PlayerReasons.ButtonJump, PlayerReasons.RefusedLanding);
             return true;
         }
@@ -413,7 +416,7 @@ namespace CriticalMass.Sim.Core
                 }
                 m.Travel[i] = 0;
                 m.TravelTicks[i] = 0;
-                m.SlideCarryUntil[i] = enemy && On(w, c.Slide) ? w.Tick + MovementSlideCarryTicks : -1;
+                m.SlideCarryUntil[i] = enemy && On(w, c.Slide) ? w.Tick + MovementSlideCarryTicks(w) : -1;
                 World.PushEvent(w, SimEventType.TravelChanged, i, -1, w.X[i], w.Z[i], 0);
                 return;
             }

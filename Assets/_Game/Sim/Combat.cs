@@ -89,8 +89,7 @@ namespace CriticalMass.Sim.Core
                 // the pry bar swings only while the TNT cools down (a held press no longer pry-swings the TNT away for good).
                 // lane S2: an enemy point-blank inside her pry-bar arc gets the pry bar and the TNT stays ready (Demolitions.PointBlank).
                 // class moves T1-1 (lane 4, DemoTntOnDigOnly): a person's Attack is always the pry bar (TNT on F only).
-                if (feel && a.Cls == ClassId.Demolitions && w.Config.Abilities.DemolitionsTnt.ThrowOnAttack && w.Tick >= w.Demolitions.TntReadyTick[i] && !Demolitions.PointBlank(w, i)
-                    && !(w.Moves != null && MovesHooks.OffenceTntOnDigOnly(w) && MovesHooks.OffenceHuman(w, i))) continue;
+                if (feel && a.Cls == ClassId.Demolitions && MovesHooks.OffenceAttackMayThrow(w, i) && w.Tick >= w.Demolitions.TntReadyTick[i] && !Demolitions.PointBlank(w, i)) continue;
                 if (a.Cls == ClassId.Healer)
                 {
                     // DG-40 (U-061): the attack press mends a hurt ally FIRST (support first); the lantern swings only when
