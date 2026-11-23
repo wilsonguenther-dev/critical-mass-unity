@@ -65,6 +65,30 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
         /// <summary>The checks of one test (Unity's NUnit has no Assert.Multiple: the [mv] lines are printed first, so every
         /// number is in the log even when the first check stops the test).</summary>
         public static void Checks(Action checks) => checks();
+
+        /// <summary>
+        /// One duel through the human seam. Switches off: PlayerSeatRig.Play exactly as the probe ran. Switches on: the seat
+        /// models' held Attack (PlayerSeatRig's "want" holds it while a swing is ready) becomes a one-tick tap for both human
+        /// seats, through lane 4's OffRig step: with Heavy on a held Attack CHARGES (tap = light), so the probe's held button
+        /// would measure charged heavies instead of the light swings a person taps. Same hands as lane 4's OffencePilot.Tap.
+        /// </summary>
+        public static DuelResult Play(Seat s, double maxSeconds, Func<Seat, bool> stop = null)
+        {
+            if (!On) return PlayerSeatRig.Play(s, maxSeconds, stop);
+            bool p1 = false, p2 = false;
+            return OffRig.Play(s, maxSeconds, q =>
+            {
+                Tap(q.Human != null ? q.Frames[q.Human.Me] : null, ref p1);
+                Tap(q.Human2 != null ? q.Frames[q.Human2.Me] : null, ref p2);
+            }, stop);
+        }
+
+        static void Tap(InputFrame f, ref bool prev)
+        {
+            if (f == null) return;
+            if (f.Attack && prev) f.Attack = false;   // one tick down, then up
+            prev = f.Attack;
+        }
         public const int Help = 1;   // shipped mouse aim help (Low)
 
         public static void CountCrits(Seat s, PsmTally t)
@@ -127,7 +151,7 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
                 var wt = new PsmWatch();
                 int uses = 0;
                 if (variant == "kit" || strong) s.BeforeTick = q => { wt.Update(q); if (UseKit(q, wt, me, false)) uses++; };
-                DuelResult r = PlayerSeatRig.Play(s, 30);
+                DuelResult r = PsmRig.Play(s, 30);
                 t.Reps++;
                 if (r.Won) t.Wins++;
                 if (r.Lost) t.Losses++;
@@ -179,7 +203,7 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
                 s.Human.AimHelp = PsmRig.Help;
                 s.NoTnt = true;
                 s.KeepThemAbove = 0.3;
-                DuelResult r = PlayerSeatRig.Play(s, 60, q => PlayerSeatRig.CountSwings(q) >= 40);
+                DuelResult r = PsmRig.Play(s, 60, q => PlayerSeatRig.CountSwings(q) >= 40);
                 Console.WriteLine("[mv] STRAFER | " + me + " | land " + r.Landed + "/" + r.Swings + " (" + PxLog.F(r.LandRate) + ")");
                 foreach (ClassId tgt in new[] { ClassId.Warrior, ClassId.Farmer, ClassId.Builder })
                 {
@@ -188,7 +212,7 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
                         Seat p = PlayerSeatRig.Duel(me, tgt, TargetMode.Passive, 0, 0, 0, tweak: PsmRig.Tweak);
                         p.NoTnt = true;
                         p.Human.HitCancels = hc;
-                        DuelResult pr = PlayerSeatRig.Play(p, 30);
+                        DuelResult pr = PsmRig.Play(p, 30);
                         Console.WriteLine("[mv] TTK | " + me + " -> " + tgt + " | hitcancel " + hc + " | " + (pr.Won ? PxLog.F(pr.Seconds) + " s" : "no kill") + " swings " + pr.Swings);
                     }
                 }
@@ -209,7 +233,7 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
                         double d = PsmWatch.Dist(q.W, 0, q.Them);
                         if (q.W.Tick >= q.W.Demolitions.TntReadyTick[0] && d >= 2.5 && d <= 6) { if (PsmRig.On) q.Human.PressDigPlace = true; else q.Human.PressAttack = true; }   // T1-1: F throws
                     };
-                    PlayerSeatRig.Play(s, 20);
+                    PsmRig.Play(s, 20);
                     throws += s.Spy.Of(SimEventType.TntThrown, e => e.A == 0).Count;
                     foreach (SeatEvent e in s.Spy.Of(SimEventType.Explosion, x => x.A == 0 && x.B == Demolitions.ExplosionTnt))
                         if (s.Spy.Of(SimEventType.Hit, h => h.B == 0 && h.A == s.Them && h.Tick == e.Tick && h.Cause == DamageCause.Explosion).Count > 0) hurt++;
@@ -256,7 +280,7 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
                     q.Human.MoveOverrideZ = action == "away" ? -uz : ux * sg;
                     answeredStarts.Add(wt.TheirStart);
                 };
-                PlayerSeatRig.Play(s, 30);
+                PsmRig.Play(s, 30);
                 int wu = w.Dur.AttackWindup[(int)them];
                 double theirReach = w.Config.Class(them).AttackRange + w.Config.Class(me).Radius;
                 var contacts = s.Spy.Of(SimEventType.AttackContact, e => e.A == s.Them);
@@ -333,7 +357,7 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
                     if (variant == "dodgegap" && rd < w.Config.Class(chaser).AttackRange + w.Config.Class(me).Radius + 0.3 && Dodge.CanStart(w, q.Me)) q.Human.PressDodge = true;
                     if (variant == "kit" && PsmRig.UseKit(q, wt, me, true)) uses++;
                 };
-                DuelResult r = PlayerSeatRig.Play(s, 6);
+                DuelResult r = PsmRig.Play(s, 6);
                 t.Reps++;
                 if (!r.Lost) t.Escaped++;
                 if (engaged || r.TheirSwings > 0) t.Engaged++;
@@ -381,7 +405,7 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
                     }
                     if (variant == "kit" && PsmRig.UseKit(q, wt, me, false)) uses++;
                 };
-                DuelResult r = PlayerSeatRig.Play(s, T.ChaseSeconds);
+                DuelResult r = PsmRig.Play(s, T.ChaseSeconds);
                 t.Reps++;
                 if (r.Won) t.Wins++;
                 t.Uses += uses;
@@ -466,7 +490,7 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
                     if (kit && w.Actors[0].AbilityCd <= 0 && rd <= 4) { q.Human.PressAbility = true; q.Human.AimOverrideX = w.X[0]; q.Human.AimOverrideZ = w.Z[0]; if (pressed < 0) pressed = w.Tick; }
                     if (w.Tick % 15 == 0) Console.WriteLine("[mv] TRACE kit " + kit + " t " + w.Tick + " me " + PxLog.F(w.X[0]) + "," + PxLog.F(w.Z[0]) + " v " + PxLog.F(w.Vx[0]) + " them " + PxLog.F(w.X[q.Them]) + " gap " + PxLog.F(rd) + " hp " + PxLog.F(w.Actors[0].Hp, "0"));
                 };
-                PlayerSeatRig.Play(s, 6);
+                PsmRig.Play(s, 6);
                 foreach (SeatEvent e in s.Spy.All.Where(e => (e.A == 0 || e.B == 0) && e.Type != SimEventType.AttackStart && e.Type != SimEventType.Knock).Take(40))
                     Console.WriteLine("[mv] TRACE kit " + kit + " ev " + e + " cause " + e.Cause);
             }
@@ -492,7 +516,7 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
                 if (variant == "feint" || variant == "all") s.Human.Feints = true;
                 if (variant == "hitcancel" || variant == "all") s.Human.HitCancels = true;
                 if (variant == "dodge" || variant == "all") s.Human.Dodges = true;
-                DuelResult r = PlayerSeatRig.Play(s, 30);
+                DuelResult r = PsmRig.Play(s, 30);
                 t.Reps++; if (r.Won) t.Wins++; if (r.Lost) t.Losses++;
                 t.Swings += r.Swings; t.Landed += r.Landed;
                 t.HpLeft += s.W.Actors[0].Alive ? s.W.Actors[0].Hp / s.W.Actors[0].MaxHp : 0;
@@ -556,7 +580,7 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
         {
             Seat p = PlayerSeatRig.Duel(me, tgt, TargetMode.Passive, 0, 0, 0, tweak: PsmRig.Tweak);
             p.NoTnt = true;
-            DuelResult pr = PlayerSeatRig.Play(p, 30);
+            DuelResult pr = PsmRig.Play(p, 30);
             return pr.Won ? pr.Seconds : double.NaN;
         }
 
@@ -593,7 +617,7 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
                         double d = PsmWatch.Dist(q.W, 0, q.Them);
                         if (q.W.Tick >= q.W.Demolitions.TntReadyTick[0] && d >= 2.5 && d <= 6) q.Human.PressDigPlace = true;
                     };
-                    PlayerSeatRig.Play(s, 20);
+                    PsmRig.Play(s, 20);
                     throws += s.Spy.Of(SimEventType.TntThrown, e => e.A == 0).Count;
                     foreach (SeatEvent e in s.Spy.Of(SimEventType.Explosion, x => x.A == 0 && x.B == Demolitions.ExplosionTnt))
                         if (s.Spy.Of(SimEventType.Hit, h => h.B == 0 && h.A == s.Them && h.Tick == e.Tick && h.Cause == DamageCause.Explosion).Count > 0) hurt++;
