@@ -149,6 +149,9 @@ namespace CriticalMass.Sim.Config
         public double ComboStepDamageMul = 1.1;
         public double FinisherDamageMul = 1.35;
         public double FinisherKnockMul = 1.8;
+        /// <summary>Integrator: per-class finisher damage, -1 = FinisherDamageMul. Demolitions on 2 steps: passive time to kill
+        /// fell 0.170 at 1.35 (band 0.05 to 0.15).</summary>
+        public double[] FinisherDamageMulByClass = { -1, -1, -1, -1, -1, -1 };
         public int FinisherExtraRecoveryTicks = 6;
         public double ComboResetSeconds = 1.0;
 
@@ -281,6 +284,7 @@ namespace CriticalMass.Sim.Config
             c.GuardKeepsFooting = (bool[])GuardKeepsFooting.Clone();
             c.GuardReleaseTicksByClass = (int[])GuardReleaseTicksByClass.Clone();
             c.LungeWindupMulByClass = (double[])LungeWindupMulByClass.Clone();
+            c.FinisherDamageMulByClass = (double[])FinisherDamageMulByClass.Clone();
             c.BotComboChance = (double[])BotComboChance.Clone();
             return c;
         }

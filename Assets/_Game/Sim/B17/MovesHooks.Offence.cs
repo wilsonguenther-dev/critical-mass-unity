@@ -510,7 +510,9 @@ namespace CriticalMass.Sim.Core
             if (!On(w, m.Combos) || s.StepSwingTick[i] != a.SwingTick) return;
             int step = s.StepOf[i];
             if (step < 2) return;
-            dmg *= step >= OffenceSteps(w, a.Cls) ? m.FinisherDamageMul : m.ComboStepDamageMul;
+            double fin = m.FinisherDamageMulByClass != null && (int)a.Cls < m.FinisherDamageMulByClass.Length && m.FinisherDamageMulByClass[(int)a.Cls] >= 0
+                ? m.FinisherDamageMulByClass[(int)a.Cls] : m.FinisherDamageMul;   // integrator: per-class finisher (Demolitions)
+            dmg *= step >= OffenceSteps(w, a.Cls) ? fin : m.ComboStepDamageMul;
         }
 
         /// <summary>After actor i's swing contact (hits 0 = whiff): combo advance or reset, HeavyWhiffExtraRecoveryTicks.</summary>

@@ -273,7 +273,15 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
                     if (rd < 1e-6) return;
                     double ux = rx / rd, uz = rz / rd, sg = (wt.TheirStart & 1) == 0 ? 1 : -1;
                     if (action == "shield") { if (w.Actors[q.Me].AbilityCd > 0) return; q.Human.PressAbility = true; answeredStarts.Add(wt.TheirStart); return; }
-                    if (action == "jump") { q.Human.PressJump = true; answeredStarts.Add(wt.TheirStart); return; }
+                    if (action == "jump")
+                    {
+                        // integrator: like the shield on cooldown, a jump that cannot start (still airborne, or inside the 1 s
+                        // relock after an evading jump) is no answer: counting those presses measured the relock, not the evade
+                        // (0.56 vs the Warrior, whose next swing usually falls inside the relock)
+                        Actor me0 = w.Actors[q.Me];
+                        if (me0.AirLen > 0 || (w.Moves != null && (w.Tick < w.Moves.Movement.JumpRelockUntil[q.Me] || w.Tick < w.Moves.Defence.JumpRelockUntil[q.Me]))) return;
+                        q.Human.PressJump = true; answeredStarts.Add(wt.TheirStart); return;
+                    }
                     if (!Dodge.CanStart(w, q.Me)) return;
                     q.Human.PressDodge = true;
                     q.Human.MoveOverrideX = action == "away" ? -ux : -uz * sg;
@@ -353,7 +361,17 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
                     double lx = k % 2 == 0 ? -1 : 1, lz = Math.Max(-0.6, Math.Min(0.6, (w.Map.Hill.Z - w.Z[q.Me]) * 0.8));
                     double ll = Math.Sqrt(lx * lx + lz * lz);
                     q.Human.MoveOverrideX = lx / ll; q.Human.MoveOverrideZ = lz / ll;
-                    if (variant == "dodge" && wt.Since(w) == PsmRig.Lag && Dodge.CanStart(w, q.Me)) { q.Human.PressDodge = true; }
+                    // integrator (decision 7): the runner's eye varies 5 to 8 ticks per start, as the chaser's does (fixed 6 put every
+                    // start on the same tick and gave 16 of 16 or 0 of 16), and with the switches on the chaser LUNGES (dodge-in) from
+                    // just outside its reach, as lane 2's escape rig does (without it this measured no lunge at all: 16 of 16 off and on)
+                    if (variant == "dodge" && wt.Since(w) == 5 + k % 4 && Dodge.CanStart(w, q.Me)) { q.Human.PressDodge = true; }
+                    double creach = w.Config.Class(chaser).AttackRange + w.Config.Class(me).Radius;
+                    if (w.Moves != null && rd > creach && rd < creach + 3.2 && rd > 1e-6 && Dodge.CanStart(w, q.Them))
+                    {
+                        q.Human2.PressDodge = true;
+                        q.Human2.MoveOverrideX = (w.X[q.Me] - w.X[q.Them]) / rd;
+                        q.Human2.MoveOverrideZ = (w.Z[q.Me] - w.Z[q.Them]) / rd;
+                    }
                     if (variant == "dodgegap" && rd < w.Config.Class(chaser).AttackRange + w.Config.Class(me).Radius + 0.3 && Dodge.CanStart(w, q.Me)) q.Human.PressDodge = true;
                     if (variant == "kit" && PsmRig.UseKit(q, wt, me, true)) uses++;
                 };
