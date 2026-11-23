@@ -929,3 +929,148 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
         }
     }
 }
+
+namespace CriticalMass.Sim.Tests.PlayerSeat
+{
+    using System;
+    using System.Collections.Generic;
+    using CriticalMass.Sim.Config;
+    using CriticalMass.Sim.Core;
+    using NUnit.Framework;
+    using T = CriticalMass.Sim.Tests.PlayerSeat.PlayerSeatTargets;
+
+    /// <summary>fix/mv-combo-buffer (Editor review): a person tapping Attack in a steady rhythm chains. Every switch on (the play
+    /// build); the human seat taps one tick every P ticks (6, 8, 10) at a passive dummy; a trial = a landed opener (step 1) whose
+    /// next swing starts inside the chain; success = that next swing is step 2. 10 trials per class and interval.</summary>
+    [TestFixture]
+    [Category("PlayerSeat")]
+    public sealed class MovesOffenceComboRhythm
+    {
+        internal static (int ok, int trials, string why) Tapper(ClassId me, int period, int phase, Action<GameConfig> tweak, int want = 10)
+        {
+            Seat s = PlayerSeatRig.Duel(me, ClassId.Healer, TargetMode.Passive, 0, phase, 0, tweak: tweak);
+            s.NoTnt = true;
+            s.KeepThemAbove = 0.3;
+            World w = s.W;
+            int lastSwing = CombatFeel.NoTick, lastStep = 0, ok = 0, trials = 0, t0 = -1;
+            bool lastLanded = false, pendingTrial = false;
+            var why = new List<string>();
+            OffRig.Play(s, 30.0, q =>
+            {
+                Actor a = q.W.Actors[q.Me];
+                if (t0 < 0) t0 = q.W.Tick;
+                if (a.SwingTick != lastSwing)
+                {
+                    // a new swing started: score the trial the previous landed opener opened
+                    int step = q.W.Moves.Offence.StepOf[q.Me];
+                    if (pendingTrial)
+                    {
+                        trials++;
+                        if (step == 2) ok++;
+                        else if (why.Count < 3) why.Add("t" + (a.SwingTick - t0) + " step " + step);
+                        pendingTrial = false;
+                    }
+                    lastSwing = a.SwingTick;
+                    lastStep = step;
+                    lastLanded = false;
+                }
+                if (!lastLanded && !a.SwingPending && q.W.Depth.Feel.LandedSwing[q.Me] == a.SwingTick && a.SwingTick != CombatFeel.NoTick)
+                {
+                    lastLanded = true;
+                    if (lastStep <= 1) pendingTrial = true;
+                }
+                // the tapper: one tick down every period ticks, never held
+                q.Frames[q.Me].Attack = (q.W.Tick - t0) % period == 0;
+            }, q => trials >= want);
+            return (ok, trials, string.Join(", ", why));
+        }
+
+        /// <summary>A person's double-tap: press 1 starts the opener, press 2 comes `gap` ticks after press 1 and nothing more;
+        /// chained = the second swing is step 2. 8 starts per gap.</summary>
+        internal static (int chained, int reps) DoubleTap(ClassId me, int gap, Action<GameConfig> tweak)
+        {
+            int chained = 0, reps = 0;
+            for (int k = 0; k < 8; k++)
+            {
+                Seat s = PlayerSeatRig.Duel(me, ClassId.Healer, TargetMode.Passive, 0, k, 0, tweak: tweak);
+                s.NoTnt = true;
+                s.KeepThemAbove = 0.3;
+                int first = -1, swings = 0, lastSwing = s.W.Actors[s.Me].SwingTick, step2 = 0;
+                OffRig.Play(s, 6.0, q =>
+                {
+                    Actor a = q.W.Actors[q.Me];
+                    if (a.SwingTick != lastSwing)
+                    {
+                        lastSwing = a.SwingTick;
+                        swings++;
+                        if (swings == 2 && q.W.Moves.Offence.StepOf[q.Me] == 2) step2 = 1;
+                    }
+                    bool inReach = q.W.Actors[q.Them].Alive && Dist(q.W, q.Me, q.Them) <= q.W.Config.Class(me).AttackRange + q.W.Config.Class(ClassId.Healer).Radius - 0.1;
+                    bool press = false;
+                    if (first < 0 && inReach && Combat.AttackReady(q.W, q.Me)) { first = q.W.Tick; press = true; }
+                    else if (first >= 0 && q.W.Tick == first + gap) press = true;
+                    q.Frames[q.Me].Attack = press;
+                    if (first >= 0) { q.Frames[q.Me].MoveX = 0; q.Frames[q.Me].MoveZ = 0; }
+                }, q => swings >= 2 || (first >= 0 && q.W.Tick > first + 90));
+                reps++;
+                chained += step2;
+            }
+            return (chained, reps);
+        }
+
+        static double Dist(World w, int a, int b) { double dx = w.X[b] - w.X[a], dz = w.Z[b] - w.Z[a]; return Math.Sqrt(dx * dx + dz * dz); }
+
+        [Test]
+        public void ADoubleTapChains_AnEarlyMashDoesNot_AndNPerClass()
+        {
+            Action<GameConfig> allOn = c => MovesConfig.PlayBuildAllOn(c.Depth.Moves);
+            var bad = new List<string>();
+            MovesConfig mc = new MovesConfig();
+            GameConfig gc = GameConfig.CreateBrowser5v5().ApplyRules(RulesProfile.Full);
+            MovesConfig.PlayBuildAllOn(gc.Depth.Moves);
+            World w0 = World.CreateWorld(new WorldOptions { Seed = 1, TeamSize = 1, HumanTeam = TeamId.Azure, HumanClass = ClassId.Warrior, Config = gc });
+            foreach (ClassId me in T.Classes)
+            {
+                if (mc.ComboSteps[(int)me] < 2) continue;
+                int wu = w0.Dur.AttackWindup[(int)me], n = MovesHooks.OffenceComboBufferTicks(w0, me);
+                // a natural double-tap: the second press just after the hit lands (contact + 1 .. + 4)
+                var parts = new List<string>();
+                bool ok = true;
+                foreach (int extra in new[] { 1, 4 })
+                {
+                    var r = DoubleTap(me, wu + extra, allOn);
+                    parts.Add("press 2 at contact+" + extra + ": " + r.chained + "/" + r.reps);
+                    if (r.chained < 7) ok = false;
+                }
+                // mashing during the wind-up (press 2 at 3 ticks, well before the hit): not remembered
+                var early = DoubleTap(me, 3, allOn);
+                parts.Add("press 2 at +3 (in the wind-up): " + early.chained + "/" + early.reps);
+                if (wu > 4 && early.chained > 0) ok = false;
+                if (!PxLog.Line("combo-buffer DoubleTap", me + " (wind-up " + wu + ", N = " + n + " ticks from contact to the window)", string.Join("; ", parts), "double-tap after the hit >= 7 of 8; a press in the wind-up never", ok)) bad.Add(me.ToString());
+            }
+            Assert.IsEmpty(bad);
+        }
+
+        [Test]
+        public void ATapperAt6_8_10TicksGetsStep2_8Of10_EveryChainingClass()
+        {
+            Action<GameConfig> allOn = c => MovesConfig.PlayBuildAllOn(c.Depth.Moves);
+            var bad = new List<string>();
+            MovesConfig mc = new MovesConfig();
+            foreach (ClassId me in T.Classes)
+            {
+                if (mc.ComboSteps[(int)me] < 2) continue;
+                var parts = new List<string>();
+                bool ok = true;
+                foreach (int p in new[] { 6, 8, 10 })
+                {
+                    var r = Tapper(me, p, 0, allOn);
+                    parts.Add("every " + p + ": " + r.ok + "/" + r.trials + (r.why.Length > 0 ? " [" + r.why + "]" : ""));
+                    if (r.trials < 10 || r.ok < 8) ok = false;
+                }
+                if (!PxLog.Line("combo-buffer Rhythm", me + " taps Attack at a passive dummy, every switch on", string.Join("; ", parts), ">= 8 of 10 at each interval", ok)) bad.Add(me.ToString());
+            }
+            Assert.IsEmpty(bad);
+        }
+    }
+}

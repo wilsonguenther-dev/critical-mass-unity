@@ -51,6 +51,9 @@ namespace CriticalMass.Sim.Core
         /// <summary>The next combo step (0 = none) and the last tick a swing may start as that step.</summary>
         public int[] ChainNext = new int[0];
         public int[] ChainUntil = new int[0];
+        /// <summary>fix/mv-combo-buffer: the tick of a person's Attack press made in the active / recovery frames of a swing that
+        /// opened the chain (NoTick = none); it starts the next step on the first tick the swing can start, inside the chain.</summary>
+        public int[] ComboPressTick = new int[0];
         /// <summary>Integrator (decision 2): the body the actor's last landed strike hit (its dodge breaks the chain), -1 = none.</summary>
         public int[] ChainVictim = new int[0];
         /// <summary>Demolitions' fuse strike: the tick a fuse stuck on this body blows (NoTick = none) and who lit it.</summary>
@@ -86,6 +89,7 @@ namespace CriticalMass.Sim.Core
             StepOf = new int[n];
             ChainNext = new int[n];
             ChainUntil = new int[n];
+            ComboPressTick = new int[n];
             ChainVictim = new int[n];
             FuseTick = new int[n];
             FuseOwner = new int[n];
@@ -112,6 +116,7 @@ namespace CriticalMass.Sim.Core
                 StepOf[i] = 0;
                 ChainNext[i] = 0;
                 ChainUntil[i] = CombatFeel.NoTick;
+                ComboPressTick[i] = CombatFeel.NoTick;
                 ChainVictim[i] = -1;
                 FuseTick[i] = CombatFeel.NoTick;
                 FuseOwner[i] = -1;
@@ -521,7 +526,7 @@ namespace CriticalMass.Sim.Core
         /// combo press in the chain window. Return wants unchanged when off.</summary>
         static bool OffenceWantsAttack(World w, int i, bool wants)
         {
-            if (!On(w, Cfg(w).Heavy)) return wants;
+            if (!On(w, Cfg(w).Heavy)) return OffenceHuman(w, i) ? OffenceComboBuffer(w, w.Moves.Offence, i, wants) : wants;
             OffenceMovesState s = w.Moves.Offence;
             if (s.PendingHeavy[i] >= 0)
             {
@@ -537,11 +542,42 @@ namespace CriticalMass.Sim.Core
                     w.Depth.Feel.BufferTick[i] = CombatFeel.NoTick;
                     return false;
                 }
-                return wants;
+                return OffenceComboBuffer(w, s, i, wants);
             }
             // a bot holding a charge for lane 5 swings nothing until the release
             if (s.BotChargeLeft[i] > 0 || s.HoldCount[i] > 0) return false;
             return wants;
+        }
+
+        /// <summary>
+        /// fix/mv-combo-buffer (Editor review): the combo's input buffer, a person's seat only. An Attack PRESS (a new press, not a
+        /// held button) made in the active or recovery frames of a swing that landed and opened the chain, from its contact tick to
+        /// the tick the next swing can start (ComboBufferTicks: the class cooldown minus its wind-up, 8 to 16 ticks at 30 Hz), is
+        /// remembered and starts the next step on the window's first tick. A press during the wind-up (before the hit) is not
+        /// remembered, a held Attack is not a press, and the press is dropped when the chain closes (a whiff, the victim's dodge
+        /// with ComboBreaksOnDodge, the window running out). Works whether or not the Heavy switch is on (the light is on press).
+        /// </summary>
+        static bool OffenceComboBuffer(World w, OffenceMovesState s, int i, bool wants)
+        {
+            if (!On(w, Cfg(w).Combos)) return wants;
+            Actor a = w.Actors[i];
+            bool open = s.ChainNext[i] >= 2 && w.Tick <= s.ChainUntil[i];
+            if (!open)
+            {
+                s.ComboPressTick[i] = CombatFeel.NoTick;
+                return wants;
+            }
+            bool press = w.Inputs[i].Attack && w.Moves.AttackHeldTicks[i] == 1;
+            if (press && !a.SwingPending && a.AttackCd > 0 && s.ComboPressTick[i] == CombatFeel.NoTick) s.ComboPressTick[i] = w.Tick;
+            return wants || s.ComboPressTick[i] != CombatFeel.NoTick;
+        }
+
+        /// <summary>The ComboBufferTicks of class cls (the report's N): its cooldown minus its light wind-up, in this world's ticks.</summary>
+        public static int OffenceComboBufferTicks(World w, ClassId cls)
+        {
+            int cd = (int)Math.Ceiling(w.Config.Class(cls).AttackCooldown * w.Config.SimHz - 1e-9);
+            int wu = w.Dur.AttackWindup[(int)cls];
+            return cd > wu ? cd - wu : 0;
         }
 
         /// <summary>The wind-up of the swing starting now (combo step x ComboStepWindupMul). Return windup when not a step.</summary>
@@ -566,6 +602,7 @@ namespace CriticalMass.Sim.Core
             }
             s.HeavySwingTick[i] = CombatFeel.NoTick;
             if (!On(w, m.Combos)) return windup;
+            s.ComboPressTick[i] = CombatFeel.NoTick;   // the remembered press is spent by this swing
             int step = 1;
             if (s.ChainNext[i] >= 2 && w.Tick <= s.ChainUntil[i] && OffenceMayChain(w, s, i)) step = s.ChainNext[i];
             s.ChainNext[i] = 0;
