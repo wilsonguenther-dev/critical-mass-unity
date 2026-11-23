@@ -965,41 +965,69 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
             Assert.IsEmpty(fails, string.Join(", ", fails));
         }
 
-        /// <summary>A dodge-in at a standing target 3.4 u away, the attack buffered in the dash. Top-down (off 0): stick and aim on
-        /// the target. Third person (off +-30): the stick and the aim both point along the lagging camera, 30 degrees off the target
-        /// (inside the 35-degree lunge cone): before the fix that dash ended 1.7 u BESIDE the target, facing past it, and whiffed.</summary>
+        /// <summary>fix/mv-lunge-stop: the lunge stop, measured. A dodge-in at a Farmer 3.4 u away, the attack buffered in the dash,
+        /// the stick and the aim 0 or 30 degrees off the target (third person: both follow the lagging camera), the target
+        /// standing or walking straight away at its base speed. At the swing's contact the gap to the target's BODY EDGE is at
+        /// most 0.8 x the swing's reach, and the swing lands. Before: the gap was 0.85 x reach at the dash's end (the Miner
+        /// 1.61 u centre to centre in the sim, 1.68 u in the engine, where it whiffed).</summary>
         [Test]
-        public void ALungeThatReachesItsStopPointLandsWhateverTheAim()
+        public void EveryLungeStopsWellInsideItsReachAndLands()
         {
             var fails = new List<string>();
-            foreach (ClassId me in new[] { ClassId.Miner, ClassId.Warrior, ClassId.Farmer, ClassId.Builder })
-                foreach (double off in new[] { 0.0, 30.0, -30.0 })
-                {
-                    Seat s = PlayerSeatRig.Duel(me, ClassId.Farmer, TargetMode.Passive, 0, 0, 0, distance: 3.4, tweak: MvCombine.AllOn);
-                    s.Human.Fight = false;
-                    World w = s.W;
-                    int t0 = w.Tick;
-                    double end = -1;
-                    s.BeforeTick = q =>
+            foreach (ClassId me in MvDefenceRig.All)
+                foreach (string mode in new[] { "standing", "standing, stick let go after the dodge", "walking away", "walking away, stick let go after the dodge", "walking away out of range, stick let go" })
+                    foreach (double off in new[] { 0.0, 30.0 })
                     {
-                        double rd = MvDefenceWatch.Dist(w, q.Me, q.Them);
-                        double ux = (w.X[q.Them] - w.X[q.Me]) / rd, uz = (w.Z[q.Them] - w.Z[q.Me]) / rd;
-                        double a = off * Math.PI / 180;
-                        q.Human.AimOverrideX = w.X[q.Me] + 4 * (ux * Math.Cos(a) - uz * Math.Sin(a));
-                        q.Human.AimOverrideZ = w.Z[q.Me] + 4 * (ux * Math.Sin(a) + uz * Math.Cos(a));
-                        q.Human.MoveOverrideX = ux * Math.Cos(a) - uz * Math.Sin(a); q.Human.MoveOverrideZ = ux * Math.Sin(a) + uz * Math.Cos(a);
-                        if (w.Tick == t0 + 2) q.Human.PressDodge = true;
-                        if (w.Tick >= t0 + 4 && w.Tick <= t0 + 6) q.Human.PressAttack = true;
-                        if (w.Moves != null && w.Moves.Defence.LungeSwingTick[q.Me] == w.Tick && end < 0) end = rd;
-                    };
-                    s.Steps(30);
-                    int lunges = s.Spy.Of(SimEventType.Lunge, e => e.A == s.Me).Count;
-                    int hits = s.Spy.Of(SimEventType.Hit, e => e.A == s.Them && e.B == s.Me && e.Cause == DamageCause.Melee).Count;
-                    bool ok = lunges == 1 && hits >= 1;
-                    PxLog.Line("mvg-lunge", me + " dodge-in at 3.4 u, stick and aim " + off + " deg off the target", "lunges " + lunges + ", gap at the swing " + PxLog.F(end) + ", hits " + hits, "1 lunge, it lands", ok);
-                    if (!ok) fails.Add(me + " " + off);
-                }
-            Assert.IsEmpty(fails, "lunge whiffed: " + string.Join(", ", fails));
+                        bool walking = mode.StartsWith("walking"), letGo = mode.Contains("let go"), far = mode.Contains("out of range");
+                        // walking: the target is at its base speed when the dodge starts (20 ticks of walking away, the player chasing)
+                        int dodgeIn = walking ? 20 : 2;
+                        Seat s = PlayerSeatRig.Duel(me, ClassId.Farmer, TargetMode.Passive, 0, 0, 0, distance: far ? 3.2 : walking ? 2.0 : 3.4, tweak: MvCombine.AllOn);
+                        s.Human.Fight = false;
+                        s.NoTnt = true;
+                        World w = s.W;
+                        int t0 = w.Tick;
+                        var gap = new Dictionary<int, double>();
+                        var hx = new Dictionary<int, double>();
+                        var tx = new Dictionary<int, double>();
+                        var tv = new Dictionary<int, double>();
+                        double ax0 = 0, az0 = 0;
+                        s.BeforeTick = q =>
+                        {
+                            double rd = MvDefenceWatch.Dist(w, q.Me, q.Them);
+                            gap[w.Tick] = rd - w.Config.Class(w.Actors[q.Them].Cls).Radius;
+                            hx[w.Tick] = w.X[q.Me] * ax0 + w.Z[q.Me] * az0;
+                            tx[w.Tick] = w.X[q.Them] * ax0 + w.Z[q.Them] * az0;
+                            tv[w.Tick] = w.Vx[q.Them] * ax0 + w.Vz[q.Them] * az0;
+                            double ux = (w.X[q.Them] - w.X[q.Me]) / rd, uz = (w.Z[q.Them] - w.Z[q.Me]) / rd;
+                            if (w.Tick == t0) { ax0 = ux; az0 = uz; }
+                            double a = off * Math.PI / 180;
+                            double cx = ux * Math.Cos(a) - uz * Math.Sin(a), cz = ux * Math.Sin(a) + uz * Math.Cos(a);
+                            q.Human.AimOverrideX = w.X[q.Me] + 4 * cx; q.Human.AimOverrideZ = w.Z[q.Me] + 4 * cz;
+                            // standing, let go: released after the press; a runner, let go: released AT the press (no chase: the sim
+                            // reads the stick at the press, and a held one means the player follows the dash in)
+                            bool stickOn = !(letGo && w.Tick > t0 + dodgeIn) && !(walking && letGo && w.Tick >= t0 + dodgeIn);
+                            q.Human.MoveOverrideX = stickOn ? cx : 0; q.Human.MoveOverrideZ = stickOn ? cz : 0;
+                            if (walking) { q.Dummy.MoveX = ax0; q.Dummy.MoveZ = az0; }
+                            if (w.Tick == t0 + dodgeIn) q.Human.PressDodge = true;
+                            if (w.Tick >= t0 + dodgeIn + 2 && w.Tick <= t0 + dodgeIn + 4) q.Human.PressAttack = true;
+                        };
+                        s.Steps(dodgeIn + 28);
+                        int lunges = s.Spy.Of(SimEventType.Lunge, e => e.A == s.Me).Count;
+                        var contact = s.Spy.Of(SimEventType.AttackContact, e => e.A == s.Me);
+                        int hits = s.Spy.Of(SimEventType.Hit, e => e.A == s.Them && e.B == s.Me && e.Cause == DamageCause.Melee).Count;
+                        LightWeapon lw = LightWeapons.Of(w, me);
+                        double reach = lw != null ? lw.Range : w.Config.Class(me).AttackRange;
+                        double edge = contact.Count > 0 && gap.TryGetValue(contact[0].Tick, out double g) ? g : double.NaN;
+                        // out of range: the dash cannot end within 0.8 x reach of a runner, so no lunge arms (a plain dodge), or one lands
+                        // a runner with the stick let go may be out of any dash's reach: no lunge then (a plain dodge), never a whiff
+                        bool mayRefuse = walking;
+                        bool ok = mayRefuse && lunges == 0 || lunges == 1 && hits >= 1 && edge <= 0.8 * reach + 1e-9;
+                        PxLog.Line("mvg-lunge", me + " dodge-in, target " + mode + ", stick and aim " + off + " deg off",
+                            "gap at the dodge " + PxLog.F(gap.TryGetValue(t0 + dodgeIn, out double g0) ? g0 : double.NaN) + ", contact +" + (contact.Count > 0 ? (contact[0].Tick - t0 - dodgeIn).ToString() : "-") + " travel " + (contact.Count > 0 && hx.ContainsKey(contact[0].Tick) ? PxLog.F(hx[contact[0].Tick] - hx[t0 + dodgeIn]) + " target " + PxLog.F(tx[contact[0].Tick] - tx[t0 + dodgeIn]) + " (" + PxLog.F(tx[contact[0].Tick - 1] - tx[t0 + dodgeIn]) + " a tick before, gap " + PxLog.F(gap[contact[0].Tick - 1]) + ")" + " v " + PxLog.F(tv[t0 + dodgeIn]) + "/" + PxLog.F(tv[t0 + dodgeIn + 1]) + "/" + PxLog.F(tv[contact[0].Tick]) : "-") + ", lunges " + lunges + ", body-edge gap at contact " + PxLog.F(edge) + " = " + PxLog.F(edge / reach) + " x reach " + PxLog.F(reach) + ", hits " + hits,
+                            mayRefuse ? "no lunge, or one that lands within 0.8 x reach" : "1 lunge, gap <= 0.8 x reach, it lands", ok);
+                        if (!ok) fails.Add(me + " " + mode + " " + off + " (" + PxLog.F(edge / reach) + ")");
+                    }
+            Assert.IsEmpty(fails, "lunge stop or whiff: " + string.Join(", ", fails));
         }
     }
 }
