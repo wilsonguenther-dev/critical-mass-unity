@@ -322,6 +322,29 @@ namespace CriticalMass.Sim.Tests.PlayerSeat
         }
 
         [Test]
+        public void Slide_OnceAnEnemyNearWindsUpDodgeIsTheDodgeAgain()
+        {
+            Seat s = PlayerSeatRig.Field(ClassId.Miner, x: 5.5, z: 15.5, tweak: Sw(true, true));
+            World w = s.W;
+            Paint(w, Flat);
+            int ib = PlayerSeatRig.EnemySlot(w);
+            PlayerSeatRig.Place(w, ib, ClassId.Farmer, 24, 15.5);
+            s.Dummy = new DummyModel { Me = ib, Around = 0 };
+            bool armedNear = false, swung = false;
+            for (int t = 0; t < 150; t++)
+            {
+                double d = Dist(w, 0, ib);
+                s.Human.MoveOverrideX = 1;
+                if (d < 7.5 && !swung) { armedNear = MovesHooks.MovementSlideArmed(w, 0); s.Dummy.PressAttack = true; swung = true; }
+                else if (swung && w.Actors[ib].SwingPending) { s.Human.PressDodge = true; s.Step(); break; }
+                s.Step();
+            }
+            int dodges = s.Spy.Of(SimEventType.Dodge, e => e.A == 0).Count, slides = s.Spy.Of(SimEventType.Slide, e => e.A == 0).Count;
+            Assert.IsTrue(PxLog.Line("MV3 T2-5 Slide carry ends on a wind-up", "Miner travels in; at 7.5 u the Farmer starts a swing; Dodge pressed during the wind-up",
+                "slide armed before the swing " + armedNear + "; then dodges " + dodges + ", slides " + slides, "armed, then the press is a dodge", armedNear && dodges == 1 && slides == 0));
+        }
+
+        [Test]
         public void Slide_EngageFromTravelBeatsWalkingIn()
         {
             // "the way into a fight from travel": a lag-6 human Warrior walks in from 20 u at a Normal bot of each class (travel lights

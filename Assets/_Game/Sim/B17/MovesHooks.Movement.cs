@@ -92,7 +92,7 @@ namespace CriticalMass.Sim.Core
         /// <summary>
         /// T2-5 (lane 3 decision, knob requested from the integrator): after TRAVEL ends because an enemy came within
         /// TravelEnemyRadius (8 u), Dodge stays the SLIDE for this many ticks (1.0 s), unless a hit, an attack, cast, guard or
-        /// interact press ends it first. Without it no slide could ever reach a body: travel ends 8 u out and the slide covers 4.5 u.
+        /// interact press, or an enemy within 8 u starting a swing wind-up, ends it first. Without it no slide could ever reach a body: travel ends 8 u out and the slide covers 4.5 u.
         /// 1.0 s lets the slowest class (the Warrior, 3.61 u/s) close from 8 u to slide range with a 0.2 s reaction.
         /// </summary>
         public const int MovementSlideCarryTicks = 30;
@@ -402,6 +402,8 @@ namespace CriticalMass.Sim.Core
                 ok = !enemy;
             }
             if (press || !a.Alive) m.SlideCarryUntil[i] = -1;
+            // the fight has started (an enemy near is winding up a swing): Dodge is the dodge again, never a slide without i-frames
+            if (!lit && w.Tick < m.SlideCarryUntil[i] && MovementEnemySwingNear(w, i, c.TravelEnemyRadius)) m.SlideCarryUntil[i] = -1;
             if (lit)
             {
                 if (ok)
@@ -432,6 +434,21 @@ namespace CriticalMass.Sim.Core
             m.Travel[id] = 0;
             m.TravelTicks[id] = 0;
             World.PushEvent(w, SimEventType.TravelChanged, id, -1, w.X[id], w.Z[id], 0);
+        }
+
+        /// <summary>A living enemy within r of actor i has a swing wind-up in flight.</summary>
+        static bool MovementEnemySwingNear(World w, int i, double r)
+        {
+            TeamId team = w.Actors[i].Team;
+            double x = w.X[i], z = w.Z[i], r2 = r * r;
+            for (int j = 0; j < w.ActorCount; j++)
+            {
+                Actor o = w.Actors[j];
+                if (j == i || !o.Alive || o.Team == team || !o.SwingPending) continue;
+                double dx = w.X[j] - x, dz = w.Z[j] - z;
+                if (dx * dx + dz * dz <= r2) return true;
+            }
+            return false;
         }
 
         /// <summary>A living enemy body (or the hatched Kaiju hostile to i, measured to its body edge) within r of actor i.</summary>
