@@ -537,6 +537,27 @@ namespace CriticalMass.Sim.Core
             return go;
         }
 
+        /// <summary>fix/mv-trade-crit: the COUNTER of source's hit on target (whose contact is within OffenceTradeTicks) is skipped:
+        /// both are persons (not the actor-0 autopilot) and target's swing is a real trade, aimed at source (within
+        /// 60 degrees of his swing facing) with source's body inside its reach. A swing at someone else or out of reach is
+        /// still caught winding up.</summary>
+        internal static bool TradeCounterSkip(World w, int source, int target)
+        {
+            bool auto0 = BotBrain.ActorZeroOnAutopilot(w);
+            // both sides persons: with a bot on either side the COUNTER stays (a person's trade with a bot is unchanged, which
+            // keeps the bot share, chase and combo-grid bands of the human-vs-bot tests where they were)
+            bool person = BotAim.IsHumanSeat(w, source) && !(source == 0 && auto0) && BotAim.IsHumanSeat(w, target) && !(target == 0 && auto0);
+            if (!person) return false;
+            Actor t = w.Actors[target];
+            double dx = w.X[source] - w.X[target], dz = w.Z[source] - w.Z[target];
+            double l = Math.Sqrt(dx * dx + dz * dz);
+            if (l < 1e-9) return true;
+            if ((JsMath.Cos(t.SwingFacing) * dx + JsMath.Sin(t.SwingFacing) * dz) / l < 0.5) return false;
+            LightWeapon lw = LightWeapons.Of(w, t.Cls);
+            double reach = (lw != null ? lw.Range : w.Config.Class(t.Cls).AttackRange) + w.Config.Class(w.Actors[source].Cls).Radius;
+            return l <= reach;
+        }
+
         // ================================================================== round 4 lunge lock
 
         /// <summary>round 4: a person's LUNGE swing is winding up and its target is alive.</summary>

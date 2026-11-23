@@ -245,7 +245,11 @@ namespace CriticalMass.Sim.Core
             if (w.Actors[source].Team == t.Team) return 0;
             // px S3: a victim whose own swing reaches contact THIS tick is trading blows, not caught winding up: no COUNTER
             // (the queue is read in actor-id order, so the lower id used to crit every same-tick trade: S35 16-0 mirrors).
-            if (t.SwingPending && t.SwingTick + t.SwingWindup > w.Tick) return 1;
+            // fix/mv-trade-crit (class moves on, a person involved): a victim whose own contact lands within
+            // MovesHooks.OffenceTradeTicks is trading, not caught winding up: no COUNTER (the earlier hitter of every Miner trade
+            // took it, 0.80 of mirror trades). Every switch off and bot-only matches: unchanged.
+            if (t.SwingPending && t.SwingTick + t.SwingWindup > w.Tick
+                && !(w.Moves != null && t.SwingTick + t.SwingWindup - w.Tick <= MovesHooks.OffenceTradeTicks && MovesHooks.TradeCounterSkip(w, source, target))) return 1;
             if (w.Tick <= w.Depth.Feel.WhiffRecoverUntil[target]) return 2;
             if (f.CritBackArcDeg > 0)
             {

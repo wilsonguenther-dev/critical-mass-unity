@@ -1404,6 +1404,7 @@ namespace CriticalMass.Net
             A(ref h, o.BotChargeLeft);
             A(ref h, o.ChainDebt);
             A(ref h, o.ChainNext);
+            A(ref h, o.ChainOpenTick);
             A(ref h, o.ChainUntil);
             A(ref h, o.ChainVictim);
             A(ref h, o.ChargeShare);
@@ -1415,6 +1416,8 @@ namespace CriticalMass.Net
             A(ref h, o.FuseTick);
             A(ref h, o.HeavySwingShare);
             A(ref h, o.HeavySwingTick);
+            A(ref h, o.HitTakenBy);
+            A(ref h, o.HitTakenTick);
             A(ref h, o.HoldCount);
             A(ref h, o.HoldSpent);
             A(ref h, o.LastHitHuman);
