@@ -112,6 +112,9 @@ namespace CriticalMass.Runtime.Camera
         /// <summary>follow-camera-3: a sim point (x, z) the auto-follow should face in the low play views (captures frame
         /// the fight and the Kaiju with it). Null = behind the fighter as usual.</summary>
         public static Vector2? AimAt;
+        /// <summary>fix/px-camera-in-editor: true while the robust third-person play camera runs (trees fade, SeeThrough
+        /// leaves them out).</summary>
+        public static bool RobustThirdPerson { get; private set; }
         double _extraSm;
         const double ExtraInTau = 0.1, ExtraOutTau = 1.1;
         /// <summary>fix/px-camera-in-editor: Editor diagnostics only (A/B against the old follow, SessionState key
@@ -207,7 +210,7 @@ namespace CriticalMass.Runtime.Camera
         bool _cursorLocked;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-        static void ResetStatics() { Current = null; ViewOverride = null; ForcePlay = false; }
+        static void ResetStatics() { Current = null; ViewOverride = null; ForcePlay = false; RobustThirdPerson = false; }
 
         void Awake() => Current = this;
 
@@ -417,6 +420,7 @@ namespace CriticalMass.Runtime.Camera
             // fix/px-camera-in-editor: the third-person play camera collides only with hard scenery (rocks, props,
             // buildings) and the grid; trees and groves never move it, they fade (UpdateFades)
             bool robust = Mode == GroundViewMode.Play && _view != CameraView.FirstPerson && !RobustOffForDiagnostics;
+            RobustThirdPerson = robust;
             _hardCount = 0;
             for (int i = 0; i < _folCount; i++) if (!robust || !_fol[i].Soft) _hard[_hardCount++] = _fol[i];
             // fix/px-camera-in-editor (no pumping): the framing's distance change goes in fast and comes out slowly, so a
@@ -957,6 +961,7 @@ namespace CriticalMass.Runtime.Camera
 
         void Leave()
         {
+            RobustThirdPerson = false;
             if (_fadeSet) { Shader.SetGlobalVector(FadeCamId, Vector4.zero); _fadeSet = false; }
             if (_keepSet) { Shader.SetGlobalVector(FadeKeepId, Vector4.zero); _keepSet = false; }
             ClearVolumes();
