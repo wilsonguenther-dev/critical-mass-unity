@@ -1357,8 +1357,18 @@ namespace CriticalMass.Runtime.Camera
         const double SplitAspect = 1.4;
         static bool SoftScenery(string cat) => !(cat == "base" || cat == "struct" || cat == "landmark" || cat == "rock_big");
         /// <summary>fix/px-rough-spots (items 2 and 4: the hill rim and the stuck spot by the hill brazier, 53.4:49.6): the hill's
-        /// open arches and the horns that stand over them fade like props; they never push the lens in.</summary>
-        static bool SoftPiece(string piece) => piece != null && (piece.IndexOf("hill_arc", StringComparison.Ordinal) >= 0 || piece.IndexOf("hill_horn", StringComparison.Ordinal) >= 0);
+        /// open arches and the horns that stand over them fade like props; they never push the lens in.
+        /// Pass 3 (item 2: the forest-edge fight held the lens 2.5 u behind him by a gate post and the dressing round it): thin
+        /// dressing (posts, stakes, rails, fences, lamps, banners, barrels, torches, signs) fades too; buildings, walls, towers
+        /// and big rocks still move the lens.</summary>
+        static bool SoftPiece(string piece) => piece != null && (piece.IndexOf("hill_arc", StringComparison.Ordinal) >= 0 || piece.IndexOf("hill_horn", StringComparison.Ordinal) >= 0
+            || ThinDressing(piece));
+        static readonly string[] ThinWords = { "post", "stake", "rail", "fence", "lamp", "banner", "barrel", "torch", "sign" };
+        static bool ThinDressing(string piece)
+        {
+            for (int i = 0; i < ThinWords.Length; i++) if (piece.IndexOf(ThinWords[i], StringComparison.OrdinalIgnoreCase) >= 0) return true;
+            return false;
+        }
 
         /// <summary>A kit piece's mesh boxes (8 corners per mesh, its own frame), from Mesh.bounds (readable or not).</summary>
         static Vector3[] PieceCorners(WorldKitCatalog cat, string piece)
