@@ -492,11 +492,12 @@ namespace CriticalMass.Runtime.Camera
         public const double RobustChestUp = 1.2, RobustBodyTall = 2.1;
         /// <summary>Distance: in at once (a wall), out only after RobustHold s clear, then on RobustOutTau (no pumping).
         /// Wall rise: up on RobustRiseTau, down after RobustHold on RobustFallTau.</summary>
-        public const double RobustHold = 1.6, RobustOutTau = 1.3, RobustRiseTau = 0.08, RobustFallTau = 0.9;
+        public const double RobustHold = 1.6, RobustOutTau = 1.3, RobustRiseTau = 0.08, RobustFallTau = 0.9, RobustWantTau = 0.35;
         /// <summary>fix/px-rough-spots (item 3): the boom only counts as clear to move out when it may grow by more than this (u).</summary>
         public const double RobustOutDeadband = 0.35;
 
         double _rise, _riseClear, _outClear;
+        bool _atWant;
         /// <summary>fix/px-camera-in-editor: even at RobustMin and the steepest rise the boom touches hard geometry (the
         /// caller fades what is in the way); the boom's pitch and the drawn look pitch this frame (tests, captures).</summary>
         public bool Blocked { get; private set; }
@@ -589,13 +590,20 @@ namespace CriticalMass.Runtime.Camera
             // 2. the distance: in at once, out slowly after a hold; never under RobustMin
             double allowed = Math.Max(RobustMin, Math.Min(want, BoomAt(f, ox, oy, oz, ux, uz, boomPitch, want)));
             Allowed = allowed;
+            bool following = false;
             if (snap || allowed < Dist) { Dist = allowed; _outClear = 0; }
             else if (dt > 0)
             {
+                // fix/px-rough-spots pass 3: the lens sat AT the wanted distance (not held in by a wall) and the path to the new,
+                // longer wanted distance is clear: the framing itself asked for more room (the two-shot fit, already
+                // governed out-only upstream), so follow it on RobustWantTau with no hold. A wall clearing keeps the hold.
+                bool atWant = _atWant && allowed >= want - 0.01;
                 _outClear = allowed > Dist + (_outClear >= RobustHold ? 0.05 : RobustOutDeadband) ? _outClear + dt : 0;
-                if (_outClear >= RobustHold) Dist += (allowed - Dist) * (1 - Math.Exp(-dt / RobustOutTau));
+                if (atWant && want > Dist) { Dist += (want - Dist) * (1 - Math.Exp(-dt / RobustWantTau)); following = true; }
+                else if (_outClear >= RobustHold) Dist += (allowed - Dist) * (1 - Math.Exp(-dt / RobustOutTau));
             }
             Dist = Math.Max(RobustMin, Math.Min(Dist, want));
+            _atWant = Dist >= want - 0.05 || (following && allowed >= want - 0.01);
             double pr = boomPitch * Math.PI / 180, cp = Math.Cos(pr), sp = Math.Sin(pr);
             CamX = ox - ux * cp * Dist;
             CamY = oy + sp * Dist;

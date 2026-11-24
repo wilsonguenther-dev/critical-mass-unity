@@ -554,12 +554,23 @@ namespace CriticalMass.Runtime.Camera
                 // fix/px-combat-camera-3: the ladder: each side at 48, 24 and 12 deg (the smaller swings only when needed),
                 // then the closer-and-higher fallback
                 double Clear(int turn, double swing) => CombatFrame.SideClear(w.Map, fx, fy, fz, lineYaw, turn, swing, k1, fit, mx, myC, mz, ex, eyC, ez, _scn, _scnCount, out _, out _, out _);
+                if (!CombatFrame.Orbit)
+                {
+                    // fix/px-rough-spots pass 3: the no-turn pose at his own yaw; Turn +1 = the lens on the left (side -1)
+                    double NoTurn(int side) => CombatFrame.NoTurnClear(w.Map, fx, gyM + FollowCamera.ThirdPivotHeight, fz, _ownYaw, side, k1, mx, myC, mz, ex, eyC, ez, _scn, _scnCount);
+                    clearPlus = NoTurn(-1);
+                    clearMinus = NoTurn(1);
+                    clearNone = Math.Max(clearPlus, clearMinus) >= CombatFrame.WallShare ? 1 : NoTurn(0);
+                }
+                else
+                {
                 clearPlus = Clear(1, 1);
                 clearMinus = Clear(-1, 1);
                 if (clearPlus < CombatFrame.WallShare) { plusHalf = Clear(1, 0.5); if (plusHalf < CombatFrame.WallShare) plusQuarter = Clear(1, 0.25); }
                 if (clearMinus < CombatFrame.WallShare) { minusHalf = Clear(-1, 0.5); if (minusHalf < CombatFrame.WallShare) minusQuarter = Clear(-1, 0.25); }
                 bool anySwing = Math.Max(clearPlus, Math.Max(clearMinus, Math.Max(plusHalf, Math.Max(minusHalf, Math.Max(plusQuarter, minusQuarter))))) >= CombatFrame.WallShare;
                 clearNone = anySwing ? 1 : Clear(0, 0);
+                }
             }
             else if (_combat.K <= 0) _scnCount = 0;
             // fix/px-combat-camera-2: looking around = his look input lately (mouse look) or his own yaw turning fast (auto)
@@ -602,6 +613,11 @@ namespace CriticalMass.Runtime.Camera
             if (k > 0 && haveLine)
             {
                 double share = _combat.Focus;   // of the way from me to him
+                if (!CombatFrame.Orbit)
+                {
+                    double gapU = Math.Sqrt((ex - mx) * (ex - mx) + (ez - mz) * (ez - mz));
+                    if (share * gapU > CombatFrame.NoTurnFocusMaxU * k) share = CombatFrame.NoTurnFocusMaxU * k / gapU;   // pass 3: capped
+                }
                 tx += share * (ex - mx) - leadX * k;
                 tz += share * (ez - mz) - leadZ * k;
                 double gyE = GroundHeight.At(w.Map, ex, ez);
@@ -616,11 +632,12 @@ namespace CriticalMass.Runtime.Camera
             // GroundFollow's shoulder test)
             int near = enabled && !_combat.Active && _combat.Weight <= 0.01 ? NearestEnemy(w, me, CombatFrame.KeepRange) : -1;
             double ag = near >= 0 ? 1 : 0;
-            _assist = snap || dt <= 0 ? (snap ? ag : _assist) : ag > _assist ? Math.Min(ag, _assist + dt / CombatFrame.AssistSeconds) : Math.Max(ag, _assist - dt / CombatFrame.AssistSeconds);
+            bool assistFresh = _assist <= 0;   // pass 3: the assist's side is picked when it starts, then held (no flip)
+            _assist =snap || dt <= 0 ? (snap ? ag : _assist) : ag > _assist ? Math.Min(ag, _assist + dt / CombatFrame.AssistSeconds) : Math.Max(ag, _assist - dt / CombatFrame.AssistSeconds);
             double pitchAdd = 0;
             if (_assist > 0)
             {
-                if (near >= 0)
+                if (near >= 0 && assistFresh)
                 {
                     GroundCamera.Basis(_ownYaw, out _, out _, out double rx, out double rz);
                     double lat = (w.X[near] - mx) * rx + (w.Z[near] - mz) * rz;

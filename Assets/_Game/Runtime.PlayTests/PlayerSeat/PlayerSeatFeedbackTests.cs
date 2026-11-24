@@ -1267,9 +1267,9 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
                 // check is the new framing: settled, no yaw added, the lens shifted to a side, both fighters wholly on screen.
                 Check("D2 EnemyNotBehindMe", x + " third person, combat camera on, enemy at 0.8 x range ahead of my own view",
                     "framing " + k.ToString("0.00") + " (" + how + "), my silhouette " + mine + ", enemy silhouette " + theirs + ", both wholly on screen " + bothOnScreen +
-                    ", share of the enemy box not covered by my box " + visibleShare.ToString("0.00") + " (logged; the orbit-era target was >= " + T.EnemyVisibleShareMin + "); renderer boxes (logged only) mine " + mineR + ", enemy " + theirsR + ", share " + rendererShare.ToString("0.00"),
-                    "the framing settles without turning the view, shifts the lens to a side and keeps both fighters on screen",
-                    mine.width > 0 && theirs.width > 0 && k >= 0.95 && framedNoTurn && bothOnScreen);
+                    ", share of the enemy box not covered by my box " + visibleShare.ToString("0.00") + "; renderer boxes (logged only) mine " + mineR + ", enemy " + theirsR + ", share " + rendererShare.ToString("0.00"),
+                    "the framing settles without turning the view, shifts the lens to a side, keeps both fighters on screen and >= " + T.NoTurnClearShareMin + " of the enemy box clear of mine",
+                    mine.width > 0 && theirs.width > 0 && k >= 0.95 && framedNoTurn && bothOnScreen && visibleShare >= T.NoTurnClearShareMin);
             }
             finally
             {
@@ -1337,14 +1337,14 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
                 bool pinned = CriticalMass.Runtime.View.Anim.AnimLod.Pinned(0) && CriticalMass.Runtime.View.Anim.AnimLod.Pinned(e);
                 Paced(false);
                 AssertAtControls("the end");
-                // fix/px-rough-spots (owner, 2026-11-23): no turn in a fight (distance, height, pitch, a small lens shift only),
-                // and the framing is no closer than the plain camera; the clear share (orbit-era target 0.6) is logged only.
+                // fix/px-rough-spots (owner, 2026-11-23): no turn in a fight (distance, height, pitch, a lens shift only). Pass 3:
+                // the no-turn two-shot (left shoulder, raised, 40 deg) clears the enemy from behind me: asserted again.
                 Check("D2b CombatCamera", x + " third person, enemy at " + share + " x range ahead of my own view, switch off then on",
                     "off: framing " + offK.ToString("0.00") + ", enemy box " + offTheirs + ", clear share " + offShare.ToString("0.00") +
                     "; on: framing " + k.ToString("0.00") + " (" + side + "; " + how + "), my box " + mine + ", enemy box " + theirs + ", clear share " + visible.ToString("0.00") +
-                    " (logged), enemy height x" + gain.ToString("0.00") + ", me on screen " + meOnScreen + ", enemy on screen " + enemyOnScreen + ", lens inside the grid " + inside,
-                    "no yaw added and a sideways lens shift, height >= x" + T.CombatHeightGainMin + ", me and the enemy wholly on screen, lens clear, framing settled (>= 0.95)",
-                    offK < 0.01 && k >= 0.95 && framedNoTurn && gain >= T.CombatHeightGainMin && meOnScreen && enemyOnScreen && !inside);
+                    ", enemy height x" + gain.ToString("0.00") + ", me on screen " + meOnScreen + ", enemy on screen " + enemyOnScreen + ", lens inside the grid " + inside,
+                    "no yaw added and a sideways lens shift, enemy box clear share >= " + T.NoTurnClearShareMin + " and >= off + " + T.NoTurnClearGainMin + ", height >= x" + T.CombatHeightGainMin + ", me and the enemy wholly on screen, lens clear, framing settled (>= 0.95)",
+                    offK < 0.01 && k >= 0.95 && framedNoTurn && visible >= T.NoTurnClearShareMin && visible >= offShare + T.NoTurnClearGainMin && gain >= T.CombatHeightGainMin && meOnScreen && enemyOnScreen && !inside);
                 Check("D2b FramedTags", x + " third person, framed at " + share + " x range", tags,
                     "name/bar anchor <= " + CriticalMass.Runtime.Camera.CombatFrame.TagGapShare + " x screen above the head top and below the top " + CriticalMass.Runtime.Camera.CombatFrame.TagTopShare + " of the screen",
                     k >= 0.95 && myTag && hisTag);

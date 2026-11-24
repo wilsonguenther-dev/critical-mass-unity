@@ -62,7 +62,14 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
         /// at the same distance with it off. fix/px-rough-spots: the framing is no closer than the plain camera now
         /// (CombatFrame.Distance 4.4; the two-shot fit only backs off), so the enemy is drawn about as big as unframed and never
         /// much smaller (as CombatCameraTests' 0.95). Was 1.4 with the old 3.2 u framing.</summary>
-        public const double CombatHeightGainMin = 0.95;
+        public const double CombatHeightGainMin = 0.78;
+        /// <summary>D2 / D2b (fix/px-rough-spots pass 3, the no-turn two-shot: lens over the left shoulder, raised and pitched to
+        /// 40 deg): the share of the enemy's silhouette BOX not covered by mine, straight ahead at 0.8 / 1.0 x reach, at least
+        /// NoTurnClearShareMin and at least NoTurnClearGainMin more than the plain camera at the same moment. Measured in the
+        /// Editor: 0.24 (Builder, the tallest box, 0.8 x) to 0.83 (Farmer, 1.0 x); the plain camera 0.00 to 0.21. Boxes over-cover
+        /// a silhouette: the same poses show 88-100% of the enemy's own pixels at fight start (pass 3 pixel measure). The
+        /// higher, pulled-back pose draws the enemy 0.82-0.89 x as tall as the plain camera (CombatHeightGainMin, was 0.95).</summary>
+        public const double NoTurnClearShareMin = 0.2, NoTurnClearGainMin = 0.2;
         /// <summary>D2 / D2b: paced 60 fps frames to wait for the framing to settle (in 0.3 s, plus the yaw chase) or release
         /// (1.0 s hold + 0.6 s out).</summary>
         public const int CombatSettleFrames = 45, CombatReleaseFrames = 120;

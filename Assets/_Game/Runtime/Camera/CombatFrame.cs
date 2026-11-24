@@ -32,6 +32,50 @@ namespace CriticalMass.Runtime.Camera
 
         public const double Distance = 4.4, FocusHeight = 1.6, FocusShare = 0.4, PitchDeg = 12, YawDeg = 48, ShoulderU = 0.8;
 
+        /// <summary>fix/px-rough-spots pass 3 (code-only builder: with the no-turn camera a straight-ahead duel hid the enemy
+        /// behind my own fighter): the NO-TURN two-shot, the way third-person action games frame melee without rotating. While
+        /// framed the lens shifts NoTurnShoulderU sideways (over one shoulder, the side picked once per fight), the pivot
+        /// rises NoTurnLiftU and the view pitches down to NoTurnPitchDeg, and the look point moves NoTurnFocus of the way to
+        /// the enemy, all eased in by the framing weight. The camera's yaw stays the player's.</summary>
+        public const double NoTurnShoulderU = 1.2, NoTurnPitchDeg = 40, NoTurnLiftU = 1.4, NoTurnFocus = 0.6, NoTurnDistance = 4.4;
+        /// <summary>The look point never moves more than this toward the enemy (u): a long-reach duel (Farmer, 1.8 u apart) kept
+        /// my own feet below the screen with the share alone.</summary>
+        public const double NoTurnFocusMaxU = 0.75;
+        /// <summary>The no-turn pose changes pitch and height a lot more than the old framing: it eases in over NoTurnInSeconds and
+        /// out over NoTurnOutSeconds (smoothstep), never a snap.</summary>
+        public const double NoTurnInSeconds = 0.45, NoTurnOutSeconds = 0.8;
+        /// <summary>Straight ahead (his view within this of the line to the enemy) the first side is the LEFT shoulder (lens left, my
+        /// fighter drawn right of centre, the enemy left of him): the fighters carry their weapon on the right, so the right
+        /// shoulder put my weapon arm over him (measured, pass 3: Miner 51-59% of the enemy showing on the right, 78-83% on the left).</summary>
+        public const double NoTurnAheadDeg = 8;
+
+        /// <summary>fix/px-rough-spots pass 3: how clear the no-turn pose is for one shoulder side (+1 lens right, -1 left, 0
+        /// none) at the player's own yaw: 1 = the lens shift and the pull-back fit, less = pulled in (share), 0 = a fighter's
+        /// chest is hidden from the lens.</summary>
+        public static double NoTurnClear(CriticalMass.Sim.Grid.MapDef map, double fx, double fy, double fz, double ownYaw, int side, double strength,
+            double mx, double my, double mz, double ex, double ey, double ez, SeeThroughCylinder[] cyl, int n)
+        {
+            double pitch = FollowCamera.ThirdPitch + (NoTurnPitchDeg - FollowCamera.ThirdPitch) * strength;
+            double sh = side * NoTurnShoulderU * strength, dist = FollowCamera.ThirdDistance;
+            GroundCamera.Basis(ownYaw, out double ux, out double uz, out double rx, out double rz);
+            double pr = pitch * Math.PI / 180, cp = Math.Cos(pr), sp = Math.Sin(pr);
+            double share = 1, s = Math.Abs(sh), px = fx, pz = fz, py = fy + NoTurnLiftU * strength;
+            if (s > 1e-6)
+            {
+                double sx = sh >= 0 ? rx : -rx, sz = sh >= 0 ? rz : -rz;
+                double got = GroundCollision.Resolve(map, px, py, pz, sx, 0, sz, s, cyl, n);
+                share = Math.Min(share, got / s);
+                px += sx * got;
+                pz += sz * got;
+            }
+            double back = GroundCollision.Resolve(map, px, py, pz, -ux * cp, sp, -uz * cp, dist, cyl, n);
+            share = Math.Min(share, back / dist);
+            double lx = px - ux * cp * back, ly = py + sp * back, lz = pz - uz * cp * back;
+            if (GroundCollision.Occluded(map, lx, ly, lz, mx, my, mz, SightStopU, cyl, n) || GroundCollision.Occluded(map, lx, ly, lz, ex, ey, ez, SightStopU, cyl, n))
+                share = 0;
+            return share;
+        }
+
         /// <summary>fix/px-rough-spots: the two-shot fit. Both fighters (upright cylinders FitBodyRadius x FitBodyTall over their
         /// ground) must project inside this safe frame (normalised device units, -1..1): FitHalfX either side, above FitBottom
         /// (the ability bar and the health panel) and below FitTop (the score, objective and resource rows). The lens moves
@@ -388,8 +432,9 @@ namespace CriticalMass.Runtime.Camera
             bool on = engaged || (_hold > 0 && _have);
             Active = on;
             bool fresh = Weight <= 0;
+            double inS = CombatFrame.Orbit ? CombatFrame.InSeconds : CombatFrame.NoTurnInSeconds, outS = CombatFrame.Orbit ? CombatFrame.OutSeconds : CombatFrame.NoTurnOutSeconds;
             if (f.Snap) Weight = on ? 1 : 0;
-            else Weight = on ? Math.Min(1, Weight + dt / CombatFrame.InSeconds) : Math.Max(0, Weight - dt / CombatFrame.OutSeconds);
+            else Weight = on ? Math.Min(1, Weight + dt / inS) : Math.Max(0, Weight - dt / outS);
             if (Weight <= 0 && !on)
             {
                 _fold += YawOffset;   // whatever is left is his now (never a rotation back)
@@ -399,8 +444,38 @@ namespace CriticalMass.Runtime.Camera
                 return;
             }
 
+            double strength = Clamp(double.IsNaN(f.Strength) ? 1 : f.Strength, 0, 1);
             // The side: the one the player's own view already shows more of the enemy from, kept with hysteresis.
             double d0 = GroundCamera.DeltaAngle(_lineYaw, f.OwnYaw);   // + = my own view is already turned right of the line
+            if (!CombatFrame.Orbit)
+            {
+                // fix/px-rough-spots pass 3: the no-turn two-shot. The side is picked ONCE per fight (no flip as he circles):
+                // toward the side the enemy already stands on, straight ahead the left shoulder, a blocked side gives way to
+                // the other; then it holds until the framing has fully let go (Reset).
+                if (Turn == 0 || (fresh && on))
+                {
+                    Turn = Math.Abs(d0) <= CombatFrame.NoTurnAheadDeg ? 1 : d0 >= 0 ? 1 : -1;   // Turn +1 = lens left
+                    double mine = Turn > 0 ? f.ClearPlus : f.ClearMinus, other = Turn > 0 ? f.ClearMinus : f.ClearPlus;
+                    if (mine < CombatFrame.WallShare && other > mine) Turn = -Turn;
+                    _swapHeld = 0;
+                }
+                WallKeep = 1;
+                K = Smooth01(Weight) * strength;
+                Reach = CombatFrame.NoTurnDistance / CombatFrame.Distance;
+                double shGoal = -Turn * CombatFrame.NoTurnShoulderU * K;
+                if (f.Snap) Shoulder = shGoal;
+                else
+                {
+                    double a0 = dt > 0 ? 1 - Math.Exp(-dt / CombatFrame.ChaseTau) : 0;
+                    Shoulder += Clamp((shGoal - Shoulder) * a0, -CombatFrame.MaxShoulderRate * dt, CombatFrame.MaxShoulderRate * dt);
+                }
+                _fold += YawOffset;   // never a yaw of its own (an Orbit-era offset left over is his)
+                YawOffset = 0;
+                PitchOffset = (CombatFrame.NoTurnPitchDeg - FollowCamera.ThirdPitch) * K;
+                Lift = CombatFrame.NoTurnLiftU * K;
+                Focus = CombatFrame.NoTurnFocus * K;
+                return;
+            }
             if (Turn == 0 || (f.Snap && on) || (fresh && on))
             {
                 Turn = d0 >= 0 ? 1 : -1;
@@ -427,7 +502,6 @@ namespace CriticalMass.Runtime.Camera
             WallKeep = f.Snap ? keepGoal : keepGoal > WallKeep ? Math.Min(keepGoal, WallKeep + dt / CombatFrame.InSeconds)
                                                                : Math.Max(keepGoal, WallKeep - dt / CombatFrame.InSeconds);
 
-            double strength = Clamp(double.IsNaN(f.Strength) ? 1 : f.Strength, 0, 1);
             K = Smooth01(Weight) * strength;
             double keep = Smooth01(WallKeep);
 
