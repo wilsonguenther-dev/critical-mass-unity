@@ -93,6 +93,9 @@ namespace CriticalMass.Runtime.PlayTests
             for (int i = 0; i < w.ActorCount; i++)
             {
                 if (!w.Actors[i].Alive) continue;
+                // rough-spots pass 3 (item 3): an enemy the fog of war hides (batch 12 item P: no friend sees him) is not drawn on
+                // purpose; this test failed on such a Miner 46.8 m out, unseen. Only a fighter the game means to draw is judged.
+                if (CriticalMass.Runtime.View.Fog.FogOfWar.Hides(i)) continue;
                 Vector3 feet = _w.WorldPos(i);
                 Vector3 vp = cam.WorldToViewportPoint(feet + Vector3.up);
                 if (vp.z <= 0f || vp.x < 0.03f || vp.x > 0.97f || vp.y < 0.03f || vp.y > 0.97f) continue;
@@ -104,12 +107,20 @@ namespace CriticalMass.Runtime.PlayTests
             return n;
         }
 
+        /// <summary>Where a hidden fighter stood against the lens (the view's own hide rules: near the lens, out of the cull).</summary>
+        static string HiddenWhy(SanityWorld world, UnityEngine.Camera cam, int i)
+        {
+            Vector3 p = world.WorldPos(i), c = cam.transform.position;
+            float dx = p.x - c.x, dz = p.z - c.z;
+            return $" (lens {Mathf.Sqrt(dx * dx + dz * dz):F2} m across, {c.y - p.y:F2} m above his feet, {Vector3.Distance(p, c):F1} m away, fog hides {CriticalMass.Runtime.View.Fog.FogOfWar.Hides(i)}, cull sees {CriticalMass.Runtime.Camera.ViewCull.Visible(p, 1.5f, 2.6f)})";
+        }
+
         /// <summary>Why actor i is not drawn as a character in this frame, or null when it is.</summary>
         internal static string Problem(SanityWorld world, UnityEngine.Camera cam, int i, Vector2Int screen)
         {
             if (world.ActorCapsule(i) != null) return "drawn as the grey-box capsule (no model)";
             Transform model = world.ActorModel(i);
-            if (model == null) return "no active model";
+            if (model == null) return "no active model" + HiddenWhy(world, cam, i);
             if (!model.gameObject.activeInHierarchy) return "model inactive";
             LODGroup lg = model.GetComponentInChildren<LODGroup>(false);
             if (lg != null && lg.enabled) return "an enabled LODGroup on the model can cull the renderer the game chose";
