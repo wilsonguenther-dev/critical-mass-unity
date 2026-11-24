@@ -1166,15 +1166,18 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
 
         /// <summary>fix/px-combat-camera-2: where fighter i's head tag projects in the live camera (GroundView.TagPoint at the
         /// HUD's 2.65 u lift) against his drawn head top; ok = within the gap above the head and under the top HUD rows.</summary>
-        string TagReport(int i, out bool ok)
+        string TagReport(int i, out bool ok) => TagReport(i, out ok, out _);
+
+        string TagReport(int i, out bool ok, out Vector3 tag)
         {
             ok = false;
+            tag = Vector3.zero;
             UnityEngine.Camera cam = UnityEngine.Camera.main;
             if (cam == null) return "no camera";
             double g = S.Ground(W.X[i], W.Z[i]);
             CriticalMass.Runtime.Camera.FightFrame.Silhouette(W.Actors[i].Cls, 0, out _, out double h);
             Vector3 head = SimSpace.ToWorld(W.X[i], g + 2.65, W.Z[i]);
-            Vector3 tag = cam.WorldToScreenPoint(CriticalMass.Runtime.Camera.GroundView.TagPoint(W, i, head, 2.65f));
+            tag = cam.WorldToScreenPoint(CriticalMass.Runtime.Camera.GroundView.TagPoint(W, i, head, 2.65f));
             Vector3 top = cam.WorldToScreenPoint(SimSpace.ToWorld(W.X[i], g + h, W.Z[i]));
             Vector3 raw = cam.WorldToScreenPoint(head);
             float H = cam.pixelHeight, gap = (float)(CriticalMass.Runtime.Camera.CombatFrame.TagGapShare * H) + 2f;
@@ -1317,7 +1320,20 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
                 bool enemyOnScreen = WhollyOnScreen(theirs);
                 // fix/px-combat-camera-2: the framed tags (his and mine) sit just above the head, below the top HUD rows;
                 // both fighters pose every frame (the throttle's focus is the followed body, not the 8 deg ground hit).
-                string tags = TagReport(0, out bool myTag) + "; " + TagReport(e, out bool hisTag);
+                string tags = TagReport(0, out bool myTag, out Vector3 myAt) + "; " + TagReport(e, out bool hisTag, out Vector3 hisAt);
+                // fix/px-rough-spots: with no turn the enemy stands behind me on screen, so GroundView.Separate (my tag never
+                // overlaps another fighter's) stacks my tag one tag box (TagSepH) above his. That stacked spot is the intended
+                // place; the just-above-my-head rule then holds for his tag, and mine sits right on top of his, under the ceiling.
+                if (!myTag && hisTag && cam != null)
+                {
+                    float sepW = CriticalMass.Runtime.Camera.GroundView.TagSepW * cam.pixelWidth, sepH = CriticalMass.Runtime.Camera.GroundView.TagSepH * cam.pixelHeight;
+                    float tagGap = (float)(CriticalMass.Runtime.Camera.CombatFrame.TagGapShare * cam.pixelHeight) + 2f;
+                    float tagCeiling = (float)((1 - CriticalMass.Runtime.Camera.CombatFrame.TagTopShare) * cam.pixelHeight) + 1f;
+                    float up = myAt.y - hisAt.y;
+                    bool stacked = myAt.z > 0 && Mathf.Abs(myAt.x - hisAt.x) < sepW && up >= sepH - 1f && up <= sepH + tagGap && myAt.y <= tagCeiling;
+                    tags += "; my tag stacked on his: " + stacked + " (" + up.ToString("0") + " px above it, tag box " + sepH.ToString("0") + " px)";
+                    myTag = stacked;
+                }
                 bool pinned = CriticalMass.Runtime.View.Anim.AnimLod.Pinned(0) && CriticalMass.Runtime.View.Anim.AnimLod.Pinned(e);
                 Paced(false);
                 AssertAtControls("the end");
