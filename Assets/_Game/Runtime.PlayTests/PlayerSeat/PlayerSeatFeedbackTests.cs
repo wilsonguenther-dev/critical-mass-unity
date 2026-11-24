@@ -1200,6 +1200,23 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
             return area > 0 ? 1 - ox * oy / area : 0;
         }
 
+        /// <summary>fix/px-rough-spots: the combat framing adds no yaw (the view belongs to the player) and shifts the lens to a
+        /// side instead (CombatFrame.Orbit off; as CombatCameraTests.ByDefaultTheFramingNeverTurnsTheView).</summary>
+        static bool FramedWithoutTurning(out string how)
+        {
+            CriticalMass.Runtime.Camera.CombatFramer fr = CriticalMass.Runtime.Camera.GroundView.Framer;
+            if (fr == null) { how = "no framer"; return false; }
+            how = "yaw added " + fr.YawOffset.ToString("0.00") + " deg, lens shift " + fr.Shoulder.ToString("0.00") + " u";
+            return !CriticalMass.Runtime.Camera.CombatFrame.Orbit && Math.Abs(fr.YawOffset) < 0.01 && Math.Abs(fr.Shoulder) > 0.05;
+        }
+
+        /// <summary>A screen box drawn wholly inside the main camera's frame.</summary>
+        static bool WhollyOnScreen(Rect r)
+        {
+            UnityEngine.Camera cam = UnityEngine.Camera.main;
+            return cam != null && r.width > 0 && r.xMin >= 0 && r.yMin >= 0 && r.xMax <= cam.pixelWidth && r.yMax <= cam.pixelHeight;
+        }
+
         /// <summary>The player's OWN camera forward (sim unit): the combat framing turns the drawn camera, the aim keeps this yaw,
         /// so the enemy is placed straight ahead of the player's view (the worst case: unframed, exactly behind my fighter).</summary>
         static void OwnForward(out double dx, out double dz) =>
@@ -1236,12 +1253,20 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
                 Rect mine = FighterSilhouette(0), theirs = FighterSilhouette(e);
                 Rect mineR = ScreenRect(S.ActorModel(0)), theirsR = ScreenRect(S.ActorModel(e));
                 double visibleShare = OutsideShare(mine, theirs), rendererShare = OutsideShare(mineR, theirsR);
+                double k = CriticalMass.Runtime.Camera.GroundView.CombatFraming;
+                bool framedNoTurn = FramedWithoutTurning(out string how);
+                bool bothOnScreen = WhollyOnScreen(mine) && WhollyOnScreen(theirs);
                 Paced(false);
                 AssertAtControls("the end");
+                // fix/px-rough-spots (owner, 2026-11-23): the framing no longer turns the view in a fight (CombatFrame.Orbit off;
+                // distance, height, pitch and a small sideways lens shift only). The old target (>= 0.6 of the enemy's box clear
+                // of mine with him straight ahead of my own view) came from the 48-degree orbit swing; it is logged now, and the
+                // check is the new framing: settled, no yaw added, the lens shifted to a side, both fighters wholly on screen.
                 Check("D2 EnemyNotBehindMe", x + " third person, combat camera on, enemy at 0.8 x range ahead of my own view",
-                    "framing " + CriticalMass.Runtime.Camera.GroundView.CombatFraming.ToString("0.00") + ", my silhouette " + mine + ", enemy silhouette " + theirs +
-                    ", share of the enemy box not covered by my box " + visibleShare.ToString("0.00") + " (target >= " + T.EnemyVisibleShareMin + "); renderer boxes (logged only) mine " + mineR + ", enemy " + theirsR + ", share " + rendererShare.ToString("0.00"),
-                    "the enemy stays mostly visible past my own fighter", mine.width > 0 && theirs.width > 0 && visibleShare >= T.EnemyVisibleShareMin);
+                    "framing " + k.ToString("0.00") + " (" + how + "), my silhouette " + mine + ", enemy silhouette " + theirs + ", both wholly on screen " + bothOnScreen +
+                    ", share of the enemy box not covered by my box " + visibleShare.ToString("0.00") + " (logged; the orbit-era target was >= " + T.EnemyVisibleShareMin + "); renderer boxes (logged only) mine " + mineR + ", enemy " + theirsR + ", share " + rendererShare.ToString("0.00"),
+                    "the framing settles without turning the view, shifts the lens to a side and keeps both fighters on screen",
+                    mine.width > 0 && theirs.width > 0 && k >= 0.95 && framedNoTurn && bothOnScreen);
             }
             finally
             {
@@ -1288,18 +1313,22 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
                 bool inside = CameraInsideGeometry();
                 CriticalMass.Runtime.Camera.CombatFramer fr = CriticalMass.Runtime.Camera.GroundView.Framer;
                 string side = fr != null ? "side " + fr.Turn + ", yaw +" + fr.YawOffset.ToString("0.0") + " deg, wall keep " + fr.WallKeep.ToString("0.00") : "no framer";
+                bool framedNoTurn = FramedWithoutTurning(out string how);
+                bool enemyOnScreen = WhollyOnScreen(theirs);
                 // fix/px-combat-camera-2: the framed tags (his and mine) sit just above the head, below the top HUD rows;
                 // both fighters pose every frame (the throttle's focus is the followed body, not the 8 deg ground hit).
                 string tags = TagReport(0, out bool myTag) + "; " + TagReport(e, out bool hisTag);
                 bool pinned = CriticalMass.Runtime.View.Anim.AnimLod.Pinned(0) && CriticalMass.Runtime.View.Anim.AnimLod.Pinned(e);
                 Paced(false);
                 AssertAtControls("the end");
+                // fix/px-rough-spots (owner, 2026-11-23): no turn in a fight (distance, height, pitch, a small lens shift only),
+                // and the framing is no closer than the plain camera; the clear share (orbit-era target 0.6) is logged only.
                 Check("D2b CombatCamera", x + " third person, enemy at " + share + " x range ahead of my own view, switch off then on",
                     "off: framing " + offK.ToString("0.00") + ", enemy box " + offTheirs + ", clear share " + offShare.ToString("0.00") +
-                    "; on: framing " + k.ToString("0.00") + " (" + side + "), my box " + mine + ", enemy box " + theirs + ", clear share " + visible.ToString("0.00") +
-                    ", enemy height x" + gain.ToString("0.00") + ", me on screen " + meOnScreen + ", lens inside the grid " + inside,
-                    "clear share >= " + T.EnemyVisibleShareMin + ", height >= x" + T.CombatHeightGainMin + ", me on screen, lens clear, framing settled (>= 0.95)",
-                    offK < 0.01 && k >= 0.95 && visible >= T.EnemyVisibleShareMin && gain >= T.CombatHeightGainMin && meOnScreen && !inside);
+                    "; on: framing " + k.ToString("0.00") + " (" + side + "; " + how + "), my box " + mine + ", enemy box " + theirs + ", clear share " + visible.ToString("0.00") +
+                    " (logged), enemy height x" + gain.ToString("0.00") + ", me on screen " + meOnScreen + ", enemy on screen " + enemyOnScreen + ", lens inside the grid " + inside,
+                    "no yaw added and a sideways lens shift, height >= x" + T.CombatHeightGainMin + ", me and the enemy wholly on screen, lens clear, framing settled (>= 0.95)",
+                    offK < 0.01 && k >= 0.95 && framedNoTurn && gain >= T.CombatHeightGainMin && meOnScreen && enemyOnScreen && !inside);
                 Check("D2b FramedTags", x + " third person, framed at " + share + " x range", tags,
                     "name/bar anchor <= " + CriticalMass.Runtime.Camera.CombatFrame.TagGapShare + " x screen above the head top and below the top " + CriticalMass.Runtime.Camera.CombatFrame.TagTopShare + " of the screen",
                     k >= 0.95 && myTag && hisTag);

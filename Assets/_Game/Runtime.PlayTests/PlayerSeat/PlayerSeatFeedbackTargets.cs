@@ -51,11 +51,18 @@ namespace CriticalMass.Runtime.PlayTests.PlayerSeat
         /// Silhouette: body radius + 0.15, class height) projected through the live camera: the renderer bounds (skinned-mesh
         /// AABBs, ~1.9 u wide for a 2.15 u Farmer in the review logs, ground rings included) cannot reach 0.6 at 1.12 u centre to
         /// centre from ANY camera angle (two 1.9 u boxes 1.12 u apart overlap 0.78 u even side-on), so they are logged, not
-        /// asserted. Was 0.5 on the renderer boxes.</summary>
+        /// asserted. Was 0.5 on the renderer boxes.
+        /// <para>fix/px-rough-spots (owner, 2026-11-23: the framing must never turn the view in a fight; distance, height,
+        /// pitch and a small sideways lens shift only, CombatFrame.Orbit = false): the 0.6 was reached by the 48-degree orbit
+        /// swing with the enemy placed straight ahead of my own view. Without a turn a 0.8 u lens shift gives only a few
+        /// pixels of parallax at that worst case, so D2 / D2b now log this share and assert the new framing instead (no yaw,
+        /// a sideways shift, both fighters wholly on screen).</para></summary>
         public const double EnemyVisibleShareMin = 0.6;
         /// <summary>D2b: with the combat camera on, the enemy's on-screen height at least this many times what the camera draws
-        /// at the same distance with it off (the old fight framing drew him smaller still: it pulled back 12%).</summary>
-        public const double CombatHeightGainMin = 1.4;
+        /// at the same distance with it off. fix/px-rough-spots: the framing is no closer than the plain camera now
+        /// (CombatFrame.Distance 4.4; the two-shot fit only backs off), so the enemy is drawn about as big as unframed and never
+        /// much smaller (as CombatCameraTests' 0.95). Was 1.4 with the old 3.2 u framing.</summary>
+        public const double CombatHeightGainMin = 0.95;
         /// <summary>D2 / D2b: paced 60 fps frames to wait for the framing to settle (in 0.3 s, plus the yaw chase) or release
         /// (1.0 s hold + 0.6 s out).</summary>
         public const int CombatSettleFrames = 45, CombatReleaseFrames = 120;
