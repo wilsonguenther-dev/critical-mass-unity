@@ -760,11 +760,11 @@ namespace CriticalMass.Runtime.View.B17
                 switch (e.Type)
                 {
                     case SimEventType.Hit:
-                        if (e.A == me && e.B >= 0 && e.B != me) { _focus = e.B; _focusAt = Time.unscaledTime; }   // he hit me
+                        if (e.A == me && e.B >= 0 && e.B != me) { _focus = e.B; _focusAt = Time.unscaledTime; WorldWords.Focus = _focus; }   // he hit me (rough-spots pass 3: the words of this same frame see it)
                         if (e.B == me && e.A != me)
                         {
                             _lastVictimOfMe[0] = e.A;
-                            _focus = e.A; _focusAt = Time.unscaledTime;   // readability-3 item 1: my opponent
+                            _focus = e.A; _focusAt = Time.unscaledTime; WorldWords.Focus = _focus;   // readability-3 item 1: my opponent
                             // readability-2 item 4: the combo hint on my first landed hit, until I have chained twice ever
                             if (CmPrefs.GetInt(ChainedPref, 0) < ChainedToLearn) Hint(w, me, MovesHelp.Verb.Combo);
                         }
@@ -843,6 +843,10 @@ namespace CriticalMass.Runtime.View.B17
                     case SimEventType.Slide:
                         if (e.B >= 0)   // readability-3 item 8: a trip is the slide event WITH a victim (B), whatever its damage
                         {
+                            // rough-spots pass 3 (item 4): the opening trip of a fight never said TRIPPED in third person; the words
+                            // focus (only my opponent's words show there) was set from hits on the NEXT frame. My trip names him now.
+                            if (e.A == me && e.B != me) { _focus = e.B; _focusAt = Time.unscaledTime; WorldWords.Focus = _focus; }
+                            else if (e.B == me && e.A >= 0 && e.A != me) { _focus = e.A; _focusAt = Time.unscaledTime; WorldWords.Focus = _focus; }
                             for (int k = 0; k < 2; k++) Puff(e.X, w.Map != null ? (float)GroundHeight.At(w.Map, e.X, e.Z) : 0f, e.Z, 0.9f, new Color(0.86f, 0.80f, 0.68f, 0.7f));
                             if (tags != null && (e.A == me || e.B == me) && tags.OnMovesWord(w, ActionTags.TrippedWord, 5500 + (e.B & 63), e.B, true, true, PxPalette.StrikeInk, PxPalette.Strike, 0.9f, 900 + (int)e.Type) != null) Said(ActionTags.TrippedWord);
                         }
