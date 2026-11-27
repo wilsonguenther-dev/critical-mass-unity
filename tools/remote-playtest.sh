@@ -72,7 +72,7 @@ OUT="$(cd "$OUT" && pwd)"
 remote_preflight
 echo "remote-playtest: build $COMMIT -> $REMOTE_HOST:~/cm-remote/builds/$COMMIT/ ($(du -sh "$APP" | cut -f1))"
 rssh "mkdir -p ~/cm-remote/builds/$COMMIT && touch ~/cm-remote/builds/$COMMIT"
-rsync_to --delete "$APP" "$REMOTE_USER@$REMOTE_HOST:cm-remote/builds/$COMMIT/" \
+[[ -e "$APP/.staged-on-air" ]] || rsync_to --delete "$APP" "$REMOTE_USER@$REMOTE_HOST:cm-remote/builds/$COMMIT/" \
   || { echo "remote-playtest: copying the app failed" >&2; exit 69; }
 
 FPS=(); [[ "$PROFILE" == floor ]] && FPS=(--fps-cap 30)
