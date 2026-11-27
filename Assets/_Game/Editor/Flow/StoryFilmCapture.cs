@@ -48,6 +48,7 @@ namespace CriticalMass.Editor.Flow
                 string seq = Arg("-filmSeq") ?? MotionComic.IntroSequence;
                 Directory.CreateDirectory(Path.Combine(outDir, "frames"));
                 Directory.CreateDirectory(Path.Combine(outDir, "full"));
+                DumpSynthCues(outDir, log);
                 code = Capture(outDir, W, H, fps, seq, log);
             }
             catch (Exception e)
@@ -137,10 +138,10 @@ namespace CriticalMass.Editor.Flow
                 Blit(rt, half, small);
                 Read(small, readSmall);
                 File.WriteAllBytes(Path.Combine(outDir, "frames", $"f{f:0000}.jpg"), readSmall.EncodeToJPG(82));
-                if (f % 6 == 0)
+                if (f % ArgInt("-filmFullEvery", 6) == 0)
                 {
                     Read(rt, readFull);
-                    File.WriteAllBytes(Path.Combine(outDir, "full", $"f{f:0000}.jpg"), readFull.EncodeToJPG(88));
+                    File.WriteAllBytes(Path.Combine(outDir, "full", $"f{f:0000}.jpg"), readFull.EncodeToJPG(ArgInt("-filmQ", 88)));
                 }
                 Stats(readSmall, table, player, SmallW, sh, out int holes, out float luma);
                 csv.Append(f).Append(',').Append(T.ToString("0.000", CultureInfo.InvariantCulture)).Append(',').Append(si + 1).Append(',')
@@ -184,6 +185,34 @@ namespace CriticalMass.Editor.Flow
             cam.targetTexture = null;
             player.Release();
             return 0;
+        }
+
+        /// <summary>LOCAL EVIDENCE PATCH (not committed): writes every synth cue variant as 16-bit WAV for offline mixing.</summary>
+        static void DumpSynthCues(string outDir, List<string> log)
+        {
+            string dir = Path.Combine(outDir, "synth");
+            Directory.CreateDirectory(dir);
+            McTable table = MotionComic.LoadTable();
+            foreach (McCue c in table.cues)
+            {
+                if (c == null || string.IsNullOrEmpty(c.synth)) continue;
+                var r = CriticalMass.Runtime.Audio.Sound.SynthRecipes.Find(c.synth);
+                if (r == null) { log.Add("synth missing " + c.synth); continue; }
+                for (int v = 0; v < Mathf.Max(1, c.variants); v++)
+                {
+                    float[] d = CriticalMass.Runtime.Audio.Sound.SoundSynth.Render(r, v);
+                    int sr = CriticalMass.Runtime.Audio.Sound.SoundSynth.SampleRate;
+                    using (var fs = new FileStream(Path.Combine(dir, c.synth + "_" + v + ".wav"), FileMode.Create))
+                    using (var bw = new BinaryWriter(fs))
+                    {
+                        bw.Write(Encoding.ASCII.GetBytes("RIFF")); bw.Write(36 + d.Length * 2); bw.Write(Encoding.ASCII.GetBytes("WAVEfmt "));
+                        bw.Write(16); bw.Write((short)1); bw.Write((short)1); bw.Write(sr); bw.Write(sr * 2); bw.Write((short)2); bw.Write((short)16);
+                        bw.Write(Encoding.ASCII.GetBytes("data")); bw.Write(d.Length * 2);
+                        foreach (float x in d) bw.Write((short)Mathf.Clamp(Mathf.RoundToInt(x * 32767f), -32768, 32767));
+                    }
+                    log.Add($"synth {c.synth} v{v}: {d.Length} samples");
+                }
+            }
         }
 
         static RenderTexture Target(int w, int h)
