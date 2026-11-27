@@ -30,7 +30,9 @@ SERVICE = "hunyuan"
 VERSION = "2023-09-01"
 REGION = os.environ.get("HY3D_REGION", "ap-singapore")
 LEDGER = os.path.expanduser("~/.config/critical-mass/tencent-credits.log")
-CAP = float(os.environ.get("HY3D_CREDIT_CAP", "120"))
+# HARD STOP 2026-11-13 14:25 UTC: the 200 free credits are spent and the package would roll into pay-as-you-go.
+# The cap is pinned to the ledger total (200); the environment can no longer raise it, so every submit refuses.
+CAP = min(float(os.environ.get("HY3D_CREDIT_CAP", "200")), 200.0)
 STOP_WORDS = ("postpaid", "arrear", "overdue", "insufficient", "balance", "billing", "unpaid",
               "resourceunavailable", "notopen", "resourcepack")
 
